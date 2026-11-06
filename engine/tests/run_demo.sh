@@ -190,14 +190,35 @@ replay "$WORK/w" site --renderer=terminal
 [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q "DEMO PLAYED" \
     && ok "W8: the same demo verifies under the terminal renderer as under the null one" \
     || bad "W8: the terminal renderer disagreed (exit $RC): $(printf '%s\n' "$OUT" | tail -1)"
-if [ -x build-sdl/u2-sdl ]; then
-    RC=0
-    SDL_VIDEODRIVER=dummy build-sdl/u2-sdl --headless --cleanroom \
-        --data-dir "$WORK/w/content" --playback "$DEMO" >/dev/null 2>&1 || RC=$?
-    [ "$RC" -eq 0 ] && ok "W8: the same demo verifies under SDL (dummy driver)" \
-                    || bad "W8: SDL playback disagreed (exit $RC)"
+# The real thing, not a stand-in: the static-SDL3 player binary, driven through its
+# own event loop with no --headless, so the SDL renderer, the host clock and the
+# 16 ms seam waits are all in the path. That is the configuration W8 is about, and
+# the terminal leg above is a weaker version of it rather than a substitute.
+# Build it with deploy/linuxbuild/build.sh (a podman container with static SDL3);
+# the artifact is gitignored, so this leg skips out loud where it has not been built.
+SDLBIN=""
+for cand in u2-sdl-static build-sdl/u2-sdl; do
+    [ -x "$cand" ] || continue
+    # The leading ./ is not decoration: a path with no slash is looked up in $PATH
+    # when it is run, so `[ -x ]` passes and the invocation then silently fails. The
+    # first version of this leg reported "does not report sdl3" for exactly that reason.
+    case "$cand" in */*) SDLBIN="$cand" ;; *) SDLBIN="./$cand" ;; esac
+    break
+done
+if [ -n "$SDLBIN" ]; then
+    # Assert the artifact is what it claims before trusting its verdict: a binary that
+    # silently fell back to a non-SDL build would pass this gate while proving nothing.
+    if "$SDLBIN" --version 2>&1 | grep -q "sdl3"; then
+        RC=0
+        SDL_VIDEODRIVER=dummy timeout 120 "$SDLBIN" --cleanroom \
+            --data-dir "$WORK/w/content" --playback "$DEMO" >/dev/null 2>&1 || RC=$?
+        [ "$RC" -eq 0 ] && ok "W8: the same demo verifies under SDL3 ($SDLBIN, dummy driver, full event loop)" \
+                        || bad "W8: SDL playback disagreed (exit $RC)"
+    else
+        bad "W8: $SDLBIN does not report sdl3 — refusing to count it as the SDL leg"
+    fi
 else
-    skip "W8 SDL leg: no SDL build (make sdl). The terminal leg above is the one that ran."
+    skip "W8 SDL leg: no SDL build found (build it with deploy/linuxbuild/build.sh). The terminal leg above ran."
 fi
 
 # --- W9: truncation and salvage -------------------------------------------------
@@ -237,6 +258,19 @@ slow=$(( (t3 - t2) / 1000000 ))
 [ "$RC" -eq 0 ] && [ "$unpaced_rc" -eq 0 ] \
     && ok "W15: the paced run reached the same verdict, so pacing did not reach state" \
     || bad "W15: the paced and unpaced runs disagreed"
+# W15's acceptance is "a demo takes visibly longer under SDL than headless", and now
+# that the SDL artifact can be built that is measured rather than approximated: SDL
+# playback paces with no flag at all, because pacing lives in the mode's clock and the
+# SDL mode has the host one.
+if [ -n "$SDLBIN" ]; then
+    s0=$(date +%s%N)
+    SDL_VIDEODRIVER=dummy timeout 120 "$SDLBIN" --cleanroom \
+        --data-dir "$WORK/w/content" --playback "$DEMO" >/dev/null 2>&1
+    s1=$(date +%s%N)
+    sdlms=$(( (s1 - s0) / 1000000 ))
+    [ "$sdlms" -gt "$fast" ] && ok "W15: SDL playback paces by default (${fast}ms headless, ${sdlms}ms under SDL)" \
+                             || bad "W15: SDL playback did not pace (${fast}ms vs ${sdlms}ms)"
+fi
 
 # --- the refusal that keeps a demo honest about the world -----------------------
 # A demo whose sector files differ from the recording's must refuse and name the

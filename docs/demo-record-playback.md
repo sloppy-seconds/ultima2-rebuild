@@ -9,12 +9,21 @@ the seam tap in `engine/src/core/seam.c`, the wiring in `engine/src/main.c`, the
 `engine/tools/demo.py` and the availability gate `tools/demo_key_gate.py` (in
 `tools/check_all.sh`). `demos/` is gitignored (D9).
 
-All fifteen work items shipped except one leg of W8, which skips out loud: this host
-has no SDL3, so the SDL comparison does not run and the gate prints
-`SKIP W8 SDL leg`. What always runs instead is the stronger-shaped version of the same
-claim — the same demo replayed under the **terminal** renderer and the null one, both
-headless, digests compared (`--headless --renderer=terminal` is now honoured rather
-than ignored, which is what made that possible). W13 is done as
+All fifteen work items shipped, with nothing skipped on a machine that has built the
+SDL artifact: `deploy/linuxbuild/build.sh` produces `engine/u2-sdl-static` (static
+SDL3, in podman) and the gate's W8 leg replays the same demo through the real SDL
+event loop with `SDL_VIDEODRIVER=dummy` — SDL renderer, host clock, the 16 ms seam
+waits, no `--headless` — and every digest matches. It also measures W15's claim on the
+same binary: SDL playback paces by default where headless does not. The artifact is
+gitignored, so on a machine that has not built it the leg skips out loud and names the
+command; what always runs is the weaker version of the same claim, the same demo
+replayed under the **terminal** renderer and the null one, both headless, digests
+compared (`--headless --renderer=terminal` is now honoured rather than ignored, which
+is what made that possible). **Hazard 9's caveat is therefore closed**: it said "until
+W8 passes, do not claim SDL playback is verified — say headless verified, SDL
+unproven", and W8 has now passed against a real SDL3 build, so the claim is made. What
+it proves is the narrow thing worth proving: a second renderer, a real event loop and a
+real clock between the same records cannot move the DS state. W13 is done as
 overworld → site → overworld; see deviation 5 for why creation is refused.
 
 **Fifteen deviations from this plan, each one forced by a measurement.** They are
@@ -80,7 +89,8 @@ spec and a spec that gets quietly rewritten is worse than a spec with a defect l
    was for the *default* threshold, and a gate cannot record a `kind=auto` turn in the
    only mode a gate can run in without it. No CP2 baseline script passes the flag, so
    the baseline is untouched.
-10. **`--headless --renderer=terminal` is honoured.** See the W8 note above.
+10. **`--headless --renderer=terminal` is honoured**, so renderer independence is
+    measurable on a machine with no SDL build at all rather than only on one with it.
 11. **`save-sha` verifies the checkpoint's own record region, not the viewer's save.**
     Refusing when the person watching has a different character loaded would make demos
     unshareable, which is the whole request, and playback overwrites the record region
