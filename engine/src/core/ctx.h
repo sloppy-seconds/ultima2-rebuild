@@ -204,6 +204,14 @@ typedef struct u2_ctx {
     const char *demo_name;   /* --demo-name NAME; pins the filename a gate needs */
     int demo_snapshots;      /* --demo-snapshots: per-record DS dumps, debug only */
     int demo_salvage;        /* --salvage: play a file with no @end (D8) */
+    /* --playback-ignore-content: play anyway when a sector file disagrees with the
+     * digest the recording carried. Same shape as --salvage: refuse by default, and
+     * let a human override it explicitly when they know why. Without an override a
+     * demo whose content cannot be reproduced is simply unplayable, which is the
+     * opposite of "recordings should be easily shareable" — and a recording made on a
+     * machine whose slot already held a sector overlay is exactly that case, because
+     * playback deliberately cannot see the recorder's save. */
+    int demo_ignore_content;
     /* Set when a playback checkpoint has just landed in a world mode and the
      * overworld loop must re-sync its position and rebuild the stamped grid before
      * it draws. It is a flag on the context rather than a call into game code because

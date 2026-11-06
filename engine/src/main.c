@@ -219,6 +219,13 @@ static void usage(const char *argv0)
         "                    left behind. Refused without this, because a file that\n"
         "                    silently stops early is indistinguishable from one that\n"
         "                    played correctly up to the point it stopped.\n"
+        "  --playback-ignore-content  play even though a sector file disagrees with the\n"
+        "                    digest the recording carried. The refusal is the default on\n"
+        "                    purpose — those bytes reach the world — but a recording made\n"
+        "                    from a save slot the viewer cannot have is otherwise stuck,\n"
+        "                    and a demo nobody can play is not a shareable demo. If a\n"
+        "                    digest then diverges, it may be the content and not the\n"
+        "                    engine, and the run says so on the way in.\n"
         "  --speed-pin       say it out loud: playback keeps the recorded DS:74 speed\n"
         "                    and tick pair instead of recalibrating. This is the default.\n"
         "  --playback-continue  keep going past the first divergence. Diagnosis only:\n"
@@ -442,6 +449,8 @@ int main(int argc, char **argv)
             ctx.demo_snapshots = 1;
         } else if (strcmp(a, "--salvage") == 0) {
             ctx.demo_salvage = 1;
+        } else if (strcmp(a, "--playback-ignore-content") == 0) {
+            ctx.demo_ignore_content = 1;
         } else if (strcmp(a, "--speed-pin") == 0) {
             ctx.demo_speed_pin = 1;
         } else if (strcmp(a, "--playback-continue") == 0) {

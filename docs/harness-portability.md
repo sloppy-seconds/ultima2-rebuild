@@ -189,7 +189,31 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
-
+* **2026-11-07 — A verification gate that only ever runs synthetic fixtures will pass
+  right up until a real user runs it once.** The record/playback subsystem cleared
+  fifteen checks with their red controls and then failed on the owner's first real
+  recording, in three separate ways that no fixture could reach. (1) The fixture's world
+  was pristine, so it never exercised the case where the recorder reads a sector from its
+  own save overlay while the viewer, correctly isolated from that save, reads the content
+  copy — two honest runs, different layers, a false refusal. (2) Every fixture stopped
+  the recording with the toggle, so the quit-stops-the-recording path — the one the
+  request actually named — had never been compared at all, and its closing digest was
+  being checked at the wrong instant. (3) Every fixture entered the world by a dev flag,
+  so the ordinary route through the menu was never walked. Transferable rule: for any
+  record/replay feature, the first thing after the synthetic gate goes green is one
+  recording made the way a person makes one, on a tree with real saves and real content
+  layers, and that run belongs in the gate rather than in a demo.
+* **2026-11-07 — A refusal needs an explicit human override, or the refusal becomes the
+  bug.** Content-digest mismatches refuse to play, which is correct as a default and
+  immediately strands any recording whose content cannot be reproduced — including
+  recordings the previous build made before the layer distinction existed. The shape that
+  works is the one already used for truncated files: refuse by default, one flag to
+  proceed, and the run states on the way in that the override was used and what it may
+  cost. Two transferable points. (1) When you add a refusal, name the situation in which a
+  person will legitimately want to walk past it, and give them a door before the first
+  user finds the wall. (2) A superseded build can leave artefacts that a later, stricter
+  check rejects; "re-record it" is not a fix when the artefact is the evidence someone
+  wanted to look at.
 * **2026-11-07 — A replay verifier must hash the state at the same point in the loop
   on both sides, and "the same loop iteration" is not the same point.** A record
   written before a key is delivered holds the state *before* that key, so the only

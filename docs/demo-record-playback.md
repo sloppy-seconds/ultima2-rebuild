@@ -26,9 +26,12 @@ it proves is the narrow thing worth proving: a second renderer, a real event loo
 real clock between the same records cannot move the DS state. W13 is done as
 overworld → site → overworld; see deviation 5 for why creation is refused.
 
-**Fifteen deviations from this plan, each one forced by a measurement.** They are
+**Sixteen deviations from this plan, each one forced by a measurement.** They are
 listed here rather than edited silently into the body, because the body is the owner's
 spec and a spec that gets quietly rewritten is worse than a spec with a defect list.
+The first fifteen came from building it; 16 to 19 came from the owner playing it on a
+real install the day after it shipped, and each of those four was invisible to every
+gate that had passed.
 
 1. **The digest scope is not `u2_state_digest_json()` (D6).** The frozen CP2 scope
    embeds the engine version string and the platform backend names (`renderer`,
@@ -118,6 +121,36 @@ spec and a spec that gets quietly rewritten is worse than a spec with a defect l
     for. It refuses to run on an absent or empty directory rather than reporting success,
     because a corpus of copyrighted playthroughs cannot be committed and a gate that
     skips silently when it is absent is the defect AGENTS.md § 3 warns about.
+16. **The `overlay` refusal only applies to content-layer bytes, and a slot-sourced
+    digest is a note.** § 4's correction says refuse on the bytes that reach the world,
+    and that is right; what the plan could not see is that the recorder often reads those
+    bytes from *its own save slot*, and § 7.4 deliberately hides that slot from
+    playback. Two honest runs, two layers, a false refusal — and it fired on the owner's
+    first real recording, on a real install, with a digest no later run could ever
+    reproduce. So the header now distinguishes `overlay` (content, enforced) from
+    `overlay-slot` (the recorder's own save, noted once and never enforced), because no
+    viewer can be expected to hold the recorder's save.
+17. **`@end` records how the recording ended, and that decides where its state digest
+    is compared.** A stop toggle leaves the run running, so the digest is a quiescent
+    state and playback compares it at the matching poll. A quit ends the run, so the
+    digest is an exit state and playback must compare it at exit. The first version
+    assumed the toggle in both cases, which meant the owner's own headline requirement —
+    *"quitting the game while recording should stop the recording gracefully"* — produced
+    a file that was perfectly well formed and could never verify. `stop=toggle` and
+    `stop=exit` now say which, and a run that reaches neither reports `DEMO INCOMPLETE`
+    with a count rather than passing a check that never ran.
+18. **A Ctrl-R on the way into play defers; it does not refuse.** The route from the menu
+    to the world passes title-flow waits, so a player who presses the key while loading a
+    character is standing at a title boundary while genuinely meaning to record a
+    session. Refusing there made the ordinary flow produce nothing at all. The request
+    now stays pending, says so once, is cancelled by a second press, and lands at the
+    first boundary playback can resume into. Creation still refuses, for the reason in
+    deviation 5, and says that reason instead of pointing at the title menu.
+19. **`--playback-ignore-content` exists.** Same shape as `--salvage`: refuse by default,
+    let a human override it explicitly and be told what it cost. Without it a demo whose
+    content cannot be reproduced is simply unplayable, which is the opposite of the
+    request that started this — and a recording made before deviation 16 was found is
+    exactly that case.
 
 Everything below is the plan as ruled on 2026-11-05, unchanged, with the D-numbers the
 implementation cites.

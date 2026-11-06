@@ -106,6 +106,30 @@ seed "$WORK/wlone"
 grep -qi "ILLEGAL" "$WORK/lone.out" && bad "W2 control: a lone 0x12 was an illegal command" \
                                      || ok "W2 control: a lone 0x12 displaces no shortcut"
 
+# The way INTO play goes through title-flow waits, so a Ctrl-R pressed on the way in
+# defers with a message rather than refusing outright. The completion of that deferral
+# is asserted in demo_check, where the boundary sequence can be driven exactly; here
+# the shell leg covers the two things a scripted run can show honestly: the deferral
+# note, and that the cancel it promises works.
+seed "$WORK/wtitle"
+printf 'P\n0x12\n0xf1\n0xf1\n0x12\n' > "$WORK/via_title.keys"
+"$U2" --headless --cleanroom --data-dir "$WORK/wtitle/content" \
+      --save-dir "$WORK/wtitle/save" --script "$WORK/via_title.keys" \
+      --demo-dir "$WORK/d_title" --demo-name title > "$WORK/title.out" 2>&1
+grep -q "will start when you reach" "$WORK/title.out" \
+    && ok "W2: a Ctrl-R on the way into play defers with a message, not a refusal" \
+    || bad "W2: the title toggle refused instead of deferring"
+printf 'P\n0x12\n0x12\n0xf1\n' > "$WORK/cancel.keys"
+rm -rf "$WORK/d_cancel"; mkdir -p "$WORK/d_cancel"
+"$U2" --headless --cleanroom --data-dir "$WORK/wtitle/content" \
+      --save-dir "$WORK/wtitle/save" --script "$WORK/cancel.keys" \
+      --demo-dir "$WORK/d_cancel" --demo-name c > "$WORK/cancel.out" 2>&1
+if [ -z "$(ls -A "$WORK/d_cancel" 2>/dev/null)" ] && grep -q "recording cancelled" "$WORK/cancel.out"; then
+    ok "W2 control: a second Ctrl-R before the world cancels, and writes nothing"
+else
+    bad "W2 control: the cancel the message promises does not happen"
+fi
+
 # --- W7: the round trip, and the control that makes it red --------------------
 replay "$WORK/w" site
 [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q "DEMO PLAYED" \
@@ -284,6 +308,22 @@ RC=0
 [ "$RC" -ne 0 ] && grep -q "mapx70" "$WORK/wm.err" \
     && ok "content: a sector file that differs from the recording's is refused by name" \
     || bad "content: a mutated mapx70 was not refused (exit $RC)"
+
+# The override that keeps a demo shareable when the content cannot be reproduced:
+# same mutated mapx70, refused by default, played when a human says they know.
+RC=0
+OUT=$("$U2" --headless --cleanroom --playback-ignore-content \
+           --data-dir "$WORK/wm/content" --playback "$DEMO" 2>&1) || RC=$?
+# The verdict here is success, and that is the point of the leg rather than an
+# accident: the mutated cell is nowhere on the recorded path, so the digests still
+# agree. What is being asserted is that the override (a) named the disagreement on the
+# way in and (b) was not a refusal — exit 2 is the refusal code, and the same file
+# without the flag gets it in the leg above.
+if printf '%s\n' "$OUT" | grep -q "playback-ignore-content" && [ "$RC" -ne 2 ]; then
+    ok "content: --playback-ignore-content plays past the refusal and says what it cost"
+else
+    bad "content: the override was still a refusal (exit $RC)"
+fi
 
 # --- W10: the tool, each subcommand, each with a known-bad input ----------------
 python3 tools/demo.py inspect "$DEMO" > "$WORK/inspect.out" 2>&1 \

@@ -58,6 +58,22 @@ typedef struct u2_demo {
     int        pending_stop;
     int        started;               /* header + checkpoint are on disk */
     int        finished;
+    /* How the recording ended, and it changes what @end's state digest MEANS.
+     * A stop toggle leaves the run running, so the digest is the state at a quiescent
+     * point and playback compares it at the matching poll. A quit leaves the run over,
+     * so the digest is the state at exit and playback must compare it at exit. The
+     * first version assumed the first in both cases, which made the owner's own
+     * requirement — "quitting the game while recording should stop the recording
+     * gracefully" — produce a demo that could never verify: it reported DEMO
+     * INCOMPLETE on a file that was perfectly well formed. */
+    int        stopped_by_toggle;
+    int        told_title;            /* the "will start when you reach the world" note */
+    /* How many times the toggle has been pressed since the recorder was armed. The
+     * cancel rule needs a count rather than a state test: "pending and not started" is
+     * the shape of a FIRST press that has not yet reached a boundary just as much as it
+     * is the shape of a second one, and testing the state alone made the first Ctrl-R
+     * arm the recording and cancel it in the same breath. */
+    int        toggles;
 
     /* ---- parsed file ---- */
     u2_demo_rec *recs;
@@ -82,10 +98,11 @@ typedef struct u2_demo {
     int        has_checkpoint;
     int        complete;              /* @end was seen */
 
-    struct { char name[24]; char sha[65]; } overlay[U2_DEMO_MAX_OVERLAYS];
+    struct { char name[24]; char sha[65]; int from_slot; } overlay[U2_DEMO_MAX_OVERLAYS];
     int        n_overlay;
     int        overlay_checked;       /* the comparison is a one-shot, see note_world */
     int        overlay_failed;
+    int        slot_note;             /* the slot-overlay caveat was printed once */
 
     /* ---- playback cursor ---- */
     int        cur_rec;
@@ -95,6 +112,7 @@ typedef struct u2_demo {
     int        applied;               /* checkpoint has been mounted */
     int        reported;
     int        closing_checked;       /* the @end state digest was compared */
+    int        stop_at_exit;          /* the recording ended by quitting, not by toggle */
 } u2_demo;
 
 /* ---- small helpers ------------------------------------------------------- */
@@ -305,7 +323,9 @@ static void write_header(u2_ctx *ctx, u2_demo *d)
     emit(d, "save-sha %s\n", sha);
 
     for (int i = 0; i < d->n_overlay; i++)
-        emit(d, "overlay %s %s\n", d->overlay[i].name, d->overlay[i].sha);
+        emit(d, "%s %s %s\n",
+             d->overlay[i].from_slot ? "overlay-slot" : "overlay",
+             d->overlay[i].name, d->overlay[i].sha);
 
     emit(d, "art %s\n", ctx->art_mode == U2_ART_EGA ? "ega" : "cga");
     emit(d, "theme %s\n", (ctx->ega_theme && *ctx->ega_theme) ? ctx->ega_theme : "default");
@@ -436,7 +456,16 @@ int u2_demo_key(u2_ctx *ctx, u2_key *k)
             u2_demo_begin_recording(ctx, NULL);
             d = of(ctx);
             if (!d) return 1;
+            /* Honour it here and stop. Falling through would land in the "second press
+             * cancels" arm below, because a freshly armed recorder has a pending start
+             * and has not started — which is exactly the shape that arm looks for, and
+             * it made the first Ctrl-R arm and cancel itself in the same breath. */
+            d->toggles = 1;
+            if (at_boundary)
+                u2_demo_quiescent(ctx, boundary_mode, NULL);
+            return 1;
         }
+        d->toggles++;
         if (d->state == U2_DEMO_PLAYING) {
             /* Ctrl-R in playback stops it and does NOT start a recording, so a
              * player cannot accidentally record a playback. */
@@ -450,8 +479,15 @@ int u2_demo_key(u2_ctx *ctx, u2_key *k)
             /* Idempotent under a double tap: a second Ctrl-R before the quiescent
              * point is the same request, not a stop-then-start. */
             if (!d->pending_stop) d->pending_stop = 1;
-        } else {
-            if (!d->pending_start) d->pending_start = 1;
+        } else if (!d->pending_start) {
+            d->pending_start = 1;
+        } else if (!d->started && d->toggles >= 2) {
+            /* A second press before anything started cancels. Without this the
+             * "Ctrl-R again cancels" promise on the deferred message was prose the
+             * code did not keep, and a player who changed their mind had no way out
+             * except reaching the world and stopping a recording they never wanted. */
+            d->pending_start = 0;
+            fprintf(stderr, "u2: recording cancelled\n");
         }
         /* If the caller is already standing at a boundary, honour the toggle now
          * rather than at the next one. Waiting costs the next key: the seam fetches
@@ -527,36 +563,43 @@ void u2_demo_quiescent(u2_ctx *ctx, u2_demo_mode mode, const u2_world *world)
         char dir[430];
         const char *slash = strrchr(d->path, '/');
 
-        d->pending_start = 0;
-        if (mode == U2_DEMO_MODE_TITLE || mode == U2_DEMO_MODE_CREATION) {
-            /* Refused rather than recorded, and the two refusals have different
-             * reasons.
-             *
-             * The title flow reaches its menu by consuming keys of its own, a splash
-             * and a story, so a checkpoint taken there could not be resumed without
-             * replaying input the recording never made.
-             *
-             * Creation is the harder one and it took a measurement to see. The form
-             * cursor, which field is highlighted and which dropdown is open, lives in a
-             * local struct and not in the DS mirror. A checkpoint taken mid-form
-             * therefore names a state playback cannot resume, and the digests diverge a
-             * few keys in, not because the engine is wrong but because the format cannot
-             * say where in the form the player was. That is D12's quiescence rule with a
-             * wider reach than ow->pending_cmd: the engine keeps scratch outside the
-             * mirror in more places than the overworld's half-typed command. Fixing it
-             * means moving the form's state into DS or into a second checkpoint block,
-             * and that is a change to the save model rather than a detail of the demo.
-             * It is written up in docs/demo-record-playback.md instead of left as a
-             * silent gap.
-             */
-            fprintf(stderr, "u2: not recording: a demo has to start where playback can"
-                            " resume it, and the %s screen is not one of those. Start"
-                            " the recording in play.\n",
-                    mode == U2_DEMO_MODE_TITLE ? "title menu" : "character creation");
-            ctx->demo = NULL;
-            free(d);
+        /* pending_start is cleared only on the paths that actually start or abandon
+         * the request. Clearing it first, which is what the first version did, made the
+         * title deferral a lie: the note said it would start later and the flag was
+         * already gone, so nothing ever started. */
+        if (mode == U2_DEMO_MODE_TITLE) {
+            /* Deferred, not refused. The way into play goes through title-flow waits —
+             * the menu, the post-load "press any key" — so a player who hits Ctrl-R on
+             * the way in is standing at a title boundary while genuinely intending to
+             * record a session. Refusing there made the real flow unusable: a scripted
+             * `P` then Ctrl-R never produced a file at all. The toggle stays pending and
+             * takes effect at the first boundary that playback can resume into, which is
+             * what D12's "next quiescent point" always meant. */
+            if (!d->told_title) {
+                d->told_title = 1;
+                fprintf(stderr, "u2: recording will start when you reach the world. "
+                                "Ctrl-R again cancels.\n");
+            }
             return;
         }
+        if (mode == U2_DEMO_MODE_CREATION) {
+            /* Refused, and the reason is a measurement rather than a guess: the form's
+             * cursor — which field is highlighted, which dropdown is open — lives in a
+             * local struct and not in the DS mirror, so a checkpoint taken mid-form
+             * names a state playback cannot resume and the digests diverge a few keys
+             * in. That is D12's quiescence rule with a wider reach than
+             * ow->pending_cmd: the engine keeps scratch outside the mirror in more
+             * places than the overworld's half-typed command. Fixing it means moving
+             * the form's state into DS or into a second checkpoint block, which is a
+             * change to the save model and not a detail of the demo. It is written up
+             * in docs/demo-record-playback.md rather than left as a silent gap. */
+            fprintf(stderr, "u2: not recording: character creation keeps its place in "
+                            "engine state the checkpoint cannot carry, so playback "
+                            "could not resume here. Start the recording in the world.\n");
+            d->pending_start = 0;
+            return;
+        }
+        d->pending_start = 0;
         if (slash) {
             size_t n = (size_t)(slash - d->path);
             if (n >= sizeof dir) n = sizeof dir - 1;
@@ -578,6 +621,7 @@ void u2_demo_quiescent(u2_ctx *ctx, u2_demo_mode mode, const u2_world *world)
         }
         d->mode = mode;
         d->state = U2_DEMO_RECORDING;
+        d->stopped_by_toggle = 0;
         /* The order is the point: note_world captures only while a recording is armed
          * and not yet written, so the sector digests have to be taken before `started`
          * goes up or the header is written with no overlay lines at all — which is
@@ -598,6 +642,7 @@ void u2_demo_quiescent(u2_ctx *ctx, u2_demo_mode mode, const u2_world *world)
 
     if (d->pending_stop && d->state == U2_DEMO_RECORDING) {
         d->pending_stop = 0;
+        d->stopped_by_toggle = 1;
         u2_demo_finish(ctx);
     }
 }
@@ -809,6 +854,8 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
             d->complete = 1;
             if (field(line, "state", val, sizeof val) && hex_ok(val))
                 snprintf(d->end_state_sha, sizeof d->end_state_sha, "%.64s", val);
+            if (field(line, "stop", val, sizeof val))
+                d->stop_at_exit = strcmp(val, "toggle") != 0;
             if (field(line, "sha", val, sizeof val) && hex_ok(val))
                 snprintf(d->end_frame_sha, sizeof d->end_frame_sha, "%.64s", val);
             continue;               /* the epilogue is not inside its own digest */
@@ -848,12 +895,14 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
                 }
             } else if (!strcmp(key, "save-sha") && hex_ok(val)) {
                 snprintf(d->save_sha, sizeof d->save_sha, "%.64s", val);
-            } else if (!strcmp(key, "overlay") && d->n_overlay < U2_DEMO_MAX_OVERLAYS) {
+            } else if ((!strcmp(key, "overlay") || !strcmp(key, "overlay-slot"))
+                       && d->n_overlay < U2_DEMO_MAX_OVERLAYS) {
                 char nm[24];
                 char sh[80];
                 if (sscanf(val, "%23s %79s", nm, sh) == 2 && hex_ok(sh)) {
                     snprintf(d->overlay[d->n_overlay].name, 24, "%.23s", nm);
                     snprintf(d->overlay[d->n_overlay].sha, 65, "%.64s", sh);
+                    d->overlay[d->n_overlay].from_slot = !strcmp(key, "overlay-slot");
                     d->n_overlay++;
                 }
             } else if (!strcmp(key, "art")) {
@@ -1027,7 +1076,7 @@ int u2_demo_next_key(u2_ctx *ctx, u2_key *out)
          * the draw, and the two differed by exactly one frame's worth of cursor
          * movement. That is the whole lesson: the two directions have to be compared
          * at the same point in the loop, not merely at the same loop iteration. */
-        if (d->applied && !d->closing_checked) {
+        if (d->applied && !d->closing_checked && !d->stop_at_exit) {
             char now[65];
             d->closing_checked = 1;
             if (*d->end_state_sha && d->digest_version == U2_DEMO_DIGEST_VERSION) {
@@ -1121,7 +1170,25 @@ void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
             d->overlay_checked = 1;
             for (int k = 0; k < d->n_overlay; k++) {
                 if (strcmp(d->overlay[k].name, name) != 0) continue;
+                if (d->overlay[k].from_slot) {
+                    if (!d->slot_note) {
+                        d->slot_note = 1;
+                        fprintf(stderr, "u2: this recording started from its own save's "
+                                        "overlay of %s, which a viewer cannot be expected "
+                                        "to have. Not a refusal; if the digests diverge, "
+                                        "that is why.\n", name);
+                    }
+                    continue;
+                }
                 if (strcmp(d->overlay[k].sha, sha) != 0 && !d->overlay_failed) {
+                    if (ctx->demo_ignore_content) {
+                        fprintf(stderr, "u2: %s differs from the bytes this recording "
+                                        "carried, and --playback-ignore-content was "
+                                        "given. Playing anyway: if a digest diverges, "
+                                        "that may be the content and not the engine.\n",
+                                name);
+                        continue;
+                    }
                     d->overlay_failed = 1;
                     fprintf(stderr, "u2: this demo needs %s to hold the bytes it recorded; "
                                     "yours differ. Point --data-dir at the content the "
@@ -1132,13 +1199,35 @@ void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
         } else if (d->state == U2_DEMO_RECORDING && !d->started) {
             /* Captured once, for the checkpoint. A sector the recording later mutates
              * is covered by the checkpoint itself, which carries the whole DS mirror;
-             * this line is about the bytes the world was BUILT from. */
+             * this line is about the bytes the world was BUILT from.
+             *
+             * Which LAYER it was built from decides whether the line can be a refusal,
+             * and getting that wrong made a real recording on a real install refuse to
+             * play with "this demo needs mapx20 to hold the bytes it recorded; yours
+             * differ" — while both sides were telling the truth. The recording read
+             * mapx20 out of its own save slot, because play writes sector overlays
+             * there; playback deliberately cannot see that slot, because § 7.4 sends
+             * its writes to scratch so a viewer's saves survive. Two honest runs,
+             * different layers, a false refusal.
+             *
+             * So: a content-layer digest is a refusal, because that is the question
+             * the check was built to answer — "does the viewer have the same release
+             * content". A slot-layer digest is a note, because no viewer can be
+             * expected to have the recorder's save, and refusing on it would make
+             * every demo recorded after the first sector write-back unplayable. */
+            const int from_slot =
+                (i == 0 && w->map_root && strcmp(w->map_root, U2_WORLD_SLOT_LAYER) == 0) ||
+                (i == 1 && w->mon_root && strcmp(w->mon_root, U2_WORLD_SLOT_LAYER) == 0);
+            /* tlkx is never in the test above on purpose: dialogue is read-only, the
+             * original never writes it home, so a slot can never hold one and its
+             * digest is always a content digest. */
             int seen = 0;
             for (int k = 0; k < d->n_overlay; k++)
                 if (strcmp(d->overlay[k].name, name) == 0) { seen = 1; break; }
             if (!seen && d->n_overlay < U2_DEMO_MAX_OVERLAYS) {
                 snprintf(d->overlay[d->n_overlay].name, 24, "%.23s", name);
                 snprintf(d->overlay[d->n_overlay].sha, 65, "%.64s", sha);
+                d->overlay[d->n_overlay].from_slot = from_slot;
                 d->n_overlay++;
             }
         }
@@ -1172,7 +1261,8 @@ int u2_demo_finish(u2_ctx *ctx)
          * D12 needs because the last record has no successor to trigger its check,
          * and `sha=` is the framing digest that makes a truncated or edited file
          * detectable rather than merely shorter. */
-        emit(d, "@end records %d state=%s sha=%s\n", d->n_written, sha, frame);
+        emit(d, "@end records %d state=%s sha=%s stop=%s\n", d->n_written, sha, frame,
+             d->stopped_by_toggle ? "toggle" : "exit");
         fflush(d->file);
         fclose(d->file);
         d->file = NULL;
@@ -1184,6 +1274,20 @@ int u2_demo_finish(u2_ctx *ctx)
             fprintf(stderr, "u2: this demo was recorded with content '%s' and this run has "
                             "'%s'. Art does not reach game state, so it played.\n",
                     d->content, ctx->content_source);
+        if (d->diverged < 0 && !d->closing_checked && d->stop_at_exit && d->applied &&
+                *d->end_state_sha && d->digest_version == U2_DEMO_DIGEST_VERSION) {
+            /* The recorder's epilogue was written by u2_demo_finish at process exit,
+             * so exit is the matching instant here. Both runs ended the same way, from
+             * the same last record, through the same code. */
+            char now[65];
+            d->closing_checked = 1;
+            u2_demo_digest(ctx, now);
+            if (strcmp(now, d->end_state_sha) != 0) {
+                d->diverged = d->n_recs;
+                fprintf(stderr, "u2: DEMO DIVERGED at the end of the run: "
+                                "recorded %s, live %s\n", d->end_state_sha, now);
+            }
+        }
         if (d->diverged < 0 && !d->closing_checked) {
             /* Every record verified and then the flow ended somewhere the recorder did
              * not stop. Saying so is the honest half of D12: the last record's own

@@ -245,6 +245,55 @@ int main(void)
         unlink(bad_path);
     }
 
+    /* --- the deferred start: a Ctrl-R on the way into play --- */
+    {
+        char defer[400], defer2[400];
+        u2_ctx c;
+        snprintf(defer, sizeof defer, "%.250s.defer.demo", path);
+        snprintf(defer2, sizeof defer2, "%.250s.cancel.demo", path);
+        unlink(defer);
+
+        boot(&c, 1);
+        c.demo_at_quiescent = 1;
+        c.demo_quiescent_mode = U2_DEMO_MODE_TITLE;
+        u2_demo_begin_recording(&c, defer);
+        u2_key tog = { 0x12, 0 };
+        u2_demo_key(&c, &tog);
+        u2_demo_quiescent(&c, U2_DEMO_MODE_TITLE, NULL);
+        {
+            FILE *probe = fopen(defer, "r");
+            expect(probe == NULL, "a Ctrl-R at the title defers and writes nothing yet");
+            if (probe) fclose(probe);
+        }
+        /* The player reaches the world. The pending request has to land here, not be
+         * silently lost — which is what the first version did, because it cleared the
+         * pending flag before the deferral branch and then returned. */
+        u2_demo_quiescent(&c, U2_DEMO_MODE_OVERWORLD, NULL);
+        {
+            FILE *probe = fopen(defer, "r");
+            expect(probe != NULL, "the deferred recording starts once the world is reached");
+            if (probe) fclose(probe);
+        }
+        u2_key k = { 'N', 0 };
+        u2_demo_key(&c, &k);
+        if (u2_demo_finish(&c) != 0) bad("the deferred recording did not finalise");
+        unlink(defer);
+
+        /* And the cancel the message promises is real. */
+        boot(&c, 1);
+        c.demo_at_quiescent = 1;
+        c.demo_quiescent_mode = U2_DEMO_MODE_TITLE;
+        u2_demo_begin_recording(&c, defer2);
+        u2_demo_key(&c, &tog);
+        u2_demo_key(&c, &tog);
+        {
+            FILE *probe = fopen(defer2, "r");
+            expect(probe == NULL, "a second Ctrl-R before the world cancels the request");
+            if (probe) fclose(probe);
+        }
+        unlink(defer2);
+    }
+
     unlink(path);
     printf("  %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
