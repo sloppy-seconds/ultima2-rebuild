@@ -219,7 +219,7 @@ fi
 # rect — as tested behaviour, not folklore.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/status_check" \
    tests/status_check.c src/game/status.c src/core/seam.c src/core/vram.c \
-   src/core/state.c src/core/font.c src/core/frame.c src/core/view.c \
+   src/core/state.c src/core/demo.c src/core/font.c src/core/frame.c src/core/view.c \
    src/core/rng.c src/core/timer.c src/core/replay.c src/core/sha256.c \
    src/debug/trace.c src/debug/dump_state.c 2>"$WORK/cc-status.err"
 if [ $? -ne 0 ]; then
@@ -239,7 +239,7 @@ fi
 # save-anywhere policy hook.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/save_q_check" \
    tests/save_q_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/flash.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c \
-   src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c \
+   src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c src/core/demo.c \
    src/core/vram.c src/core/state.c src/core/font.c src/core/frame.c \
    src/core/view.c src/core/rng.c src/core/timer.c src/core/replay.c \
    src/debug/trace.c src/debug/dump_state.c 2>"$WORK/cc-saveq.err"
@@ -259,7 +259,7 @@ fi
 # death handler at runtime 0x0E62 (asm/0C62), which zeroes DS:51..59.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/food_check" \
    tests/food_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/flash.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c \
-   src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c \
+   src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c src/core/demo.c \
    src/core/vram.c src/core/state.c src/core/font.c src/core/frame.c \
    src/core/view.c src/core/rng.c src/core/timer.c src/core/replay.c \
    src/debug/trace.c src/debug/dump_state.c 2>"$WORK/cc-food.err"
