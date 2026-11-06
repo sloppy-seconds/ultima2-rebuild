@@ -39,6 +39,15 @@
 /* char_print scrolls when the row counter reaches this (cmpb $0x18,0x2f). */
 #define U2_SCROLL_ROW  24
 
+/* Engine-side cell flag: draw this cell inverse, swapping whatever text pair the
+ * frame is using. The original's own attribute byte at DS:0x23E only ever holds
+ * 0x0F normal, 0x70 dim or 0x02 red (state.h, asm/53D9, asm/53E6, asm/53EE), so
+ * bit 7 -- the CGA blink bit -- is never set by it and the engine borrows it for
+ * its own widgets. A renderer that cannot do reverse video must ignore the bit
+ * rather than drop the cell: the text has to survive a plain terminal even when
+ * the highlight does not. */
+#define U2_ATTR_HILITE 0x80
+
 typedef struct u2_cell {
     uint8_t ch;
     uint8_t attr;

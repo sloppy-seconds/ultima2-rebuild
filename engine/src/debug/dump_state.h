@@ -20,6 +20,12 @@
 #define U2_STATE_JSON_MAX 8192   /* sized for the creature table plus the raw block; see u2_state_json */
 
 void u2_dump_screen(const u2_ctx *ctx, FILE *out);
+/* One `HILITE <row> <col>` line per cell carrying U2_ATTR_HILITE, 0-based, in
+ * row-major order. The grid dump prints characters only, so an inverted cell and
+ * a plain one are identical there and the highlight is unobservable to a text
+ * assertion. This is the channel that makes it assertable headlessly, without
+ * driving a terminal and parsing its escapes. */
+void u2_dump_hilite(const u2_ctx *ctx, FILE *out);
 void u2_dump_state_json(const u2_ctx *ctx, FILE *out);
 int  u2_screen_text(const u2_ctx *ctx, char *out, int outsz);
 int  u2_state_json(const u2_ctx *ctx, char *out, int outsz);

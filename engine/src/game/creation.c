@@ -16,20 +16,23 @@
  *   - the 256-byte record written to a byte-compatible PLAYER file
  *
  * What is deliberately improved (docs/phase4-plan.md § 4a, deviations D1-D4):
- *   D1 Tab / arrows move between fields and any field can be re-edited. The
- *      original is strictly sequential (asm/53B0 reads, stores, moves on).
+ *   D1 Up/Down move between fields and any field can be re-edited. The original
+ *      is strictly sequential (asm/53B0 reads, stores, moves on).
  *   D2 Backspace deletes one character. The original restarts the whole name
  *      field (asm/5BA5).
  *   D3 An illegal entry is refused in place. The original discards the entire
  *      generation and jumps back to asm/5698.
  *   D4 The cursor is shown on the field being edited. The original shows no
- *      cursor, so there is no indication which field is active.
- * D6 Stat entry is a two-digit shift register: the field shows 00, typing 5
- *    reads 05, typing 0 then reads 50, backspace shifts back out. The original
- *    takes the first digit as the tens, so typing 5 means 50 and immediately
- *    moves on (asm/53B0) — which reads as a bug to anyone who meant 5.
- * D7 The point budget may go negative while typing; the character is simply not
- *    creatable until it lands on exactly 00. The original refuses an overspend
+ *      cursor, so there is no indication which field is active. While a dropdown
+ *      is open it marks the highlighted row instead (D12).
+ * D6 RETIRED 2026-11-06, replaced by Left/Right stepping. It was a two-digit
+ *    shift register: typing 5 read 05, a following 0 read 50. The original takes
+ *    the first digit as the tens, so typing 5 means 50 and immediately moves on
+ *    (asm/53B0) — which reads as a bug to anyone who meant 5.
+ * D7 RETIRED 2026-11-06, unreachable under stepping. It allowed the budget to go
+ *    negative mid-edit. Stepping is clamped to [STAT_MIN, STAT_MIN + remaining],
+ *    so the illegal state cannot be entered at all, which is a stronger guarantee
+ *    than tolerating it and refusing to commit. The original refuses an overspend
  *    by throwing the whole generation away (asm/5C66 -> 0x5698).
  * D8 Control characters are refused in the name. The original masks the high bit
  *    off every typed byte (asm/5207 `and al,$0x7f`) and then stores whatever is
@@ -46,6 +49,23 @@
  *    an extracted game string, so it paints over row 16 rather than editing the
  *    blob — the blob stays faithful to the binary and the override is visible as
  *    engine text.
+ * D12 Sex, Race and Type open a dropdown: Up/Down move a `>` highlight, Enter
+ *    commits, Esc cancels. The original types a digit against a static
+ *    `RACES: / TYPES:` legend the player has to memorise; the FM Towns version
+ *    keys off letters and had to rename Hobbit to `B)obbit` because H was taken
+ *    by Human. Neither is available to us without that collision, and the
+ *    collision is the reason for the dropdown. The legend is painted over the way
+ *    D9 paints over the confirm line: the blob stays byte-faithful and the
+ *    override is engine presentation.
+ * D13 The engine prints the creation bonuses beside the stats as `+N`. The
+ *    original never shows them anywhere; they exist only as bytes in asm/5400.
+ *    While a dropdown is open the preview tracks the highlight, so the number is
+ *    what the highlighted choice would do, not only what is committed. There is
+ *    no negative form and none is planned: all ten bonuses are additions, and
+ *    with a 90 budget over six stats floored at 10 the largest any stat can
+ *    reach is 40, so the unguarded `daa` cannot wrap here. Colour is deliberately
+ *    not part of this round — the delta prints in the same ink as everything else
+ *    and the `+` carries the meaning on its own.
  * D10 Every stat starts at 10, the minimum the original enforces, so the player
  *    distributes the 30 points left over rather than building all 90 from zero.
  *    Same solution set — six stats of at least 10 summing to 90 — but an illegal
@@ -83,6 +103,16 @@
 #define CONFIRM_ROW    16      /* the blob's SATISFACTORY line, overwritten (D9) */
 #define CONFIRM_COL    10      /* the original indents that line by 10 spaces */
 #define CONFIRM_TEXT   "[S]AVE   [R]ESET"
+#define LEGEND_ROW     18      /* asm blob's RACES:/TYPES: legend; painted over (D12) */
+#define LEGEND_ROWS    5       /* rows 18..22: the legend plus its blank leader */
+#define NOTE_ROW       24      /* engine-authored status line */
+#define HINT_MINUS_COL 25      /* `-` tight left of a stat value: Left takes one */
+#define HINT_PLUS_COL  28      /* `+` tight right of it: Right adds one */
+#define BONUS_COL      30      /* the bonus slot, blank until a choice adds (D13) */
+#define BONUS_W        3       /* widest is `+25`: two digits and a sign */
+#define DD_TOP         17      /* dropdown box: top border row (D12) */
+#define DD_LEFT        13
+#define DD_W           14      /* box width in cells, borders included */
 
 typedef enum { F_STAT, F_SEX, F_RACE, F_CLASS, F_NAME, F_SAVE, F_RESET } field_kind;
 
@@ -114,19 +144,64 @@ static const field FIELDS[] = {
  *                               HOBBIT +10 WIS (0x5A5B)  THIEF   +10 AGI (0x5B35)
  * STAMINA is never modified by sex, race or class. */
 
+/* The same ten bonuses as data, so the preview (D13) and commit() cannot drift
+ * apart. Stat index order is the order commit() uses:
+ * 0 STR, 1 AGI, 2 STA, 3 CHA, 4 WIS, 5 INT. */
+typedef struct { int stat; int bcd; } bonus;
+static const bonus BONUS_SEX[2]   = { { 0, 0x05 }, { 3, 0x10 } };
+static const bonus BONUS_RACE[4]  = { { 5, 0x05 }, { 1, 0x05 }, { 0, 0x05 }, { 4, 0x10 } };
+static const bonus BONUS_CLASS[4] = { { 0, 0x15 }, { 4, 0x10 }, { 5, 0x10 }, { 1, 0x10 } };
+
+/* Dropdown contents (D12). Every label is an extracted game string, so the box
+ * invents no text; only the title, the `>` marker and the border are ours. */
+typedef struct { const char *label; int key; } choice_opt;
+static const choice_opt OPT_SEX[] = {
+    { U2_S_SEX_MALE,    'M' }, { U2_S_SEX_FEMALE,  'F' },
+};
+static const choice_opt OPT_RACE[] = {
+    { U2_S_RACE_HUMAN,  '1' }, { U2_S_RACE_ELF,    '2' },
+    { U2_S_RACE_DWARF,  '3' }, { U2_S_RACE_HOBBIT, '4' },
+};
+static const choice_opt OPT_CLASS[] = {
+    { U2_S_CLASS_FIGHTER, '1' }, { U2_S_CLASS_CLERIC, '2' },
+    { U2_S_CLASS_WIZARD,  '3' }, { U2_S_CLASS_THIEF,  '4' },
+};
+
+static const choice_opt *opts_for(field_kind k, int *n)
+{
+    switch (k) {
+    case F_SEX:   *n = (int)(sizeof OPT_SEX   / sizeof OPT_SEX[0]);   return OPT_SEX;
+    case F_RACE:  *n = (int)(sizeof OPT_RACE  / sizeof OPT_RACE[0]);  return OPT_RACE;
+    case F_CLASS: *n = (int)(sizeof OPT_CLASS / sizeof OPT_CLASS[0]); return OPT_CLASS;
+    default:      *n = 0; return NULL;
+    }
+}
+
+/* Box titles are engine-authored: the DOS blob carries the prompts only inside
+ * U2_S_CREATE_FORM, as `M/F-`, `RACE-` and `TYPE-`, so there is no extracted
+ * string that is just the word. Marked per docs/char-creation-ui-plan.md. */
+static const char *dd_title(field_kind k)
+{
+    switch (k) {
+    case F_SEX:   return "Sex";
+    case F_RACE:  return "Race";
+    case F_CLASS: return "Type";
+    default:      return "";
+    }
+}
+
 typedef struct {
-    int     val[6];           /* decimal 0..99; 00 means not yet entered */
-    int     typed;            /* digits typed into the focused stat (D6) */
-    int     sex;            /* 'M' / 'F' */
-    int     race;           /* '1'..'4' */
-    int     cls;            /* '1'..'4' */
+    int     val[6];           /* decimal, floored at STAT_MIN and capped by the budget */
+    int     sex;              /* 'M' / 'F' */
+    int     race;             /* '1'..'4' */
+    int     cls;              /* '1'..'4' */
     char    name[NAME_MAX];
     int     name_len;
-    int     sel;            /* index into FIELDS */
-    char    note[48];       /* engine-authored status line */
+    int     sel;              /* index into FIELDS */
+    int     dd;               /* FIELDS index with a dropdown open, or -1 (D12) */
+    int     dd_hi;            /* highlighted row inside that dropdown */
+    char    note[48];         /* engine-authored status line */
 } form;
-
-static int up(int c) { return (c >= 'a' && c <= 'z') ? c - 32 : c; }
 
 static int pack_bcd(int d) { return ((d / 10) << 4) | (d % 10); }
 static int unpack_bcd(int p) { return (p >> 4) * 10 + (p & 0x0F); }
@@ -147,7 +222,8 @@ static int spent(const form *f)
 
 static int remaining(const form *f)
 {
-    /* Allowed to go negative (D7): the check happens at creation time, not here. */
+    /* step_stat is the only writer of a stat and it refuses a press that would
+     * take this below zero, so the total is always 00..90. */
     return unpack_bcd(BUDGET_START) - spent(f);
 }
 
@@ -173,26 +249,50 @@ static void print_pair(u2_ctx *ctx, int v)
     seam_str_out(ctx, b);
 }
 
-/* The budget can read negative while the player is mid-edit (D7), which the
- * original never shows because it forbids the overspend outright. */
+/* The remaining total as the original prints it: two decimal digits in the value
+ * slot of the POINTS line. Stepping keeps it in 00..90, so there is no sign case
+ * to format; an earlier version carried one for D7, and D7 is retired. */
 static void print_budget(u2_ctx *ctx, int v)
 {
-    char b[8];
-    int a = v < 0 ? -v : v;
-    if (a > 999) a = 999;          /* bounded by 6 stats x 99 against a 90 budget */
-    if (v < 0) snprintf(b, sizeof b, "-%02d", a);
-    else snprintf(b, sizeof b, "%02d", a);
-    seam_str_out(ctx, b);
+    print_pair(ctx, pack_bcd(v));
 }
 
 /* ---- drawing ------------------------------------------------------------ */
 
-static void draw_budget_line(u2_ctx *ctx, const form *f)
+/* Mark a span of cells inverse. Presentation only: the game's own attribute byte
+ * at DS:0x23E is never touched, so this cannot change what the original would have
+ * drawn anywhere else. See U2_ATTR_HILITE in core/vram.h for the bit and why
+ * borrowing it is safe. */
+static void hilite(u2_ctx *ctx, int row, int col, int len)
 {
-    /* asm/5C7D..5C89: after every stat the original goes to column 33 row 2 and
-     * prints the new total there. That is the value slot of the POINTS line. */
-    seam_goto(ctx, BUDGET_COL, BUDGET_ROW);
-    print_budget(ctx, remaining(f));
+    for (int i = 0; i < len; i++) {
+        int c = col + i;
+        if (row < 0 || row >= U2_ROWS || c < 0 || c >= U2_COLS) continue;
+        ctx->vram.cell[row][c].attr |= U2_ATTR_HILITE;
+    }
+    ctx->vram.dirty = 1;
+}
+
+/* What an unfilled choice field shows. The original shows a bare dash, which says
+ * the field is empty and nothing about how to fill it; ENTER says both. Engine
+ * text, not extracted. It is padded to the widest value it can be replaced by
+ * (FIGHTER, 7 cells) so the box border under it never shifts when a choice lands.
+ */
+#define BLANK_TEXT  "ENTER  "
+#define CONFIRM_W   6                 /* "[S]AVE" and "[R]ESET" are both 6 cells */
+
+/* One value slot on the form, highlighted as a whole when the cursor is on it and
+ * no dropdown is open. While a dropdown is open the box owns the highlight. */
+static void draw_value(u2_ctx *ctx, const form *f, int which, int col, const char *word)
+{
+    const field *fd = &FIELDS[which];
+    seam_str_out_at(ctx, col, fd->row, word);
+    if (which == f->sel && f->dd < 0) {
+        /* Highlight the word, not the padding that keeps the column width steady. */
+        int n = (int)strlen(word);
+        while (n > 0 && word[n - 1] == ' ') n--;
+        hilite(ctx, fd->row, col, n);
+    }
 }
 
 static void draw_field(u2_ctx *ctx, form *f, int which)
@@ -202,25 +302,27 @@ static void draw_field(u2_ctx *ctx, form *f, int which)
     case F_STAT:
         seam_goto(ctx, fd->col, fd->row);
         print_pair(ctx, pack_bcd(f->val[fd->index]));
+        if (which == f->sel && f->dd < 0)
+            hilite(ctx, fd->row, fd->col, 2);
         break;
     case F_SEX:
-        seam_goto(ctx, fd->col + 5, fd->row);
-        seam_str_out(ctx, f->sex ? (f->sex == 'M' ? U2_S_SEX_MALE : U2_S_SEX_FEMALE)
-                                 : "-");
+        draw_value(ctx, f, which, fd->col + 5,
+                   f->sex ? (f->sex == 'M' ? U2_S_SEX_MALE : U2_S_SEX_FEMALE)
+                          : BLANK_TEXT);
         break;
     case F_RACE:
-        seam_goto(ctx, fd->col + 6, fd->row);
-        seam_str_out(ctx, f->race ? (f->race == '1' ? U2_S_RACE_HUMAN
-                                 : f->race == '2' ? U2_S_RACE_ELF
-                                 : f->race == '3' ? U2_S_RACE_DWARF
-                                                   : U2_S_RACE_HOBBIT) : "-");
+        draw_value(ctx, f, which, fd->col + 6,
+                   f->race ? (f->race == '1' ? U2_S_RACE_HUMAN
+                            : f->race == '2' ? U2_S_RACE_ELF
+                            : f->race == '3' ? U2_S_RACE_DWARF
+                                              : U2_S_RACE_HOBBIT) : BLANK_TEXT);
         break;
     case F_CLASS:
-        seam_goto(ctx, fd->col + 6, fd->row);
-        seam_str_out(ctx, f->cls ? (f->cls == '1' ? U2_S_CLASS_FIGHTER
-                                  : f->cls == '2' ? U2_S_CLASS_CLERIC
-                                  : f->cls == '3' ? U2_S_CLASS_WIZARD
-                                                   : U2_S_CLASS_THIEF) : "-");
+        draw_value(ctx, f, which, fd->col + 6,
+                   f->cls ? (f->cls == '1' ? U2_S_CLASS_FIGHTER
+                           : f->cls == '2' ? U2_S_CLASS_CLERIC
+                           : f->cls == '3' ? U2_S_CLASS_WIZARD
+                                            : U2_S_CLASS_THIEF) : BLANK_TEXT);
         break;
     case F_NAME: {
         seam_goto(ctx, fd->col + 6, fd->row);
@@ -239,22 +341,124 @@ static void draw_field(u2_ctx *ctx, form *f, int which)
     }
 }
 
+/* ---- the bonus preview (D13) --------------------------------------------- */
+
+/* The delta the current choices apply to each stat. While a dropdown is open the
+ * highlighted row is substituted into its field, so the numbers describe the
+ * choice being looked at and not only the one already made. Every entry is a
+ * sum of additions: there is no negative case, because all ten bonuses add and
+ * a stat cannot exceed 40 under the budget, so the unguarded `daa` cannot wrap. */
+static void bonus_delta(const form *f, int out[6])
+{
+    for (int i = 0; i < 6; i++) out[i] = 0;
+    int sex = f->sex, race = f->race, cls = f->cls;
+    if (f->dd >= 0) {
+        int n = 0;
+        const choice_opt *o = opts_for(FIELDS[f->dd].kind, &n);
+        if (o && f->dd_hi >= 0 && f->dd_hi < n) {
+            field_kind k = FIELDS[f->dd].kind;
+            if (k == F_SEX)   sex = o[f->dd_hi].key;
+            if (k == F_RACE)  race = o[f->dd_hi].key;
+            if (k == F_CLASS) cls = o[f->dd_hi].key;
+        }
+    }
+    const bonus *b;
+    if (sex)  { b = &BONUS_SEX[sex == 'M' ? 0 : 1]; out[b->stat] += unpack_bcd(b->bcd); }
+    if (race) { b = &BONUS_RACE[race - '1'];        out[b->stat] += unpack_bcd(b->bcd); }
+    if (cls)  { b = &BONUS_CLASS[cls - '1'];        out[b->stat] += unpack_bcd(b->bcd); }
+}
+
+/* The `-` / `+` tight against a stat value, so the three cells read as one
+ * control and not three unrelated glyphs, and the bonus (D13) in its own column
+ * to the right: `STRENGTH..... -10+` becomes `STRENGTH..... -10+ +20` once a
+ * choice adds fifteen to it. */
+static void draw_stat_hints(u2_ctx *ctx, const form *f)
+{
+    int d[6];
+    bonus_delta(f, d);
+    for (int i = 0; i < 6; i++) {
+        int row = STAT_ROW_FIRST + i;
+        /* The blob's leader dots run to col 25 and the value starts at 26, so the
+         * hint takes col 25 and a space takes 24. The value column itself is the
+         * byte-proven one and does not move. */
+        seam_goto(ctx, HINT_MINUS_COL - 1, row);
+        seam_char_out(ctx, ' ');
+        seam_char_out(ctx, '-');
+        seam_goto(ctx, HINT_PLUS_COL, row);
+        seam_char_out(ctx, '+');
+        int v = d[i] > 99 ? 99 : d[i];   /* three bonuses cap at 25; a format bound */
+        char b[BONUS_W + 1];
+        if (v > 0) snprintf(b, sizeof b, "+%d", v);
+        else b[0] = '\0';
+        seam_goto(ctx, BONUS_COL, row);
+        int j = 0;
+        for (; b[j] && j < BONUS_W; j++) seam_char_out(ctx, (uint8_t)b[j]);
+        for (; j < BONUS_W; j++) seam_char_out(ctx, ' ');
+    }
+}
+
+/* ---- the dropdown (D12) -------------------------------------------------- */
+
+/* ASCII borders, not box-drawing glyphs: u2_font_draw_cell renders anything
+ * outside 32..126 as a space, so the box has to be built from characters every
+ * backend can draw. Monochrome on purpose — the highlight is the `>` marker, so
+ * it survives a terminal with colour off and a theme whose palette has nothing
+ * spare. */
+static void draw_box_row(u2_ctx *ctx, int row, const char *text, int mark, int centre)
+{
+    char b[DD_W + 1];
+    int inner = DD_W - 4;                 /* "| " + marker + text + pad + " |" */
+    int w = (int)strlen(text);
+    if (w > inner) w = inner;
+    int pad = centre ? (inner - w) / 2 : 0;
+    b[0] = '|'; b[1] = ' '; b[2] = (char)(mark ? '>' : ' ');
+    int i = 3;
+    for (int j = 0; j < pad; j++) b[i++] = ' ';
+    for (int j = 0; j < w; j++) b[i++] = text[j];
+    while (i < DD_W - 1) b[i++] = ' ';
+    b[DD_W - 1] = '|';
+    b[DD_W] = '\0';
+    seam_str_out_at(ctx, DD_LEFT, row, b);
+    /* The whole word, not a caret beside it: an inverted block is the same idiom
+     * the form fields use, so the box and the form say "this one" the same way. */
+    if (mark) hilite(ctx, row, DD_LEFT + 3, w);
+}
+
+static void draw_box_border(u2_ctx *ctx, int row)
+{
+    char b[DD_W + 1];
+    b[0] = '+';
+    for (int i = 1; i < DD_W - 1; i++) b[i] = '-';
+    b[DD_W - 1] = '+';
+    b[DD_W] = '\0';
+    seam_str_out_at(ctx, DD_LEFT, row, b);
+}
+
+static void draw_dropdown(u2_ctx *ctx, const form *f)
+{
+    if (f->dd < 0) return;
+    int n = 0;
+    const choice_opt *o = opts_for(FIELDS[f->dd].kind, &n);
+    if (!o) return;
+    draw_box_border(ctx, DD_TOP);
+    draw_box_row(ctx, DD_TOP + 1, dd_title(FIELDS[f->dd].kind), 0, 1);
+    for (int i = 0; i < n; i++)
+        draw_box_row(ctx, DD_TOP + 2 + i, o[i].label, i == f->dd_hi, 0);
+    draw_box_border(ctx, DD_TOP + 2 + n);
+}
+
 static void place_cursor(u2_ctx *ctx, form *f)
 {
-    const field *fd = &FIELDS[f->sel];
-    int col = fd->col, row = fd->row;
-    switch (fd->kind) {
-    case F_STAT: col += 2; break;
-    case F_SEX:  col += 5; break;
-    case F_RACE:
-    case F_CLASS: col += 6; break;
-    case F_NAME: col += 6 + f->name_len; break;
-    case F_SAVE:
-    case F_RESET: break;               /* cursor sits on the label itself */
+    /* The block cursor is the caret for the name field and nothing else. Every
+     * other field is now shown inverse as a whole, which says the same thing more
+     * clearly and does not depend on a renderer that can paint a block. */
+    if (f->dd >= 0 || FIELDS[f->sel].kind != F_NAME) {
+        ctx->vram.visible = 0;
+        return;
     }
-    /* D4: the original gives no indication of the active field. */
+    const field *fd = &FIELDS[f->sel];
     ctx->vram.visible = 1;
-    seam_goto(ctx, col, row);
+    seam_goto(ctx, fd->col + 6 + f->name_len, fd->row);
 }
 
 static void draw_form(u2_ctx *ctx, form *f)
@@ -281,11 +485,25 @@ static void draw_form(u2_ctx *ctx, form *f)
      * to the content. */
     seam_clear_row(ctx, CONFIRM_ROW);
     seam_str_out_at(ctx, CONFIRM_COL, CONFIRM_ROW, CONFIRM_TEXT);
+    /* The two buttons are fields, so the one the cursor is on is shown inverse
+     * exactly like a value slot. */
+    for (int i = 0; i < NFIELDS; i++) {
+        const field *fd = &FIELDS[i];
+        if ((fd->kind == F_SAVE || fd->kind == F_RESET) && i == f->sel && f->dd < 0)
+            hilite(ctx, CONFIRM_ROW, fd->col, CONFIRM_W);
+    }
+    /* D12: the blob's `RACES: / TYPES:` legend is the DOS answer to "what are the
+     * numbers", and with dropdowns there are no numbers to look up. Cleared here
+     * so the box has the space; the blob itself is untouched, same arrangement as
+     * D9's confirm line. */
+    for (int r = LEGEND_ROW; r < LEGEND_ROW + LEGEND_ROWS; r++) seam_clear_row(ctx, r);
     for (int i = 0; i < NFIELDS; i++)
         draw_field(ctx, f, i);
+    draw_stat_hints(ctx, f);
+    draw_dropdown(ctx, f);
     if (f->note[0]) {
-        seam_clear_row(ctx, 23);
-        seam_str_out_at(ctx, 1, 23, f->note);
+        seam_clear_row(ctx, NOTE_ROW);
+        seam_str_out_at(ctx, 1, NOTE_ROW, f->note);
         f->note[0] = '\0';
     }
     place_cursor(ctx, f);
@@ -296,76 +514,61 @@ static void draw_form(u2_ctx *ctx, form *f)
 
 static int complete(const form *f, char *why, size_t n)
 {
-    for (int i = 0; i < 6; i++) {
-        if (f->val[i] < STAT_MIN) { snprintf(why, n, "[engine] stat %d must be 10 or more", i + 1); return 0; }
-    }
+    /* Only the reachable refusals. Stepping clamps every stat to
+     * [STAT_MIN, STAT_MIN + remaining], so "a stat is under the floor" and "the
+     * budget is overspent" are not states this form can be in, and a check for
+     * either would be a dead branch that reads like a rule. */
     int left = remaining(f);
     if (left > 0) { snprintf(why, n, "[engine] %d point%s left to spend", left, left == 1 ? "" : "s"); return 0; }
-    if (left < 0) { snprintf(why, n, "[engine] %d points over budget", -left); return 0; }
-    if (!f->sex)   { snprintf(why, n, "[engine] choose M or F"); return 0; }
+    if (!f->sex)   { snprintf(why, n, "[engine] choose a sex"); return 0; }
     if (!f->race)  { snprintf(why, n, "[engine] choose a race"); return 0; }
     if (!f->cls)   { snprintf(why, n, "[engine] choose a type"); return 0; }
     if (!f->name_len) { snprintf(why, n, "[engine] a name is needed"); return 0; }
     return 1;
 }
 
-/* Returns 1 to advance to the next field. */
+/* Left/Right stepping, which replaces digit entry outright (D6 retired). The
+ * clamp is the whole legality story: a stat can never leave
+ * [STAT_MIN, STAT_MIN + remaining], so the budget cannot go negative and no
+ * illegal value can be entered (D7 retired). The original has no editing at all —
+ * a bad value throws the generation away (asm/5C66 -> 0x5698) — so there is
+ * nothing here to match, only a rule that cannot be broken. */
+static void step_stat(form *f, int dir)
+{
+    int i = FIELDS[f->sel].index;
+    f->note[0] = '\0';
+    if (dir > 0) {
+        if (remaining(f) <= 0) {
+            snprintf(f->note, sizeof f->note, "[engine] no points left to spend");
+            return;
+        }
+        f->val[i]++;
+    } else {
+        if (f->val[i] <= STAT_MIN) {
+            snprintf(f->note, sizeof f->note, "[engine] %d is the minimum", STAT_MIN);
+            return;
+        }
+        f->val[i]--;
+    }
+}
+
+/* Returns 1 to advance to the next field. Stats step and the three choice fields
+ * use a dropdown, so the name is the only field that takes typed characters. */
 static int edit_field(u2_ctx *ctx, form *f, int c)
 {
     const field *fd = &FIELDS[f->sel];
     f->note[0] = '\0';
-    /* The original upper-cases the keys it matches on (asm/4F4D `and $0xdf`), so
-     * case never matters for a choice. The name is the one field that keeps it. */
-    if (fd->kind != F_NAME) c = up(c);
 
     switch (fd->kind) {
-    case F_STAT: {
-        if (c == '\b') {
-            /* Backspace returns the stat to its minimum. The original has no
-             * editing at all — a bad value throws the generation away — so there
-             * is no behaviour to match here, only something that makes sense. */
-            f->val[fd->index] = STAT_MIN;
-            f->typed = 0;
-            draw_field(ctx, f, f->sel);
-            draw_budget_line(ctx, f);
-            return 0;
-        }
-        if (c < '0' || c > '9') {
-            /* D3: refuse in place rather than discarding the generation. */
-            snprintf(f->note, sizeof f->note, "[engine] %s is two digits",
-                     "that stat");
-            return 0;
-        }
-        /* D6: shift left and take the new digit in the units place, so 5 reads
-         * 05 and a following 0 reads 50. The first digit into a field starts a
-         * fresh number, so it replaces the prefilled minimum instead of shifting
-         * it. The original puts the first digit in the tens place (asm/53B0),
-         * which is why typing 5 there means 50. */
-        if (f->typed == 0) f->val[fd->index] = 0;
-        int nv = (f->val[fd->index] * 10 + (c - '0')) % 100;
-        /* No clamp here: a half-typed value like 05 is normal mid-entry. The
-         * minimum is enforced in complete(), where it is a useful message. */
-        f->val[fd->index] = nv;
-        f->typed++;
-        draw_field(ctx, f, f->sel);
-        draw_budget_line(ctx, f);
-        return f->typed >= 2 ? 1 : 0;      /* two digits fills the field */
-    }
+    case F_STAT:
+        snprintf(f->note, sizeof f->note, "[engine] Left -1   Right +1");
+        return 0;
     case F_SEX:
-        if (c != 'M' && c != 'F') { snprintf(f->note, sizeof f->note, "[engine] M or F"); return 0; }
-        f->sex = c;
-        draw_field(ctx, f, f->sel);
-        return 1;
     case F_RACE:
-        if (c < '1' || c > '4') { snprintf(f->note, sizeof f->note, "[engine] race 1-4"); return 0; }
-        f->race = c;
-        draw_field(ctx, f, f->sel);
-        return 1;
     case F_CLASS:
-        if (c < '1' || c > '4') { snprintf(f->note, sizeof f->note, "[engine] type 1-4"); return 0; }
-        f->cls = c;
-        draw_field(ctx, f, f->sel);
-        return 1;
+        /* D12: the choice is made in the dropdown, not by a keystroke here. */
+        snprintf(f->note, sizeof f->note, "[engine] Enter to choose");
+        return 0;
     case F_NAME:
         if (c == '\b') {                          /* D2: delete one char */
             if (f->name_len > 0) f->name_len--;
@@ -451,34 +654,83 @@ int u2_creation_flow(u2_ctx *ctx)
     for (;;) {
         form f;
         memset(&f, 0, sizeof f);
-        /* Every stat starts at the minimum the original enforces (asm/5C69:
-         * `cmp al,$0xa; jb` fail). Six stats at 10 consume 60 of the 90, so the
-         * player distributes the remaining 30 — the same solution set as "90
-         * total, each at least 10", with no way to type an illegal value. */
+        /* Every stat starts at the minimum the original enforces. Six stats at 10
+         * consume 60 of the 90, so the player distributes the remaining 30 — the
+         * same solution set as "90 total, each at least 10", with no way to enter
+         * an illegal value. */
         for (int i = 0; i < 6; i++) f.val[i] = STAT_MIN;
+        f.dd = -1;                                  /* no dropdown open (D12) */
         draw_form(ctx, &f);
 
         int done = 0;
         while (!done) {
             int c = wait_key(ctx);
             if (c < 0) return 0;                    /* bailed or input ended */
+
+            /* D12: a dropdown owns every key while it is open. Up/Down move the
+             * highlight, Enter commits and advances, Esc closes and changes
+             * nothing. Anything else is swallowed rather than passed down to the
+             * field underneath, so a stray letter cannot land somewhere the player
+             * has stopped looking. */
+            if (f.dd >= 0) {
+                int n = 0;
+                const choice_opt *o = opts_for(FIELDS[f.dd].kind, &n);
+                if (!o) { f.dd = -1; draw_form(ctx, &f); continue; }
+                if (c == U2_KEY_UP)        f.dd_hi = (f.dd_hi + n - 1) % n;
+                else if (c == U2_KEY_DOWN) f.dd_hi = (f.dd_hi + 1) % n;
+                else if (c == '\r' || c == '\n') {
+                    switch (FIELDS[f.dd].kind) {
+                    case F_SEX:   f.sex  = o[f.dd_hi].key; break;
+                    case F_RACE:  f.race = o[f.dd_hi].key; break;
+                    case F_CLASS: f.cls  = o[f.dd_hi].key; break;
+                    default: break;
+                    }
+                    f.dd = -1;
+                    f.sel = (f.sel + 1) % NFIELDS;   /* the choice is made; move on */
+                } else if (c == 0x1b) {
+                    f.dd = -1;                       /* cancel, change nothing */
+                } else {
+                    continue;
+                }
+                draw_form(ctx, &f);
+                continue;
+            }
+
             if (c == 0x1b) return 0;                /* ESC abandons creation (D11) */
 
-            if (c == '\t' || c == U2_KEY_DOWN || c == U2_KEY_RIGHT) {
-                f.sel = (f.sel + 1) % NFIELDS;      /* D1 */
-                f.typed = 0;
+            /* D1: Up/Down is the only field navigation. There is no Tab binding,
+             * and Left/Right belongs to the stat under the cursor. */
+            if (c == U2_KEY_UP || c == U2_KEY_DOWN) {
+                f.sel = (f.sel + NFIELDS + ((c == U2_KEY_UP) ? -1 : 1)) % NFIELDS;
                 draw_form(ctx, &f);
-            } else if (c == U2_KEY_UP || c == U2_KEY_LEFT) {
-                f.sel = (f.sel + NFIELDS - 1) % NFIELDS;
-                f.typed = 0;
+                continue;
+            }
+
+            if (c == U2_KEY_LEFT || c == U2_KEY_RIGHT) {
+                if (FIELDS[f.sel].kind == F_STAT)
+                    step_stat(&f, (c == U2_KEY_RIGHT) ? 1 : -1);
+                else
+                    edit_field(ctx, &f, c);         /* says why nothing happened */
                 draw_form(ctx, &f);
-            } else if (c == '\r' || c == '\n') {
-                /* Enter walks the form and activates whatever it lands on. On
-                 * SAVE it validates and commits; on RESET it rebuilds. Nothing
-                 * else, so no letter you can type into the name is also a
-                 * command. */
-                if (FIELDS[f.sel].kind == F_RESET) { done = -1; break; }
-                if (FIELDS[f.sel].kind == F_SAVE) {
+                continue;
+            }
+
+            if (c == '\r' || c == '\n') {
+                /* Enter activates whatever the cursor is on: it opens a dropdown
+                 * on a choice field, finishes the name, validates and commits on
+                 * SAVE, and rebuilds on RESET. Nothing else, so no letter that can
+                 * be typed into a name is also a command. */
+                field_kind k = FIELDS[f.sel].kind;
+                if (k == F_SEX || k == F_RACE || k == F_CLASS) {
+                    int n = 0;
+                    const choice_opt *o = opts_for(k, &n);
+                    int cur = k == F_SEX ? f.sex : k == F_RACE ? f.race : f.cls;
+                    f.dd_hi = 0;
+                    for (int i = 0; o && i < n; i++) if (o[i].key == cur) f.dd_hi = i;
+                    f.dd = f.sel;
+                    draw_form(ctx, &f);
+                } else if (k == F_RESET) { done = -1; break; }
+                else if (k == F_SAVE) {
                     char why[48];
                     if (!complete(&f, why, sizeof why)) {
                         snprintf(f.note, sizeof f.note, "%s", why);
@@ -488,12 +740,15 @@ int u2_creation_flow(u2_ctx *ctx)
                     commit(ctx, &f);
                     done = 1;
                 } else {
-                    f.sel = (f.sel + 1) % NFIELDS;
-                    f.typed = 0;
+                    f.sel = (f.sel + 1) % NFIELDS;  /* Name: Enter means finished */
+                    draw_form(ctx, &f);
                 }
-            } else {
+                continue;
+            }
+
+            {
                 int adv = edit_field(ctx, &f, c);
-                if (adv) { f.sel = (f.sel + 1) % NFIELDS; f.typed = 0; }
+                if (adv) f.sel = (f.sel + 1) % NFIELDS;
                 /* Only repaint the whole screen when something actually changed
                  * up there; a keystroke that just moves the cursor should not
                  * clear and redraw the form. */

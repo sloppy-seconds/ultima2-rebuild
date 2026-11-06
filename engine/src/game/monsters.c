@@ -207,6 +207,26 @@ void u2_monsters_clear_spawn_cells(u2_ctx *ctx, u2_world *w)
         const int cell = (int)s->mon_y[i] * U2_SECTOR_EDGE + (int)s->mon_x[i];
         if (cell < 0 || cell >= U2_SECTOR_TILES)
             continue;
+        /* Only a cell that actually carries the baked creature byte. The header's
+         * premise is that mapx was authored with the creatures drawn into it, and
+         * that premise holds for the sector's own monx file — but this runs after
+         * u2_monsters_spawn, and the wandering spawner parks creatures on ordinary
+         * ground. Paving those is not faithful and it is not invisible: art 0x1C is
+         * town paving in the original CGA table, which is why nobody ever noticed
+         * it there, and it is a red brick wall in the EGA fan pack and in the FM
+         * Towns theme.
+         *
+         * Measured against the owner's own save on 2026-11-06, sector 20: 13 slots
+         * with a type, and 0 of the 13 sat on a byte equal to their own type. Every
+         * one of them was paved, over ground of 0x08, 0x0c and 0x00, and the result
+         * was thirteen brick tiles scattered across the sector. The sector-03 seed
+         * capture that established the 0x70 behaviour rewrote cells that WERE baked,
+         * so this guard keeps that result and drops the one nobody reported.
+         *
+         * The "he left a copy of him behind" defect this function exists for is a
+         * baked-cell problem, and it stays fixed. */
+        if (w->map_base[cell] != s->mon_type[i])
+            continue;
         /* Both arrays: map_base is what restamp rebuilds from, so clearing only w->map would let
          * the baked art reappear on the creature's first step off the cell - which is the bug. */
         w->map_base[cell] = k_clear;

@@ -196,6 +196,28 @@ harnesses into CI, and repointing this section.
 
 ## Gate log
 
+- **2026-11-06 (owner-approved): CP2 baseline moved 42 → 70 steps, 39 → 66 keys.**
+  `feat/fmtowns-char-creation` replaced the typed creation form with stepping and dropdowns
+  (T1/T2/T3, `docs/char-creation-ui-plan.md`), so the committed evidence's stored keystrokes no
+  longer describe the form they were recorded against. Re-recorded with
+  `tests/play_to/reach_everything_today.keys`, which was rewritten for the new model in the same
+  branch, and verified to reproduce: `steps recorded=70 replayed=70 / REPLAY: REPRODUCES`.
+
+  **The first attempt at this move produced a transcript that did not reproduce against itself, and
+  the cause was the save directory, not behaviour.** `--save-dir /var/tmp/x/disk` where `/var/tmp/x`
+  does not exist is not a fresh disk: `u2_slot_ensure` makes two plain `mkdir`s (`core/slot.h`), the
+  first of which fails on a missing parent, so the save path answers `U2_SAVE_NOT_READY` and the `P`
+  branch prints `INSERT PLAYER DISK` instead of loading a blank seeded record. `tools/playlog.py
+  verify` always creates its temp directory, so it replays the *other* game. Measured: parent absent
+  gave 112 steps and diverged at step 15 against a 70-step replay of the same 66 tokens; parent
+  present gave 70 steps and reproduced 70/70. **The recipe's `<fresh>` has to be `mkdir -p`'d
+  first.**
+
+  This is the second baseline move in this log whose cause was the save directory rather than a
+  behaviour change — the 2026-10-21 entry records the same class from a stale default `saves/` — and
+  the two failed in opposite directions: one recorded against a dirty disk, this one against a disk
+  that did not exist. Neither is visible in the transcript; the reproduce check is what catches them.
+
 - **2026-10-21 (owner-approved): T5 shipped, CP2 baseline moved 40 → 42 steps.**
   A fidelity axis was added — `ctx.fidelity` with `--enhanced`, independent of
   `u2_mode`, which is a renderer axis. The creation tail is now faithful in

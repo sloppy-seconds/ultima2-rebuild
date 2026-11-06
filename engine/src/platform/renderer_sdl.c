@@ -19,6 +19,16 @@
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <time.h>
+#ifdef _WIN32
+#  include <direct.h>
+#  define U2_MKDIR(p) _mkdir(p)
+#else
+#  include <sys/stat.h>
+#  define U2_MKDIR(p) mkdir(p, 0755)
+#endif
 
 #include "core/ctx.h"
 #include "core/font.h"
@@ -388,6 +398,56 @@ static int sdl_present_frame(u2_ctx *ctx, const struct u2_frame *f)
     return 0;
 }
 
+/* Ctrl-S. The point is a bug the player can see but a log cannot show, so this
+ * captures the frame that was actually presented, not the grid the game thinks it
+ * drew -- the same distinction that made the invisible-cursor bug invisible to
+ * every text assertion. BMP because the writer already exists in core/frame.c and
+ * needs no image library on any of the three build targets; a PNG would mean
+ * linking zlib into the static and mingw builds as well.
+ *
+ * The path is deliberately not configurable: screenshots are for filing a bug, and
+ * `./screenshots/` next to the game is where a person looks first. */
+static int sdl_screenshot(u2_ctx *ctx)
+{
+    sdl_video *v = sv(ctx);
+    if (!v || !v->last) {
+        fprintf(stderr, "u2: no frame has been presented yet, nothing to capture\n");
+        return 1;
+    }
+    if (U2_MKDIR("screenshots") != 0 && errno != EEXIST) {
+        fprintf(stderr, "u2: cannot create screenshots/: %s\n", strerror(errno));
+        return 1;
+    }
+    time_t t = time(NULL);
+    struct tm *lt = localtime(&t);
+    char path[64];
+    if (lt)
+        strftime(path, sizeof path, "screenshots/u2-%Y%m%d-%H%M%S.bmp", lt);
+    else
+        snprintf(path, sizeof path, "screenshots/u2-%ld.bmp", (long)t);
+
+    int rc;
+    if (ctx->art_mode == U2_ART_EGA) {
+        uint8_t pal[16][3];
+        if (ctx->theme_palette_set) memcpy(pal, ctx->theme_palette, sizeof pal);
+        else u2_frame_palette_ega(pal);
+        rc = u2_frame_write_bmp16(v->last, path, pal);
+    } else {
+        uint8_t pal[4][3];
+        u2_frame_palette(pal);
+        rc = u2_frame_write_bmp(v->last, path, pal);
+    }
+    if (rc != 0) {
+        fprintf(stderr, "u2: could not write %s\n", path);
+        return 1;
+    }
+    /* stderr, not the game screen: a message drawn into the frame would be in the
+     * next screenshot, which is the opposite of the point. */
+    fprintf(stderr, "u2: saved %s\n", path);
+    fflush(stderr);
+    return 0;
+}
+
 /* Re-present the last frame. The window was resized and nothing else will paint
  * it: the game presents when it has something new to say, and a resize is not
  * something the game says. Called from the input backend's event pump, which is
@@ -401,11 +461,17 @@ void u2_sdl_repaint(u2_ctx *ctx)
 static void sdl_cell(u2_ctx *ctx, int row, int col, uint8_t ch, uint8_t attr)
 {
     sdl_video *v = sv(ctx);
-    (void)attr;   /* mode-4 text colour is white-on-black everywhere the
-                   * engine prints; real attribute mapping is CP9 work. */
     if (!v || row < 0 || row >= U2_ROWS || col < 0 || col >= U2_COLS) return;
     v->grid[row][col] = ch;
-    u2_font_draw_cell(&v->text, row, col, ch, v->text.text_fg, U2_CGA_BLACK);
+    /* The engine's highlight bit swaps the pair this cell would otherwise be drawn
+     * with rather than naming a colour: a theme that ships an RGB table can make
+     * any index anything, which is exactly the trap that made the cursor invisible
+     * in the FM Towns theme. Everything else keeps the pair it has always used, so
+     * honouring the attribute is a no-op on every screen that does not ask for it. */
+    if (attr & U2_ATTR_HILITE)
+        u2_font_draw_cell(&v->text, row, col, ch, U2_CGA_BLACK, v->text.text_fg);
+    else
+        u2_font_draw_cell(&v->text, row, col, ch, v->text.text_fg, U2_CGA_BLACK);
 }
 
 static void sdl_cursor(u2_ctx *ctx, int row, int col, int visible)
@@ -462,6 +528,7 @@ const u2_renderer u2_renderer_sdl = {
     .flush = sdl_flush,
     .shutdown = sdl_shutdown,
     .present_frame = sdl_present_frame,
+    .screenshot = sdl_screenshot,
 };
 
 #endif /* U2_HAVE_SDL */

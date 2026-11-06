@@ -82,6 +82,10 @@ static void usage(const char *argv0)
         "  --dump-map FILE render one frame of the overworld to FILE as PPM\n"
         "                  (needs --data-dir with the game files; no display needed)\n"
         "  --dump-each     print the grid after every screen change (frame log)\n"
+        "  --dump-hilite   print the inverse-video cells after every screen change\n"
+        "                  as 'HILITE <row> <col>', 0-based. The grid dump carries\n"
+        "                  characters only, so this is how a highlight is asserted\n"
+        "                  without driving a terminal and parsing its escapes.\n"
         "  --debug cli     write turn-NNNNN.ppm and .json into --debug-path after\n"
         "                  every player turn. This is the only way to observe a\n"
         "                  running session; the dump flags are all run-then-exit.\n"
@@ -446,6 +450,8 @@ int main(int argc, char **argv)
             ctx.frame_dump_path = argv[++i];
         } else if (strcmp(a, "--dump-each") == 0) {
             ctx.dump_each = 1;
+        } else if (strcmp(a, "--dump-hilite") == 0) {
+            ctx.dump_hilite = 1;
         } else if (strcmp(a, "--dump-screen") == 0 && i + 1 < argc) {
             ctx.dump_screen = argv[++i];
         } else if (strcmp(a, "--debug") == 0) {

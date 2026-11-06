@@ -110,34 +110,55 @@ int main(int argc, char **argv)
     int occupied = u2_monsters_spawn(&ctx, &w);
     CHECK(occupied == 31, "31 occupied slots, the one all-zero slot reported empty (got %d)", occupied);
 
-    /* --- 1b. mapx bakes creature art into spawn cells; the clear removes it ---
-     * Self-contained: the fixture world is shared with the checks below, so the arrays are
-     * snapshotted and restored, and only slots the implementation itself would touch (in range)
-     * are asserted on. A test that mutates state for its neighbours is a false failure waiting
-     * to be blamed on someone else's change. */
+    /* --- 1b. mapx bakes creature art into spawn cells; the clear removes it, and only
+     *     those cells ---
+     * The real mapx is authored with the creatures drawn into the terrain, so the byte
+     * under a spawn cell IS that creature's own type. That is what the clear is for. A
+     * creature the wandering spawner parked on ordinary ground is not baked art and
+     * must keep its terrain: paving those cells is what put a red brick wall in the
+     * middle of sector 20's ocean, and the owner's save had 13 creatures there and 0
+     * baked cells, so all 13 were being paved.
+     *
+     * Self-contained: the fixture world is shared with the checks below, so the arrays
+     * are snapshotted and restored, and only slots the implementation itself would
+     * touch (in range) are asserted on. A test that mutates state for its neighbours is
+     * a false failure waiting to be blamed on someone else's change. */
     static uint8_t save_map[U2_SECTOR_TILES], save_base[U2_SECTOR_TILES];
     memcpy(save_map, w.map, sizeof save_map);
     memcpy(save_base, w.map_base, sizeof save_base);
     const uint8_t keep_x = ctx.state.mon_x[7], keep_y = ctx.state.mon_y[7];
 
+    const int CTRL_SLOT = 5;            /* left as plain terrain: the control */
     int inrange = 0;
     for (int i = 0; i < U2_MON_SLOTS; i++) {
         if (ctx.state.mon_type[i] == 0) continue;
         const int c = (int)ctx.state.mon_y[i] * U2_SECTOR_EDGE + (int)ctx.state.mon_x[i];
-        if (c >= 0 && c < U2_SECTOR_TILES) inrange++;
+        if (c < 0 || c >= U2_SECTOR_TILES) continue;
+        inrange++;
+        /* Bake the creature art the way a real mapx does, except on the control slot,
+         * which gets ordinary ground under it exactly as a wandering spawn would. */
+        const uint8_t under = (i == CTRL_SLOT) ? (uint8_t)0x08 : ctx.state.mon_type[i];
+        w.map_base[c] = under;
+        w.map[c] = under;
     }
     CHECK(inrange > 0, "fixture has in-range spawn cells to test (%d)", inrange);
 
     const int c7 = (int)ctx.state.mon_y[7] * U2_SECTOR_EDGE + (int)ctx.state.mon_x[7];
-    CHECK(c7 < U2_SECTOR_TILES && w.map_base[c7] != 0x70,
-          "fixture: spawn cell 7 starts as baked art, not paving");
+    const int c5 = (int)ctx.state.mon_y[CTRL_SLOT] * U2_SECTOR_EDGE + (int)ctx.state.mon_x[CTRL_SLOT];
+    CHECK(c7 < U2_SECTOR_TILES && w.map_base[c7] == ctx.state.mon_type[7],
+          "fixture: spawn cell 7 starts baked with its own creature art");
+
     u2_monsters_clear_spawn_cells(&ctx, &w);
 
-    int spawn_cleared = 1;
+    int spawn_cleared = 1, plain_kept = 1;
     for (int i = 0; i < U2_MON_SLOTS; i++) {
         if (ctx.state.mon_type[i] == 0) continue;
         const int c = (int)ctx.state.mon_y[i] * U2_SECTOR_EDGE + (int)ctx.state.mon_x[i];
         if (c < 0 || c >= U2_SECTOR_TILES) continue;   /* same guard as the implementation */
+        if (i == CTRL_SLOT) {
+            if (w.map_base[c] != 0x08 || w.map[c] != 0x08) plain_kept = 0;
+            continue;
+        }
         if (w.map_base[c] != 0x70 || w.map[c] != 0x70) spawn_cleared = 0;
     }
     int others_kept = 1;
@@ -153,7 +174,9 @@ int main(int argc, char **argv)
             others_kept = 0;
         }
     }
-    CHECK(spawn_cleared, "every in-range spawn cell became 0x70 paving in both map and map_base");
+    CHECK(spawn_cleared, "every baked spawn cell became 0x70 paving in both map and map_base");
+    CHECK(plain_kept,
+          "a creature standing on ordinary ground kept the ground under it (no brick paving)");
     CHECK(others_kept, "cells with no creature behind them kept their terrain");
 
     /* restamp must not resurrect the art - that resurrection IS the reported bug. */
@@ -169,6 +192,7 @@ int main(int argc, char **argv)
     memcpy(w.map_base, save_base, sizeof w.map_base);
     ctx.state.mon_x[7] = keep_x;
     ctx.state.mon_y[7] = keep_y;
+    (void)c5;
 
     int col_ok = 1;
     for (int i = 0; i < 31; i++) {

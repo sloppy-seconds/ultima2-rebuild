@@ -763,7 +763,17 @@ fi
 # load a sector without mapxNN.
 if [ -n "$CONTENT" ]; then
     T5KEYS="$WORK/t5.keys"
-    printf 'ESC\nC\n1\n5\n1\n5\n1\n5\n1\n5\n1\n5\n1\n5\nM\n1\n1\nB\nR\nI\nT\nI\nS\nH\n0x0d\n0x0d\n0x0d\n0x0d\n' > "$T5KEYS"
+    # The form is stepped and dropdowned, not typed: 0xf3 is Right (+1) and 0xf1
+    # is Down, so five of the former and one of the latter per stat takes each from
+    # its floor of 10 to 15 and moves on. Three pairs of Enter then open a dropdown
+    # and commit its first row: MALE, HUMAN, FIGHTER.
+    printf 'ESC\nC\n' > "$T5KEYS"
+    for s in 1 2 3 4 5 6; do
+        for i in 1 2 3 4 5; do printf '0xf3\n' >> "$T5KEYS"; done
+        printf '0xf1\n' >> "$T5KEYS"
+    done
+    for i in 1 2 3 4 5 6; do printf '0x0d\n' >> "$T5KEYS"; done
+    printf 'B\nR\nI\nT\nI\nS\nH\n0x0d\n0x0d\n0x0d\n0x0d\n' >> "$T5KEYS"
 
     rm -rf "$WORK/t5orig"; mkdir -p "$WORK/t5orig"
     ./u2 --headless --data-dir "$CONTENT" --save-dir "$WORK/t5orig" \

@@ -2,10 +2,10 @@
  * renderer_term.c — ANSI terminal backend.
  *
  * Paints the 80x25 grid with cursor addressing; the grid itself is owned by
- * core/vram.c so this stays a pure painter (seam discipline).
- * Colour attributes are mapped to the 16 CGA palette colours when the
- * terminal is asked for them; CP0 draws plain, CP9 (SDL2 CGA) is where
- * palette authenticity lives.
+ * core/vram.c so this stays a pure painter (seam discipline). The only attribute
+ * honoured is the engine's own highlight bit (U2_ATTR_HILITE, core/vram.h), which
+ * becomes ANSI reverse video. Full palette-accurate attribute mapping is still CP9
+ * work; this header used to claim it had already happened, and it had not.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,8 +21,13 @@ static int term_init(u2_ctx *ctx)
 
 static void term_cell(u2_ctx *ctx, int row, int col, uint8_t ch, uint8_t attr)
 {
-    (void)attr;
-    printf("\033[%d;%dH%c", row + 1, col + 1, (char)ch);
+    (void)ctx;
+    /* Reverse video for the engine's highlight bit. The glyph is written either
+     * way, so a terminal that eats the escape still gets the text. */
+    if (attr & U2_ATTR_HILITE)
+        printf("\033[%d;%dH\033[7m%c\033[27m", row + 1, col + 1, (char)ch);
+    else
+        printf("\033[%d;%dH%c", row + 1, col + 1, (char)ch);
 }
 
 static void term_cursor(u2_ctx *ctx, int row, int col, int visible)

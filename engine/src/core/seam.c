@@ -161,9 +161,28 @@ static void key_uppercase_fold(u2_key *k)
         k->ch = (uint8_t)(k->ch & 0xDF);
 }
 
+/* Ctrl-S: save the frame that is on screen and swallow the keystroke, so no game
+ * handler ever sees it and no letter shortcut is displaced. Handled here rather
+ * than in each screen because this is the one place every screen's input passes --
+ * title, creation, overworld and dungeon alike -- and a bug can be on any of them.
+ * A backend with no pixels leaves the hook NULL, and the key then reaches the game
+ * as the control byte it is, which is what happened before it meant anything. */
+#define U2_KEY_SCREENSHOT 0x13
+
+/* Returns 1 when the key was consumed here and the caller must not deliver it. */
+static int take_screenshot_key(u2_ctx *ctx, const u2_key *out)
+{
+    if (out->ch != U2_KEY_SCREENSHOT) return 0;
+    if (!ctx->renderer || !ctx->renderer->screenshot) return 0;
+    ctx->renderer->screenshot(ctx);
+    return 1;
+}
+
 int seam_key_poll(u2_ctx *ctx, u2_key *out)
 {
     int got = ctx->input->poll(ctx, out);
+    if (got > 0 && take_screenshot_key(ctx, out))
+        return 0;
     if (got > 0) {
         key_uppercase_fold(out);
         /* No "last key" state byte: DS:0x4A is the sector's second digit /
@@ -182,7 +201,13 @@ int seam_key_poll(u2_ctx *ctx, u2_key *out)
 
 int seam_key_wait(u2_ctx *ctx, u2_key *out)
 {
-    int got = ctx->input->wait(ctx, out);
+    int got;
+    for (;;) {
+        got = ctx->input->wait(ctx, out);
+        /* Ctrl-S is consumed here and never reaches the game, so keep waiting for
+         * a key the game should actually see. */
+        if (!(got > 0 && take_screenshot_key(ctx, out))) break;
+    }
     if (got > 0) {
         key_uppercase_fold(out);   /* same tail as the poll path; see key_uppercase_fold */
     } else if (got < 0) {
@@ -255,6 +280,10 @@ void seam_present(u2_ctx *ctx)
         u2_replay_record(ctx);
     if (ctx->dump_each) {
         u2_dump_screen(ctx, stdout);
+        fflush(stdout);
+    }
+    if (ctx->dump_hilite) {
+        u2_dump_hilite(ctx, stdout);
         fflush(stdout);
     }
 }

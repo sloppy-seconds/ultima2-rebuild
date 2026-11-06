@@ -75,11 +75,19 @@ grep -qE '"gold"[[:space:]]*:[[:space:]]*0' "$WORK/p_empty.out" \
 # exactly 12 in the record plus the 4 zero pad bytes the original writes, and
 # must not disturb the sex / class / race bytes that follow the field.
 printf 'ESC\nC\n' > "$WORK/longname.keys"
-for d in 2 0 2 0 1 5 1 5 1 0 1 0; do printf '%s\n' "$d" >> "$WORK/longname.keys"; done
-printf 'M\n1\n1\n' >> "$WORK/longname.keys"
-# The name must avoid the letter R: outside the name field R is the reset
-# shortcut (D9), and the 13th character onwards lands on other fields.
-for ch in A B C D E F G H I J K L M N O P Q S; do printf '%s\n' "$ch" >> "$WORK/longname.keys"; done
+# Spend the 30 spare points first: stepping is the only stat input now that D6 is
+# retired, and Save refuses while points are left unspent.
+for s in 1 2 3 4 5 6; do
+    for i in 1 2 3 4 5; do printf '0xf3\n' >> "$WORK/longname.keys"; done
+    printf '0xf1\n' >> "$WORK/longname.keys"
+done
+# Three pairs of Enter: the first opens a dropdown, the second commits its first
+# row. MALE, HUMAN, FIGHTER, and the cursor lands on the name field.
+for c in 1 2 3; do printf '0x0d\n0x0d\n' >> "$WORK/longname.keys"; done
+# Eighteen characters, R included. There are no letter shortcuts left on the form
+# (D9 became Enter-activated fields), so a name may hold any printable byte and a
+# name containing R must not reset the generation.
+for ch in A B C D E F G H I J K L M N O P Q R; do printf '%s\n' "$ch" >> "$WORK/longname.keys"; done
 printf '0x0d\n0x0d\n' >> "$WORK/longname.keys"
 mkdir -p "$WORK/longname"
 ./u2 --headless --script "$WORK/longname.keys" --save-dir "$WORK/longname" \
@@ -115,9 +123,20 @@ if command -v script >/dev/null 2>&1; then
     # \021 is Ctrl-Q: the run ends on its own instead of being killed at the
     # timeout, which is what used to make this suite take ~40 seconds.
     invalid_bytes=$(pty_run 'X\021' "$WORK/d_invalid")
-    # No newline after C: Enter walks the form now, so a stray one would shift
-    # every field by one before the first digit lands.
-    create_bytes=$(pty_run 'C151515151515M11BRITISH\r\r\021' "$WORK/d_create")
+    # The form is stepped and dropdowned, not typed: \033[C is Right (+1) and
+    # \033[B is Down, so five of the former and one of the latter per stat takes
+    # each from its floor of 10 to 15 and moves on. Then three pairs of Enter
+    # open a dropdown and commit its first row, then the name, then Enter to
+    # leave the name and Enter on SAVE.
+    CK='C'
+    for s in 1 2 3 4 5 6; do
+        for i in 1 2 3 4 5; do CK="${CK}\\033[C"; done
+        CK="${CK}\\033[B"
+    done
+    CK="${CK}\\r\\r\\r\\r\\r\\r"
+    CK="${CK}BRITISH"
+    CK="${CK}\\r\\r\\021"
+    create_bytes=$(pty_run "$CK" "$WORK/d_create")
     [ "$create_bytes" -gt $((invalid_bytes * 2)) ] \
         && ok "C draws a form in a real terminal (${create_bytes}B vs ${invalid_bytes}B for an invalid key)" \
         || bad "C produced no more screen output than an invalid key (${create_bytes}B vs ${invalid_bytes}B)"
@@ -134,6 +153,127 @@ if command -v script >/dev/null 2>&1; then
 else
     printf '  SKIP  script(1) unavailable, interactive pty test not run\n'
 fi
+
+# --- the dropdown form (D12) and the bonus preview (D13) -------------------
+# These assert on the grid, not on pixels: the box, the `>` highlight, the `+N`
+# deltas and the refusals are all text. The colour of the delta is deliberately
+# not tested because there is deliberately no colour yet.
+keys() { printf 'ESC\nC\n' > "$WORK/$1.keys"; }          # fresh form, cursor on STR
+feed() { printf '%s\n' "$2" >> "$WORK/$1.keys"; }
+grid() { ./u2 --headless --script "$WORK/$1.keys" --save-dir "$WORK/dd_$1" \
+              --dump-each > "$WORK/$1.grid" 2>&1; }
+
+# Six Downs walks STR..SEX; a pair of Enter opens a dropdown and commits its
+# first row, so this leaves MALE and HUMAN committed and the Type dropdown open
+# with FIGHTER highlighted.
+keys prev; for i in 1 2 3 4 5 6; do feed prev 0xf1; done
+for i in 1 2; do feed prev 0x0d; feed prev 0x0d; done
+feed prev 0x0d
+grid prev
+# MALE is +5 STR and FIGHTER +15 STR, so the highlighted row must already be
+# counted: the preview tracks the highlight, not only the commit.
+grep -q 'STRENGTH\.\.\.\.\. -10+ +20' "$WORK/prev.grid" \
+    && ok "preview adds the highlighted row: MALE +5 and FIGHTER +15 show as +20" \
+    || bad "preview did not track the highlight (expected 'STRENGTH..... -10+ +20')"
+grep -q 'INTELLIGENCE\. -10+ +5' "$WORK/prev.grid" \
+    && ok "HUMAN's +5 INT shows while the Type dropdown is open" \
+    || bad "HUMAN +5 INT missing from the preview"
+grep -qE 'STAMINA\.+ -10[+] *\|' "$WORK/prev.grid" \
+    && ok "STAMINA shows the stepping hints with no bonus: no choice modifies it" \
+    || bad "a bonus appeared on STAMINA, which asm/5400 never modifies"
+# No choice can lower a stat, so a minus must never be printable. The only legal
+# `-` on a stat line is the Left hint, so a second one on any stat line is a
+# negative bonus. If someone builds the red path this goes red, which is the point.
+neg=$(grep -E 'STRENGTH|AGILITY|STAMINA|CHARISMA|WISDOM|INTELLIGENCE' "$WORK/prev.grid" \
+       | awk '{ if (gsub(/-/, "-") > 1) n++ } END { print n + 0 }')
+[ "$neg" = "0" ] \
+    && ok "no negative bonus anywhere: every stat line carries exactly one minus" \
+    || bad "$neg stat line(s) carried a second minus; no creation modifier subtracts"
+
+# Esc closes a dropdown and changes nothing. Commit HUMAN, walk back to RACE,
+# open it, move the highlight to DWARF, cancel: the field must still read HUMAN.
+keys esc; for i in 1 2 3 4 5 6; do feed esc 0xf1; done
+feed esc 0x0d; feed esc 0x0d; feed esc 0x0d; feed esc 0x0d
+feed esc 0xf0; feed esc 0x0d; feed esc 0xf1; feed esc 0xf1; feed esc 0x1b
+grid esc
+if grep -q '>DWARF' "$WORK/esc.grid" && \
+   grep -q 'RACE-      HUMAN' "$WORK/esc.grid" && \
+   ! grep -q 'RACE-      DWARF' "$WORK/esc.grid"; then
+    ok "Esc cancels a dropdown: the highlight moved to DWARF and the field kept HUMAN"
+else
+    bad "Esc changed the committed value, or the highlight never moved"
+fi
+
+# Stepping is clamped at both ends, and says so.
+keys over; for i in $(seq 1 31); do feed over 0xf3; done
+grid over
+grep -q 'STRENGTH\.\.\.\.\. -40' "$WORK/over.grid" \
+    && ok "30 Rights take a stat to 40 and no further (90 budget, floor 10)" \
+    || bad "a stat left [10, 40] under stepping"
+grep -q 'no points left to spend' "$WORK/over.grid" \
+    && ok "the 31st Right is refused with a message" \
+    || bad "the 31st Right was swallowed silently"
+keys floor; feed floor 0xf2
+grid floor
+grep -q '10 is the minimum' "$WORK/floor.grid" \
+    && ok "a Left at the floor is refused with a message" \
+    || bad "a Left at the floor was swallowed silently"
+
+# Save refuses while points are unspent, and names the number.
+keys early; for i in $(seq 1 10); do feed early 0xf1; done
+feed early 0x0d
+grid early
+grep -q '30 points left to spend' "$WORK/early.grid" \
+    && ok "Save refuses an unspent budget and says how much is left" \
+    || bad "Save accepted a form with 30 points unspent"
+
+# --- the highlight inverts the whole field, not one cell -------------------
+# The grid dump carries characters only, so an inverted cell is identical to a
+# plain one there. --dump-hilite prints the cells the engine marked inverse, which
+# is what makes the highlight assertable at all -- and assertable headlessly, so
+# these need no pty, no sleep, and no terminal that understands reverse video.
+hil() {   # $1 = label; the highlight of the last presented frame
+    ./u2 --headless --script "$WORK/$1.keys" --save-dir "$WORK/hi_$1" \
+         --dump-hilite 2>/dev/null | grep HILITE
+}
+keys str
+keys sex; for i in 1 2 3 4 5 6; do feed sex 0xf1; done
+keys save; for i in $(seq 1 10); do feed save 0xf1; done
+keys dd;   for i in 1 2 3 4 5 6; do feed dd 0xf1; done; feed dd 0x0d
+
+want="HILITE 4 26
+HILITE 4 27"
+got=$(hil str | tail -2)
+[ "$got" = "$want" ] \
+    && ok "a stat value is highlighted as a whole: both cells of the number" \
+    || bad "stat highlight wrong: got [$(echo "$got" | tr '\n' ' ')] want [4 26 / 4 27]"
+want="HILITE 11 25
+HILITE 11 26
+HILITE 11 27
+HILITE 11 28
+HILITE 11 29"
+got=$(hil sex | tail -5)
+[ "$got" = "$want" ] \
+    && ok "an unset choice field highlights the whole ENTER word, 5 cells" \
+    || bad "ENTER not highlighted as a whole: got [$(echo "$got" | tr '\n' ' ')]"
+want="HILITE 16 10
+HILITE 16 11
+HILITE 16 12
+HILITE 16 13
+HILITE 16 14
+HILITE 16 15"
+got=$(hil save | tail -6)
+[ "$got" = "$want" ] \
+    && ok "the SAVE button is highlighted as a whole, 6 cells" \
+    || bad "SAVE not highlighted: got [$(echo "$got" | tr '\n' ' ')]"
+want="HILITE 19 16
+HILITE 19 17
+HILITE 19 18
+HILITE 19 19"
+got=$(hil dd | tail -4)
+[ "$got" = "$want" ] \
+    && ok "the dropdown highlights its whole marked word, not a caret beside it" \
+    || bad "dropdown row not highlighted as a whole: got [$(echo "$got" | tr '\n' ' ')]"
 
 # --- nothing generated may be committed -----------------------------------
 cat > "$WORK/probe_player" <<'EOF'

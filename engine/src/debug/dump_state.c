@@ -32,6 +32,14 @@ void u2_dump_screen(const u2_ctx *ctx, FILE *out)
     fputs("+\n", out);
 }
 
+void u2_dump_hilite(const u2_ctx *ctx, FILE *out)
+{
+    for (int r = 0; r < U2_ROWS; r++)
+        for (int c = 0; c < U2_COLS; c++)
+            if (ctx->vram.cell[r][c].attr & U2_ATTR_HILITE)
+                fprintf(out, "HILITE %d %d\n", r, c);
+}
+
 int u2_screen_text(const u2_ctx *ctx, char *out, int outsz)
 {
     char line[U2_COLS + 1];

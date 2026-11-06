@@ -79,6 +79,11 @@ typedef struct u2_renderer {
      * seam that lets a backend show real pixels without the game logic knowing
      * which backend exists. Returns non-zero when the display asked to quit. */
     int  (*present_frame)(u2_ctx *ctx, const struct u2_frame *f);
+    /* Optional: save the last presented frame to a file the backend chooses.
+     * Present only on bitmap backends, because a cell renderer has no pixels to
+     * capture. Returns zero on success and non-zero with the reason already on
+     * stderr; the caller does not print again. */
+    int  (*screenshot)(u2_ctx *ctx);
 } u2_renderer;
 
 typedef struct u2_input {

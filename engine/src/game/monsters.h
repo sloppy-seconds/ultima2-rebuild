@@ -124,6 +124,14 @@ int u2_monsters_at(const u2_ctx *ctx, int x, int y);
  * Whether the original clears at load or on departure is still open (docs/map-format.md § 9); both
  * produce this terrain, so both are served by clearing map_base once here. Call after the monx
  * load, while the arrays still hold spawn positions.
+ *
+ * Amended 2026-11-06 after the owner reported brick tiles in open country. The clear is now
+ * restricted to cells whose map byte actually equals the creature's own type, which is what the
+ * paragraph above is about. It used to fire for every slot carrying a type, and because this runs
+ * after the wandering spawner that paved ordinary terrain wherever a spawned creature stopped.
+ * Sector 20 in the owner's own save had 13 creatures and 0 baked cells, so all 13 got paved. Art
+ * 0x1C is subtle paving in the original CGA table and a red brick wall in the EGA fan pack and the
+ * FM Towns theme, which is why the defect was invisible in the DOS original and is not here.
  */
 void u2_monsters_clear_spawn_cells(u2_ctx *ctx, u2_world *w);
 

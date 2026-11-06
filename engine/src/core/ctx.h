@@ -174,6 +174,10 @@ typedef struct u2_ctx {
      * whole screen. See seam.h for why this is not folded into seam_key_wait itself. */
     void (*present_now)(struct u2_ctx *ctx);
     int dump_each;          /* --dump-each: print the grid after every present */
+    int dump_hilite;        /* --dump-hilite: print the highlighted cells after
+                             * every present. The grid dump carries characters
+                             * only, so this is the only headless way to see the
+                             * creation form's inverse-video highlight. */
     const char *dump_screen;/* --dump-screen F: SDL build saves the first
                              * presented frame to F as PPM, then the run ends.
                              * With SDL_VIDEODRIVER=dummy this makes the whole

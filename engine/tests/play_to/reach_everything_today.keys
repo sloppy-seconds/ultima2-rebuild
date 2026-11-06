@@ -8,9 +8,12 @@
 #               character on the disk it prints (INSERT PLAYER DISK) and waits
 #               for ESC, which is exactly what the original does
 #   ESC         dismisses that prompt
-#   C           create branch (asm/5400) — CP3 made this a real flow, so the
-#               route now completes a character: six stats of 15 (the 90-point
-#               budget exactly), MALE, HUMAN, FIGHTER, a name, and Y to accept.
+#   C           create branch (asm/5400). The form is stepped and dropdowned,
+#               not typed: 0xf3 is Right (+1) and 0xf1 is Down, so five Rights
+#               and a Down takes each stat from its floor of 10 to 15 and moves
+#               on, which spends the 30 spare points exactly. Then three pairs
+#               of Enter open a dropdown and commit its first row: MALE, HUMAN,
+#               FIGHTER. Then a name, Enter to leave the field, Enter on SAVE.
 #   0x0d        dismiss the status screen creation ends on
 WAIT
 WAIT
@@ -26,21 +29,48 @@ ESC
 P
 ESC
 C
-1
-5
-1
-5
-1
-5
-1
-5
-1
-5
-1
-5
-M
-1
-1
+0xf3
+0xf3
+0xf3
+0xf3
+0xf3
+0xf1
+0xf3
+0xf3
+0xf3
+0xf3
+0xf3
+0xf1
+0xf3
+0xf3
+0xf3
+0xf3
+0xf3
+0xf1
+0xf3
+0xf3
+0xf3
+0xf3
+0xf3
+0xf1
+0xf3
+0xf3
+0xf3
+0xf3
+0xf3
+0xf1
+0xf3
+0xf3
+0xf3
+0xf3
+0xf3
+0xf1
+0x0d
+0x0d
+0x0d
+0x0d
+0x0d
+0x0d
 B
 R
 I
