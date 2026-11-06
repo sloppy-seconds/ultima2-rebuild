@@ -23,6 +23,8 @@
 #include "core/demo.h"
 #include "core/state.h"
 #include "core/vram.h"
+#include "core/world.h"
+#include "game/monsters.h"
 
 static int fails;
 static int checks;
@@ -148,11 +150,80 @@ static int play_demo(u2_ctx *ctx, const char *path, int perturb)
     return u2_demo_finish(ctx);
 }
 
+/* ---- the derivability claim, in four assertions --------------------------------
+ *
+ * A demo carries the DS mirror and a digest of the sector bytes as the loader had
+ * them. It does not carry the grid. For that to be enough, the grid a viewer
+ * rebuilds has to be the grid the recorder stood in, which is true only if the
+ * stamp is a function of (map_base, the DS creature table) and the checkpoint
+ * restores that table wholesale.
+ *
+ * If this holds, a demo needs no `monx` delta at all: pristine content plus the
+ * checkpoint plus a restamp converges on the recorder's grid, and the only world
+ * bytes a demo has to carry are terrain edits nothing else can derive. If it does
+ * not hold, creature state has to move into the demo body and the format changes.
+ * This is the check that decides which, and it is the check a static read of
+ * u2_monsters_restamp() and u2_state_load_ds_buf() says yes to but cannot prove.
+ */
+static void checkpoint_drives_the_stamp(void)
+{
+    u2_ctx c;
+    u2_world w;
+    const int old_cell = 10 * U2_SECTOR_EDGE + 10;
+    const int new_cell = 20 * U2_SECTOR_EDGE + 20;
+
+    boot(&c, 7u);
+    memset(&w, 0, sizeof w);
+    w.map_loaded = 1;
+    for (int i = 0; i < U2_SECTOR_TILES; i++)
+        w.map_base[i] = w.map[i] = 0x08;    /* authored ground, no baked art */
+
+    /* The recorder's world: slot 3 alive at (10,10). */
+    c.state.mon_type[3] = 0x30;
+    c.state.mon_x[3]    = 10;
+    c.state.mon_y[3]    = 10;
+    u2_monsters_restamp(&c, &w);
+    expect(w.map[old_cell] == 0x30,
+           "stamp: the grid reads the DS creature table, not the world's mon buffer");
+
+    /* A checkpoint lands. u2_state_load_ds_buf() is a wholesale memcpy of the
+     * mirror, so this is what mounting one does to the table: slot 3 is gone and
+     * slot 5 is somewhere else with a different type. */
+    memset(c.state.mon_type, 0, sizeof c.state.mon_type);
+    memset(c.state.mon_x, 0, sizeof c.state.mon_x);
+    memset(c.state.mon_y, 0, sizeof c.state.mon_y);
+    c.state.mon_type[5] = 0x34;
+    c.state.mon_x[5]    = 20;
+    c.state.mon_y[5]    = 20;
+
+    /* The control, and it has to sit here rather than after the call. The grid is
+     * still the old one and nothing tracks state on its own, so a restamp that was
+     * never wired up would sail through every assertion below if this one came
+     * later. This is the assertion that makes ctx->demo_restamp_pending load
+     * bearing instead of decorative. */
+    expect(w.map[old_cell] == 0x30 && w.map[new_cell] == 0x08,
+           "control: a checkpoint with no restamp leaves the stale grid in place");
+
+    u2_monsters_restamp(&c, &w);
+    expect(w.map[new_cell] == 0x34,
+           "restamp after the checkpoint stamps the checkpoint's creature");
+    expect(w.map[old_cell] == 0x08,
+           "and the recorder's old stamp is erased to terrain, not left as a ghost");
+
+    /* The span guard. The claim above is only true while the checkpoint reaches the
+     * whole table; if U2_DEMO_SPAN ever shrinks below mon_role the four assertions
+     * still pass, because this harness pokes the struct directly. */
+    expect(U2_DEMO_SPAN >= U2_OFF(mon_role) + 32,
+           "the checkpoint span covers all six creature arrays");
+}
+
 int main(void)
 {
     char path[256];
     u2_ctx a, b;
     FILE *f;
+
+    checkpoint_drives_the_stamp();
 
     snprintf(path, sizeof path, "%s/u2-demo-check-%d.demo",
              getenv("TMPDIR") ? getenv("TMPDIR") : "/var/tmp", (int)getpid());

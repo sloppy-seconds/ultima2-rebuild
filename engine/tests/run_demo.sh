@@ -34,7 +34,7 @@ if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/demo_check" \
        tests/demo_check.c src/core/demo.c src/core/state.c src/core/vram.c \
        src/core/font.c src/core/frame.c src/core/view.c src/core/rng.c \
        src/core/timer.c src/core/sha256.c src/core/version.c src/core/replay.c \
-       src/debug/dump_state.c src/debug/trace.c 2>"$WORK/cc.err"; then
+       src/game/monsters.c src/debug/dump_state.c src/debug/trace.c 2>"$WORK/cc.err"; then
     cout=$("$WORK/demo_check" 2>&1)
     n=$(printf '%s\n' "$cout" | sed -n 's/^ *\([0-9]\{1,\}\) checks.*/\1/p')
     if printf '%s\n' "$cout" | grep -q "NOT OK"; then
