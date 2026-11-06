@@ -101,6 +101,12 @@ opt_run "cmd_provenance_derived" captures/spice86 -- python3 tools/cmd_handlers.
 # has seen run must carry an UNPROVEN marker, and nothing may be called code-complete while one
 # stands. Selftest first -- 9 controls, both polarities, including the one that proves the gate
 # refuses rather than passing on a tree it cannot see.
+# The engine's control-byte availability proof (docs/demo-record-playback.md D10,
+# W11). Required, not optional: it reads only asm/, which CI has, and its whole job
+# is to notice when a claim the demo toggle rests on has stopped being true.
+run "demo_key_gate selftest" tools/demo_key_gate.py -- python3 tools/demo_key_gate.py --selftest
+run "demo_key_gate" asm -- python3 tools/demo_key_gate.py
+
 run "cmd_marker_gate selftest" tools/cmd_marker_gate.py -- python3 tools/cmd_marker_gate.py --selftest
 run "cmd_marker_gate" engine/src docs/phase4-state.md -- python3 tools/cmd_marker_gate.py
 # Which SDL a build links is decided by this probe, and a wrong verdict is a build
