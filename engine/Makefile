@@ -58,7 +58,7 @@ DEPS     := $(OBJS:.o=.d)
 SDLOBJS  := $(patsubst %.c,$(BUILD)-sdl/%.o,$(SRCS))
 SDL_DEPS := $(SDLOBJS:.o=.d)
 
-.PHONY: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 clean content content-check licenses licenses-check fmtowns-map fmtowns-map-check sdl sdl-probe-check sdl-run sdl-win sdl-static play help fresh
+.PHONY: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo clean content content-check licenses licenses-check fmtowns-map fmtowns-map-check sdl sdl-probe-check sdl-run sdl-win sdl-static play help fresh
 
 all: $(BIN)
 
@@ -126,7 +126,10 @@ run: $(BIN)
 headless: $(BIN)
 	./$(BIN) --headless --script tests/title.keys --dump-state
 
-test: test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7
+test: test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo
+
+test-demo: $(BIN)
+	bash tests/run_demo.sh
 
 test-cp0: $(BIN)
 	bash tests/run_cp0.sh

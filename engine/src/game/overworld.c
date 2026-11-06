@@ -27,6 +27,7 @@
 #include "core/panel.h"
 #include "core/save.h"
 #include "core/seam.h"
+#include "core/demo.h"      /* Ctrl-R record/playback: the seam tap's other half */
 #include "core/tiles.h"
 #include "core/tiles_builtin.h"
 #include "core/view.h"
@@ -1465,9 +1466,25 @@ static int overworld_resume(u2_ctx *ctx, u2_overworld *ow)
     ctx->screen_player_col = ow->view.player_col;
     ctx->screen_player_row = ow->view.player_row;
 
+    /* The demo's sector digests are checked here, at the one point where the loaded
+     * bytes are both available and still pristine — after the load, before anything
+     * has stamped into them. This is where § 4's line lands: refuse on the bytes that
+     * reach the world, note on the bytes that only reach the screen. */
+    u2_demo_note_world(ctx, &ow->world);
+    if (u2_demo_overlay_failed(ctx)) return -1;
+
     if (!ctx->load_ds_path)
         return 0;
 
+    /* A --load-ds checkpoint is applied here, after everything that would overwrite
+     * it has run. A demo's is not: it mounts at the loop's first quiescent point, so
+     * that the instant it lands is the same instant the recorder took it (D12), and
+     * the two directions cannot be made to agree from two different places.
+     *
+     * The restamp is the step that is easy to forget and impossible to see in a state
+     * digest on its own: the grid the renderer draws is rebuilt from the creature
+     * table, so a resume that skips it presents a frame where every creature is
+     * invisible while every byte of state agrees (hazard 2). */
     const int sec_hi = ow->sector_hi, sec_lo = ow->sector_lo;
     if (u2_state_load_ds(&ctx->state, ctx->load_ds_path) != 0)
         return -1;
@@ -1894,6 +1911,40 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
     int idle_polls = 0;     /* polls since the last key, for the auto-PASS */
 
     for (;;) {
+        /* The quiescent point (D12), and it sits BEFORE the draw on purpose. The
+         * recorder takes its checkpoint here and the player takes its first delivered
+         * key after the draw, so playback has to mount the checkpoint at the same
+         * point in the same sequence or the two directions are measuring instants
+         * that differ by one frame. That is not a detail: it is the whole of "the
+         * state at a seam boundary is exactly the state playback will be in when it
+         * resumes there".
+         *
+         * A pending Ctrl-R takes effect here and nowhere else, and only when no
+         * command is half-typed, because `ow->pending_cmd` lives in this struct and
+         * not in the DS mirror — a checkpoint taken with one outstanding would name a
+         * state the format cannot restore.
+         *
+         * Space is folded in here rather than being a separate hook: the in-space
+         * command loop is this loop with a different tile set, which is what
+         * docs/handoff-2026-11-03.md § 2 concluded when it found that the
+         * discriminator byte does not exist. */
+        if (!ow->pending_cmd) {
+            u2_demo_mode dm = U2_DEMO_MODE_OVERWORLD;
+            if (u2_site_is_dungeon(ctx))       dm = U2_DEMO_MODE_DUNGEON;
+            else if (ctx->state.world == 0x0A) dm = U2_DEMO_MODE_SPACE;
+            else if (ctx->state.sector_second) dm = U2_DEMO_MODE_SITE;
+            u2_demo_quiescent(ctx, dm, &ow->world);
+            if (ctx->demo_restamp_pending) {
+                /* The checkpoint just landed. The draw path mirrors ow->x/ow->y back
+                 * into DS:00/01 every frame and the grid was stamped from the freshly
+                 * loaded monx, so both have to be re-synced before anything draws. */
+                ctx->demo_restamp_pending = 0;
+                ow->x = ctx->state.sector_x;
+                ow->y = ctx->state.sector_y;
+                u2_monsters_restamp(ctx, &ow->world);
+            }
+        }
+
         u2_overworld_draw(ctx, ow);
         if (seam_present_frame(ctx)) break;      /* window closed */
 
@@ -1909,13 +1960,29 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
              * closed the window mid-game. */
             if (ctx->exit_code || ctx->input_exhausted) break;
 
+            /* Playback's replacement for the poll-count trigger (D4). It is checked
+             * FIRST and unconditionally, including in headless, because a demo carries
+             * its own auto-PASS records: the threshold is then about how a session was
+             * recorded, not about whether an existing demo replays. */
+            if (u2_demo_auto_pass_due(ctx)) {
+                ow->pending_cmd = 0;
+                u2_overworld_pass(ctx, ow);
+                continue;
+            }
+
             /* Idle auto-PASS. The original advances time while the player
              * thinks: after enough polls with no input it performs a PASS,
              * costing food and letting monsters step. Headless runs are exempt
              * on purpose — scripted input must stay byte-exact against the CP2
              * baseline, and a poll-count timeout would make test outcomes depend
-             * on how fast the harness spins the loop. */
-            if (ctx->mode != U2_MODE_HEADLESS) {
+             * on how fast the harness spins the loop.
+             *
+             * The exemption is for the DEFAULT threshold, not for an explicit one:
+             * `--auto-pass-polls N` in a headless run asks for the mechanism by name,
+             * and a demo has to be able to record an idle turn in the only mode a gate
+             * can run it in (docs/demo-record-playback.md D4, W5). No CP2 baseline
+             * script passes the flag, so the baseline is untouched. */
+            if (ctx->mode != U2_MODE_HEADLESS || ctx->auto_pass_polls > 0) {
                 const int limit = ctx->auto_pass_polls == 0
                                 ? (int)U2_AUTO_PASS_POLLS
                                 : ctx->auto_pass_polls;
@@ -1924,6 +1991,13 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
                     /* If a command is half-typed, the PASS closes that same line:
                      * `CMD: ATTACK--PASS`, exactly as the live capture shows. */
                     ow->pending_cmd = 0;
+                    /* The one event the seam cannot see: a turn with no key behind it
+                     * (D4). This is the ONLY site that gets a `kind=auto` record —
+                     * cmd_P reaches u2_overworld_pass too, and a pass taken from a
+                     * recorded key must not also write an auto record, or playback
+                     * would synthesise a second PASS on top of the one cmd_P already
+                     * performed. */
+                    u2_demo_mark_auto_pass(ctx);
                     u2_overworld_pass(ctx, ow);
                     /* Not modelled: the original also steps every monster on
                      * this tick, observed live as one cell per auto-PASS while

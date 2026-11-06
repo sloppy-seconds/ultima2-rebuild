@@ -47,6 +47,7 @@
 #include "core/pic_ega.h"
 #include "core/save.h"
 #include "core/seam.h"
+#include "core/demo.h"
 #include "core/timer.h"
 #include "debug/trace.h"
 #include "gen_content.h"
@@ -288,6 +289,11 @@ static int wait_choice(u2_ctx *ctx)
 {
     u2_key k;
 
+    /* The title flow's top-level wait, so it is where a Ctrl-R pressed at the menu
+     * takes effect (D12). Nothing here is half-typed: the menu reads one key and
+     * acts on it, so every point in this loop is quiescent. */
+    u2_demo_quiescent(ctx, U2_DEMO_MODE_TITLE, NULL);
+
     while (!seam_key_poll(ctx, &k)) {
         /* input_exhausted is the flag that actually gets set: a finished
          * script, a closed window and --dump-screen all arrive through
@@ -296,8 +302,17 @@ static int wait_choice(u2_ctx *ctx)
          * is what made `SDL_VIDEODRIVER=dummy --dump-screen` write its frame
          * and then spin here for ever (T6, measured 2026-10-20: the PPM was
          * on disk, the process had to be killed). */
-        if (ctx->exit_code || ctx->input_exhausted || ctx->mode == U2_MODE_HEADLESS)
+        if (ctx->exit_code || ctx->input_exhausted)
             return -1;
+        /* The headless clause that used to sit in the test above is gone, and its
+         * absence is deliberate rather than an oversight: it conflated "no key this
+         * poll" with "the player has left", which is exactly the seam contract
+         * seam_key_poll documents as three states. A spent script sets
+         * input_exhausted, a closed window and --dump-screen set exit_code (T6, the
+         * failure this line was written for), and a swallowed control key — Ctrl-S, or
+         * Ctrl-R starting a recording — is neither. Answering -1 for a swallow is what
+         * made a scripted Ctrl-R look like the player walked away. */
+        seam_wait_ms(ctx, 16);
         seam_wait_ms(ctx, 20);
     }    seam_char_print(ctx, k.ch);
     seam_present(ctx);

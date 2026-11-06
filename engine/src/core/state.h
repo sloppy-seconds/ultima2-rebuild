@@ -683,4 +683,8 @@ void u2_state_init(u2_state *s);
  */
 int u2_state_load_ds(u2_state *s, const char *path);
 
+/* Apply a checkpoint that is already in memory. Demands the whole span; see the
+ * comment at the definition for why a short one is refused rather than tolerated. */
+int u2_state_load_ds_buf(u2_state *s, const unsigned char *buf, size_t n);
+
 #endif /* U2_STATE_H */

@@ -32,6 +32,7 @@
 #include "core/tiles_ega.h"
 #include "core/rng.h"
 #include "core/replay.h"
+#include "core/demo.h"
 #include "debug/trace.h"
 #include "debug/dump_state.h"
 #include "debug/turnlog.h"
@@ -192,10 +193,40 @@ static void usage(const char *argv0)
         "  Ctrl-Q  quit (the original has no quit key; 'Q' saves)\n"
         "  Ctrl-T  cycle the EGA tile theme (only with --ega; walks the themes\n"
         "          directory in alphabetical order)\n"
-        "  --mode M          reserved for CP11; only 'original' exists today\n"
-        "\nkeys while playing:\n"
-        "  Ctrl-Q  quit (the original has no quit key; 'Q' saves)\n"
-        "  --trace[=FILE]  log every seam call with its asm address\n",
+        "  Ctrl-R  start or stop a demo recording at the next prompt. The original\n"
+        "          has no record key, and nothing in asm/ compares against 0x12, so\n"
+        "          it displaces no shortcut — a gate checks that claim rather than\n"
+        "          resting on it (tools/demo_key_gate.py). A recording never starts\n"
+        "          with a command half-typed, and quitting while it is running ends\n"
+        "          the file cleanly.\n"
+        "  --trace[=FILE]  log every seam call with its asm address\n"
+        "\ndemo record and playback (docs/demo-record-playback.md):\n"
+        "  --playback FILE   replay a recording. It restores the checkpoint the file\n"
+        "                    carries, re-injects the recorded keys through the same\n"
+        "                    input seam a player's keys arrive on, and verifies every\n"
+        "                    record's digest. A demo that plays back wrong is a FAILED\n"
+        "                    playback: it names the record and exits 5. A demo written\n"
+        "                    by an older digest scope plays unverified and exits 6.\n"
+        "                    Writes go to a scratch save directory, so watching a demo\n"
+        "                    cannot touch your own saves or sector overlays.\n"
+        "  --demo-dir DIR    where recordings go (default: ./demos, created on demand).\n"
+        "                    Never /tmp: on this host that is RAM.\n"
+        "  --demo-name NAME  pin the filename instead of the host-time stamp, so a gate\n"
+        "                    can find the file it just made.\n"
+        "  --demo-snapshots  also write a full DS dump after every record. Local\n"
+        "                    debugging only; the reader ignores them and they are big.\n"
+        "  --salvage         play a recording with no @end, i.e. one an interrupted run\n"
+        "                    left behind. Refused without this, because a file that\n"
+        "                    silently stops early is indistinguishable from one that\n"
+        "                    played correctly up to the point it stopped.\n"
+        "  --speed-pin       say it out loud: playback keeps the recorded DS:74 speed\n"
+        "                    and tick pair instead of recalibrating. This is the default.\n"
+        "  --playback-continue  keep going past the first divergence. Diagnosis only:\n"
+        "                    the run has already failed.\n"
+        "  --playback-pace     pace a HEADLESS playback at real time. Off by default\n"
+        "                    because the gate has to finish; SDL and terminal playback\n"
+        "                    pace without being asked, and pacing cannot reach state.\n"
+        "  --mode M          reserved for CP11; only 'original' exists today\n",
         argv0);
 }
 
@@ -215,6 +246,15 @@ static int wire_backends(u2_ctx *ctx)
         ctx->audio    = &u2_audio_null;
         ctx->clock    = &u2_clock_script;
         ctx->input    = ctx->script_path ? &u2_input_script : &u2_input_term;
+        /* Headless names the null renderer because nothing is looking at the screen,
+         * and that stays the default. An explicit --renderer=terminal is honoured on
+         * top of it: the grid still composes, the escapes still go to stdout, and the
+         * input and clock stay scripted so the run is still reproducible. The demo
+         * gate needs exactly this combination, because "the renderer cannot reach game
+         * state" is a claim that can only be made by running a second renderer and
+         * comparing digests (docs/demo-record-playback.md W8). */
+        if (ctx->renderer_explicit && ctx->renderer_choice == U2_RENDERER_TERMINAL)
+            ctx->renderer = &u2_renderer_term;
 #ifdef U2_HAVE_SDL
     } else if (ctx->renderer_choice == U2_RENDERER_SDL) {
         /* The bitmap shell. It only moves pixels the engine already composed;
@@ -229,6 +269,29 @@ static int wire_backends(u2_ctx *ctx)
         ctx->audio    = &u2_audio_beep;
         ctx->clock    = &U2_CLOCK_HOST;
         ctx->input    = &u2_input_term;
+    }
+
+    /* --playback replaces the input backend and nothing else. The renderer stays
+     * whatever the mode chose, because a demo is watchable by ruling (D11) and the
+     * picture is presentation; the clock stays whatever the mode chose for the same
+     * reason, which is why headless playback is unthrottled (the script clock's
+     * sleep is instant) and SDL playback is not. Forcing the script clock here would
+     * have quietly deleted the pacing D11 asks for.
+     *
+     * auto_pass_polls goes to -1 for the session (D4): the playback loop polls for
+     * keys between records, each poll adds to the idle counter, and at the threshold
+     * the engine would perform a PASS that was never in the recording. The auto-PASS
+     * turns a demo does carry arrive through u2_demo_auto_pass_due instead. */
+    if (ctx->playback_path) {
+        ctx->input = &u2_input_demo;
+        ctx->auto_pass_polls = -1;
+        /* --playback-pace asks for real-time pacing in a run that would otherwise be
+         * unthrottled, and the script clock's sleep is instant by design. So the flag
+         * takes the host clock: pacing is presentation, and a presentation knob that
+         * silently does nothing is worse than one that is not offered. The state is
+         * driven from the file either way, which is what W15 measures. */
+        if (ctx->mode == U2_MODE_HEADLESS && ctx->demo_play_pace)
+            ctx->clock = &U2_CLOCK_HOST;
     }
 
     if (ctx->clock->init && ctx->clock->init(ctx) != 0) return -1;
@@ -319,6 +382,10 @@ int main(int argc, char **argv)
     u2_config cfg;
     memset(&ctx, 0, sizeof ctx);
     ctx.mode = U2_MODE_TERM;
+    /* D5 is the default, not an option: a playback that recalibrated the speed
+     * fields could diverge for a reason that looks like a deep bug, so pinning is
+     * what playback means and --speed-pin only names it out loud. */
+    ctx.demo_speed_pin = 1;
 
     ctx.debug_limit = U2_TURNLOG_DEFAULT_LIMIT;
 
@@ -328,6 +395,7 @@ int main(int argc, char **argv)
             ctx.mode = U2_MODE_HEADLESS;
         } else if (strcmp(a, "--sdl") == 0) {
             ctx.renderer_choice = U2_RENDERER_SDL;      /* legacy alias */
+            ctx.renderer_explicit = 1;
         } else if (strncmp(a, "--renderer=", 11) == 0) {
             const char *r = a + 11;
             if (strcmp(r, "sdl") == 0)
@@ -338,6 +406,7 @@ int main(int argc, char **argv)
                 fprintf(stderr, "u2: --renderer takes 'sdl' or 'terminal' (got '%s')\n", r);
                 return 2;
             }
+            ctx.renderer_explicit = 1;
         } else if (strcmp(a, "--play-map") == 0) {
             ctx.play_map = 1;
         } else if (strcmp(a, "--dev") == 0) {
@@ -359,6 +428,26 @@ int main(int argc, char **argv)
             ctx.keep_site_state = 1;
         } else if (strcmp(a, "--script") == 0 && i + 1 < argc) {
             ctx.script_path = argv[++i];
+        } else if (strcmp(a, "--playback") == 0 && i + 1 < argc) {
+            /* Replay a recorded demo (docs/demo-record-playback.md). The file names
+             * its own starting state, so nothing else on the command line chooses it. */
+            ctx.playback_path = argv[++i];
+        } else if (strcmp(a, "--demo-dir") == 0 && i + 1 < argc) {
+            ctx.demo_dir = argv[++i];
+        } else if (strcmp(a, "--demo-name") == 0 && i + 1 < argc) {
+            /* Pins the filename a gate needs to find. Without it the name is host
+             * time, which is what a person wants and what a test cannot assert on. */
+            ctx.demo_name = argv[++i];
+        } else if (strcmp(a, "--demo-snapshots") == 0) {
+            ctx.demo_snapshots = 1;
+        } else if (strcmp(a, "--salvage") == 0) {
+            ctx.demo_salvage = 1;
+        } else if (strcmp(a, "--speed-pin") == 0) {
+            ctx.demo_speed_pin = 1;
+        } else if (strcmp(a, "--playback-continue") == 0) {
+            ctx.demo_play_continue = 1;
+        } else if (strcmp(a, "--playback-pace") == 0) {
+            ctx.demo_play_pace = 1;
         } else if (strcmp(a, "--save-dir") == 0 && i + 1 < argc) {
             ctx.save_dir = argv[++i];
         } else if (strcmp(a, "--cleanroom") == 0) {
@@ -646,6 +735,49 @@ int main(int argc, char **argv)
         return 2;
     }
 
+    /* Two input backends is a configuration with no meaning. A script and a demo
+     * both claim the keyboard and whichever won would decide what the player saw,
+     * so the combination is refused in the same style as the one above rather than
+     * resolved by a precedence nobody asked for. */
+    if (ctx.playback_path && ctx.script_path) {
+        fprintf(stderr, "u2: --playback and --script together is refused: a demo and a"
+                        " key script are two sources of the same keystrokes.\n");
+        return 2;
+    }
+
+    /* Playback must not touch the player's saves or overlays (§ 7.4). A demo
+     * containing a `Q`, or simply a site entry — the original auto-saves on site
+     * entry and on rocket launch, measured 2026-11-03 — would otherwise mutate the
+     * viewer's own slot while they were only watching. The scratch directory sits
+     * under the demo's own directory so a shared demo brings its scratch with it,
+     * and the redirect is announced once because a save that silently went somewhere
+     * else is the kind of surprise this project refuses elsewhere.
+     *
+     * It is set here, before the slot migration below, because `u2_slot_adopt_legacy`
+     * reads the same field: adopting into a scratch directory the player never named
+     * would move their real record. */
+    if (ctx.playback_path) {
+        static char scratch[520];
+        char base[430];
+        const char *slash = strrchr(ctx.playback_path, '/');
+
+        if (ctx.demo_dir && *ctx.demo_dir)
+            snprintf(base, sizeof base, "%.400s", ctx.demo_dir);
+        else if (slash) {
+            size_t n = (size_t)(slash - ctx.playback_path);
+            if (n >= sizeof base) n = sizeof base - 1;
+            memcpy(base, ctx.playback_path, n);
+            base[n] = '\0';
+            if (n == 0) snprintf(base, sizeof base, ".");
+        } else
+            snprintf(base, sizeof base, "demos");
+
+        snprintf(scratch, sizeof scratch, "%.429s/playback", base);
+        ctx.save_dir = scratch;
+        fprintf(stderr, "u2: playback writes go to the scratch save directory '%s'; "
+                        "your own saves are untouched.\n", scratch);
+    }
+
     /* --keep-site-state is an enhanced-mode knob. Refusing it in original mode is the
      * whole point: the original writes no sector file on a transition, so a default-mode
      * run that persisted town state would be inventing behaviour, quietly, and the CP2
@@ -806,6 +938,18 @@ int main(int argc, char **argv)
     if (ctx.play_map || map_dump_path)
         (void)u2_save_load(&ctx);
 
+    /* Parse the demo before a single backend is wired, so a file that cannot be
+     * played is refused before anything has been opened or drawn. The refusal rules
+     * — an unknown format version, a missing checkpoint, a file with no `@end`
+     * unless --salvage, a checkpoint that disagrees with its own digest — live in
+     * core/demo.c and every one of them prints its reason and exits 2. */
+    if (ctx.playback_path) {
+        if (u2_demo_begin_playback(&ctx, ctx.playback_path) != 0) {
+            u2_trace_close(&ctx);
+            return 2;
+        }
+    }
+
     if (map_dump_path) {
         /* No backends, no display: this path exists so the real extracted tiles
          * can be seen, and diffed, on a machine with no screen at all. */
@@ -826,6 +970,18 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* A demo that started outside the world has no sector to wait for, and one that
+     * started inside it needs its sector digits in place before the world is opened.
+     * Both mount at the first quiescent point of the flow entered below, which is the
+     * instant the recorder took them (core/demo.h). */
+    {
+        int dhi = 0, dlo = 0;
+        if (u2_demo_preload_sector(&ctx, &dhi, &dlo)) {
+            ctx.state.sector_first = (uint8_t)dhi;
+            ctx.state.sector_second = (uint8_t)dlo;
+        }
+    }
+
     /* One directory per launch, named by its launch time in ISO 8601, always —
      * whether the base came from --debug or --debug-path. A fixed directory is a
      * trap: turn-00001.ppm from yesterday sits next to today's and an agent
@@ -843,7 +999,40 @@ int main(int argc, char **argv)
         fprintf(stderr, "u2: --debug cli writing to %s\n", full);
     }
 
-    if (ctx.play_map) {
+    if (ctx.playback_path) {
+        /* Playback enters the recorded mode's own flow rather than the title menu,
+         * because the checkpoint stands in for every key that would have got there.
+         * Running the title flow and letting it spend the demo's first keys reaching a
+         * menu would replay input the recording never made and verify a state the
+         * recording never had, which is the opposite of what a digest is for. */
+        const u2_demo_mode dm = u2_demo_playback_mode(&ctx);
+        if (u2_demo_mode_needs_world(dm)) {
+            u2_overworld ow;
+            const int rc = u2_overworld_init_state(&ctx, &ow);
+            fprintf(stderr, "overworld: %s\n", ow.note);
+            if (rc == 0)
+                u2_overworld_loop(&ctx, &ow);
+            else if (u2_demo_overlay_failed(&ctx)) {
+                /* The reason was already printed and named the file. This is a
+                 * refusal, not a divergence: the demo was never played, so reporting
+                 * it with the divergence code would say the engine disagreed when in
+                 * fact the content did. */
+                (void)u2_demo_finish(&ctx);
+                release_backends(&ctx);
+                u2_trace_close(&ctx);
+                return 2;
+            } else
+                ctx.exit_code = 1;
+        } else {
+            /* Unreachable today, and kept as a refusal rather than a silent fall
+             * through: the only non-world mode the recorder will start is one that
+             * playback can enter, and if that ever changes the wrong answer should be
+             * a loud one. core/demo.h names the reason creation is refused. */
+            fprintf(stderr, "u2: no playback entry for start mode '%s'.\n",
+                    u2_demo_mode_name(dm));
+            ctx.exit_code = 2;
+        }
+    } else if (ctx.play_map) {
         /* The record is already loaded (above), so this enters the world as the
          * character on disk rather than as a blank state. The note goes to stderr
          * unconditionally: on this development entry "sector 31 ... 32 creatures"
@@ -885,6 +1074,21 @@ int main(int argc, char **argv)
     if (report_path && u2_replay_write(&ctx, report_path) != 0) {
         fprintf(stderr, "u2: cannot write replay report '%s'\n", report_path);
         ctx.exit_code = 1;
+    }
+    /* The graceful quit while recording, which is an owner requirement rather than a
+     * nicety: quitting while the red light is on must end the file cleanly. This is
+     * also the SIGINT/SIGTERM path — input_sdl.c installs the handlers and turns the
+     * signal into a quit request, so a killed run reaches this line the same way a
+     * closed window does, and the epilogue gets written. Only SIGKILL, which has no
+     * handler, skips it, and that is the case D8's "incomplete, and says so" covers.
+     *
+     * For playback this is also where the verdict lands: a divergent demo exits
+     * non-zero naming the record (D6), and a demo from another digest scope exits
+     * with its own distinct code (D13). */
+    {
+        const int demo_rc = u2_demo_finish(&ctx);
+        if (demo_rc != 0 && ctx.exit_code == 0)
+            ctx.exit_code = demo_rc;
     }
     free(ctx.replay);
     ctx.replay = NULL;

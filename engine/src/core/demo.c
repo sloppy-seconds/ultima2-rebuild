@@ -1,0 +1,1239 @@
+/*
+ * demo.c — record and playback of a playable session. See core/demo.h; the
+ * decisions are D1..D13 in docs/demo-record-playback.md and the D-numbers below
+ * point at them rather than restating them, because a restated decision is a
+ * second copy that can drift and then lie.
+ *
+ * Shape: one struct, two directions. Recording appends and flushes per record so
+ * a hard kill loses at most the open record (D8); playback parses the whole file
+ * up front so a truncated file is refused before a single key is delivered rather
+ * than discovered at record 4000.
+ */
+#define _POSIX_C_SOURCE 200809L   /* mkdir, stat, localtime under -std=c11 */
+
+#include "core/demo.h"
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <time.h>
+
+#include "core/compat.h"
+#include "core/save.h"
+#include "core/sha256.h"
+#include "core/state.h"
+#include "debug/dump_state.h"
+
+const int U2_DEMO_EXCLUDE[U2_DEMO_EXCLUDE_COUNT] = {
+    0x74, 0x75, 0x550, 0x551, 0x552, 0x553
+};
+
+#define U2_DEMO_MAX_KEYS_PER_REC 8
+#define U2_DEMO_MAX_OVERLAYS 3
+#define U2_DEMO_LINEBUFSZ 768
+/* The saved record is 256 bytes at DS:36 (core/save.h). Named once here so the
+ * two places that digest it cannot disagree about the span. */
+#define U2_DEMO_RECORD_BYTES 256
+
+typedef struct u2_demo_rec {
+    int      kind;                    /* 0 = key, 1 = auto */
+    u2_key   keys[U2_DEMO_MAX_KEYS_PER_REC];
+    int      n_keys;
+    uint32_t rolls;
+    char     sha[65];
+} u2_demo_rec;
+
+typedef struct u2_demo {
+    u2_demo_state state;
+    u2_demo_mode  mode;
+
+    /* ---- recording ---- */
+    FILE      *file;
+    char       path[600];
+    sha256_ctx framing;               /* running digest over every byte written */
+    int        n_written;
+    int        pending_start;
+    int        pending_stop;
+    int        started;               /* header + checkpoint are on disk */
+    int        finished;
+
+    /* ---- parsed file ---- */
+    u2_demo_rec *recs;
+    int        n_recs;
+    int        cap_recs;
+    int        format_version;
+    int        digest_version;
+    int        span;
+    int        n_excl;
+    int        excl[U2_DEMO_EXCLUDE_COUNT];
+    char       engine[64];
+    char       content[128];
+    char       art[16];
+    char       theme[40];
+    int        enhanced;
+    int        sector_hi, sector_lo;
+    char       save_sha[65];
+    char       checkpoint_sha[65];
+    char       end_state_sha[65];
+    char       end_frame_sha[65];
+    uint8_t    checkpoint[U2_DEMO_SPAN];
+    int        has_checkpoint;
+    int        complete;              /* @end was seen */
+
+    struct { char name[24]; char sha[65]; } overlay[U2_DEMO_MAX_OVERLAYS];
+    int        n_overlay;
+    int        overlay_checked;       /* the comparison is a one-shot, see note_world */
+    int        overlay_failed;
+
+    /* ---- playback cursor ---- */
+    int        cur_rec;
+    int        cur_key;
+    int        verified_through;      /* last record whose digest was checked */
+    int        diverged;              /* first bad record index, -1 = none */
+    int        applied;               /* checkpoint has been mounted */
+    int        reported;
+    int        closing_checked;       /* the @end state digest was compared */
+} u2_demo;
+
+/* ---- small helpers ------------------------------------------------------- */
+
+static void hex64(const uint8_t in[32], char out[65])
+{
+    static const char digits[] = "0123456789abcdef";
+    for (int i = 0; i < 32; i++) {
+        out[i * 2]     = digits[in[i] >> 4];
+        out[i * 2 + 1] = digits[in[i] & 0x0F];
+    }
+    out[64] = '\0';
+}
+
+static int hex_ok(const char *s)
+{
+    if (!s || strlen(s) != 64) return 0;
+    for (int i = 0; i < 64; i++) {
+        const char c = s[i];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+            return 0;
+    }
+    return 1;
+}
+
+/* Pull `key=` out of a line. Returns NULL when absent; `val` receives the value up
+ * to the next space.
+ *
+ * The word-boundary test is load-bearing, not tidiness: `sha=` must not be found
+ * inside `save-sha=`, and a naive strstr would read the save digest as the record
+ * digest and report a clean file as corrupt. */
+static const char *field(const char *line, const char *key, char *val, size_t valsz)
+{
+    const size_t klen = strlen(key);
+    const char *p = line;
+
+    while ((p = strstr(p, key)) != NULL) {
+        if ((p == line || p[-1] == ' ') && p[klen] == '=') {
+            p += klen + 1;
+            size_t i = 0;
+            while (p[i] && p[i] != ' ' && p[i] != '\n' && i + 1 < valsz) {
+                val[i] = p[i];
+                i++;
+            }
+            val[i] = '\0';
+            return val;
+        }
+        p += klen;
+    }
+    return NULL;
+}
+
+void u2_demo_digest(const u2_ctx *ctx, char out[65])
+{
+    unsigned char span[U2_DEMO_SPAN];
+    char head[80];
+    uint8_t d[32];
+    sha256_ctx c;
+
+    /* The whole mirror, with the clock-derived bytes blanked rather than skipped:
+     * the exclusion is then six zeroed positions in one fixed-length buffer
+     * instead of a variable-length one whose length depends on which offsets
+     * happened to be excluded. D3's "the snapshot carries them and the comparison
+     * excludes them", made literal. */
+    memcpy(span, &ctx->state, sizeof span);
+    for (int i = 0; i < U2_DEMO_EXCLUDE_COUNT; i++)
+        span[U2_DEMO_EXCLUDE[i]] = 0;
+
+    /* State only, not pixels, and that is the plan's scope rather than a shortcut:
+     * D6 names the frozen CP2 digest, whose screen contribution is the cursor and a
+     * write counter, not the grid. The grid cannot be in here because the checkpoint
+     * cannot restore it — a demo carries DS:0000..064F and the text grid lives
+     * outside the DS mirror — and a digest of something playback cannot reproduce is
+     * a guaranteed false positive, which is worse than no check.
+     *
+     * What that costs, stated rather than hidden: hazard 2's missing restamp leaves
+     * every DS byte agreeing while the frame shows no creatures. The creature table
+     * IS in here, so the state that a restamp is derived from is verified; the stamp
+     * itself is not, and only a frame comparison can see it. W7's digest check is
+     * therefore a state proof and not a picture proof, and must not be cited as one. */
+    sha256_init(&c);
+    const int n = snprintf(head, sizeof head, "udemo-digest %d rolls=%u\n",
+                           U2_DEMO_DIGEST_VERSION, ctx->rng_rolls);
+    if (n > 0) sha256_update(&c, head, (size_t)n);
+    sha256_update(&c, span, sizeof span);
+    sha256_final(&c, d);
+    hex64(d, out);
+}
+
+const char *u2_demo_mode_name(u2_demo_mode m)
+{
+    switch (m) {
+    case U2_DEMO_MODE_TITLE:     return "title";
+    case U2_DEMO_MODE_CREATION:  return "creation";
+    case U2_DEMO_MODE_OVERWORLD: return "overworld";
+    case U2_DEMO_MODE_SITE:      return "site";
+    case U2_DEMO_MODE_DUNGEON:   return "dungeon";
+    case U2_DEMO_MODE_SPACE:     return "space";
+    }
+    return "overworld";
+}
+
+static u2_demo_mode mode_from_name(const char *s)
+{
+    if (!strcmp(s, "creation"))  return U2_DEMO_MODE_CREATION;
+    if (!strcmp(s, "site"))      return U2_DEMO_MODE_SITE;
+    if (!strcmp(s, "dungeon"))   return U2_DEMO_MODE_DUNGEON;
+    if (!strcmp(s, "space"))     return U2_DEMO_MODE_SPACE;
+    if (!strcmp(s, "title"))     return U2_DEMO_MODE_TITLE;
+    return U2_DEMO_MODE_OVERWORLD;
+}
+
+int u2_demo_mode_needs_world(u2_demo_mode m)
+{
+    switch (m) {
+    case U2_DEMO_MODE_OVERWORLD:
+    case U2_DEMO_MODE_SITE:
+    case U2_DEMO_MODE_DUNGEON:
+    case U2_DEMO_MODE_SPACE:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+/* ---- the recorder -------------------------------------------------------- */
+
+static void emit(u2_demo *d, const char *fmt, ...)
+#if defined(__GNUC__)
+    __attribute__((format(printf, 2, 3)))
+#endif
+    ;
+
+/* One line to disk and into the framing digest, from the same bytes. Two writers
+ * of the same line is how an epilogue digest stops covering what it claims to. */
+static void emit(u2_demo *d, const char *fmt, ...)
+{
+    char line[U2_DEMO_LINEBUFSZ];
+    va_list ap;
+
+    va_start(ap, fmt);
+    const int n = vsnprintf(line, sizeof line, fmt, ap);
+    va_end(ap);
+    if (n <= 0) return;
+    fwrite(line, 1, (size_t)n, d->file);
+    sha256_update(&d->framing, line, (size_t)n);
+}
+
+static void emit_hex_payload(u2_demo *d, const uint8_t *bytes, size_t n)
+{
+    /* Two leading spaces, because the format says a payload line is a payload line
+     * (§ 4) and the parser dispatches on exactly that. Writing bare hex here produced
+     * a file whose checkpoint the reader could not find. */
+    char line[132];
+    size_t i = 0;
+
+    while (i < n) {
+        size_t j = 2;
+        line[0] = ' ';
+        line[1] = ' ';
+        for (size_t k = 0; k < 32 && i + k < n; k++)
+            j += (size_t)sprintf(line + j, "%02x", bytes[i + k]);
+        line[j++] = '\n';
+        fwrite(line, 1, j, d->file);
+        sha256_update(&d->framing, line, j);
+        i += 32;
+    }
+}
+
+static void keys_to_text(const u2_demo_rec *r, char *out, size_t outsz)
+{
+    size_t n = 0;
+
+    *out = '\0';
+    for (int i = 0; i < r->n_keys; i++) {
+        const int w = snprintf(out + n, outsz - n, "%s%02x:%02x",
+                               i ? "," : "", r->keys[i].ch, r->keys[i].scan);
+        if (w <= 0 || (size_t)w >= outsz - n) break;
+        n += (size_t)w;
+    }
+}
+
+static void write_header(u2_ctx *ctx, u2_demo *d)
+{
+    char ver[32];
+    char sha[65];
+
+    u2_engine_version(ver, (int)sizeof ver);
+    emit(d, "%s %d\n", U2_DEMO_MAGIC, U2_DEMO_VERSION);
+    emit(d, "engine %s\n", ver);
+    emit(d, "digest-version %d\n", U2_DEMO_DIGEST_VERSION);
+    emit(d, "content %s\n", ctx->content_source ? ctx->content_source : "none");
+    emit(d, "mode %s\n", u2_demo_mode_name(d->mode));
+    emit(d, "sector %u%u\n", (unsigned)ctx->state.sector_first,
+         (unsigned)ctx->state.sector_second);
+    emit(d, "span %d\n", U2_DEMO_SPAN);
+    emit(d, "exclude");
+    for (int i = 0; i < U2_DEMO_EXCLUDE_COUNT; i++)
+        emit(d, " %x", U2_DEMO_EXCLUDE[i]);
+    emit(d, "\n");
+
+    /* The record region of the checkpoint: the same 256 bytes the original's own
+     * save writes (DS:36..0x135, core/save.h). Checked against the checkpoint at
+     * load, which is what makes a corrupted checkpoint read as a broken file and
+     * not as a demo that diverges at record 1 — hazard 4's two digests, two jobs. */
+    sha256_hex((const unsigned char *)&ctx->state + U2_PLAYER_RECORD_DS,
+               U2_DEMO_RECORD_BYTES, sha);
+    emit(d, "save-sha %s\n", sha);
+
+    for (int i = 0; i < d->n_overlay; i++)
+        emit(d, "overlay %s %s\n", d->overlay[i].name, d->overlay[i].sha);
+
+    emit(d, "art %s\n", ctx->art_mode == U2_ART_EGA ? "ega" : "cga");
+    emit(d, "theme %s\n", (ctx->ega_theme && *ctx->ega_theme) ? ctx->ega_theme : "default");
+    emit(d, "enhanced %d\n", ctx->enhanced_layout ? 1 : 0);
+    emit(d, "\n");
+}
+
+static void write_checkpoint(u2_ctx *ctx, u2_demo *d)
+{
+    char sha[65];
+
+    emit(d, "@checkpoint keys=%d rolls=%u sector=%u%u\n",
+         ctx->keys_consumed, ctx->rng_rolls,
+         (unsigned)ctx->state.sector_first, (unsigned)ctx->state.sector_second);
+    emit_hex_payload(d, (const uint8_t *)&ctx->state, U2_DEMO_SPAN);
+    sha256_hex((const unsigned char *)&ctx->state, U2_DEMO_SPAN, sha);
+    emit(d, "@checkpoint-sha %s\n", sha);
+}
+
+static void write_record(u2_ctx *ctx, u2_demo *d, const u2_demo_rec *r)
+{
+    char keys[U2_DEMO_MAX_KEYS_PER_REC * 6 + 1];
+
+    keys_to_text(r, keys, sizeof keys);
+    emit(d, "@rec %d kind=%s keys=%s rolls=%u sha=%s\n",
+         d->n_written + 1, r->kind ? "auto" : "key", keys, r->rolls, r->sha);
+
+    if (ctx->demo_snapshots) {
+        emit(d, "@snap %d\n", d->n_written + 1);
+        emit_hex_payload(d, (const uint8_t *)&ctx->state, U2_DEMO_SPAN);
+    }
+    d->n_written++;
+    fflush(d->file);      /* D8: a hard kill loses at most the open record */
+}
+
+/* The default filename: basic ISO 8601, so lexical order is chronological order
+ * and the name is legal on a Windows filesystem (the engine ships `make sdl-win`,
+ * and the extended form's colons are not). Host time, never ctx->clock, which is
+ * virtual under a scripted run and would name every run the same file (hazard 7).
+ */
+static void default_demo_path(u2_ctx *ctx, char *out, size_t outsz)
+{
+    char dir[430];
+    char stamp[32];
+    time_t now = time(NULL);
+    struct tm lt;
+
+    if (ctx->demo_dir && *ctx->demo_dir)
+        snprintf(dir, sizeof dir, "%.400s", ctx->demo_dir);
+    else
+        snprintf(dir, sizeof dir, "%s", "demos");
+
+    if (ctx->demo_name && *ctx->demo_name) {
+        snprintf(out, outsz, "%.429s/%.120s", dir, ctx->demo_name);
+        if (!strstr(out, ".demo")) {
+            const size_t n = strlen(out);
+            if (n + 6 < outsz) snprintf(out + n, outsz - n, ".demo");
+        }
+        return;
+    }
+
+    localtime_r(&now, &lt);
+    strftime(stamp, sizeof stamp, "%Y%m%dT%H%M%S", &lt);
+    snprintf(out, outsz, "%.429s/%.16s.demo", dir, stamp);
+
+    /* Never overwrite what someone was about to share. A collision is unlikely at
+     * one-second resolution on a single-instance engine and unrecoverable when it
+     * happens, so the cheap check is worth it. */
+    for (int n = 2; n < 100; n++) {
+        FILE *probe = fopen(out, "r");
+        if (!probe) break;
+        fclose(probe);
+        snprintf(out, outsz, "%.429s/%.16s-%d.demo", dir, stamp, n);
+    }
+}
+
+static int ensure_dir(const char *path)
+{
+    struct stat st;
+    if (stat(path, &st) == 0) return S_ISDIR(st.st_mode) ? 0 : -1;
+    return mkdir(path, 0755);
+}
+
+void u2_demo_begin_recording(u2_ctx *ctx, const char *path)
+{
+    u2_demo *d;
+
+    if (ctx->demo) {
+        if (u2_demo_state_of(ctx) == U2_DEMO_PLAYING)
+            fprintf(stderr, "u2: refusing to record a playback. A demo of a demo "
+                            "would carry two checkpoints and one honest explanation.\n");
+        return;
+    }
+    d = calloc(1, sizeof *d);
+    if (!d) return;
+    d->state = U2_DEMO_IDLE;
+    d->diverged = -1;
+    ctx->demo = d;
+    d->pending_start = 1;
+
+    if (path && *path)
+        snprintf(d->path, sizeof d->path, "%.599s", path);
+    else
+        default_demo_path(ctx, d->path, sizeof d->path);
+    /* Announced at the press, not at the quiescent point, because the whole point of
+     * the message is that the player knows to stop it. AGENTS.md § 3: an action the
+     * player takes must produce a message, and a recording that started silently is
+     * a recording nobody remembers to end. */
+    fprintf(stderr, "u2: RECORDING - Ctrl-R TO STOP\n");
+}
+
+/* ---- the seam tap -------------------------------------------------------- */
+
+static u2_demo *of(const u2_ctx *ctx) { return ctx->demo; }
+
+int u2_demo_key(u2_ctx *ctx, u2_key *k)
+{
+    u2_demo *d = of(ctx);
+
+    if (k->ch == U2_KEY_DEMO_TOGGLE) {
+        const int at_boundary = ctx->demo_at_quiescent;
+        const u2_demo_mode boundary_mode = (u2_demo_mode)ctx->demo_quiescent_mode;
+
+        if (!d) {
+            /* The first Ctrl-R, with nothing armed. This is the only way recording
+             * starts: there is no --record flag, because the owner's spec is a key
+             * press and a second way to do it is a second way to get it wrong. */
+            u2_demo_begin_recording(ctx, NULL);
+            d = of(ctx);
+            if (!d) return 1;
+        }
+        if (d->state == U2_DEMO_PLAYING) {
+            /* Ctrl-R in playback stops it and does NOT start a recording, so a
+             * player cannot accidentally record a playback. */
+            fprintf(stderr, "u2: playback stopped at record %d of %d\n",
+                    d->cur_rec, d->n_recs);
+            d->cur_rec = d->n_recs;
+            d->cur_key = 0;
+            return 1;
+        }
+        if (d->state == U2_DEMO_RECORDING) {
+            /* Idempotent under a double tap: a second Ctrl-R before the quiescent
+             * point is the same request, not a stop-then-start. */
+            if (!d->pending_stop) d->pending_stop = 1;
+        } else {
+            if (!d->pending_start) d->pending_start = 1;
+        }
+        /* If the caller is already standing at a boundary, honour the toggle now
+         * rather than at the next one. Waiting costs the next key: the seam fetches
+         * another key inside the same wait to replace the swallowed one, and that key
+         * would be delivered before any quiescent call had a chance to run. */
+        if (at_boundary)
+            u2_demo_quiescent(ctx, boundary_mode, NULL);   /* falls back to ctx->demo_world */
+        return 1;
+    }
+
+    if (!d) return 0;
+    ctx->demo_at_quiescent = 0;   /* a key is in flight until the caller says otherwise */
+
+    if (d->state == U2_DEMO_RECORDING && d->started) {
+        u2_demo_rec r;
+        memset(&r, 0, sizeof r);
+        r.kind = 0;
+        r.keys[0] = *k;
+        r.n_keys = 1;
+        r.rolls = ctx->rng_rolls;
+        u2_demo_digest(ctx, r.sha);
+        write_record(ctx, d, &r);
+    }
+    /* Playback needs nothing here: the verification is driven from
+     * u2_demo_next_key, which is the only place that knows which record the key
+     * about to be delivered came from. */
+    return 0;
+}
+
+void u2_demo_quiescent(u2_ctx *ctx, u2_demo_mode mode, const u2_world *world)
+{
+    u2_demo *d = of(ctx);
+
+    /* The boundary flags are set before the null test on purpose: the first Ctrl-R
+     * arrives with no demo struct yet, and the recorder it creates has to know that
+     * the press was already standing at a boundary a moment earlier. */
+    ctx->demo_at_quiescent = 1;
+    ctx->demo_quiescent_mode = (int)mode;
+    if (world)
+        ctx->demo_world = world;
+    else
+        world = (const u2_world *)ctx->demo_world;
+
+    if (!d) return;
+
+    /* A staged playback mounts here, once, at the first quiescent point of the flow
+     * it names. See the header: this is the instant the recorder's checkpoint was
+     * taken, so it is the only instant the two directions can be compared at. */
+    if (d->state == U2_DEMO_PLAYING && !d->applied) {
+        d->applied = 1;
+        if (u2_state_load_ds_buf(&ctx->state, d->checkpoint, U2_DEMO_SPAN) != 0) {
+            d->diverged = 0;
+            d->cur_rec = d->n_recs;
+            return;
+        }
+        if (ctx->demo_speed_pin) {
+            /* D5: "not compared" is not "not used". DS:74 feeds the delay table via
+             * asm/0711, so a playback that recalibrated it would diverge for a reason
+             * that looks like a deep bug. The engine performs no startup calibration
+             * today — speed.c is a model with no callers — so the pin's job here is to
+             * name what is in force and to be the one place a future calibration has
+             * to stand down at. */
+            fprintf(stderr, "u2: speed pinned from the demo: DS:74=%04X DS:550=%04X\n",
+                    (unsigned)ctx->state.speed, (unsigned)ctx->state.tick_low);
+        }
+        if (u2_demo_mode_needs_world(d->mode))
+            ctx->demo_restamp_pending = 1;
+    }
+
+    if (d->state != U2_DEMO_IDLE) return;
+
+    if (d->pending_start && !d->started) {
+        char dir[430];
+        const char *slash = strrchr(d->path, '/');
+
+        d->pending_start = 0;
+        if (mode == U2_DEMO_MODE_TITLE || mode == U2_DEMO_MODE_CREATION) {
+            /* Refused rather than recorded, and the two refusals have different
+             * reasons.
+             *
+             * The title flow reaches its menu by consuming keys of its own, a splash
+             * and a story, so a checkpoint taken there could not be resumed without
+             * replaying input the recording never made.
+             *
+             * Creation is the harder one and it took a measurement to see. The form
+             * cursor, which field is highlighted and which dropdown is open, lives in a
+             * local struct and not in the DS mirror. A checkpoint taken mid-form
+             * therefore names a state playback cannot resume, and the digests diverge a
+             * few keys in, not because the engine is wrong but because the format cannot
+             * say where in the form the player was. That is D12's quiescence rule with a
+             * wider reach than ow->pending_cmd: the engine keeps scratch outside the
+             * mirror in more places than the overworld's half-typed command. Fixing it
+             * means moving the form's state into DS or into a second checkpoint block,
+             * and that is a change to the save model rather than a detail of the demo.
+             * It is written up in docs/demo-record-playback.md instead of left as a
+             * silent gap.
+             */
+            fprintf(stderr, "u2: not recording: a demo has to start where playback can"
+                            " resume it, and the %s screen is not one of those. Start"
+                            " the recording in play.\n",
+                    mode == U2_DEMO_MODE_TITLE ? "title menu" : "character creation");
+            ctx->demo = NULL;
+            free(d);
+            return;
+        }
+        if (slash) {
+            size_t n = (size_t)(slash - d->path);
+            if (n >= sizeof dir) n = sizeof dir - 1;
+            memcpy(dir, d->path, n);
+            dir[n] = '\0';
+            if (n > 0 && ensure_dir(dir) != 0) {
+                fprintf(stderr, "u2: cannot create demo directory '%s'\n", dir);
+                ctx->demo = NULL;
+                free(d);
+                return;
+            }
+        }
+        d->file = fopen(d->path, "w");
+        if (!d->file) {
+            fprintf(stderr, "u2: cannot open demo file '%s'\n", d->path);
+            ctx->demo = NULL;
+            free(d);
+            return;
+        }
+        d->mode = mode;
+        d->state = U2_DEMO_RECORDING;
+        /* The order is the point: note_world captures only while a recording is armed
+         * and not yet written, so the sector digests have to be taken before `started`
+         * goes up or the header is written with no overlay lines at all — which is
+         * what the first version did, and it looked like a working demo. */
+        if (world)
+            u2_demo_note_world(ctx, world);
+        d->started = 1;
+        sha256_init(&d->framing);
+        write_header(ctx, d);
+        write_checkpoint(ctx, d);
+        fflush(d->file);
+        /* stderr, never the game screen: the per-record digest covers the text grid,
+         * so a line only the recorder printed would make the first record mismatch.
+         * This is the same channel and the same reason as the Ctrl-S notice. */
+        fprintf(stderr, "u2: recording to %s\n", d->path);
+        return;
+    }
+
+    if (d->pending_stop && d->state == U2_DEMO_RECORDING) {
+        d->pending_stop = 0;
+        u2_demo_finish(ctx);
+    }
+}
+
+int u2_demo_mark_auto_pass(u2_ctx *ctx)
+{
+    u2_demo *d = of(ctx);
+    u2_demo_rec r;
+
+    if (!d || d->state != U2_DEMO_RECORDING || !d->started) return 0;
+    memset(&r, 0, sizeof r);
+    r.kind = 1;
+    r.rolls = ctx->rng_rolls;
+    u2_demo_digest(ctx, r.sha);
+    write_record(ctx, d, &r);
+    return 1;
+}
+
+/* ---- the parser ---------------------------------------------------------- */
+
+static int rec_push(u2_demo *d, const u2_demo_rec *r)
+{
+    if (d->n_recs >= d->cap_recs) {
+        const int cap = d->cap_recs ? d->cap_recs * 2 : 256;
+        u2_demo_rec *grown = realloc(d->recs, (size_t)cap * sizeof *grown);
+        if (!grown) return -1;
+        d->recs = grown;
+        d->cap_recs = cap;
+    }
+    d->recs[d->n_recs++] = *r;
+    return 0;
+}
+
+static int parse_keys_list(const char *s, u2_demo_rec *r)
+{
+    const char *p = s;
+
+    if (!s || !*s) return 0;
+    while (*p && r->n_keys < U2_DEMO_MAX_KEYS_PER_REC) {
+        unsigned ch = 0, sc = 0;
+        if (sscanf(p, "%2x:%2x", &ch, &sc) != 2) return -1;
+        r->keys[r->n_keys].ch = (uint8_t)ch;
+        r->keys[r->n_keys].scan = (uint8_t)sc;
+        r->n_keys++;
+        p = strchr(p, ',');
+        if (!p) break;
+        p++;
+    }
+    return 0;
+}
+
+static int parse_hex_payload_line(const char *s, uint8_t *dst, size_t cap, size_t *n)
+{
+    size_t i = 0;
+
+    while (s[i] && s[i] != '\n' && s[i] != ' ' && s[i] != '#') {
+        unsigned v;
+        char pair[3];
+        pair[0] = s[i];
+        pair[1] = s[i + 1];
+        pair[2] = '\0';
+        if (!pair[1] || sscanf(pair, "%2x", &v) != 1) return -1;
+        if (*n >= cap) return -1;
+        dst[(*n)++] = (uint8_t)v;
+        i += 2;
+    }
+    return 0;
+}
+
+static int refuse_playback(u2_demo *d, const char *why)
+{
+    fprintf(stderr, "u2: %s\n", why);
+    free(d->recs);
+    free(d);
+    return -1;
+}
+
+/* Split a header line into `<key> <value>`. The format is space-separated (the
+ * § 4 example is the format; the prose's "key=value" describes the @rec lines,
+ * which do use `=` and are parsed by field() above). Returns 0 when the line has
+ * no space, and strips the trailing newline and any trailing comment. */
+static int split_header(const char *line, char *key, size_t keysz, char *val, size_t valsz)
+{
+    const char *sp = strchr(line, ' ');
+    if (!sp) return -1;
+
+    size_t n = (size_t)(sp - line);
+    if (n == 0 || n >= keysz) return -1;
+    memcpy(key, line, n);
+    key[n] = '\0';
+
+    const char *v = sp + 1;
+    while (*v == ' ') v++;
+    n = strlen(v);
+    while (n > 0 && (v[n - 1] == '\n' || v[n - 1] == '\r')) n--;
+    const char *hash = memchr(v, '#', n);
+    if (hash) n = (size_t)(hash - v);
+    while (n > 0 && v[n - 1] == ' ') n--;
+    if (n >= valsz) n = valsz - 1;
+    memcpy(val, v, n);
+    val[n] = '\0';
+    return 0;
+}
+
+int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
+{
+    u2_demo *d = calloc(1, sizeof *d);
+    FILE *f;
+    char line[4096];
+    char val[128];
+    size_t ck_n = 0;
+    int in_checkpoint = 0;
+    sha256_ctx framing;
+    uint8_t raw[32];
+    char frame_sha[65];
+
+    if (!d) return -1;
+    d->diverged = -1;
+    d->state = U2_DEMO_PLAYING;
+    snprintf(d->path, sizeof d->path, "%.599s", path ? path : "");
+    sha256_init(&framing);
+
+    f = fopen(path, "r");
+    if (!f) {
+        free(d);
+        fprintf(stderr, "u2: cannot open demo '%s'\n", path ? path : "(null)");
+        return -1;
+    }
+
+    while (fgets(line, (int)sizeof line, f)) {
+        const int is_end = !strncmp(line, "@end", 4);
+
+        /* Everything above @end, byte for byte, in the order the writer hashed it,
+         * and hashed BEFORE the dispatch below, because every branch of the dispatch
+         * `continue`s. Without this the framing digest is decoration and an edited
+         * record digest reads as an engine divergence — hazard 4's whole point, and
+         * the reason `@checkpoint-sha` exists separately for the payload. */
+        if (!is_end) sha256_update(&framing, line, strlen(line));
+
+        if (line[0] == '#') continue;
+
+        if (line[0] == ' ' && line[1] == ' ') {
+            /* A payload line: the checkpoint's, or a @snap's, which the reader
+             * ignores by design (D7 — snapshots are a debugging lever, not data). */
+            if (in_checkpoint &&
+                parse_hex_payload_line(line + 2, d->checkpoint, sizeof d->checkpoint,
+                                       &ck_n) != 0) {
+                fclose(f);
+                return refuse_playback(d, "malformed checkpoint payload");
+            }
+            continue;
+        }
+
+        if (!strncmp(line, U2_DEMO_MAGIC " ", strlen(U2_DEMO_MAGIC) + 1)) {
+            d->format_version = atoi(line + strlen(U2_DEMO_MAGIC) + 1);
+            in_checkpoint = 0;
+            continue;
+        }
+        if (!strncmp(line, "@checkpoint-sha ", 16)) {
+            if (sscanf(line + 16, "%127s", val) == 1)
+                snprintf(d->checkpoint_sha, sizeof d->checkpoint_sha, "%.64s", val);
+            in_checkpoint = 0;
+            if (ck_n != (size_t)U2_DEMO_SPAN) {
+                fclose(f);
+                fprintf(stderr, "u2: demo '%s': checkpoint is %zu bytes, the format "
+                                "names %d\n", path, ck_n, U2_DEMO_SPAN);
+                free(d->recs);
+                free(d);
+                return -1;
+            }
+            d->has_checkpoint = 1;
+            continue;
+        }
+        if (!strncmp(line, "@checkpoint ", 12)) {
+            in_checkpoint = 1;
+            if (field(line, "sector", val, sizeof val) && strlen(val) == 2) {
+                d->sector_hi = val[0] - '0';
+                d->sector_lo = val[1] - '0';
+            }
+            continue;
+        }
+        if (!strncmp(line, "@snap ", 6)) { in_checkpoint = 0; continue; }
+        if (!strncmp(line, "@rec ", 5)) {
+            u2_demo_rec r;
+            memset(&r, 0, sizeof r);
+            in_checkpoint = 0;
+            r.kind = (field(line, "kind", val, sizeof val) && !strcmp(val, "auto")) ? 1 : 0;
+            if (field(line, "rolls", val, sizeof val))
+                r.rolls = (uint32_t)strtoul(val, NULL, 10);
+            if (field(line, "keys", val, sizeof val) && parse_keys_list(val, &r) != 0) {
+                fclose(f);
+                fprintf(stderr, "u2: demo '%s': malformed keys list '%s'\n", path, val);
+                free(d->recs);
+                free(d);
+                return -1;
+            }
+            if (!field(line, "sha", val, sizeof val) || !hex_ok(val)) {
+                fclose(f);
+                fprintf(stderr, "u2: demo '%s': a record carries no digest\n", path);
+                free(d->recs);
+                free(d);
+                return -1;
+            }
+            snprintf(r.sha, sizeof r.sha, "%.64s", val);
+            if (rec_push(d, &r) != 0) { fclose(f); goto oom; }
+            continue;
+        }
+        if (!strncmp(line, "@end", 4)) {
+            d->complete = 1;
+            if (field(line, "state", val, sizeof val) && hex_ok(val))
+                snprintf(d->end_state_sha, sizeof d->end_state_sha, "%.64s", val);
+            if (field(line, "sha", val, sizeof val) && hex_ok(val))
+                snprintf(d->end_frame_sha, sizeof d->end_frame_sha, "%.64s", val);
+            continue;               /* the epilogue is not inside its own digest */
+        }
+
+        /* header: `<key> <value>`. Dispatch on the key itself rather than searching
+         * the line, because a substring search found `sha` inside `save-sha` and
+         * `art` inside any word that happened to carry it — the same class of defect
+         * the @rec field scanner had to be written around. */
+        {
+            char key[24];
+            if (split_header(line, key, sizeof key, val, sizeof val) != 0) continue;
+            if (!strcmp(key, "digest-version")) {
+                d->digest_version = atoi(val);
+            } else if (!strcmp(key, "engine")) {
+                snprintf(d->engine, sizeof d->engine, "%.63s", val);
+            } else if (!strcmp(key, "content")) {
+                snprintf(d->content, sizeof d->content, "%.127s", val);
+            } else if (!strcmp(key, "mode")) {
+                d->mode = mode_from_name(val);
+            } else if (!strcmp(key, "sector") && strlen(val) == 2) {
+                d->sector_hi = val[0] - '0';
+                d->sector_lo = val[1] - '0';
+            } else if (!strcmp(key, "span")) {
+                d->span = atoi(val);
+            } else if (!strcmp(key, "exclude")) {
+                const char *p = line + strlen("exclude") + 1;
+                d->n_excl = 0;
+                for (;;) {
+                    unsigned v;
+                    while (*p == ' ') p++;
+                    if (!*p || *p == '\n' || *p == '#' ||
+                            d->n_excl >= U2_DEMO_EXCLUDE_COUNT) break;
+                    if (sscanf(p, "%2x", &v) != 1) break;
+                    d->excl[d->n_excl++] = (int)v;
+                    p += 2;
+                }
+            } else if (!strcmp(key, "save-sha") && hex_ok(val)) {
+                snprintf(d->save_sha, sizeof d->save_sha, "%.64s", val);
+            } else if (!strcmp(key, "overlay") && d->n_overlay < U2_DEMO_MAX_OVERLAYS) {
+                char nm[24];
+                char sh[80];
+                if (sscanf(val, "%23s %79s", nm, sh) == 2 && hex_ok(sh)) {
+                    snprintf(d->overlay[d->n_overlay].name, 24, "%.23s", nm);
+                    snprintf(d->overlay[d->n_overlay].sha, 65, "%.64s", sh);
+                    d->n_overlay++;
+                }
+            } else if (!strcmp(key, "art")) {
+                snprintf(d->art, sizeof d->art, "%.15s", val);
+            } else if (!strcmp(key, "theme")) {
+                snprintf(d->theme, sizeof d->theme, "%.39s", val);
+            } else if (!strcmp(key, "enhanced")) {
+                d->enhanced = atoi(val);
+            }
+        }
+    }
+    fclose(f);
+
+    /* --- refusals, in the order a reader would want them named --- */
+    if (d->format_version != U2_DEMO_VERSION) {
+        char msg[160];
+        snprintf(msg, sizeof msg, "demo '%s': format version %d, this engine writes %d",
+                 path, d->format_version, U2_DEMO_VERSION);
+        return refuse_playback(d, msg);
+    }
+    if (d->mode == U2_DEMO_MODE_TITLE || d->mode == U2_DEMO_MODE_CREATION) {
+        char msg[200];
+        snprintf(msg, sizeof msg, "demo '%s': start mode '%s' cannot be resumed. "
+                                  "Playback enters the recorded mode's own flow, and "
+                                  "that mode's position is held in engine scratch the "
+                                  "checkpoint does not carry.",
+                 path, u2_demo_mode_name(d->mode));
+        return refuse_playback(d, msg);
+    }
+    if (!d->has_checkpoint) {
+        char msg[160];
+        snprintf(msg, sizeof msg,
+                 "demo '%s': no checkpoint, so there is no starting state", path);
+        return refuse_playback(d, msg);
+    }
+    if (!d->complete && !ctx->demo_salvage) {
+        fprintf(stderr, "u2: demo '%s' has no @end: it is an interrupted recording of "
+                        "%d records. Play it with --salvage if that is what you want.\n",
+                path, d->n_recs);
+        free(d->recs);
+        free(d);
+        return -1;
+    }
+    if (!d->complete && ctx->demo_salvage) {
+        fprintf(stderr, "u2: salvaging '%s': %d records present, no epilogue. "
+                        "Whatever was in flight when it stopped is gone.\n",
+                path, d->n_recs);
+    }
+
+    if (d->complete && *d->end_frame_sha) {
+        sha256_final(&framing, raw);
+        hex64(raw, frame_sha);
+        if (strcmp(frame_sha, d->end_frame_sha) != 0) {
+            fprintf(stderr, "u2: demo '%s': the file does not match its own @end digest. "
+                            "Something was edited or truncated after it was written, so "
+                            "nothing in it can be trusted.\n", path);
+            free(d->recs);
+            free(d);
+            return -1;
+        }
+    }
+
+    /* The checkpoint's own integrity, before anything else (hazard 4). A corrupted
+     * checkpoint must read as a broken file, not as a demo that diverges at record 1. */
+    {
+        char sha[65], rec_sha[65];
+        sha256_hex(d->checkpoint, U2_DEMO_SPAN, sha);
+        if (*d->checkpoint_sha && strcmp(sha, d->checkpoint_sha) != 0) {
+            char msg[200];
+            snprintf(msg, sizeof msg, "demo '%s': the checkpoint does not match its own "
+                                      "@checkpoint-sha; the file is corrupt", path);
+            return refuse_playback(d, msg);
+        }
+        sha256_hex(d->checkpoint + U2_PLAYER_RECORD_DS, U2_DEMO_RECORD_BYTES, rec_sha);
+        if (*d->save_sha && strcmp(rec_sha, d->save_sha) != 0) {
+            char msg[200];
+            snprintf(msg, sizeof msg, "demo '%s': the checkpoint's player record does not "
+                                      "match save-sha; the file is corrupt", path);
+            return refuse_playback(d, msg);
+        }
+    }
+
+    if (d->digest_version != U2_DEMO_DIGEST_VERSION) {
+        /* D13: not a refusal. The stimulus is a checkpoint plus keys and neither
+         * depends on the engine version, which is exactly what makes an old demo
+         * useful for confirming a bug was fixed. What is impossible is VERIFYING it:
+         * the digest scope is frozen per version, so comparing across versions is
+         * comparing two different functions. */
+        fprintf(stderr, "u2: demo '%s': digest scope %d, this engine is scope %d — "
+                        "PLAYBACK UNVERIFIED. It will play; nothing is being checked.\n",
+                path, d->digest_version, U2_DEMO_DIGEST_VERSION);
+    }
+
+    /* Art is a note, never a refusal (§ 4's correction), and the note is deferred to
+     * u2_demo_finish because `content_source` is not known until the title flow has
+     * run — it comes from the generated header and is stamped there, not here. */
+
+    ctx->demo = d;
+    return 0;
+
+oom:
+    return refuse_playback(d, "out of memory parsing the demo");
+}
+
+/* ---- playback ------------------------------------------------------------ */
+
+static void verify_record(u2_ctx *ctx, u2_demo *d, int idx)
+{
+    char now[65];
+
+    if (idx < 0 || idx >= d->n_recs) return;
+    if (d->digest_version != U2_DEMO_DIGEST_VERSION) return;   /* D13: unverified */
+    if (d->diverged >= 0 && !ctx->demo_play_continue) return;
+
+    /* The pairing is record N against the state at the instant key N is taken, not
+     * the instant after it. The plan's D12 words it the other way round ("before
+     * delivering key N+1, checks the live digest against N's recorded digest"), and
+     * that reading cannot work: a record holds the state BEFORE its own key, so at
+     * the tap for N+1 the live state is the state AFTER N and the two differ by
+     * exactly one turn. Verified against its own record, the comparison is the same
+     * instant on both sides, and the divergence lands on the key that caused it
+     * before that key has been applied — which is finer than the plan asked for.
+     *
+     * What is still unverified by any record is the state the LAST record produced,
+     * and that is what @end's `state=` digest covers (D12's first consequence). */
+    u2_demo_digest(ctx, now);
+    if (strcmp(now, d->recs[idx].sha) == 0) return;
+
+    d->diverged = idx;
+    fprintf(stderr, "u2: DEMO DIVERGED at record %d (kind=%s, %d key%s, rolls=%u): "
+                    "recorded %s, live %s\n",
+            idx + 1, d->recs[idx].kind ? "auto" : "key", d->recs[idx].n_keys,
+            d->recs[idx].n_keys == 1 ? "" : "s", d->recs[idx].rolls,
+            d->recs[idx].sha, now);
+    if (!ctx->demo_play_continue) {
+        /* The plan asks for the field diff from tools/replay_diff.py here. That
+         * differ is listed as partial in § 5 and its alignment work is a separate
+         * item, so the engine names the tool rather than growing a second differ in
+         * C — and `engine/tools/demo.py diff` is the one that reads a demo. */
+        fprintf(stderr, "u2: re-run with --playback-continue to see every divergence, or\n"
+                        "u2:   engine/tools/demo.py diff <demo> --against <run>\n");
+    }
+}
+
+int u2_demo_auto_pass_due(u2_ctx *ctx)
+{
+    u2_demo *d = of(ctx);
+
+    if (!d || d->state != U2_DEMO_PLAYING) return 0;
+    if (d->cur_rec >= d->n_recs) return 0;
+    if (d->recs[d->cur_rec].kind != 1) return 0;
+
+    verify_record(ctx, d, d->cur_rec);
+    d->verified_through = d->cur_rec;
+    d->cur_rec++;
+    return 1;
+}
+
+int u2_demo_next_key(u2_ctx *ctx, u2_key *out)
+{
+    u2_demo *d = of(ctx);
+    u2_demo_rec *r;
+
+    if (!d || d->state != U2_DEMO_PLAYING) return -1;
+    if (d->cur_rec >= d->n_recs) {
+        /* The closing digest (D12's first consequence), and it is compared HERE — at
+         * the poll after the last record, which is after the frame has been drawn —
+         * because that is where the recorder was standing when it wrote @end: the
+         * stop toggle arrives at a poll, one draw after the last recorded key. An
+         * earlier version compared it at the next quiescent point, which is BEFORE
+         * the draw, and the two differed by exactly one frame's worth of cursor
+         * movement. That is the whole lesson: the two directions have to be compared
+         * at the same point in the loop, not merely at the same loop iteration. */
+        if (d->applied && !d->closing_checked) {
+            char now[65];
+            d->closing_checked = 1;
+            if (*d->end_state_sha && d->digest_version == U2_DEMO_DIGEST_VERSION) {
+                u2_demo_digest(ctx, now);
+                if (strcmp(now, d->end_state_sha) != 0) {
+                    d->diverged = d->n_recs;
+                    fprintf(stderr, "u2: DEMO DIVERGED after the last record: "
+                                    "recorded %s, live %s\n", d->end_state_sha, now);
+                }
+            }
+        }
+        return -1;
+    }
+    if (d->diverged >= 0 && !ctx->demo_play_continue) return -1;
+
+    r = &d->recs[d->cur_rec];
+    if (r->kind == 1) return 0;            /* the loop owes a PASS, not a key */
+    if (d->cur_key == 0) {
+        verify_record(ctx, d, d->cur_rec);
+        d->verified_through = d->cur_rec;
+    }
+    *out = r->keys[d->cur_key++];
+    if (d->cur_key >= r->n_keys) { d->cur_rec++; d->cur_key = 0; }
+    return 1;
+}
+
+int u2_demo_preload_sector(const u2_ctx *ctx, int *sector_hi, int *sector_lo)
+{
+    const u2_demo *d = of(ctx);
+
+    if (!d || d->state != U2_DEMO_PLAYING) return 0;
+    if (!u2_demo_mode_needs_world(d->mode)) return 0;
+    if (sector_hi) *sector_hi = d->sector_hi;
+    if (sector_lo) *sector_lo = d->sector_lo;
+    return 1;
+}
+
+u2_demo_mode u2_demo_playback_mode(const u2_ctx *ctx)
+{
+    const u2_demo *d = of(ctx);
+    return d ? d->mode : U2_DEMO_MODE_OVERWORLD;
+}
+
+/* The filename a sector's bytes came from, spelled the way the loader found it, so
+ * the name in the header is the name a player can go and look at. */
+static void sector_name(char *out, size_t outsz, const char *prefix,
+                        unsigned hi, unsigned lo)
+{
+    snprintf(out, outsz, "%.8s%u%u", prefix ? prefix : "mapx", hi & 0x0Fu, lo & 0x0Fu);
+}
+
+void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
+{
+    u2_demo *d = of(ctx);
+    char sha[65], name[24];
+
+    if (!d || !w) return;
+
+    struct src {
+        const char *prefix; unsigned hi, lo; const uint8_t *bytes; size_t n;
+    } f[3];
+
+    f[0].prefix = w->map_prefix;  f[0].hi = w->map_id.hi;  f[0].lo = w->map_id.lo;
+    f[0].bytes  = w->map_base;    f[0].n  = sizeof w->map_base;
+    f[1].prefix = w->mon_prefix;  f[1].hi = w->mon_id.hi;  f[1].lo = w->mon_id.lo;
+    f[1].bytes  = w->mon;         f[1].n  = sizeof w->mon;
+    f[2].prefix = w->tlkx_prefix; f[2].hi = w->tlkx_id.hi; f[2].lo = w->tlkx_id.lo;
+    f[2].bytes  = w->tlkx;        f[2].n  = sizeof w->tlkx;
+
+    for (int i = 0; i < 3; i++) {
+        /* Only a file that was actually read. The guard is not tidiness: an absent
+         * tlkx leaves `tlkx_prefix` NULL and `tlkx_id` at 00, and the fallback spelling
+         * in sector_name() then produced "mapx00" for the dialogue buffer — so a
+         * sector with no tlkx reported that its own map file had changed. A name that
+         * is a guess must never be checked against a digest. */
+        if (!f[i].prefix || !f[i].bytes || f[i].n == 0) continue;
+        if (i == 0 && !w->map_loaded) continue;
+        if (i == 1 && !w->mon_loaded) continue;
+        if (i == 2 && !w->tlkx_loaded) continue;
+
+        sector_name(name, sizeof name, f[i].prefix, f[i].hi, f[i].lo);
+        sha256_hex(f[i].bytes, f[i].n, sha);
+
+        if (d->state == U2_DEMO_PLAYING) {
+            /* Once, at load. `mon` is the LIVE creature table and its hp bytes move in
+             * play, so re-checking it every frame would report that the content changed
+             * the first time anything was wounded. The question this answers is "did
+             * the viewer load the same world the recorder did", and that is settled the
+             * moment the sector is resident. */
+            if (d->overlay_checked) return;
+            d->overlay_checked = 1;
+            for (int k = 0; k < d->n_overlay; k++) {
+                if (strcmp(d->overlay[k].name, name) != 0) continue;
+                if (strcmp(d->overlay[k].sha, sha) != 0 && !d->overlay_failed) {
+                    d->overlay_failed = 1;
+                    fprintf(stderr, "u2: this demo needs %s to hold the bytes it recorded; "
+                                    "yours differ. Point --data-dir at the content the "
+                                    "recording used, or remove the slot's overlay of it.\n",
+                            name);
+                }
+            }
+        } else if (d->state == U2_DEMO_RECORDING && !d->started) {
+            /* Captured once, for the checkpoint. A sector the recording later mutates
+             * is covered by the checkpoint itself, which carries the whole DS mirror;
+             * this line is about the bytes the world was BUILT from. */
+            int seen = 0;
+            for (int k = 0; k < d->n_overlay; k++)
+                if (strcmp(d->overlay[k].name, name) == 0) { seen = 1; break; }
+            if (!seen && d->n_overlay < U2_DEMO_MAX_OVERLAYS) {
+                snprintf(d->overlay[d->n_overlay].name, 24, "%.23s", name);
+                snprintf(d->overlay[d->n_overlay].sha, 65, "%.64s", sha);
+                d->n_overlay++;
+            }
+        }
+    }
+}
+
+int u2_demo_overlay_failed(const u2_ctx *ctx)
+{
+    const u2_demo *d = of(ctx);
+    return d && d->overlay_failed;
+}
+
+/* ---- finish -------------------------------------------------------------- */
+
+int u2_demo_finish(u2_ctx *ctx)
+{
+    u2_demo *d = of(ctx);
+    int rc = 0;
+
+    if (!d) return 0;
+
+    if (d->state == U2_DEMO_RECORDING && d->file && !d->finished) {
+        char sha[65], frame[65];
+        uint8_t raw[32];
+        sha256_ctx c = d->framing;   /* copy: the epilogue is not inside its own digest */
+
+        u2_demo_digest(ctx, sha);
+        sha256_final(&c, raw);
+        hex64(raw, frame);
+        /* Two digests, two jobs (hazard 4): `state=` is the closing state digest
+         * D12 needs because the last record has no successor to trigger its check,
+         * and `sha=` is the framing digest that makes a truncated or edited file
+         * detectable rather than merely shorter. */
+        emit(d, "@end records %d state=%s sha=%s\n", d->n_written, sha, frame);
+        fflush(d->file);
+        fclose(d->file);
+        d->file = NULL;
+        d->finished = 1;
+        fprintf(stderr, "u2: RECORDED %d RECORDS -> %s\n", d->n_written, d->path);
+    } else if (d->state == U2_DEMO_PLAYING && !d->reported) {
+        d->reported = 1;
+        if (*d->content && ctx->content_source && strcmp(d->content, ctx->content_source) != 0)
+            fprintf(stderr, "u2: this demo was recorded with content '%s' and this run has "
+                            "'%s'. Art does not reach game state, so it played.\n",
+                    d->content, ctx->content_source);
+        if (d->diverged < 0 && !d->closing_checked) {
+            /* Every record verified and then the flow ended somewhere the recorder did
+             * not stop. Saying so is the honest half of D12: the last record's own
+             * effect is the one thing no record can vouch for. */
+            d->diverged = d->n_recs;
+            fprintf(stderr, "u2: DEMO INCOMPLETE: the run ended before the recording's "
+                            "stop point, so the closing state was never reached "
+                            "(%d of %d records delivered).\n", d->cur_rec, d->n_recs);
+        }
+        if (d->diverged >= 0) {
+            rc = U2_DEMO_EXIT_DIVERGED;
+        } else if (d->digest_version != U2_DEMO_DIGEST_VERSION) {
+            fprintf(stderr, "u2: DEMO PLAYED %d/%d RECORDS UNVERIFIED (digest scope %d)\n",
+                    d->cur_rec, d->n_recs, d->digest_version);
+            rc = U2_DEMO_EXIT_UNVERIFIED;
+        } else {
+            fprintf(stderr, "u2: DEMO PLAYED %d/%d RECORDS\n", d->cur_rec, d->n_recs);
+        }
+    }
+
+    if (d->file) { fclose(d->file); d->file = NULL; }
+    free(d->recs);
+    free(d);
+    ctx->demo = NULL;
+    return rc;
+}
+
+/* ---- observation --------------------------------------------------------- */
+
+u2_demo_state u2_demo_state_of(const u2_ctx *ctx)
+{
+    const u2_demo *d = of(ctx);
+    return d ? d->state : U2_DEMO_IDLE;
+}
+
+int u2_demo_record_count(const u2_ctx *ctx)
+{
+    const u2_demo *d = of(ctx);
+    if (!d) return 0;
+    return d->state == U2_DEMO_RECORDING ? d->n_written : d->n_recs;
+}
+
+int u2_demo_divergence(const u2_ctx *ctx)
+{
+    const u2_demo *d = of(ctx);
+    return d ? d->diverged : -1;
+}
+
+int u2_demo_unverifiable(const u2_ctx *ctx)
+{
+    const u2_demo *d = of(ctx);
+    return d && d->digest_version != U2_DEMO_DIGEST_VERSION;
+}

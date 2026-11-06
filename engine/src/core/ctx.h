@@ -194,6 +194,49 @@ typedef struct u2_ctx {
     unsigned seed;          /* PRNG seed byte, i.e. the 0x40:6C value (core/rng.h) */
     int keys_consumed;      /* script tokens consumed so far (input_script sets it) */
     void *replay;           /* u2_replay* when --replay-report is active */
+    /* u2_demo* while a demo is being recorded or played back (core/demo.h).
+     * Deliberately one pointer rather than a flag: the recorder's state is a file
+     * handle, a cursor and a parsed record table, and none of it belongs in the
+     * struct every translation unit compiles. NULL means neither, and the seam tap
+     * costs one null test on a normal run. */
+    void *demo;
+    const char *demo_dir;    /* --demo-dir DIR; "demos" when unset (core/demo.h) */
+    const char *demo_name;   /* --demo-name NAME; pins the filename a gate needs */
+    int demo_snapshots;      /* --demo-snapshots: per-record DS dumps, debug only */
+    int demo_salvage;        /* --salvage: play a file with no @end (D8) */
+    /* Set when a playback checkpoint has just landed in a world mode and the
+     * overworld loop must re-sync its position and rebuild the stamped grid before
+     * it draws. It is a flag on the context rather than a call into game code because
+     * core/ does not know what a restamp is, and the alternative was the loop asking
+     * the demo module a question every frame. */
+    int demo_restamp_pending;
+    /* Is a top-level wait in progress right now? Set by u2_demo_quiescent and cleared
+     * when a key is delivered. The toggle uses it to take effect at the instant it is
+     * pressed when that instant is already a boundary, instead of waiting for the next
+     * one and losing the key that arrives in between. Mid-command it is 0 and the
+     * toggle waits, which is D2's rule.
+     *
+     * It lives on the context rather than on the demo struct because the FIRST Ctrl-R
+     * arrives when there is no demo struct yet, and the recorder has to know whether
+     * that press was already standing at a boundary. `demo_quiescent_mode` is the same
+     * story: it is a u2_demo_mode widened to int because ctx.h cannot include demo.h
+     * (demo.h includes ctx.h). */
+    int demo_at_quiescent;
+    int demo_quiescent_mode;
+    /* The sector that was resident the last time a top-level wait reported itself
+     * quiescent, as a void* because core/world.h includes ctx.h and the arrow must not
+     * run the other way. core/demo.c casts it back. It exists so the checkpoint's
+     * `overlay` lines can be captured at the instant the recording starts even when
+     * that instant is the seam tap rather than the wait: the tap has no sector to
+     * hand over, and a header written without the overlay digests still looks like a
+     * working demo, which is the bad kind of silence. */
+    const void *demo_world;
+    int demo_speed_pin;      /* --speed-pin: keep the recorded speed/tick bytes (D5) */
+    int demo_play_continue;  /* --playback-continue: diagnose past a divergence */
+    int demo_play_pace;      /* --playback-pace: force real-time pacing in headless.
+                              * The lever W15's control needs: without it the only
+                              * proof that pacing is applied rather than a no-op is
+                              * a stopwatch on an SDL run nobody can run in CI. */
     int rng_probe;          /* --rng-sequence N: print N rolls and exit */
     /* Idle auto-PASS threshold, in polls of the overworld input loop.
      *   0  = not configured, use U2_AUTO_PASS_POLLS (the faithful default)
@@ -226,14 +269,23 @@ typedef struct u2_ctx {
                              * reads it as "the player left". */
     const char *content_source; /* set by the game layer from the generated header */
     const char *script_path;/* --script PATH (input_script backend input) */
+    const char *playback_path;/* --playback PATH (input_demo backend input) */
     const char *save_dir;    /* --save-dir PATH; "saves" when unset (core/save.h) */
     const char *data_dir;    /* --data-dir PATH; "." when unset — the original's
                                 default drive, holding mapxNN / monxNN / tlkxNN.
                                 Never created; see core/world.h. */
     int save_seeded;         /* set when the blank PLAYER file was created here */
     u2_renderer_choice renderer_choice;  /* --renderer=sdl|terminal; see the enum.
-                                 Named apart from `renderer`, which is the backend
-                                 pointer this selection resolves *to*. */
+                                 * Named apart from `renderer`, which is the backend
+                                 * pointer this selection resolves *to*. */
+    /* Set only when the player NAMED a renderer. `renderer_choice` cannot carry this
+     * on its own because AUTO is resolved to a concrete value before the backends are
+     * wired, and the two questions -- "what was asked for" and "what to use" -- have
+     * to stay separate for one reason: `--headless --renderer=terminal` is the
+     * combination the demo gate uses to prove a renderer cannot reach game state
+     * (docs/demo-record-playback.md W8), and it has to mean the text grid rather than
+     * the null one the headless default picks. */
+    int renderer_explicit;
     int play_map;            /* --play-map: enter the CP4 overworld directly */
     int dev;                 /* --dev: development affordances, off by default.
                               * THE RULE, and it is the reason the flag exists: --dev may add

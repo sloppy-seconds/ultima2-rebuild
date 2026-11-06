@@ -20,6 +20,7 @@
  */
 #include <string.h>
 #include "core/seam.h"
+#include "core/demo.h"
 #include "core/rng.h"
 #include "core/replay.h"
 #include "core/timer.h"
@@ -185,6 +186,14 @@ int seam_key_poll(u2_ctx *ctx, u2_key *out)
         return 0;
     if (got > 0) {
         key_uppercase_fold(out);
+        /* Ctrl-R (D10): swallowed here, before game logic, exactly like Ctrl-S. It
+         * cannot displace a letter shortcut because nothing in asm/ compares against
+         * 0x12 — tools/demo_key_gate.py makes that a gate rather than a claim.
+         * Positioned after the fold and after the screenshot swallow because that is
+         * the instant a key becomes game logic's stimulus, which is the same instant
+         * the recorder writes its record (D1, D12). */
+        if (u2_demo_key(ctx, out))
+            return 0;
         /* No "last key" state byte: DS:0x4A is the sector's second digit /
          * site kind (see state.h). Storing the polled key here corrupted the
          * saved sector digit in engine-written PLAYER records. */
@@ -204,13 +213,15 @@ int seam_key_wait(u2_ctx *ctx, u2_key *out)
     int got;
     for (;;) {
         got = ctx->input->wait(ctx, out);
-        /* Ctrl-S is consumed here and never reaches the game, so keep waiting for
-         * a key the game should actually see. */
-        if (!(got > 0 && take_screenshot_key(ctx, out))) break;
-    }
-    if (got > 0) {
+        if (!(got > 0)) break;
         key_uppercase_fold(out);   /* same tail as the poll path; see key_uppercase_fold */
-    } else if (got < 0) {
+        /* Ctrl-S and Ctrl-R are consumed here and never reach the game, so keep
+         * waiting for a key the game should actually see. The fold moved above this
+         * line so both seam entries tap the recorder at the same point in the
+         * pipeline; it is inert for both control bytes, which sit below 0x61. */
+        if (!take_screenshot_key(ctx, out) && !u2_demo_key(ctx, out)) break;
+    }
+    if (got < 0) {
         /* Collapse to the same two-state answer seam_key_poll gives, and set the
          * same flag. This is the whole fix for "closing the window or pressing
          * Ctrl-C on the creation screen acts like the Down arrow".

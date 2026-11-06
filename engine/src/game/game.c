@@ -21,6 +21,7 @@
 #include "game/title.h"
 #include "game/overworld.h"
 #include "core/seam.h"
+#include "core/demo.h"
 #include "debug/trace.h"
 
 typedef struct game_ctx {
@@ -87,6 +88,7 @@ static void run_selftest(u2_ctx *ctx)
     for (;;) {
         u2_key k;
 
+        u2_demo_quiescent(ctx, U2_DEMO_MODE_TITLE, NULL);
         if (ctx->exit_code || g->quit)
             break;
         if (!seam_key_poll(ctx, &k)) {

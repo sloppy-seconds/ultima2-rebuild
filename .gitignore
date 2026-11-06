@@ -154,3 +154,8 @@ engine/u2-sdl.exe
 engine/build-win/
 engine/u2-sdl-static
 engine/build-sdlstatic/
+
+# Player demo recordings (docs/demo-record-playback.md D9). A demo encodes a
+# playthrough of copyrighted content exactly as a save file does, so it is user data
+# and never a repo artefact. The gate records its own fixture instead.
+demos/

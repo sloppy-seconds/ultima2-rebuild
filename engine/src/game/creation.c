@@ -82,6 +82,7 @@
 #include "game/creation.h"
 #include "core/save.h"
 #include "core/seam.h"
+#include "core/demo.h"
 #include "gen_content.h"
 
 #define STAT_COL       26      /* asm/58B7: every stat value at column 26 */
@@ -232,6 +233,11 @@ static int remaining(const form *f)
 static int wait_key(u2_ctx *ctx)
 {
     u2_key k;
+    /* Character creation is a mode with no turn counter at all, which is the case
+     * D12 exists for: the seam sees it and no per-mode boundary hook has to. This is
+     * also where a demo started during creation learns its start mode, and why the
+     * header carries one. */
+    u2_demo_quiescent(ctx, U2_DEMO_MODE_CREATION, NULL);
     if (!seam_key_wait(ctx, &k)) return -1;   /* input exhausted: the player left */
     if (k.ch == 0x11) {                       /* Ctrl-Q quits from anywhere (D5) */
         ctx->exit_code = 0;

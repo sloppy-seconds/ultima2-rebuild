@@ -42,6 +42,31 @@ int u2_state_load_ds(u2_state *s, const char *path)
     return 0;
 }
 
+/* The in-memory twin of u2_state_load_ds, and the reason it is separate rather than a
+ * refactor of it: a demo carries its checkpoint inside a text file with its own
+ * framing, its own digest and its own refusal rules (core/demo.h), so the bytes are
+ * already decoded and already verified by the time this is reached. Writing them out
+ * to a temporary file to reuse the path-based loader would put a demo's state on disk
+ * behind the back of the digest that is supposed to prove what it was.
+ *
+ * The span is demanded in full, not accepted at any length. `--dump-ds` writes 0x280
+ * and the demo needs 0x650 (D3), and a loader that quietly took a short buffer would
+ * leave the creature arrays, the speed fields and the tick pair at whatever the
+ * process happened to hold — a divergence that reads like an engine bug. Refusing is
+ * the whole difference between a checkpoint and a partial one. */
+int u2_state_load_ds_buf(u2_state *s, const unsigned char *buf, size_t n)
+{
+    if (s == NULL || buf == NULL) return -1;
+    if (n != sizeof(u2_state)) {
+        fprintf(stderr, "u2: checkpoint is %zu bytes but the DS mirror is %zu; "
+                        "a partial checkpoint is not a checkpoint\n",
+                n, sizeof(u2_state));
+        return -1;
+    }
+    memcpy(s, buf, n);
+    return 0;
+}
+
 uint8_t u2_bcd_dec1(uint8_t v)
 {
     if (v == 0) return 0;

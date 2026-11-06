@@ -129,6 +129,10 @@ extern const u2_renderer u2_renderer_term;
 extern const u2_renderer u2_renderer_null;
 extern const u2_input    u2_input_term;
 extern const u2_input    u2_input_script;
+/* Replays a demo's key stream (platform/input_demo.c). Wired only by --playback,
+ * and never together with --script: two input backends is a configuration with no
+ * meaning, and main refuses it loudly rather than picking one. */
+extern const u2_input    u2_input_demo;
 extern const u2_audio    u2_audio_beep;
 extern const u2_audio    u2_audio_null;
 extern const u2_clock    u2_clock_posix;
