@@ -242,6 +242,53 @@ in that module's header. See `disasm/selfmod-capture.md`.
 that does not really sleep, so a key script replays identically and stdout is
 machine-readable.
 
+One flag opts out of the virtual clock by name. `--playback-pace` asks for
+real-time pacing in a headless playback, and the script clock's sleep is instant
+by design, so the flag wires the host clock instead. A presentation knob that
+silently does nothing is worse than one that is not offered, and the demo gate
+(W15) measures that the paced and unpaced runs reach the same verdict.
+
+`--headless --renderer=terminal` is honoured rather than ignored: the grid still
+composes and the escapes still go to stdout, while the input and clock stay
+scripted so the run is still reproducible. That combination exists because "the
+renderer cannot reach game state" is a claim that can only be made by running a
+second renderer over the same demo and comparing digests.
+
+## Demo recording and playback
+
+`Ctrl-R` records; `--playback FILE` replays and verifies. The design is
+`docs/demo-record-playback.md` and the implementation is `src/core/demo.c`,
+`src/platform/input_demo.c` and the gate `tests/run_demo.sh` (`make test-demo`).
+
+What a `.demo` holds, in one plain-text file: a checkpoint of the whole DS mirror
+(`0x650`, not `--dump-ds`'s `0x280`), then one record per key the game consumed,
+each carrying a digest of the state that key was delivered into. Playback restores
+the checkpoint, re-injects the keys through the same `u2_input` seam a player's keys
+arrive on, and compares every digest. A demo that plays back wrong is a failed
+playback: it names the record and exits 5. A demo written under a different digest
+scope plays and exits 6, because the stimulus does not depend on the engine version
+but the comparison does.
+
+Three properties worth knowing before using one:
+
+* **The unit is the delivered key, not the turn.** That is what lets one file cross
+  the overworld, a site and back out with no per-mode hook, and it localises a
+  divergence to the key that caused it.
+* **Playback writes nowhere you own.** A `--playback` run redirects its save
+  directory to a scratch directory beside the demo, because the original auto-saves
+  on site entry and on rocket launch and a viewer watching someone else's demo must
+  not have their own slot mutated by it.
+* **A demo is evidence of reproducibility, never of fidelity.** If the engine is
+  wrong at record 200 the demo records the wrong behaviour and replays it perfectly.
+
+`demos/` is gitignored: a demo encodes a playthrough of copyrighted content exactly
+as a save file does. The gate records its own fixture from engine-authored filler
+(`tests/demo_seed.py`) and no committed game data.
+
+`engine/tools/demo.py` is the tool side: `inspect`, `verify`, `against-trace`,
+`diff`, `export-keys`, `from-playlog` and `corpus` (replay a directory of saved
+ demos and report match / first divergence / unverifiable per file).
+
 ## Randomness
 
 `rand_byte` is a six-byte feedback shift register at `DS:0x23F..0x244`

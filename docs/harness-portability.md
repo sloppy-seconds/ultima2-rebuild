@@ -190,6 +190,69 @@ Candidates are easy to miss because they usually look like a bug fix:
 
 Newest first. One line per learning; the detail stays in the owning document.
 
+* **2026-11-07 — A replay verifier must hash the state at the same point in the loop
+  on both sides, and "the same loop iteration" is not the same point.** A record
+  written before a key is delivered holds the state *before* that key, so the only
+  comparison that can succeed is that record against the live state at the same
+  boundary — not against the state after the key, which is what "verify the previous
+  record before delivering the next one" reads like and what the first implementation
+  did. Two transferable points. (1) Where a record's digest is taken relative to the
+  frame draw decides the verdict: a closing digest captured after the draw on one side
+  and before it on the other differs by exactly one frame's worth of cursor movement,
+  and that looks like an engine bug rather than a pairing bug. Pin the pairing in
+  prose next to the code that computes it, because nothing in the types says which
+  instant was meant. (2) The last record has no successor to trigger its check, so the
+  format needs a closing digest and the verifier needs a place to compare it that is
+  the same instant the recorder wrote it. A run that ends before that point must fail
+  with a name — "the closing state was never reached" — rather than pass.
+* **2026-11-07 — A recording facility must never write to the surface its own digest
+  covers, and the announcement the player needs has to go somewhere else.** If the
+  per-record digest includes the screen, then a "RECORDING" banner printed to the game
+  screen is present in the recording and absent from the playback, and the first record
+  mismatches for a reason the engine caused. Two transferable points. (1) Route
+  recorder and player notices to a channel the digest does not read — the same channel
+  the screenshot key already uses — and say why in a comment at the print site, or the
+  next person will "improve" the UX by moving the message onto the screen and break
+  verification. (2) The same asymmetry bites anywhere the observer writes to what it
+  observes: a checkpoint that restores state but not the screen cannot vouch for the
+  screen, so either carry the screen in the checkpoint or keep it out of the digest,
+  and say in the header which one you chose and what that makes undetectable.
+* **2026-11-07 — "Record the input the game consumed" needs a seam that every mode
+  passes through, and a toggle that arms itself at the seam.** Logging raw keystrokes
+  records input the game never read; logging resolved actions needs a hook in every
+  handler. Tapping the one place a key becomes game logic gets both right, but only if
+  the first press of the toggle can arm the recorder from there: a toggle handler that
+  returns "no key" and waits for the next quiescent point loses the key that arrives
+  in between, because the seam fetches a replacement inside the same blocking call.
+  Two transferable points. (1) Distinguish "a boundary is open right now" from "a
+  boundary will come", and honour the toggle immediately when the caller is already
+  standing at one. (2) The quiescence rule still has to hold mid-command, so the flag
+  needs clearing when a key goes out — otherwise a press during a half-typed command
+  takes effect in the middle of it.
+* **2026-11-07 — A checkpoint can only resume a mode whose position lives in the state
+  the checkpoint carries.** Recording was refused in two modes after measurement, for
+  two different reasons, and both are the same rule. The title screen reaches its menu
+  by consuming keys of its own, so a checkpoint there cannot be resumed without
+  replaying input the recording never made. A character-creation form keeps its cursor
+  — which field is highlighted, which dropdown is open — in a local struct, so a
+  checkpoint taken mid-form names a state playback cannot resume and the digests
+  diverge a few keys in. Two transferable points. (1) Before building record/playback,
+  enumerate the per-mode scratch held outside the mirrored state and refuse to record
+  where it matters; a refusal that names the reason is worth more than a demo that
+  replays wrong and looks like an engine defect. (2) "Quiescent" is not one condition
+  but one per mode, and the honest set is the modes with no such scratch at all.
+* **2026-11-07 — An argparse `REMAINDER` positional swallows the options declared
+  before it, so a pass-through-to-subprocess flag must be `append`, not `REMAINDER`.**
+  A wrapper that forwards extra arguments to the binary it drives was written as
+  `extra: REMAINDER` after `--engine` and `--data-dir`; parsing
+  `--engine X --data-dir Y -- --flag` put all four tokens in `extra` and left the real
+  options at their defaults, so the subprocess was launched with the wrapper's own
+  option names and failed with a usage dump the wrapper reported as a bare exit code.
+  Two transferable points. (1) Use a repeatable `--engine-arg` for pass-through and
+  document that its value must be one token (`--engine-arg=--flag`). (2) When a wrapper
+  reports a child's failure, carry the child's own diagnostic line into the verdict;
+  "exit 2" tells a person nothing about which file or why.
+
 * **2026-11-05 — A "nothing changed" gate must also prove that something was written,
   or it passes on a run that did nothing at all.** The property worth gating in any
   reconstruction that plays against player-supplied content is *the content tree is
