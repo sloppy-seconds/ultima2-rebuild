@@ -130,6 +130,7 @@ gate that had passed.
     reproduce. So the header now distinguishes `overlay` (content, enforced) from
     `overlay-slot` (the recorder's own save, noted once and never enforced), because no
     viewer can be expected to hold the recorder's save.
+    *(Superseded in direction by § 13, which removes the two layers rather than grading them.)*
 17. **`@end` records how the recording ended, and that decides where its state digest
     is compared.** A stop toggle leaves the run running, so the digest is a quiescent
     state and playback compares it at the matching poll. A quit ends the run, so the
@@ -151,6 +152,13 @@ gate that had passed.
     content cannot be reproduced is simply unplayable, which is the opposite of the
     request that started this — and a recording made before deviation 16 was found is
     exactly that case.
+20. **Deviation 16 is a workaround, not the design, and § 13 replaces it.** The two-tier
+    `overlay` / `overlay-slot` split makes a demo recorded after any prior play
+    best-effort, which is where the owner's own 165-record demo ended up. § 13 amends the
+    format to carry a **terrain delta against content** instead of a digest of whatever the
+    run loaded, which retires the split, retires `--demo-embed-overlays`, and finally makes
+    the real-install case testable as gate leg W16. **§ 13 is design only and unbuilt**; the
+    five assertions that prove its load-bearing property are shipped and gated.
 
 Everything below is the plan as ruled on 2026-11-05, unchanged, with the D-numbers the
 implementation cites.
@@ -343,6 +351,10 @@ matters more than the bytes.
 is named rather than left vague: a demo that must carry its own sector overlays to be self-contained (§ 4,
 `--demo-embed-overlays`) stops being a text file, and that is the day to reconsider the container.
 
+> **Closed 2026-11-07 by § 13.** A demo never has to carry its overlays, because it carries a delta
+> against content instead. `--demo-embed-overlays` is retired as an idea and the container question
+> does not arise.
+
 ### D8 — a file with no epilogue is **incomplete** and refused unless asked
 
 Recording appends and flushes per record, so a hard kill loses at most the open record. The reader treats a
@@ -534,7 +546,7 @@ The refusal stays where state actually lives:
 | input to state | policy |
 | --- | --- |
 | `mapx`/`monx`/`tlkx` content files | refuse on digest mismatch, naming the file |
-| the slot's sector overlays (`mapx`/`monx` the recording itself mutated) | refuse on digest mismatch, naming the file |
+| the slot's sector overlays (`mapx`/`monx` the recording itself mutated) | refuse on digest mismatch, naming the file **(overtaken: deviation 16 notes these once instead; § 13 removes the category)** |
 | the PLAYER record | refuse on digest mismatch (`save-sha`) |
 | tile art, theme, `fmtowns` art | note once on stderr, play |
 
@@ -835,3 +847,160 @@ engine against it turn by turn. This plan is the engine half of it and does not 
 The direction that will actually be built first is the cross-game one, because it is the one that finds
 bugs. This subsystem is what makes the result *shareable*: a repeatable scenario a person can send to
 another person, rather than a capture directory only this machine can read.
+
+---
+
+## 13. Amendment — the world delta (ruled 2026-11-07, **not built**)
+
+**Design only. Nothing in this section is implemented.** It is written down the day the direction
+was ruled because § 4's overlay policy, D7's deferred flag and deviation 16's two-tier split all
+point here, and because the reasoning that produced it is worth more than the summary in a commit
+message would preserve.
+
+### 13.1 The defect a digest cannot fix
+
+§ 4 refuses playback when the sector bytes a viewer loads disagree with the digest the recorder
+captured. That is the right instinct and the wrong mechanism, and it failed on the owner's first
+real recording on a real install.
+
+The reason is that the recorder and the viewer are not allowed to read the same files. The recorder
+plays, and play writes sector overlays into its own save slot (`docs/save-scoped-worlds.md`), so
+the bytes it digests are its slot's. § 7.4 then deliberately hides that slot from playback, so a
+viewer cannot be asked to hold it. Deviation 16 handled that honestly by splitting the category in
+two and refusing to enforce the half that could not be honoured. Correct, and it left the property
+nobody wanted: **a demo recorded after any prior play is best-effort, and `--playback-ignore-content`
+is how you play one.** That is the state the owner's 165-record demo is in.
+
+A digest describes the world. It does not travel, and it cannot be applied. What a demo needs is not
+a stronger check on the world it started from but **the small amount by which that world differed
+from the one a viewer already has**.
+
+### 13.2 The property that makes that amount small (proven 2026-11-07, with controls)
+
+The overlay's `mapx` differs from shipped content almost entirely by **baked creature stamps**, and
+stamps are derivable. Four facts, all read off the code and then confirmed by running it:
+
+* `u2_state_load_ds_buf()` is a wholesale `memcpy` of the whole DS mirror and refuses a partial
+  span (`state.c:57`). Mounting a checkpoint therefore restores the creature table, not just the
+  player.
+* `u2_monsters_restamp()` reads `const u2_state *s = &ctx->state` — the mirror — and **not**
+  `w->mon`. It first rebuilds all 4096 cells from `map_base`, then stamps `s->mon_type[i]` at
+  `s->mon_y[i] * 64 + s->mon_x[i]` (`monsters.c:138`).
+* The six creature arrays sit at `0x137..0x1F7`, inside `U2_DEMO_SPAN = 0x650`.
+* The ordering hazard is already closed: `ctx->demo_restamp_pending` goes up when a world-mode
+  checkpoint lands (`demo.c:557`) and is consumed in the command loop (`overworld.c:1937`), which
+  re-syncs `ow->x/y` and restamps before anything draws. Its own comment names the exact failure
+  this was worried about — *"the grid was stamped from the freshly loaded monx"*.
+
+So a viewer with pristine content, the checkpoint and a restamp converges on the recorder's grid.
+**`monx` needs no delta.** The only world bytes a demo has to carry are terrain edits nothing else
+can derive: an unlocked door, a boarded vehicle, a looted chest, a parked rocket — and the rocket is
+itself re-stamped from `DS:69/6A/6B`, so it is not even one of those.
+
+Proven, not inferred. `engine/tests/demo_check.c` carries five assertions (`checkpoint_drives_the_stamp`)
+and each was demonstrated red by a mutation, per AGENTS.md § 3:
+
+| control | mutation | went red |
+| --- | --- | --- |
+| A | drop the restamp after the checkpoint mounts | the two post-checkpoint assertions, and nothing else |
+| B | stop `u2_monsters_restamp` rebuilding from `map_base` | the ghost assertion only |
+| C | shrink `U2_DEMO_SPAN` to `0x100` | the span assertion, plus the round-trip it genuinely breaks |
+
+Control A is placed *before* the restamp call rather than after it, because after it the assertion
+would pass for the wrong reason and the control would be vacuous.
+
+### 13.3 The format
+
+`@world` lines replace `overlay` lines in a v2 file, one group per sector the recording loaded:
+
+```
+@world mapx20 base=<sha256 of the content bytes> delta=<x>,<y>:<old>-><new>;...
+@world monx20 base=<sha256> delta=none
+@world tlkx20 base=<sha256> delta=none
+```
+
+| field | rule |
+| --- | --- |
+| `base` | digest of the **content-layer** bytes the loader would have read had the slot held no overlay. This is what makes the refusal satisfiable again: two people with the same release pack match. |
+| `delta` | the cells where the bytes actually loaded differ from `base`. Empty for a recording made on a clean install, which is the case that already works today. |
+| cell | decimal `x,y`, bytes two hex digits, no `0x`. |
+| order | ascending by `y * 64 + x`, always. D7 chose text so demos would be diffable; an unordered delta is not. |
+| `base=absent` | a file the viewer has none of. Normal for `tlkx`; several sectors ship without one. Needs no delta. |
+
+Playback: load content, verify `base` (refusal on mismatch, naming the file — the existing
+behaviour, now one a clean viewer can pass), apply `delta`, play. `--playback-ignore-content`
+keeps its meaning and shrinks to its proper use: overriding a genuine `base` mismatch, not
+papering over a slot the viewer cannot hold.
+
+`tlkx` needs no delta because play never writes it — `world.c:359` states it flat: *"tlkx is
+read-only, so nothing records a root for it."*
+
+### 13.4 What this retires
+
+* **Deviation 16's two-tier split.** There is no longer a content layer versus a slot layer to be
+  honest about, because the delta is taken against content regardless of where the bytes came from.
+  `overlay-slot`, the note-once path and `slot_note` all go away rather than being corrected.
+* **`--demo-embed-overlays`.** D7 named it as the condition that would revive `.zip`: *"a demo that
+  must carry its own sector overlays to be self-contained stops being a text file, and that is the
+  day to reconsider the container."* Under § 13 a demo never must. The flag is retired as an idea
+  and D7's condition is closed, not deferred.
+* **The stale row in § 4's correction table**, which still says slot overlays "refuse on digest
+  mismatch" — deviation 16 already overtook it.
+
+**Licensing, which is the reason option three died.** A base sha is a hash and a cell delta is
+player-generated state, so a § 13 demo has the same standing as a save file under D9. Embedding
+full sector bytes would be distributing 4224 bytes of authored terrain per sector, which is the
+thing `AGENTS.md` § 0 forbids and D9 reasons around. The delta is not merely smaller; it is the only
+variant that clears the line while satisfying "easily shareable".
+
+### 13.5 Versioning
+
+`udemo 1` → `udemo 2`. **`format-version` bumps; `digest-version` does not**, because the DS digest
+scope is untouched and D13's downgrade-to-unverified path must not fire for a reason as shallow as a
+new header line. A v2 reader plays a v1 file with v1 semantics (digest compare, no delta); an
+unrecognised version still refuses, per § 4.
+
+### 13.6 Gate legs
+
+| item | leg | control |
+| --- | --- | --- |
+| **W16** | record in a world whose slot holds a dirty `mapx`, replay in a clean world over the same content, require a clean verification | strip the `delta` from the file: must diverge or refuse, never pass quietly |
+| **W17** | `base` mismatch refuses and names the file | re-point the existing `dd` mutation at `run_demo.sh:304` from digest to `base` |
+| **W18** | two recordings of the same edit emit byte-identical `@world` lines | write the delta out of canonical order and require the writer to be the thing asserted |
+| **W19** | a v1 file still plays under a v2 reader | claim `udemo 99` and require refusal |
+
+**W16 is the point of the whole amendment.** It is the leg that could not be written today, because
+today it cannot pass — which is exactly the gap `docs/harness-portability.md` records: fifteen
+controls on a synthetic fixture and three failures on first real use.
+
+### 13.7 Open items, named rather than discovered later
+
+* **More than one sector.** `U2_DEMO_MAX_OVERLAYS` is 3 — one sector's three files, captured at the
+  quiescent point. A recording that walks sectors dirties and loads more than one, and the viewer
+  diverges on the second sector it enters. The delta must cover **every sector the recording
+  loads**, so the bound has to become a list. Unresolved and load-bearing.
+* **Site geometry.** Inside a town, tower or dungeon `map_base` is 16 pages of 16×16 indexed by
+  floor, not a 64×64 grid (`monsters.c:143`). `y * 64 + x` is meaningless there. The header already
+  carries `mode`, so the encoding can be page-aware, but the format has to say which geometry a
+  cell is in. Do not reuse the overworld spelling for a site and hope.
+* **Engine-to-engine only.** `map_base` is an engine construct and `docs/map-format.md` warns it
+  "must not be read as a model of the original's memory". A § 13 delta is therefore an
+  engine-to-engine contract. Fine — replaying a demo against the original is
+  `docs/plan-cross-game-replay.md`, not this — but the header should say so in one line.
+* **If 13.2 ever stops holding.** The five assertions now guard it, so this is monitored rather than
+  open: if the checkpoint stops driving the stamp, creature state moves into the delta and the
+  format grows. It stays license-clean either way, since positions are state and not content.
+
+### 13.8 Parked with reasons: the save-side delta
+
+The same afternoon raised a wider idea — that `saves/<slot>/` should hold a delta against content
+instead of a full sector copy, so a save stops shadowing later content fixes.
+
+**Owner ruling 2026-11-07: parked, and § 13 is the reason.** The demo requirement was the only
+load-bearing argument for it. Once the demo carries its own delta, the overlay format has no
+consumer that needs the change, and what is left is content-fix precedence — real but weak, and
+answerable later with a content-version stamp in the slot rather than a format change. The full-copy
+overlay also stays faithful to `asm/2305`, which writes the stamped grid, and `asm/2305`'s own header
+still reads `confidence: low` and "behavior not yet reviewed". Changing a format to deviate from a
+routine nobody has finished reading is not a trade worth making twice.
+
