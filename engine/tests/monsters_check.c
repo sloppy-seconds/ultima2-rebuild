@@ -124,8 +124,10 @@ int main(int argc, char **argv)
      * touch (in range) are asserted on. A test that mutates state for its neighbours is
      * a false failure waiting to be blamed on someone else's change. */
     static uint8_t save_map[U2_SECTOR_TILES], save_base[U2_SECTOR_TILES];
+    static uint8_t save_kind[U2_MON_SLOTS];
     memcpy(save_map, w.map, sizeof save_map);
     memcpy(save_base, w.map_base, sizeof save_base);
+    memcpy(save_kind, ctx.state.mon_kind, sizeof save_kind);
     const uint8_t keep_x = ctx.state.mon_x[7], keep_y = ctx.state.mon_y[7];
 
     const int CTRL_SLOT = 5;            /* left as plain terrain: the control */
@@ -140,6 +142,13 @@ int main(int argc, char **argv)
         const uint8_t under = (i == CTRL_SLOT) ? (uint8_t)0x08 : ctx.state.mon_type[i];
         w.map_base[c] = under;
         w.map[c] = under;
+        /* The original restores `DS:1B7[slot]` on departure (asm/2233), and that byte is
+         * the terrain under this creature - measured: across 511 live shipped slots it is
+         * only ever 0x70 or 0x08. The fixture's generated mon_kind column is not terrain,
+         * so give each baked slot a plausible one, and give two of them DIFFERENT values.
+         * That difference is the whole point: a constant restore cannot produce it. */
+        if (i != CTRL_SLOT)
+            ctx.state.mon_kind[i] = (uint8_t)((i == 7) ? 0x08 : 0x0C);
     }
     CHECK(inrange > 0, "fixture has in-range spawn cells to test (%d)", inrange);
 
@@ -151,6 +160,7 @@ int main(int argc, char **argv)
     u2_monsters_clear_spawn_cells(&ctx, &w);
 
     int spawn_cleared = 1, plain_kept = 1;
+    int c_other = -1; uint8_t k_other = 0;
     for (int i = 0; i < U2_MON_SLOTS; i++) {
         if (ctx.state.mon_type[i] == 0) continue;
         const int c = (int)ctx.state.mon_y[i] * U2_SECTOR_EDGE + (int)ctx.state.mon_x[i];
@@ -159,7 +169,9 @@ int main(int argc, char **argv)
             if (w.map_base[c] != 0x08 || w.map[c] != 0x08) plain_kept = 0;
             continue;
         }
-        if (w.map_base[c] != 0x70 || w.map[c] != 0x70) spawn_cleared = 0;
+        if (w.map_base[c] != ctx.state.mon_kind[i] || w.map[c] != ctx.state.mon_kind[i])
+            spawn_cleared = 0;
+        if (i != 7 && c_other < 0) { c_other = c; k_other = ctx.state.mon_kind[i]; }
     }
     int others_kept = 1;
     for (int c = 0; c < U2_SECTOR_TILES; c++) {
@@ -174,7 +186,17 @@ int main(int argc, char **argv)
             others_kept = 0;
         }
     }
-    CHECK(spawn_cleared, "every baked spawn cell became 0x70 paving in both map and map_base");
+    CHECK(spawn_cleared,
+          "every baked spawn cell was restored to its OWN slot's terrain byte, in both arrays");
+    /* T1: the assertion that makes "its own byte" mean something. A restore that writes a
+     * constant passes the loop above whenever the fixture happens to use that constant, and
+     * the old fixture did use 0x70 for everything - which is how the constant hid. */
+    if (c7 < U2_SECTOR_TILES)
+        CHECK(w.map_base[c7] == 0x08 && w.map[c7] == 0x08,
+              "T1: slot 7 restored to its own terrain 0x08, not to a constant");
+    if (c_other >= 0)
+        CHECK(w.map_base[c_other] == 0x0C && k_other == 0x0C,
+              "T1: a second slot restored to a DIFFERENT terrain byte 0x0C");
     CHECK(plain_kept,
           "a creature standing on ordinary ground kept the ground under it (no brick paving)");
     CHECK(others_kept, "cells with no creature behind them kept their terrain");
@@ -184,12 +206,13 @@ int main(int argc, char **argv)
         ctx.state.mon_x[7] = (uint8_t)((keep_x + 1) & 0x3F);
         ctx.state.mon_y[7] = (uint8_t)((keep_y + 1) & 0x3F);
         u2_monsters_restamp(&ctx, &w);
-        CHECK(w.map[c7] == 0x70,
-              "after a creature leaves its spawn cell, restamp restores paving, not its sprite");
+        CHECK(w.map[c7] == 0x08,
+              "after a creature leaves its spawn cell, restamp restores its terrain, not its sprite");
     }
 
     memcpy(w.map, save_map, sizeof w.map);
     memcpy(w.map_base, save_base, sizeof w.map_base);
+    memcpy(ctx.state.mon_kind, save_kind, sizeof save_kind);
     ctx.state.mon_x[7] = keep_x;
     ctx.state.mon_y[7] = keep_y;
     (void)c5;

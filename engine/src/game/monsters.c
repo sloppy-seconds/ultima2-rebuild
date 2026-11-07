@@ -198,7 +198,6 @@ void u2_monsters_restamp(u2_ctx *ctx, u2_world *w)
 
 void u2_monsters_clear_spawn_cells(u2_ctx *ctx, u2_world *w)
 {
-    static const uint8_t k_clear = 0x70;   /* art 0x1C; see the header comment for the evidence */
     u2_state *s = &ctx->state;
 
     for (int i = 0; i < 32; i++) {
@@ -224,13 +223,29 @@ void u2_monsters_clear_spawn_cells(u2_ctx *ctx, u2_world *w)
          * so this guard keeps that result and drops the one nobody reported.
          *
          * The "he left a copy of him behind" defect this function exists for is a
-         * baked-cell problem, and it stays fixed. */
+         * baked-cell problem, and it stays fixed.
+         *
+         * CORRECTED 2026-11-08: what gets written was wrong. This restored a constant
+         * 0x70, but the original restores the SLOT's own terrain byte - `DS:1B7[slot]`,
+         * which `asm/2233_sub_2233` writes back into the grid on departure and
+         * `asm/0CEE_spawn_tile_store` fills at spawn from the rolled cell's terrain.
+         * No constant 0x70 is ever stored to the grid anywhere in the corpus. The
+         * shipped data agrees: across 511 live slots `monx[128..159]` is only ever
+         * 0x70 or 0x08, because that is where authored creatures stand. Sector 03 is a
+         * paving sector, which is exactly why the constant looked right there and why
+         * § 9 could not tell the two apart from that sector alone. Right in towns, wrong
+         * in the field. See docs/map-format.md § 9 and docs/needs-gameplay.md G66.
+         *
+         * The baked-cell guard above stays, and for an honest reason: the original needs
+         * no guard because it restores on departure, whereas the engine restores here at
+         * load, so it must not pave ground that was never baked. The guard reaching the
+         * right outcome for the wrong reason is why the constant survived this long. */
         if (w->map_base[cell] != s->mon_type[i])
             continue;
         /* Both arrays: map_base is what restamp rebuilds from, so clearing only w->map would let
          * the baked art reappear on the creature's first step off the cell - which is the bug. */
-        w->map_base[cell] = k_clear;
-        w->map[cell] = k_clear;
+        w->map_base[cell] = s->mon_kind[i];
+        w->map[cell] = s->mon_kind[i];
     }
 }
 
