@@ -1197,6 +1197,51 @@ requirement at all.** It draws one art index per cell, so `ground_at` is an enha
 not a fidelity claim. Keeping `map_base` for it is therefore not a divergence from the bytes — it is
 extra machinery the bytes are silent about, which is a different and much more comfortable category.
 
+### Step 2c — DECIDED 2026-11-08: **partial**, and Phase 1b is what makes it possible
+
+Two facts settled it, both checked rather than assumed.
+
+**1. `map_base` has a live consumer.** `frame.c:308` calls `u2_view_ground_at()` to composite a
+sprite over terrain in the EGA path. So `map_base` is not dead weight and the full one-buffer outcome
+is off the table. (An earlier grep for consumers came back empty and would have led to the opposite
+conclusion; it matched `.ground`/`->ground` and missed the accessor. Recorded because a null result
+from a pattern that is too narrow is the same failure as a gate that cannot go red.)
+
+**2. The original never rebuilds. It patches one cell at a time.** Three sites, all targeted:
+
+| event | the original | the engine today |
+| --- | --- | --- |
+| departure | `asm/2233` restores `DS:1B7[di]` into the old cell | `ai.c` restores `map_base[old]`, then a full rebuild |
+| arrival | `asm/225A` saves the new cell's terrain into `DS:1B7[di]`, then stamps | now does this, Phase 1b |
+| death | `asm/2E3D` masks the cell with `and $0xF0` through `[DS:8]` — one cell | full rebuild at `overworld.c:1865` |
+
+So § 10's finding stands and the engine's rebuild is a genuine divergence, but it is a divergence of
+*method*, not of outcome — and removing it is a refactor with its own gates, not a deletion.
+
+**The dependency nobody saw.** `clear_spawn_cells` writes **both** arrays, and that is what forces the
+load-time rebuild: blank the stamp in `map`, then restamp to put it back. If it wrote only `map_base`,
+`map` would keep the file's stamps — which are already correct, because `mapx` and `monx` are a matched
+save pair — and the load rebuild becomes unnecessary. But fixing `map_base` at a creature's *current*
+cell requires the slot byte to describe the current cell, and that is exactly what Phase 1b added.
+**Before `asm/225A` was mirrored, the partial outcome was not reachable.** The phases turned out to
+be load-bearing on each other, not just sequential.
+
+**Decision, as a sequence of separately-gated steps:**
+
+| step | change | gate |
+| --- | --- | --- |
+| 2c-i | `clear_spawn_cells` writes `map_base` only, not `map` | M2, and the ghost counter must stay at zero |
+| 2c-ii | drop the move-path rebuild at `overworld.c:130` — `ai.c` already commits per creature and its own comment calls the rebuild "redundant rather than wrong" | M3, the `monx61 (31,44)` stacked-cell case |
+| 2c-iii | replace the kill-path rebuild at `overworld.c:1865` with a targeted restore of the dead slot's cell | M1, and re-read the staging-vs-map trap recorded in that site's comment before touching it |
+| 2c-iv | keep the load-path and demo-mount rebuilds | — |
+| 2c-v | `terrain_put`'s dual write **stays**, but its comment must be rewritten: it is no longer "survive our own rebuild", it is "keep `ground_at` honest" | M1 |
+
+**Not decided, and deliberately so:** whether the load-path rebuild can also go. It can probably be
+replaced by a stamp-only pass, but the demo-mount site (`:1944`) genuinely needs a full re-stamp after
+a checkpoint lands, and collapsing the two would couple Phase 2 to Phase 3. Leave it until Phase 3
+exists.
+
+
 **Whatever is chosen, record it in `docs/map-format.md` § 10 next to the finding it resolves.** A
 measured finding the code contradicts, with no note saying why, is the shape AGENTS.md § 3 calls a
 gate that cannot go red.
@@ -1255,10 +1300,14 @@ three failures on first real use.
 
 | phase | size | risk | unblocks |
 | --- | --- | --- | --- |
-| 1 | small, ~6 files | low; one behaviour change, one rename | G66's frame, and an honest `state.h` |
-| 2 | unknown until 2a | **the real risk is here**, and 2a is cheap enough to find out early | whether `terrain_put` and `clear_spawn_cells` can go |
+| 1 | small, ~6 files | low; one behaviour change, one rename | G66's frame, and an honest `state.h` — **done, plus Phase 1b** |
+| 2 | unknown until 2a | **the real risk is here**, and 2a is cheap enough to find out early | whether `terrain_put` and `clear_spawn_cells` can go — **decided: partial, five gated steps** |
 | 3 | medium, well-specified | low once 1 and 2 settle | shareable demos, W16 |
 
 Phase 1 ships alone. Phase 2 ships as a decision record even if the decision is "no change". Phase 3
 is indifferent to Phase 2's outcome by construction, which is what makes it safe to specify now.
+
+**Status after 2026-11-08:** Phase 1 and Phase 1b are shipped. Phase 2's decision is recorded above and
+its five steps are not — they are separately gated and 2c-i is a no-op until 2c-ii and 2c-iii land
+with it, so they move as one unit or not at all. Phase 3 is unchanged and still unbuilt.
 
