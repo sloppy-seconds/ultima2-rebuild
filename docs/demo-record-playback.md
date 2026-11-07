@@ -1426,10 +1426,31 @@ purpose. Same hazard class the closing digest already documents — "the two dir
 compared at the same point in the loop, not merely at the same loop iteration" — arriving at the
 first record instead of the last.
 
-The fix is an ordering fix in the playback loop, not a scope change: after a world-mode mount the
-first verification has to happen one step later, at the tap for key 1 after the same draw the
-recorder sat through, rather than at the mount instant. That is a change to loop ordering, the class
-of change this project has been burned by repeatedly, so it is proposed rather than done.
+The fix was an ordering fix in the playback loop, not a scope change — and it turned out to be
+smaller than that, and not ordering at all. Recorded here because the diagnosis above was wrong in
+its last step and the reasoning that got there is worth keeping.
+
+**Resolved 2026-11-08, one commit later.** The three measurements were all correct; the inference
+from them was not. `u2_demo_digest` puts `ctx->rng_rolls` in its head string, and `rng_rolls` is the
+engine's own tally, not part of the DS mirror — `u2_rng_load` resets it deliberately, because it is
+not original state. So a playback that restored all 1616 bytes and left the tally at 0 hashed
+`rolls=0` over a recording made at `rolls=14` and reported a divergence on every record while every
+byte agreed. The checkpoint line already carries `rolls=`; the mount now restores it.
+
+Proved by arithmetic rather than by watching it improve: hashing the recorded checkpoint span with
+`rolls=0` reproduces the engine's reported live digest exactly, and with `rolls=14` it reproduces the
+recorded record-1 digest exactly. Nothing else differs. A state-vs-metadata split is the one place a
+"0 differing offsets" measurement can still be a true statement about the wrong thing.
+
+**A second, separate divergence remains, and it is a real one.** Records 1–9 now verify; record 10
+and the 400 after it do not. It starts at `rolls=36`, several turns into play, which is what a genuine
+simulation difference looks like rather than a bookkeeping one. The leading hypothesis, not yet
+tested: `monx20`'s slot overlay differs from content in 22 creature bytes and carries no delta, per
+§ 13.2's ruling that the checkpoint's creature table makes a monx delta unnecessary. That ruling
+holds for the table itself and not for what the file feeds at load time — `clear_spawn_cells` restores
+`s->mon_kind[i]` terrain into the grid before the mount lands, so it restores terrain chosen from the
+content creature table while the recorder restored terrain chosen from its own. § 13.2 may need
+revisiting on the same grounds that made mapx need a delta.
 
 Ruled out by measurement, so nobody re-walks them: not the theme, not the art, not the scratch-save
 redirect (all reproduce identically on the owner's install and on a local copy of the same content

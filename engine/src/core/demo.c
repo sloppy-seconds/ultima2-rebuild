@@ -128,6 +128,10 @@ typedef struct u2_demo {
     char       end_frame_sha[65];
     uint8_t    checkpoint[U2_DEMO_SPAN];
     int        has_checkpoint;
+    /* The `rolls=` the checkpoint line carried. The digest head embeds ctx->rng_rolls, so
+     * a playback that restores the mirror but not this counter digests a different string
+     * over identical bytes and diverges at every record. */
+    uint32_t   ckpt_rolls;
     int        complete;              /* @end was seen */
 
     struct demo_overlay *overlay;
@@ -635,6 +639,18 @@ void u2_demo_quiescent(u2_ctx *ctx, u2_demo_mode mode, const u2_world *world)
             d->cur_rec = d->n_recs;
             return;
         }
+        /* The roll counter is NOT part of the DS mirror — ctx->rng_rolls is the engine's
+         * own tally, and u2_rng_load resets it precisely because it is not original state.
+         * But u2_demo_digest puts it in the head string, so a playback that restores 1616
+         * bytes and leaves the tally at 0 hashes "rolls=0" over a recording made at
+         * "rolls=14" and reports a divergence on every single record while every byte
+         * agrees. Restoring it is the whole fix; the RNG itself needs no help, because its
+         * shift register lives at DS:0x23F and the mirror restore already carried it.
+         *
+         * Measured, not inferred: hashing the recorded checkpoint span with rolls=0
+         * reproduces the engine's reported live digest exactly, and with rolls=14 it
+         * reproduces the recorded record-1 digest exactly. Nothing else differs. */
+        ctx->rng_rolls = d->ckpt_rolls;
         if (ctx->demo_speed_pin) {
             /* D5: "not compared" is not "not used". DS:74 feeds the delay table via
              * asm/0711, so a playback that recalibrated it would diverge for a reason
@@ -921,6 +937,8 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
                 d->sector_hi = val[0] - '0';
                 d->sector_lo = val[1] - '0';
             }
+            if (field(line, "rolls", val, sizeof val))
+                d->ckpt_rolls = (uint32_t)strtoul(val, NULL, 10);
             continue;
         }
         if (!strncmp(line, "@snap ", 6)) { in_checkpoint = 0; continue; }
