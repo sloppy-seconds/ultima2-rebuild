@@ -26,6 +26,15 @@ it proves is the narrow thing worth proving: a second renderer, a real event loo
 real clock between the same records cannot move the DS state. W13 is done as
 overworld → site → overworld; see deviation 5 for why creation is refused.
 
+**The real-install follow-up is closed too.** Every fault the owner's own recordings found has a root
+cause, a fix and a leg: the truncated delta and the unsafe `emit` (the three bugs the first real
+recording found), the roll counter, the creature layer, the stop toggle, the per-load version, the
+non-contiguous version group (21) and the rule mode (22). The owner's 216-record demo verifies
+216/216 with exit 0 against a local copy of `original/`, with no override flags. What is left in the
+demo work is not a demo fault: the three older files in `engine/demos/` were recorded before option A
+and cannot be repaired retroactively, and `docs/needs-gameplay.md` G67 is a fidelity question the
+fixed playback exposed rather than caused.
+
 **Every deviation from this plan, each one forced by a measurement; the count is whatever the
 list below ends in, and it is not repeated in prose on purpose.** They are
 listed here rather than edited silently into the body, because the body is the owner's
@@ -1551,6 +1560,13 @@ is the creature table after a site departure, the recorder reloaded 10 creatures
 and this file carries **one** `@world` version per sector file — it was recorded before option A, so
 the second load of `monx20` had no version of its own to take. The file cannot be repaired
 retroactively; it is stale evidence, and the fault it now shows is the one already closed above.
+
+**The same applies to the other two files recorded before option A, and nobody should re-walk them.**
+`20261108T052917.demo` (diverges at 56) and `20261108T053052.demo` (at 58) each carry exactly one
+`@world` version for `mapx20`, `monx20`, `mapx22` and `monx22`, and neither moves under `--enhanced`.
+One version per file is the pre-option-A signature: a mid-session save rewrote a sector and the file
+has no second version to hand the load that reads it. They are stale evidence in the same way, and
+only a recording made by a current binary can test the current contract.
 
 **W25 is the leg, and it is behavioural rather than textual.** `tests/demo_kill_fixture.py` seeds one
 creature at hp 16 one cell east of a character whose swing is exactly 16, with agility 0x80 so every
