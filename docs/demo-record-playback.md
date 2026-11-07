@@ -1442,21 +1442,74 @@ Proved by arithmetic rather than by watching it improve: hashing the recorded ch
 recorded record-1 digest exactly. Nothing else differs. A state-vs-metadata split is the one place a
 "0 differing offsets" measurement can still be a true statement about the wrong thing.
 
-**A second, separate divergence remains, and it is a real one.** Records 1–9 now verify; record 10
-and the 400 after it do not. It starts at `rolls=36`, several turns into play, which is what a genuine
-simulation difference looks like rather than a bookkeeping one. The leading hypothesis, not yet
-tested: `monx20`'s slot overlay differs from content in 22 creature bytes and carries no delta, per
-§ 13.2's ruling that the checkpoint's creature table makes a monx delta unnecessary. That ruling
-holds for the table itself and not for what the file feeds at load time — `clear_spawn_cells` restores
-`s->mon_kind[i]` terrain into the grid before the mount lands, so it restores terrain chosen from the
-content creature table while the recorder restored terrain chosen from its own. § 13.2 may need
-revisiting on the same grounds that made mapx need a delta.
+**The second divergence was the monx ruling, and § 13.2 was reversed.** Records 1-9 verified and
+record 10 onward did not, and the hypothesis above was right: `clear_spawn_cells` restores
+`s->mon_kind[i]` terrain into the grid before the mount lands, so a playback that loads the content
+creature file ends up with a creature the recorder never had. Both layers now carry deltas; see
+`note_layer_delta` and the `is_map` flag on `u2_demo_apply_world`. On a fresh recording that fixed
+records 10 through 19, and then 1 through 103.
+
+**Ctrl-R not stopping a recording was two independent faults on one key press.** The seam swallowed
+the toggle and looped back into `wait()`, which the SDL backend blocks in and the scripted backend
+cannot -- so every gate passed and the real game never stopped. Behind that, the handler that turns
+`pending_stop` into a finished file sat *after* `if (d->state != U2_DEMO_IDLE) return;`, and a
+recording is never IDLE, so it was unreachable in every backend. That is why every demo this project
+has produced said `stop=exit`. W22 now asserts the word `stop=toggle`, and was watched going red
+against the original ordering before the fix was believed.
+
+**The closing digest was a consequence of that, not a separate fault.** A `stop=toggle` recording
+ends at a defined instant and its closing digest matches: an 8-record demo verifies 8/8 with exit 0.
+Only quit-terminated recordings disagreed, because the quit happened at an unrecorded moment after
+the last key.
+
+---
+
+### The open one: a creature that will not die
+
+A 147-record `stop=toggle` demo (`demos/20261108T052450.demo`, 2026-11-08) verifies records 1-36 and
+diverges at 37. Twelve bytes differ, and they are one creature and its consequences:
+
+```
+DS:014F  recorded 3e  live 3f   mon_x[24]
+DS:018F  recorded 00  live 01   mon_hp[24]
+DS:01AF  recorded 00  live 30   mon_type[24]
+DS:01CF  recorded 00  live 08   mon_kind[24]
+DS:0057  recorded 09  live 05
+DS:0059  recorded 18  live 11
+DS:023F..0244                    rng_state, downstream of everything else
+```
+
+The recorder had slot 24 dead (`type 00, hp 00`, stale `x` left behind); the playback has it alive
+(`type 0x30, hp 1`). A live creature rolls every turn, so the register difference is expected to be
+a consequence rather than a cause -- **but that is a hypothesis, and the last time a hypothesis about
+this digest was written down before it was measured, it was wrong.** The counters at `DS:0057` and
+`DS:0059` are unexplained and the recorder has more of both.
+
+The monx delta is applied (35 cells on that demo), so the creature spawned correctly. The question is
+why it did not die on the recorder, or why it survived in playback. That is combat or damage, not
+world loading, and nothing in this file has covered it.
+
+**The recipe, because it is what made all of these findable.** Record and play back with the same two
+flags, then diff:
+
+```
+./u2-sdl-static --demo-snapshots --trace-rolls ~/Games/u2/long.trace
+SDL_VIDEODRIVER=dummy ./u2-sdl-static --demo-snapshots --trace-rolls play.trace \
+    --playback demos/<new>.demo
+python3 engine/tools/demo_span_diff.py demos/<new>.demo demos/<new>.demo.live 37
+```
+
+`demo_span_diff.py` names creature slots, not raw offsets, and refuses to pretend a verified record
+is a zero diff. Two traps it exists to avoid: the `@snap` payload is 51 lines of 32 bytes and reading
+one line compares 32 bytes and reports "0 differing" for a span that differs in thirteen -- that
+mistake produced a confidently wrong diagnosis and an almost-shipped digest change. And `--trace-rolls`
+covers the whole run, so the recorder's trace starts at roll 1 while playback starts at the
+checkpoint's count; compare the END roll, not the line count.
 
 Ruled out by measurement, so nobody re-walks them: not the theme, not the art, not the scratch-save
 redirect (all reproduce identically on the owner's install and on a local copy of the same content
 and save); not the RNG, whose shift register lives at DS:0x23F and is inside the restored span; not
-`monx20`, whose slot overlay differs from content in 22 creature bytes but is overwritten by the
-mount; not the speed pin, reported as pinned to the recorded values. An earlier note here claimed the
-recorded and live `rolls=` counts agreed — they were never compared. The printed `rolls=` is the
+the speed pin, reported as pinned to the recorded values. An earlier note here claimed the
+recorded and live `rolls=` counts agreed -- they were never compared. The printed `rolls=` is the
 record's own metadata, and reading it as a live comparison was an over-read.
 
