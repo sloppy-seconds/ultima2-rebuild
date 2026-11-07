@@ -556,7 +556,13 @@ else
 fi
 
 # --- --data-dir is part of the documented contract ----------------------
-./u2 --help 2>&1 | grep -q -- '--data-dir' \
+# Captured to a file rather than piped: `./u2 --help | grep -q` races under
+# `set -o pipefail`. grep -q exits at the first match and closes the pipe; if the engine
+# is still writing it takes SIGPIPE and exits 141, and pipefail reports that as a failed
+# pipeline even though the match happened. Measured 5 false failures in 300 runs, and it
+# went red once in a real `make test` before this.
+./u2 --help > "$WORK/help.txt" 2>&1
+grep -q -- '--data-dir' "$WORK/help.txt" \
     && ok "--data-dir is in the usage text" \
     || bad "--data-dir missing from usage"
 

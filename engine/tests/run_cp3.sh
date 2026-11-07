@@ -34,7 +34,12 @@ else
 fi
 
 # --- the disk model is part of the documented contract --------------------
-./u2 --help 2>&1 | grep -q -- '--save-dir' \
+# Captured to a file rather than piped. `./u2 --help | grep -q` is a race under
+# `set -o pipefail`: grep -q exits at the first match and closes the pipe, and if the
+# engine is still writing it takes SIGPIPE and exits 141, which pipefail reports as a
+# failed pipeline even though the match happened. Measured: 5 false failures in 300 runs.
+./u2 --help > "$WORK/help.txt" 2>&1
+grep -q -- '--save-dir' "$WORK/help.txt" \
     && ok "--save-dir is in the usage text" \
     || bad "--save-dir missing from usage"
 
