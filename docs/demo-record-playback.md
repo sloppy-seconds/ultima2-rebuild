@@ -1382,5 +1382,35 @@ is indifferent to Phase 2's outcome by construction, which is what makes it safe
 
 **Status after 2026-11-08:** Phase 1 and Phase 1b are shipped. Phase 2 is shipped except **2c-iii**,
 which was rejected as written — see the step 2c note. 2c-i, 2c-ii and 2c-v landed together, because
-2c-i is a behavioural no-op until 2c-ii gives it a reason. Phase 3 is unchanged and still unbuilt.
+2c-i is a behavioural no-op until 2c-ii gives it a reason. Phase 3 is shipped: 3a, 3b, 3c and 3d,
+gated by W16–W20.
+
+**The first real recording found three bugs the fixtures could not.** The owner's demo on a real
+install (`demos/20261107T145757.demo`, 410 records, sector 20 with a six-cell delta) reproduced all
+three, and the gate did not:
+
+- `char val[128]` in the reader silently truncated the `@world` value mid-cell at 127 characters.
+  Three cells applied, the fragment `"35,23"` failed the per-cell byte check, and a good demo was
+  refused. The fixture's delta was 36 characters and fitted, so the gate passed. The fixture now
+  uses six cells and W16 goes red against the old buffer — verified before the fix, not after.
+- `emit()` used `vsnprintf`'s return as a length. That is the length it *would* have written, so a
+  line longer than `U2_DEMO_LINEBUFSZ` would `fwrite` past the end of its own stack buffer and hash
+  the garbage into the framing digest. Memory-unsafe as well as wrong. The buffer is now sized for
+  the longest legitimate line and `emit()` clamps and announces.
+- A truncated delta was *appliable*. The parser now requires the value to end at a cell boundary,
+  because applying the intact prefix of a delta is the worst outcome available: a partly rebuilt
+  sector that looks like a rebuilt one.
+
+The lesson is about fixture sizing, and it belongs with `docs/harness-portability.md`: a fixture
+built at the convenient size cannot catch a size bug. Fifteen synthetic legs passed a demo format
+that failed on the first real save overlay it met.
+
+**Still open, and it is not the delta.** With the truncation fixed the real demo rebuilds its sector
+(`mapx20: rebuilt from the demo's recorded delta (6 cells)`) and then diverges at **every one of the
+410 records**, while the recorded and live `rolls=` counts agree on all of them. A fixed offset from
+record 1 with the RNG in step is a state-scope problem, not a world problem: something inside
+`U2_DEMO_SPAN` differs between two runs of the same binary on a real install, and the six excluded
+offsets do not cover it. Reproduced identically on the owner's install and on a local copy of the
+same content and save, so it is not the theme, not the art and not the scratch-save redirect. This
+is the next investigation and it is a digest-scope question, not a Phase 3 regression.
 

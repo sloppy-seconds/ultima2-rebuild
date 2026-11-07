@@ -20,7 +20,12 @@ import os
 import sys
 
 # (x, y) in descending file order: (63,63) is the last byte, (10,0) near the first.
-CELLS = [(63, 63), (3, 4), (10, 0)]
+# Six cells, not three. The first version of this fixture used three and its delta came
+# to 36 characters, which fitted inside the reader's 127-character value buffer, so the
+# gate passed while a real recording's six-cell delta was being truncated mid-token on
+# load. A fixture sized to the easy case cannot catch a size bug. Six cells put the
+# value at 161 characters and over the old buffer.
+CELLS = [(63, 63), (35, 23), (25, 22), (36, 21), (3, 4), (10, 0)]
 MARK = 0x44
 TILES = 4096
 

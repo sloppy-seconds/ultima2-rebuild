@@ -58,7 +58,13 @@ struct demo_world {
     char base[65];
     char delta[U2_DEMO_DELTA_MAX];
 };
-#define U2_DEMO_LINEBUFSZ 768
+/* Sized for the longest line the writer can legitimately emit, which is an `@world`:
+ * prefix + name + base + ` delta=` + a full U2_DEMO_DELTA_MAX delta. The value used to be
+ * 768, which a six-cell real delta did not exceed but a larger one would have, and emit()
+ * used vsnprintf's return as a length — so a too-long line would have fwrite'd past the
+ * end of its own stack buffer and hashed the garbage into the framing digest. emit() now
+ * clamps as well, so this constant is a size and not a silent trap. */
+#define U2_DEMO_LINEBUFSZ (U2_DEMO_DELTA_MAX + 256)
 /* The saved record is 256 bytes at DS:36 (core/save.h). Named once here so the
  * two places that digest it cannot disagree about the span. */
 #define U2_DEMO_RECORD_BYTES 256
@@ -324,8 +330,19 @@ static void emit(u2_demo *d, const char *fmt, ...)
     const int n = vsnprintf(line, sizeof line, fmt, ap);
     va_end(ap);
     if (n <= 0) return;
-    fwrite(line, 1, (size_t)n, d->file);
-    sha256_update(&d->framing, line, (size_t)n);
+    /* vsnprintf returns the length it WOULD have written. Passing that straight to fwrite
+     * reads off the end of `line` the moment a line outgrows the buffer, and the extra
+     * bytes also went into the framing digest, so the file would carry a digest over stack
+     * junk. Clamp, and say so: a truncated line is still a corrupt file, but it is a
+     * corrupt file that announces itself instead of one that verifies. */
+    size_t w = (size_t)n;
+    if (w >= sizeof line) {
+        fprintf(stderr, "u2: demo line exceeded %zu bytes and was truncated;"
+                        " the recording is corrupt\n", sizeof line);
+        w = sizeof line - 1;
+    }
+    fwrite(line, 1, w, d->file);
+    sha256_update(&d->framing, line, w);
 }
 
 static void emit_hex_payload(u2_demo *d, const uint8_t *bytes, size_t n)
@@ -829,7 +846,12 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
     u2_demo *d = calloc(1, sizeof *d);
     FILE *f;
     char line[4096];
-    char val[128];
+    /* Must hold a whole `@world` value: name + ` base=` + 64 hex + ` delta=` + a full
+     * delta. It was 128, which silently cut a real six-cell delta mid-token at 127
+     * characters — the reader then applied three cells, choked on the fragment "35,23",
+     * and refused a perfectly good demo. split_header truncates rather than failing, so
+     * the only defence is a buffer that cannot overflow and a completeness check below. */
+    char val[U2_DEMO_DELTA_MAX + 128];
     size_t ck_n = 0;
     int in_checkpoint = 0;
     sha256_ctx framing;
@@ -1006,6 +1028,23 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
                     snprintf(d->world[d->n_world].base, 65, "%.64s", sh);
                     snprintf(d->world[d->n_world].delta, U2_DEMO_DELTA_MAX,
                              "%.2047s", dp + 7);
+                    /* Completeness, not tidiness. Every cell the writer emits ends with
+                     * ';', so a value that stops anywhere else was cut short somewhere —
+                     * by a buffer, by an edit, or by a truncation nobody noticed. Applying
+                     * the intact prefix of a delta is the worst available outcome: a
+                     * partially rebuilt sector, and the per-cell byte check is the only
+                     * thing that would ever have caught it. Refuse the file instead. */
+                    {
+                        const char *dv = d->world[d->n_world].delta;
+                        const size_t dl = strlen(dv);
+                        if (dl != 0 && strcmp(dv, "none") && strcmp(dv, "too-big")
+                                && dv[dl - 1] != ';') {
+                            return refuse_playback(d,
+                                "a @world delta stops mid-cell: this file is truncated or"
+                                " was edited after it was written, so no sector in it can"
+                                " be rebuilt safely");
+                        }
+                    }
                     d->n_world++;
                 }
             } else if (!strcmp(key, "art")) {

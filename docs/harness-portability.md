@@ -1596,3 +1596,14 @@ caller loads, and carry them. Second, when a shape routine reloads only a subset
 before a call, treat that as evidence the rest are live state and ask what last wrote them —
 a routine that reloads nothing between calls is a state machine, not a list of independent
 draws.
+
+A fixture built at the convenient size cannot catch a size bug. A variable-length record passed
+every synthetic leg for days and failed on the first real instance, because the reader's value
+buffer silently truncated it mid-field and the fixture's example was shorter than the buffer.
+Two rules follow. Size a fixture's variable-length field so that it would overflow the naive
+buffer, and make the reader reject a value that stops short of a field boundary rather than
+applying the intact prefix — a partially applied record reads as a fully applied one. Related:
+`vsnprintf` returns the length it *would* have written, so using it as a write length overruns
+the destination whenever a line outgrows the buffer; a formatter that hashes what it wrote must
+clamp before it hashes. Verify the enlarged fixture goes red against the old buffer before
+believing it goes green against the new one.
