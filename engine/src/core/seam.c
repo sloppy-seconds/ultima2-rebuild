@@ -220,6 +220,23 @@ int seam_key_wait(u2_ctx *ctx, u2_key *out)
          * line so both seam entries tap the recorder at the same point in the
          * pipeline; it is inert for both control bytes, which sit below 0x61. */
         if (!take_screenshot_key(ctx, out) && !u2_demo_key(ctx, out)) break;
+        /* A Ctrl-R consumed just above left a transition pending, and on a blocking
+         * backend this loop never returns to the caller, so the caller's own quiescent
+         * point is never reached and the stop sits pending forever. That is why Ctrl-R
+         * stopped a recording in every scripted gate and never once in the real game:
+         * the scripted wait cannot block and the SDL one blocks until a key arrives.
+         *
+         * Honouring it here, at the boundary the caller already reported, is the whole
+         * fix. The alternative -- making wait answer "no key, player still here" -- has
+         * nowhere to go: every caller reads 0 as "the player left", creation.c returns
+         * -1 on it and four menu sites break out, so a third state would have to be
+         * audited at five sites that have never exercised one.
+         *
+         * Placed after the break test so a real key still wins: if the player pressed
+         * something after the toggle, that key is delivered and the caller reaches its
+         * own boundary a moment later, which is the old path and still correct. */
+        if (u2_demo_pending_transition(ctx))
+            u2_demo_quiescent(ctx, (u2_demo_mode)ctx->demo_quiescent_mode, NULL);
     }
     if (got < 0) {
         /* Collapse to the same two-state answer seam_key_poll gives, and set the

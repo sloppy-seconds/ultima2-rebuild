@@ -148,6 +148,11 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path);
  * the key: a demo that stops the game mid-turn would be a second bug. */
 int u2_demo_key(u2_ctx *ctx, u2_key *k);
 
+/* True when a Ctrl-R has been consumed and the transition it asked for is still waiting
+ * for a quiescent point. seam_key_wait needs this: on a blocking backend the wait loop
+ * never returns to the caller, so nothing else would ever reach that point. */
+int u2_demo_pending_transition(const u2_ctx *ctx);
+
 /* Where a pending Ctrl-R may take effect, and where a staged playback mounts its
  * checkpoint. Each mode's top-level wait calls this, and the overworld loop only
  * calls it when `ow->pending_cmd` is 0, because that is what keeps a half-typed

@@ -537,6 +537,16 @@ void u2_demo_begin_recording(u2_ctx *ctx, const char *path)
 
 static u2_demo *of(const u2_ctx *ctx) { return ctx->demo; }
 
+int u2_demo_pending_transition(const u2_ctx *ctx)
+{
+    const u2_demo *d = of(ctx);
+
+    if (!d) return 0;
+    if (d->state == U2_DEMO_RECORDING && d->pending_stop) return 1;
+    if (d->state == U2_DEMO_IDLE && d->pending_start) return 1;
+    return 0;
+}
+
 int u2_demo_key(u2_ctx *ctx, u2_key *k)
 {
     u2_demo *d = of(ctx);
