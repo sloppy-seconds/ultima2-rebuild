@@ -234,6 +234,16 @@ static int creature_step(u2_ctx *ctx, u2_world *w, int slot, int dx, int dy,
          *  touching still has to converge.
          */
         u2_world_tile_put(w, ox, oy, w->map_base[u2_world_tile_index(ox, oy)]);
+        /* asm/225A: save the NEW cell's terrain into the slot, then stamp.
+         * asm/2233 fetches the destination tile and asm/225a stores it into
+         * DS:1B7[di] before writing the type byte over it, so the slot byte is a
+         * rolling one-cell memory rather than a spawn record. Read the grid, not
+         * map_base: that is what the original's fetch returns, and the step gate has
+         * just proved the cell is unoccupied, so the two agree here. Without this the
+         * saved monx column keeps the spawn cell's terrain while the saved mapx
+         * carries the stamp at the current cell, and a reload restores the wrong byte
+         * under a creature that moved before saving. */
+        st->mon_kind[slot] = w->map[u2_world_tile_index(nx, ny)];
         u2_world_tile_put(w, nx, ny, st->mon_type[slot]);
         return 1;
     }
@@ -316,6 +326,9 @@ static int creature_wander_step(u2_ctx *ctx, u2_world *w, int slot, int px, int 
      * the occupancy rule, so it must be current for the next creature's gate test, not refreshed
      * once after the pass. */
     u2_world_tile_put(w, ox, oy, w->map_base[u2_world_tile_index(ox, oy)]);
+    /* asm/225A, same rolling save as the pursuit path: the retreat reaches the commit
+     * through the same pair in the original, so the slot byte follows here too. */
+    st->mon_kind[slot] = w->map[u2_world_tile_index(nx, ny)];
     u2_world_tile_put(w, nx, ny, st->mon_type[slot]);
     return 1;
 }
@@ -339,7 +352,9 @@ u2_ai_report u2_ai_creature_turn(u2_ctx *ctx, u2_world *w, int px, int py)
          * them on the sector's second decimal digit: digit 0 — the world map —
          * jumps here (asm/0A6D), digits 1..3 branch to the role-gated sweep at
          * asm/1013/1015, digits 4 and 5 branch into runtime 135E/135F inside
-         * asm/1151's span (the dungeon flow, parked per AGENTS.md § 3), and
+         * asm/1151's span (the dungeon flow, read in full 2026-10-29 for G54 and
+         * implemented as a second AI in engine/src/game/dungeon.c — the "parked per
+         * AGENTS.md § 3" note here outlived the park by ten days), and
          * digits 6..9 fall through to asm/0A6D as well. So mon_role gates the
          * TOWN sweep and not the world map: on the world map every live slot gets
          * the full pass, which is why a wandering spawn walks at you even though

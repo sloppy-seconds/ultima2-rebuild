@@ -124,6 +124,37 @@ int main(void)
     CHECK(rep.moved == 1 && u2_rng_rolls(&ctx) == 0,
           "outside the 3-cell ring the gate is not rolled at all (asm/0AB6/0AC0)");
 
+    /* --- asm/225A: the slot's terrain byte follows the creature ------------------
+     *
+     * DS:1B7 is not a static spawn terrain. asm/2233 restores it into the cell the
+     * creature leaves and asm/225a immediately overwrites it with the terrain of the
+     * cell it entered, so it is a rolling one-cell memory: "the ground under this
+     * creature right now". The engine had no equivalent update. That is invisible
+     * while map_base is accurate, and wrong across a save: the saved mapx carries the
+     * stamp at the creature's CURRENT cell while the saved monx column would still
+     * carry its SPAWN cell's terrain, so a reload restores the wrong byte there and
+     * clear_spawn_cells faithfully propagates the error.
+     *
+     * Fixture: paving everywhere, grass only under the creature, slot byte set to
+     * that grass. The pursuit test above establishes this setup moves (5,5)->(6,6),
+     * so the destination is paving and the two terrains genuinely differ - which is
+     * the only shape that can tell a rolling save from a stale one.
+     */
+    arm(&ctx, &w, 0x0Cu, 3, 5, 5, 40, 0x30);       /* paving everywhere */
+    const int from = 5 * U2_SECTOR_EDGE + 5;
+    const int to   = 6 * U2_SECTOR_EDGE + 6;
+    w.map[from] = w.map_base[from] = GRASS;        /* grass only under it */
+    ctx.state.mon_kind[3] = GRASS;
+    ctx.state.mon_role[3] = 1;
+    rep = u2_ai_creature_turn(&ctx, &w, 8, 8);
+    CHECK(rep.moved == 1 && ctx.state.mon_x[3] == 6 && ctx.state.mon_y[3] == 6,
+          "fixture: moved (5,5)->(6,6), off grass and onto paving");
+    CHECK(w.map[from] == GRASS,
+          "the cell it left was restored to its own terrain, not to a constant");
+    CHECK(w.map[to] == 0x30, "the cell it entered carries its stamp");
+    CHECK(ctx.state.mon_kind[3] == 0x0C,
+          "asm/225A: the slot's terrain byte now names the cell it is standing on");
+
     /* --- the two HP thresholds are different numbers ------------------------ */
     arm(&ctx, &w, GRASS, 4, 5, 5, 15, 0x30);
     ctx.state.mon_role[4] = 1;
