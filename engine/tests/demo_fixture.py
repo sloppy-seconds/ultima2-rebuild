@@ -31,6 +31,10 @@ the ones docs/demo-record-playback.md § 9 names as controls.
                         control: the shape every pre-fix demo is, and the one case where the
                         reader cannot know the rule and must say so.
   fidelity   IN OUT VAL rewrite the `fidelity` value to VAL, repair framing. W25's refusal.
+  badbase    IN OUT NAME break the base= of the LAST @world line for NAME, repair framing.
+                        This is W26: the mount is happy and the SECOND load refuses, which
+                        is the only way to make a refusal happen mid-run rather than at the
+                        mount.
 
 Usage: demo_fixture.py SUBCOMMAND IN OUT [arg]
 """
@@ -312,8 +316,43 @@ def cmd_fidelity(argv):
     return 0
 
 
+def cmd_badbase(argv):
+    """Break the `base=` of the LAST `@world` line for a given file name (argv[1]).
+
+    This is W26's fixture: the mount applies version 1 and is happy, and it is the SECOND
+    load -- the one that happens when the player walks back out of a site -- whose version
+    refuses. That is the only arrangement that exercises a mid-run refusal, and a mid-run
+    refusal used to be swallowed: `site_leave` called `(void)site_reload(...)`, the loop
+    carried on with the previous sector's grid under the new sector's position, and the
+    run ended looking exactly like a window the player closed.
+
+    The last line is chosen rather than the second so the same fixture works whether the
+    file carries two versions or one.
+    """
+    lines = read(argv[0])
+    want = "@world %s " % argv[1]
+    hit = -1
+    for i, line in enumerate(lines):
+        if line.startswith(want):
+            hit = i
+    if hit < 0:
+        print("demo_fixture: no @world line for %s" % argv[1], file=sys.stderr)
+        return 2
+    line = lines[hit]
+    if "base=" not in line:
+        print("demo_fixture: that @world line carries no base", file=sys.stderr)
+        return 2
+    head, rest = line.split("base=", 1)
+    sha = rest.strip().split(" ")[0]
+    broken = "0" * (len(sha) - 1) + ("a" if sha[-1] != "a" else "b")
+    lines[hit] = "%sbase=%s %s\n" % (head, broken, rest.strip().split(" ", 1)[1])
+    write(argv[2], repair_end(lines))
+    return 0
+
+
 COMMANDS = {
     "dupworld": cmd_dupworld,
+    "badbase": cmd_badbase,
     "dropfidelity": cmd_dropfidelity,
     "fidelity": cmd_fidelity,
     "spreadworld": cmd_spreadworld,

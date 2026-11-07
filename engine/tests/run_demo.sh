@@ -566,6 +566,35 @@ RC=0
 [ "$RC" -ne 0 ] && ok "W25 control: a fidelity value the engine has no rule for is refused" \
                  || bad "W25 control: an unknown rule mode played anyway"
 
+# --- W26: a mid-run refusal stops the run and says which sector -----------------------
+# The mount refusal had an exit code and a message; a refusal at a LATER load had neither.
+# `site_leave` and `site_enter` both called `(void)site_reload(...)`, so a demo whose second
+# load of a sector refused carried on with the previous sector's grid under the new sector's
+# position and mode byte, and the only thing the watcher got was a window that closed. The
+# owner's words for it were "the demo playback died after coming back from the town into the
+# main overworld" — which is the town→overworld reload, exactly, and there was nothing on
+# screen to disagree with.
+python3 tests/demo_fixture.py badbase "$WORK/spread.demo" mapx70 "$WORK/midrun.demo"
+RC=0
+OUT=$("$U2" --headless --cleanroom --data-dir "$WORK/wc3/content" \
+           --save-dir "$WORK/wc3/save" --playback "$WORK/midrun.demo" 2>&1) || RC=$?
+if [ "$RC" -eq 2 ] && printf '%s\n' "$OUT" | grep -q "could not be rebuilt: sector 70"; then
+    ok "W26: a refusal at the second load stops the run and names the sector (exit 2)"
+else
+    bad "W26: mid-run refusal was not surfaced (exit $RC): $(printf '%s\n' "$OUT" | grep -i 'rebuild\|not the one' | head -1)"
+fi
+# The divergence check is what makes this leg measure the refusal rather than something
+# downstream of it. The first version of this leg passed with the flag never set at all:
+# the swallowed refusal left the latch up, a later site entry failed on the latch, and the
+# run stopped for an unrelated reason while printing a stale note about sector 70. A run
+# that refuses cleanly never reaches a record worth disagreeing about.
+printf '%s\n' "$OUT" | grep -q "DEMO DIVERGED" \
+    && bad "W26: it diverged before refusing, so the refusal is not what stopped the run" \
+    || ok "W26: the run stopped at the refusal, not at a divergence behind it"
+printf '%s\n' "$OUT" | grep -q "DEMO PLAYED" \
+    && bad "W26: it reported a clean playback after refusing a sector" \
+    || ok "W26 control: a run that refused a sector does not report itself as played"
+
 # --- W16: the delta is APPLIED at load, not merely parsed ----------------------
 # W18 gates the writer, and that turned out not to be enough. The reader was storing a
 # fixed 23-character slice of the whole line as the sector name, so no sector ever

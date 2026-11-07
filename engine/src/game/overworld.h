@@ -56,6 +56,15 @@ typedef struct u2_overworld {
      * the handler chain, so the state is the command's, not the loop's. */
     uint8_t  pending_cmd;
     uint8_t  view_mode;            /* the DS:12 analogue: 0xFF in-world, 4 in a site */
+    /* Set when a sector switch could not rebuild the world — a missing map file, or a
+     * demo whose recorded delta refused. Both mean the grid on screen is the PREVIOUS
+     * sector's while the position, the mode byte and the creature table are the new one's,
+     * which is a state no player should be left standing in. `site_reload` already wrote
+     * the reason into `note`; this is the flag that says somebody has to act on it. Before
+     * this existed the only callers were `(void)`, so a playback carried on from a
+     * half-loaded sector and the owner's report of it was "it died after coming back from
+     * the town" with nothing on screen to say why. */
+    int      reload_failed;
     int      sector_hi, sector_lo;
     /* Stands in for "a gate is actually standing on the map". In the original that is
      * literally true — the door is a 0xC0 stamped into the resident sector — and the
@@ -315,6 +324,7 @@ void u2_overworld_enter(u2_ctx *ctx, u2_overworld *ow);
  * two routes out of a site and which the original routes through the same block.
  */
 void u2_overworld_site_leave(u2_ctx *ctx, u2_overworld *ow);
+
 
 /*
  * The death tail: asm/0C62..0C99 as one span. Zeroes DS:51..DS:59, repaints the

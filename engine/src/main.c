@@ -207,6 +207,9 @@ static void usage(const char *argv0)
         "                    record's digest. A demo that plays back wrong is a FAILED\n"
         "                    playback: it names the record and exits 5. A demo written\n"
         "                    by an older digest scope plays unverified and exits 6.\n"
+        "                    A sector the recording cannot rebuild is a REFUSAL\n"
+        "                    rather than a divergence: it exits 2 and names the\n"
+        "                    sector, whether the mount or a later load refused.\n"
         "                    Writes go to a scratch save directory, so watching a demo\n"
         "                    cannot touch your own saves or sector overlays.\n"
         "  --demo-dir DIR    where recordings go (default: ./demos, created on demand).\n"
@@ -1019,9 +1022,26 @@ int main(int argc, char **argv)
             u2_overworld ow;
             const int rc = u2_overworld_init_state(&ctx, &ow);
             fprintf(stderr, "overworld: %s\n", ow.note);
-            if (rc == 0)
+            if (rc == 0) {
                 u2_overworld_loop(&ctx, &ow);
-            else if (u2_demo_overlay_failed(&ctx)) {
+                /* The loop also ends when a sector switch could not rebuild the world.
+                 * For a playback that is a refusal in exactly the sense the mount refusal
+                 * below is: the demo was never played, the content disagreed. It has to
+                 * name the sector, because "the window closed" is the only other reason
+                 * this loop stops and from the player's chair the two look identical —
+                 * which is precisely how "the playback died after coming back from the
+                 * town" ended up with no explanation anywhere. */
+                if (ow.reload_failed) {
+                    fprintf(stderr, "u2: the world could not be rebuilt: %s\n", ow.note);
+                    if (ctx.playback_path) {
+                        (void)u2_demo_finish(&ctx);
+                        release_backends(&ctx);
+                        u2_trace_close(&ctx);
+                        return 2;
+                    }
+                    ctx.exit_code = 1;
+                }
+            } else if (u2_demo_overlay_failed(&ctx)) {
                 /* The reason was already printed and named the file. This is a
                  * refusal, not a divergence: the demo was never played, so reporting
                  * it with the divergence code would say the engine disagreed when in

@@ -327,7 +327,16 @@ static int site_reload(u2_ctx *ctx, u2_overworld *ow)
      * and the run diverged somewhere that looked exactly like an engine bug. This is the
      * § 13.7 per-sector item; the cap was the smaller half of it. */
     u2_demo_note_world(ctx, &ow->world);
-    if (u2_demo_overlay_failed(ctx)) return -1;
+    if (u2_demo_overlay_failed(ctx)) {
+        /* The note has to name THIS sector. The latch is run-wide and sticky, so a
+         * reload that fails here long after an earlier refusal would otherwise leave
+         * whatever note the first failure wrote, and the message at the top level would
+         * blame a sector that was never involved. That is not hypothetical: it is what
+         * this path did, and it named sector 70 for a failure in sector 71. */
+        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo world does not match",
+                 ow->sector_hi, ow->sector_lo);
+        return -1;
+    }
 
     /* asm/343F tail, reached by every arm: `mov $0x4,%al; mov %al,0x12`. */
     ctx->state.view_mode = 4;
@@ -411,7 +420,8 @@ static void site_enter(u2_ctx *ctx, u2_overworld *ow, int digit,
     ctx->state.sector_second = (uint8_t)digit;
     ow->x = ax;
     ow->y = ay;
-    (void)site_reload(ctx, ow);
+    if (site_reload(ctx, ow) != 0)
+        ow->reload_failed = 1;
 }
 
 /*
@@ -482,7 +492,8 @@ void u2_overworld_site_leave(u2_ctx *ctx, u2_overworld *ow)
         if (ow->world.mon_dirty) (void)u2_world_store(ctx, &ow->world, 0);
     }
 
-    (void)site_reload(ctx, ow);
+    if (site_reload(ctx, ow) != 0)
+        ow->reload_failed = 1;
 }
 
 /*
@@ -1529,7 +1540,11 @@ static int overworld_resume(u2_ctx *ctx, u2_overworld *ow)
      * has stamped into them. This is where § 4's line lands: refuse on the bytes that
      * reach the world, note on the bytes that only reach the screen. */
     u2_demo_note_world(ctx, &ow->world);
-    if (u2_demo_overlay_failed(ctx)) return -1;
+    if (u2_demo_overlay_failed(ctx)) {
+        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo world does not match",
+                 ow->sector_hi, ow->sector_lo);
+        return -1;
+    }
 
     if (!ctx->load_ds_path)
         return 0;
@@ -1969,6 +1984,12 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
     int idle_polls = 0;     /* polls since the last key, for the auto-PASS */
 
     for (;;) {
+        /* A sector switch that could not rebuild the world leaves the grid, the position
+         * and the creature table describing three different sectors. Stop here rather
+         * than draw that, and stop BEFORE the quiescent point, so a recording never takes
+         * a checkpoint from a state the engine already knows is broken and a playback
+         * never verifies a record delivered into it. */
+        if (ow->reload_failed) break;
         /* The quiescent point (D12), and it sits BEFORE the draw on purpose. The
          * recorder takes its checkpoint here and the player takes its first delivered
          * key after the draw, so playback has to mount the checkpoint at the same
