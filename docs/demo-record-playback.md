@@ -1407,10 +1407,35 @@ that failed on the first real save overlay it met.
 
 **Still open, and it is not the delta.** With the truncation fixed the real demo rebuilds its sector
 (`mapx20: rebuilt from the demo's recorded delta (6 cells)`) and then diverges at **every one of the
-410 records**, while the recorded and live `rolls=` counts agree on all of them. A fixed offset from
-record 1 with the RNG in step is a state-scope problem, not a world problem: something inside
-`U2_DEMO_SPAN` differs between two runs of the same binary on a real install, and the six excluded
-offsets do not cover it. Reproduced identically on the owner's install and on a local copy of the
-same content and save, so it is not the theme, not the art and not the scratch-save redirect. This
-is the next investigation and it is a digest-scope question, not a Phase 3 regression.
+410 records**. Root cause located by measurement on 2026-11-08 rather than guessed:
+
+- The checkpoint mount is exact. Dumping the live DS mirror immediately after
+  `u2_state_load_ds_buf` and diffing it against the `@checkpoint` payload the file carries gives
+  **0 differing offsets across all 1616 bytes**.
+- The live mirror at the record-1 verification is **also identical to the mirror at the mount**:
+  0 offsets changed. Nothing ran in between.
+- The recorded `@checkpoint` says `keys=0 rolls=14` and `@rec 1` says `rolls=14`, so no turn
+  separates them on the recording either — yet the recorder's own record-1 digest does not match
+  the digest of its own checkpoint span.
+
+So the recorder's state moved between writing the checkpoint and writing record 1 without a single
+RNG roll, and playback never reproduces that movement because it verifies record 1 at the same
+instant it mounts. The moving parts are the ones the digest covers and a draw or a poll changes
+without rolling: the screen cursor and the write counter, which D6 put inside the CP2 scope on
+purpose. Same hazard class the closing digest already documents — "the two directions have to be
+compared at the same point in the loop, not merely at the same loop iteration" — arriving at the
+first record instead of the last.
+
+The fix is an ordering fix in the playback loop, not a scope change: after a world-mode mount the
+first verification has to happen one step later, at the tap for key 1 after the same draw the
+recorder sat through, rather than at the mount instant. That is a change to loop ordering, the class
+of change this project has been burned by repeatedly, so it is proposed rather than done.
+
+Ruled out by measurement, so nobody re-walks them: not the theme, not the art, not the scratch-save
+redirect (all reproduce identically on the owner's install and on a local copy of the same content
+and save); not the RNG, whose shift register lives at DS:0x23F and is inside the restored span; not
+`monx20`, whose slot overlay differs from content in 22 creature bytes but is overwritten by the
+mount; not the speed pin, reported as pinned to the recorded values. An earlier note here claimed the
+recorded and live `rolls=` counts agreed — they were never compared. The printed `rolls=` is the
+record's own metadata, and reading it as a live comparison was an over-read.
 
