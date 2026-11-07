@@ -5,6 +5,16 @@
 #           L_0023fc `mov $0xff,%al; cmp $0x0,%al; ret`. The trailing cmp is the contract:
 #           the callers at asm/2150, asm/2169 and asm/2189 branch on ZF, so
 #           **AL = 0 accept / AL = 0xFF refuse**, and ZF is the flag the callers read.
+# WHICH GRID IT READS, settled 2026-11-08 (step 2a of docs/demo-record-playback.md § 13.10):
+#           **the stamped grid, and there is only one.** The tile reaches this routine in AL from
+#           `call L_0052b3`, which resolves the cell through `word[DS:472]`; that word is `0x1800`
+#           in every live dump (`asm/68C0`'s provenance) and is written only by the sector read
+#           `asm/2290` and the sector store `asm/2305`. There is no second, unstamped buffer for a
+#           step-gate probe to read, so the accept set {0x08, 0x0C, 0x5C, 0x70, 0x00} is evaluated
+#           over a grid that already carries creature type bytes. **The stamp is therefore the
+#           original's occupancy rule, by construction and not by a separate test** — which is what
+#           `engine/src/game/ai.c` claims to reproduce, and does: `creature_may_enter` reads
+#           `u2_world_tile_at()`, which is `w->map`, the stamped grid. Confidence unchanged: high.
 # REAL FUNCTION SPAN: runtime 2199..2200 (file 2399..2400). The `# func` line below
 #           declares only this fragment's 10 bytes; the body continues through
 #           asm/21A3 .. asm/21FC, all of which are parts of this one predicate.
