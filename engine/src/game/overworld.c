@@ -276,6 +276,16 @@ static int site_reload(u2_ctx *ctx, u2_overworld *ow)
         return -1;
     }
 
+    /* The recorded delta, applied here and nowhere later: it has to land before the
+     * spawn clear and the restamp, or those two run over bytes the recording never
+     * had and the pipelines diverge for a reason that has nothing to do with the
+     * player. The refusal text has already been printed by the time this returns -1. */
+    if (u2_demo_apply_world(ctx, &ow->world, id) != 0) {
+        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo world does not match",
+                 ow->sector_hi, ow->sector_lo);
+        return -1;
+    }
+
     monsters_clear(ctx);
     const u2_world_result mr = u2_world_load(ctx, &ow->world, 0, id);
     const int creatures = (mr == U2_WORLD_OK) ? u2_monsters_spawn(ctx, &ow->world) : 0;
@@ -1342,6 +1352,15 @@ static int overworld_open(u2_ctx *ctx, u2_overworld *ow)
     if (wr != U2_WORLD_OK) {
         snprintf(ow->note, sizeof ow->note, "sector %d%d: %s",
                  ow->sector_hi, ow->sector_lo, u2_world_result_text(wr));
+        return -1;
+    }
+
+    /* The other of the two ways a sector becomes resident. Both need the delta, and a
+     * fix in only one of them is the mistake this project has now made twice with the
+     * restamp — see the comment at u2_monsters_restamp. */
+    if (u2_demo_apply_world(ctx, &ow->world, id) != 0) {
+        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo world does not match",
+                 ow->sector_hi, ow->sector_lo);
         return -1;
     }
 

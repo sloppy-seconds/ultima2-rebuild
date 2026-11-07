@@ -2,7 +2,10 @@
 """demo_delta_fixture.py — make a seeded world DIRTY at the slot and print the
 exact @world delta the recorder must emit.
 
-usage: demo_delta_fixture.py WORLD_DIR   -> prints the expected delta string
+usage: demo_delta_fixture.py WORLD_DIR            -> the expected delta string
+       demo_delta_fixture.py WORLD_DIR slot-sha   -> sha256 of the slot file's first
+                                                    4096 bytes, what a correct apply
+                                                    must reproduce
 
 The three cells are written in DESCENDING file order on purpose. A writer that emitted
 cells in the order it noticed them would produce a different string from the canonical
@@ -12,19 +15,22 @@ that is blind to ordering.
 
 Every byte here is engine-authored filler from demo_seed.py. No game content.
 """
+import hashlib
 import os
 import sys
 
 # (x, y) in descending file order: (63,63) is the last byte, (10,0) near the first.
 CELLS = [(63, 63), (3, 4), (10, 0)]
 MARK = 0x44
+TILES = 4096
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: demo_delta_fixture.py WORLD_DIR", file=sys.stderr)
+    if len(sys.argv) not in (2, 3):
+        print("usage: demo_delta_fixture.py WORLD_DIR [slot-sha]", file=sys.stderr)
         return 2
     world = sys.argv[1]
+    want = sys.argv[2] if len(sys.argv) == 3 else "delta"
 
     src = None
     for root, _dirs, files in os.walk(os.path.join(world, "content")):
@@ -53,6 +59,11 @@ def main() -> int:
     os.makedirs(slot, exist_ok=True)
     with open(os.path.join(slot, "mapx70"), "wb") as f:
         f.write(bytes(raw))
+
+    if want == "slot-sha":
+        # What a correct apply has to reproduce: the recorder's own sector bytes.
+        print(hashlib.sha256(bytes(raw[:TILES])).hexdigest()[:8])
+        return 0
 
     # Canonical order is ascending by y*64+x, regardless of the order written above.
     parts = [f"{x},{y}:{origins[(x, y)]:02x}->{MARK:02x};" for x, y in

@@ -432,6 +432,74 @@ else
     fi
 fi
 
+# --- W16: the delta is APPLIED at load, not merely parsed ----------------------
+# W18 gates the writer, and that turned out not to be enough. The reader was storing a
+# fixed 23-character slice of the whole line as the sector name, so no sector ever
+# matched its own delta and every one was silently read as absent -- and W18 stayed
+# green throughout, because writing a correct line and reading it back are two
+# contracts. The failure was invisible by construction: "this sector has no delta" is
+# the normal case on a clean install, so the broken path looked exactly like the common
+# one. These legs replay a DIRTY recording into a CLEAN world, the only arrangement
+# where a delta has to do work for the run to be right.
+seed "$WORK/wc"
+REC_SHA=$(python3 tests/demo_delta_fixture.py "$WORK/wd" slot-sha)
+RC=0
+OUT=$("$U2" --headless --cleanroom --data-dir "$WORK/wc/content" \
+           --save-dir "$WORK/wc/save" --playback "$WORK/d_dirty/dirty.demo" 2>&1) || RC=$?
+if printf '%s\n' "$OUT" | grep -q "rebuilt from the demo.s recorded delta" \
+   && printf '%s\n' "$OUT" | grep -q "sector now $REC_SHA"; then
+    ok "W16: the rebuilt sector hashes to the recorder's own bytes, not just to a parsed delta"
+else
+    bad "W16: the delta did not land (exit $RC, expected sector $REC_SHA): $(printf '%s\n' "$OUT" | tail -2)"
+fi
+[ "$RC" -ne 2 ] && ok "W16: replaying a dirty recording into a clean world is not a refusal" \
+                || bad "W16: it refused: $(printf '%s\n' "$OUT" | tail -2)"
+
+# Control: the base. A viewer holding a different pack must be told the demo cannot
+# rebuild their sector. This is the § 13.1 refusal, and it is now satisfiable: the
+# delta describes the recording's bytes, and nothing else.
+# The byte is written OUTSIDE the delta's cells, so only the base can catch it.
+printf '\xfe' | dd of="$WORK/wc/content/mapx70" bs=1 seek=20 count=1 conv=notrunc status=none
+RC=0
+"$U2" --headless --cleanroom --data-dir "$WORK/wc/content" --save-dir "$WORK/wc/save" \
+      --playback "$WORK/d_dirty/dirty.demo" >/dev/null 2>"$WORK/wc.err" || RC=$?
+if [ "$RC" -eq 2 ] && grep -q 'not the one the recording was made against' "$WORK/wc.err"; then
+    ok "W16 control: a base that is not the recording's is refused, and names both digests"
+else
+    bad "W16 control: a mismatched base was not refused (exit $RC): $(tail -2 "$WORK/wc.err")"
+fi
+
+# And the override must SKIP the delta rather than apply it to foreign bytes. If the
+# base check were decorative, the rebuild line would still appear here.
+RC=0
+OUT=$("$U2" --headless --cleanroom --playback-ignore-content --data-dir "$WORK/wc/content" \
+           --save-dir "$WORK/wc/save" --playback "$WORK/d_dirty/dirty.demo" 2>&1) || RC=$?
+if [ "$RC" -ne 2 ] && ! printf '%s\n' "$OUT" | grep -q 'rebuilt from' \
+   && printf '%s\n' "$OUT" | grep -q 'NOT applied'; then
+    ok "W16 control: with the override the delta is skipped out loud, not applied blind"
+else
+    bad "W16 control: the override applied or skipped the delta silently (exit $RC)"
+fi
+
+# --- W19: the version range, both edges ----------------------------------------
+# § 13.5 rules cross-version playback a supported use case, and the bump from 1 to 2
+# was the moment that mattered: the reader's check used to be equality, which would have
+# made every existing file unplayable. The fixture repairs the @end framing digest, so a
+# refusal here is the version check and not the corruption check.
+python3 tests/demo_fixture.py version "$DEMO" "$WORK/v1.demo" 1
+RC=0
+"$U2" --headless --cleanroom --data-dir "$WORK/w/content" --save-dir "$WORK/w/save" \
+      --playback "$WORK/v1.demo" >/dev/null 2>&1
+[ "$RC" -eq 0 ] && ok "W19: a v1 file plays under the v2 reader, so the bump is not destructive" \
+                || bad "W19: a v1 file was refused (exit $RC) — the version range is broken"
+
+python3 tests/demo_fixture.py version "$DEMO" "$WORK/v99.demo" 99
+RC=0
+"$U2" --headless --cleanroom --data-dir "$WORK/w/content" --save-dir "$WORK/w/save" \
+      --playback "$WORK/v99.demo" >/dev/null 2>&1 || RC=$?
+[ "$RC" -ne 0 ] && ok "W19 control: a file claiming a version past this build is refused" \
+                || bad "W19 control: udemo 99 was accepted, so nothing bounds the range"
+
 echo
 if [ "$fail" -ne 0 ]; then
     echo "DEMO TEST: FAIL"

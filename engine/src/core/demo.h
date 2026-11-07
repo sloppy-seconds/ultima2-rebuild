@@ -229,6 +229,19 @@ u2_demo_mode u2_demo_playback_mode(const u2_ctx *ctx);
  * the checkpoint was taken. */
 void u2_demo_note_world(u2_ctx *ctx, const u2_world *w);
 
+/* Replace a freshly loaded sector with the bytes the recorder had, using that
+ * sector's `@world` delta. Call it after the map load and BEFORE the spawn clear and
+ * the restamp, so the two pipelines agree from the same starting bytes.
+ *
+ * It re-reads the CONTENT layer rather than patching whatever the loader chose, so a
+ * viewer holding their own overlay for the sector still gets the recorder's world
+ * rather than a third world that matches neither. § 7.4's isolation is the reason.
+ *
+ * Returns 0 when there is nothing to apply — not playing back, no line for this
+ * sector, delta=none, or the caller overrode the content check — and -1 when the
+ * bytes on disk are not the bytes the delta claims to patch. */
+int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id);
+
 /* Non-zero once a checked overlay has disagreed; the caller refuses. */
 int u2_demo_overlay_failed(const u2_ctx *ctx);
 

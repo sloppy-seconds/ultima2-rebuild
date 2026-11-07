@@ -19,6 +19,9 @@ the ones docs/demo-record-playback.md § 9 names as controls.
                         This is W14's control: the engine compares its own constant
                         against the file's, so a file claiming another scope exercises
                         exactly the path a build with a bumped scope would.
+  version  IN OUT N     rewrite the `udemo` magic's version to N, repair framing. This
+                        is W19: a v1 file must still play under a v2 reader, and a
+                        version beyond the reader's must refuse.
 
 Usage: demo_fixture.py SUBCOMMAND IN OUT [arg]
 """
@@ -169,7 +172,29 @@ def cmd_digestver(argv):
     return 0
 
 
+def cmd_version(argv):
+    """Rewrite the `udemo N` magic's version and repair the framing digest.
+
+    This is W19: the reader accepts a RANGE, so a file claiming a version inside it must
+    play and one claiming a version outside it must refuse. Editing the magic without
+    repairing @end would refuse the file as corrupt and prove nothing about the version
+    check at all.
+    """
+    lines = read(argv[0])
+    want = argv[2]
+    for i, line in enumerate(lines):
+        if line.startswith("udemo "):
+            lines[i] = f"udemo {want}\n"
+            break
+    else:
+        print("demo_fixture: no udemo line", file=sys.stderr)
+        return 2
+    write(argv[1], repair_end(lines))
+    return 0
+
+
 COMMANDS = {
+    "version": cmd_version,
     "digest": cmd_digest,
     "rawdigest": cmd_rawdigest,
     "strip": cmd_strip,

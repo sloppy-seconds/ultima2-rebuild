@@ -925,7 +925,18 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
                     d->overlay[d->n_overlay].from_slot = !strcmp(key, "overlay-slot");
                     d->n_overlay++;
                 }
-            } else if (!strcmp(key, "@world") && d->n_world < U2_DEMO_MAX_OVERLAYS) {
+            } else if (!strcmp(key, "@world")) {
+                /* Overflow is a refusal, not a drop. A silently dropped delta applies
+                 * nothing for that sector, the world comes out as the viewer's own, and
+                 * the run still verifies — a wrong world reported as a correct one. */
+                if (d->n_world >= U2_DEMO_MAX_OVERLAYS) {
+                    char msg[160];
+                    snprintf(msg, sizeof msg,
+                             "demo carries more @world sectors than this build holds (%d);"
+                             " raise U2_DEMO_MAX_OVERLAYS in src/core/demo.c",
+                             U2_DEMO_MAX_OVERLAYS);
+                    return refuse_playback(d, msg);
+                }
                 /* `@world mapx20 base=<sha64> delta=<cells|none|too-big>`.
                  * Parsed with strstr rather than one wide sscanf so an over-long delta
                  * cannot walk off the buffer, and so a malformed line is dropped rather
@@ -934,8 +945,15 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
                 const char *bp = strstr(val, " base=");
                 const char *dp = strstr(val, " delta=");
                 char sh[80];
-                if (bp && dp && sscanf(bp + 6, "%79s", sh) == 1 && hex_ok(sh)) {
-                    snprintf(d->world[d->n_world].name, 24, "%.23s", val);
+                char nm[24];
+                /* The name is the FIRST TOKEN of val, not 23 characters of it. A fixed
+                 * slice stored [mapx70 base=0428859797292] as the name, so no sector ever
+                 * matched its own line and every delta was silently treated as absent.
+                 * That failure is invisible by construction, because having no delta for a
+                 * sector is the normal case for a clean install. */
+                if (bp && dp && sscanf(val, "%23s", nm) == 1
+                        && sscanf(bp + 6, "%79s", sh) == 1 && hex_ok(sh)) {
+                    snprintf(d->world[d->n_world].name, 24, "%.23s", nm);
                     snprintf(d->world[d->n_world].base, 65, "%.64s", sh);
                     snprintf(d->world[d->n_world].delta, U2_DEMO_DELTA_MAX,
                              "%.2047s", dp + 7);
@@ -1343,6 +1361,129 @@ void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
             d->n_world++;
         }
     }
+}
+
+/* ---- applying a recorded world delta ------------------------------------- */
+
+/* Parse one `x,y:oo->nn` cell and write it into buf. Returns 0 on success, -1 when the
+ * text is malformed or the byte it should replace is not what the delta claims. A delta
+ * that does not match the bytes under it is not a thing to apply "as best we can": a
+ * half-applied sector verifies against nothing and looks exactly like a correct one. */
+static int delta_cell(const char *tok, uint8_t *buf, size_t n)
+{
+    unsigned x, y, o, v;
+    if (sscanf(tok, "%u,%u:%x->%x", &x, &y, &o, &v) != 4) return -1;
+    if (x >= U2_SECTOR_EDGE || y >= U2_SECTOR_EDGE) return -1;
+    const size_t i = (size_t)y * U2_SECTOR_EDGE + x;
+    if (i >= n || buf[i] != (uint8_t)o) return -1;
+    buf[i] = (uint8_t)v;
+    return 0;
+}
+
+int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id)
+{
+    u2_demo *d = of(ctx);
+    char name[24], fname[24], sha[65];
+
+    if (!d || !w || d->state != U2_DEMO_PLAYING || d->n_world == 0) return 0;
+
+    sector_name(name, sizeof name, "mapx", id.hi, id.lo);
+    int idx = -1;
+    for (int i = 0; i < d->n_world; i++)
+        if (strcmp(d->world[i].name, name) == 0) { idx = i; break; }
+    if (idx < 0) return 0;
+
+    const char *dt = d->world[idx].delta;
+    if (!dt[0] || !strcmp(dt, "none")) return 0;
+    if (!strcmp(dt, "too-big")) {
+        /* The writer refused to inline a change this large, so the demo carries no way
+         * to rebuild the sector. Announcing that beats the same lie as applying nothing
+         * quietly, which is a sector that verifies and is wrong. */
+        fprintf(stderr, "u2: %s: the recorded change is too large for a demo to carry,"
+                        " so this sector plays as your own copy.\n", name);
+        return 0;
+    }
+
+    /* Re-read the CONTENT layer rather than patching whatever the loader picked. A
+     * viewer holding their own overlay for this sector would otherwise get a third
+     * world that matches neither the recording nor their save — and would be told it
+     * verified. § 7.4: playback does not read the player's slot. */
+    uint8_t buf[U2_SECTOR_TILES];
+    if (u2_world_read_content(ctx, 1, id, buf, sizeof buf, fname, sizeof fname)
+            != U2_WORLD_OK) {
+        fprintf(stderr, "u2: %s: the demo carries a delta for this sector but the"
+                        " content file cannot be read, so it cannot be applied.\n", name);
+        d->overlay_failed = 1;
+        return -1;
+    }
+
+    sha256_hex(buf, sizeof buf, sha);
+    if (strcmp(sha, d->world[idx].base) != 0) {
+        if (!ctx->demo_ignore_content) {
+            fprintf(stderr, "u2: %s: your copy of this sector is not the one the"
+                            " recording was made against.\n"
+                            "    recorded base %s\n    your copy    %s\n"
+                            "    The demo can only rebuild the sector it recorded, so it"
+                            " refuses.\n"
+                            "    --playback-ignore-content plays anyway on your own"
+                            " bytes.\n", name, d->world[idx].base, sha);
+            d->overlay_failed = 1;
+            return -1;
+        }
+        /* Announced, not swallowed. The flag says the player accepts a different world;
+         * it does not say they want the recorded change dropped without being told, and
+         * a sector that silently plays as someone else's ground is the exact silence this
+         * project has been told twice to stop producing. */
+        fprintf(stderr, "u2: %s: your copy is not the recording's base and"
+                        " --playback-ignore-content was given, so the recorded delta is"
+                        " NOT applied. This sector plays as your own bytes.\n", name);
+        return 0;
+    }
+
+    /* The cells are `;`-separated and canonically ordered, but the reader must not
+     * depend on the order: an unordered writer would otherwise apply silently. */
+    /* The writer terminates every cell with ';', so an empty token is a separator and
+     * not a cell. A parser that handed one to delta_cell would refuse every real delta
+     * it read, which is the shape this loop had before anyone ran it.
+     * `n_cells` and not `applied`: d->applied already means the checkpoint is mounted. */
+    int n_cells = 0;
+    for (const char *p = dt; *p; ) {
+        const char *q = strchr(p, ';');
+        const size_t len = q ? (size_t)(q - p) : strlen(p);
+        if (len > 0) {
+            char tok[32];
+            if (len >= sizeof tok) { d->overlay_failed = 1; return -1; }
+            memcpy(tok, p, len);
+            tok[len] = '\0';
+            if (delta_cell(tok, buf, sizeof buf) != 0) {
+                fprintf(stderr, "u2: %s: the recorded delta does not describe these bytes"
+                                " (cell '%s'). Refusing rather than applying part of it.\n",
+                        name, tok);
+                d->overlay_failed = 1;
+                return -1;
+            }
+            n_cells++;
+        }
+        if (!q) break;
+        p = q + 1;
+    }
+
+    /* Both buffers, because the loader fills map_base as a copy of map and the spawn
+     * clear edits map_base afterwards. Patching one alone would leave them disagreeing
+     * by the whole delta. */
+    memcpy(w->map, buf, sizeof buf);
+    memcpy(w->map_base, buf, sizeof buf);
+    /* Digested from w->map AFTER the copy, deliberately not from `buf`. Hashing the
+     * staging buffer made this leg pass with both memcpys commented out, because the
+     * message then described bytes that never reached the world. The observable has to
+     * be taken from the thing the claim is about or it proves nothing, which is the
+     * second vacuous assertion this leg has caught in itself.
+     * asm/2233 restores terrain without announcing it; a demo is not the original, and a
+     * player has no other way to know where the ground came from. */
+    sha256_hex(w->map, sizeof buf, sha);
+    fprintf(stderr, "u2: %s: rebuilt from the demo's recorded delta"
+                    " (%d cells, sector now %.8s).\n", name, n_cells, sha);
+    return 0;
 }
 
 int u2_demo_overlay_failed(const u2_ctx *ctx)
