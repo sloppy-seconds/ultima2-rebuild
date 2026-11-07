@@ -34,6 +34,7 @@ if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/demo_check" \
        tests/demo_check.c src/core/demo.c src/core/state.c src/core/vram.c \
        src/core/font.c src/core/frame.c src/core/view.c src/core/rng.c \
        src/core/timer.c src/core/sha256.c src/core/version.c src/core/replay.c \
+       src/core/world.c src/core/roots.c src/core/slot.c \
        src/game/monsters.c src/debug/dump_state.c src/debug/trace.c 2>"$WORK/cc.err"; then
     cout=$("$WORK/demo_check" 2>&1)
     n=$(printf '%s\n' "$cout" | sed -n 's/^ *\([0-9]\{1,\}\) checks.*/\1/p')
@@ -389,6 +390,47 @@ RC=0
 python3 tools/demo.py corpus "$WORK" --engine ./u2 >/dev/null 2>&1 || RC=$?
 [ "$RC" -ne 0 ] && ok "W14 control: corpus refuses a directory with no demos instead of passing" \
                  || bad "W14 control: corpus reported success on an empty corpus"
+
+# --- W18: the @world delta is canonical, and the base is the content layer ------
+# § 13.3's format, gated. The recorder's world is DIRTY at the slot and clean at
+# content, which is the only shape that produces a delta at all: a clean-install
+# recording emits delta=none and would pass every assertion below by carrying nothing.
+# The fixture writes its cells in descending file order, so an unordered writer emits a
+# different string than the canonical one and the exact match below catches it. That is
+# the control, and it is why the expected string is spelled out rather than compared
+# against a second run of the same code.
+seed "$WORK/wd"
+EXPECT=$(python3 tests/demo_delta_fixture.py "$WORK/wd")
+if [ -z "$EXPECT" ]; then
+    bad "W18: the dirty-slot fixture did not run"
+else
+    record dirty  "$WORK/wd" "$WORK/site.keys"
+    record dirty2 "$WORK/wd" "$WORK/site.keys"
+    GOT=$(grep '^@world mapx70' "$WORK/d_dirty/dirty.demo" | sed 's/.*delta=//')
+    if [ "$GOT" = "$EXPECT" ]; then
+        ok "W18: the delta is canonical and names exactly the edited cells"
+    else
+        bad "W18: delta was '$GOT', expected '$EXPECT'"
+    fi
+
+    # base must be the CONTENT digest, not the overlay's. That is the whole reason
+    # § 13.1's refusal became satisfiable: two people with the same release pack match
+    # on base, and the delta is the only thing that has to travel.
+    CB=$(grep '^@world mapx70' "$WORK/d_dirty/dirty.demo" | sed 's/.*base=\([0-9a-f]*\).*/\1/')
+    OB=$(grep '^overlay-slot mapx70' "$WORK/d_dirty/dirty.demo" | awk '{print $3}')
+    if [ -n "$CB" ] && [ -n "$OB" ] && [ "$CB" != "$OB" ]; then
+        ok "W18: base is the content digest, and differs from the overlay's"
+    else
+        bad "W18: base did not distinguish content from the overlay (base=$CB overlay=$OB)"
+    fi
+
+    if [ "$(grep '^@world' "$WORK/d_dirty/dirty.demo")" = \
+         "$(grep '^@world' "$WORK/d_dirty2/dirty2.demo")" ]; then
+        ok "W18: two recordings of one edit emit byte-identical @world lines"
+    else
+        bad "W18: two recordings of the same edit differ, so the delta is not canonical"
+    fi
+fi
 
 echo
 if [ "$fail" -ne 0 ]; then

@@ -50,7 +50,7 @@
 /* Format identity, first line of every file. An unrecognised version refuses (D8's
  * "refuse rather than guess" rule applied to the version rather than to truncation). */
 #define U2_DEMO_MAGIC   "udemo"
-#define U2_DEMO_VERSION 1
+#define U2_DEMO_VERSION 2
 
 /* Which digest scope the `sha` values use. Bumping this is what downgrades an old
  * demo to "playback unverified" (D13), because comparing a scope-1 digest against

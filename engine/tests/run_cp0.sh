@@ -78,7 +78,7 @@ rm -f "$tr"
 # with a backend that can say all three.
 if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "${WORK:-/var/tmp}/keywait_check" \
         tests/keywait_check.c src/core/seam.c src/core/vram.c src/core/state.c \
-        src/core/demo.c \
+        src/core/demo.c src/core/world.c src/core/roots.c src/core/slot.c \
         src/core/font.c src/core/frame.c src/core/view.c src/core/rng.c \
         src/core/timer.c src/core/replay.c src/core/sha256.c src/core/version.c \
         src/debug/trace.c src/debug/dump_state.c 2>"${WORK:-/var/tmp}/keywait.build"; then

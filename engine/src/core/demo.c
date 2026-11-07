@@ -32,6 +32,13 @@ const int U2_DEMO_EXCLUDE[U2_DEMO_EXCLUDE_COUNT] = {
 
 #define U2_DEMO_MAX_KEYS_PER_REC 8
 #define U2_DEMO_MAX_OVERLAYS 3
+
+/* A sector delta is spelled `x,y:old->new` per differing byte, ascending by y*64+x,
+ * joined by ';'. The cap is generous on purpose: a sector a player really edited is a
+ * handful of cells, and anything past this is a corrupt or adversarial file rather than
+ * a game. Over-cap is reported, never silently truncated — a truncated delta that still
+ * verifies is the vacuous-pass shape AGENTS.md § 3 exists to stop. */
+#define U2_DEMO_DELTA_MAX 2048
 #define U2_DEMO_LINEBUFSZ 768
 /* The saved record is 256 bytes at DS:36 (core/save.h). Named once here so the
  * two places that digest it cannot disagree about the span. */
@@ -100,6 +107,12 @@ typedef struct u2_demo {
 
     struct { char name[24]; char sha[65]; int from_slot; } overlay[U2_DEMO_MAX_OVERLAYS];
     int        n_overlay;
+    /* The § 13.3 world lines: the content-layer digest a viewer must match, plus the
+     * cells this save changed. Carried ALONGSIDE `overlay` rather than replacing it, so
+     * a v1 file still plays with v1 semantics and a v2 file is a superset of it. */
+    struct { char name[24]; char base[65]; char delta[U2_DEMO_DELTA_MAX]; }
+             world[U2_DEMO_MAX_OVERLAYS];
+    int        n_world;
     int        overlay_checked;       /* the comparison is a one-shot, see note_world */
     int        overlay_failed;
     int        slot_note;             /* the slot-overlay caveat was printed once */
@@ -326,6 +339,13 @@ static void write_header(u2_ctx *ctx, u2_demo *d)
         emit(d, "%s %s %s\n",
              d->overlay[i].from_slot ? "overlay-slot" : "overlay",
              d->overlay[i].name, d->overlay[i].sha);
+
+    /* The § 13.3 world lines. Only the map carries a delta: § 13.2's proven property is
+     * that the checkpoint's creature table drives the stamp, so creature state needs no
+     * delta at all and monx is base-only. */
+    for (int i = 0; i < d->n_world; i++)
+        emit(d, "@world %s base=%s delta=%s\n",
+             d->world[i].name, d->world[i].base, d->world[i].delta);
 
     emit(d, "art %s\n", ctx->art_mode == U2_ART_EGA ? "ega" : "cga");
     emit(d, "theme %s\n", (ctx->ega_theme && *ctx->ega_theme) ? ctx->ega_theme : "default");
@@ -905,6 +925,22 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
                     d->overlay[d->n_overlay].from_slot = !strcmp(key, "overlay-slot");
                     d->n_overlay++;
                 }
+            } else if (!strcmp(key, "@world") && d->n_world < U2_DEMO_MAX_OVERLAYS) {
+                /* `@world mapx20 base=<sha64> delta=<cells|none|too-big>`.
+                 * Parsed with strstr rather than one wide sscanf so an over-long delta
+                 * cannot walk off the buffer, and so a malformed line is dropped rather
+                 * than half-accepted: a half-parsed delta would apply partially and then
+                 * verify, which is the worst possible outcome. */
+                const char *bp = strstr(val, " base=");
+                const char *dp = strstr(val, " delta=");
+                char sh[80];
+                if (bp && dp && sscanf(bp + 6, "%79s", sh) == 1 && hex_ok(sh)) {
+                    snprintf(d->world[d->n_world].name, 24, "%.23s", val);
+                    snprintf(d->world[d->n_world].base, 65, "%.64s", sh);
+                    snprintf(d->world[d->n_world].delta, U2_DEMO_DELTA_MAX,
+                             "%.2047s", dp + 7);
+                    d->n_world++;
+                }
             } else if (!strcmp(key, "art")) {
                 snprintf(d->art, sizeof d->art, "%.15s", val);
             } else if (!strcmp(key, "theme")) {
@@ -917,9 +953,13 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
     fclose(f);
 
     /* --- refusals, in the order a reader would want them named --- */
-    if (d->format_version != U2_DEMO_VERSION) {
+    if (d->format_version < 1 || d->format_version > U2_DEMO_VERSION) {
+        /* A range, not an equality. § 13.5 rules that cross-version playback is a
+         * supported use case and a v2 reader must still play a v1 file — v1 files simply
+         * carry no @world lines, which means "nothing to apply", the correct v1
+         * semantics. Refusing on inequality here would have made the bump destructive. */
         char msg[160];
-        snprintf(msg, sizeof msg, "demo '%s': format version %d, this engine writes %d",
+        snprintf(msg, sizeof msg, "demo '%s': format version %d, this engine reads 1..%d",
                  path, d->format_version, U2_DEMO_VERSION);
         return refuse_playback(d, msg);
     }
@@ -1128,6 +1168,39 @@ static void sector_name(char *out, size_t outsz, const char *prefix,
     snprintf(out, outsz, "%.8s%u%u", prefix ? prefix : "mapx", hi & 0x0Fu, lo & 0x0Fu);
 }
 
+/* The delta between two RAW sector images, in the canonical spelling § 13.3 requires.
+ *
+ * Canonical order is not cosmetics. D7 chose text so demos would be diffable, and an
+ * unordered delta makes two recordings of one session differ in the file while being
+ * identical in fact — which turns every later comparison into a judgement call.
+ *
+ * Returns the cell count, or -1 if the delta does not fit. Both sides must be file
+ * bytes: diffing against `map_base` would compare a stamped, spawn-cleared pipeline
+ * against a file, and would tie every demo to whichever restore mechanism the engine
+ * happens to implement. That is the § 13.11 correction that killed the map_base digest.
+ */
+static int world_delta(const uint8_t *base, const uint8_t *now, size_t n,
+                       char *out, size_t outsz)
+{
+    size_t used = 0;
+    int cells = 0;
+
+    if (!out || !outsz) return -1;
+    out[0] = '\0';
+    for (size_t i = 0; i < n; i++) {
+        if (base[i] == now[i]) continue;
+        /* "63,63:ff->fe;" is 13 characters worst case, and gcc's truncation check only
+         * believes the arithmetic when the bound is written out. */
+        if (used + 14 >= outsz) { out[0] = '\0'; return -1; }
+        used += (size_t)snprintf(out + used, outsz - used, "%u,%u:%02x->%02x;",
+                                 (unsigned)(i % U2_SECTOR_EDGE),
+                                 (unsigned)(i / U2_SECTOR_EDGE),
+                                 base[i], now[i]);
+        cells++;
+    }
+    return cells;
+}
+
 void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
 {
     u2_demo *d = of(ctx);
@@ -1230,6 +1303,44 @@ void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
                 d->overlay[d->n_overlay].from_slot = from_slot;
                 d->n_overlay++;
             }
+        }
+    }
+
+    /* The § 13.3 world lines, recording side.
+     *
+     * Both sides of the delta are RAW FILE BYTES read off disk, not the world's copy.
+     * By now w->map has been stamped and w->map_base spawn-cleared, and a diff against
+     * either would compare two pipelines rather than two worlds — and would tie every
+     * demo to whichever restore mechanism the engine happens to implement. The base is
+     * always the content layer, because that is the one thing a viewer is expected to
+     * already have, which is what makes the § 13.1 refusal satisfiable again.
+     *
+     * Only the map gets a delta. § 13.2's proven property is that the checkpoint's
+     * creature table drives the stamp, so creature state needs no delta and monx is
+     * base-only. That is the whole reason the delta stays a handful of bytes and the
+     * demo stays a text file.
+     */
+    if (d->state != U2_DEMO_PLAYING && w->map_loaded &&
+        d->n_world < U2_DEMO_MAX_OVERLAYS) {
+        static uint8_t content[U2_SECTOR_TILES], over[U2_SECTOR_TILES];
+        char nm[24] = "";
+        char delta[U2_DEMO_DELTA_MAX];
+        const char *dtxt = "none";
+
+        if (u2_world_read_content(ctx, 1, w->map_id, content, sizeof content,
+                                  nm, sizeof nm) == U2_WORLD_OK) {
+            if (w->map_root && strcmp(w->map_root, U2_WORLD_SLOT_LAYER) == 0 &&
+                u2_world_read_slot(ctx, 1, w->map_id, over, sizeof over,
+                                   NULL, 0) == U2_WORLD_OK) {
+                const int cells = world_delta(content, over, U2_SECTOR_TILES,
+                                              delta, sizeof delta);
+                if (cells > 0)      dtxt = delta;
+                else if (cells < 0) dtxt = "too-big";   /* reported, never truncated */
+            }
+            snprintf(d->world[d->n_world].name, 24, "%.23s", nm);
+            sha256_hex(content, U2_SECTOR_TILES, d->world[d->n_world].base);
+            snprintf(d->world[d->n_world].delta, U2_DEMO_DELTA_MAX, "%.2047s", dtxt);
+            d->n_world++;
         }
     }
 }
