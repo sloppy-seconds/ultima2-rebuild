@@ -338,9 +338,20 @@ static int site_reload(u2_ctx *ctx, u2_overworld *ow)
         return -1;
     }
 
-    /* asm/343F tail, reached by every arm: `mov $0x4,%al; mov %al,0x12`. */
-    ctx->state.view_mode = 4;
-    ow->view_mode = 4;
+    /* asm/343F tail, reached by every arm: `mov $0x4,%al; mov %al,0x12`.
+     *
+     * NOT a constant, and that was the bug. asm/0C1F sets DS:12 to 4, reads DS:4A, and
+     * falls through to asm/0C2B — which sets 0xFF — only when that digit is zero, so the
+     * original's mode byte is a pure function of the sector's ones digit, re-derived every
+     * tick: `DS:4A ? 4 : 0xFF`. Stamping 4 here meant that leaving a site through the sector
+     * edge reloaded the world map and then wrote the site's mode into it, so DS:12 stayed
+     * latched at 4 for every step after the departure — the exact defect `site_leave`'s own
+     * comment exists to prevent, reintroduced two lines after the comment by the reload it
+     * calls. Observed in the owner's 216-record demo: DS:12 = 0x04 for records 116-171 while
+     * standing in sector 20. docs/needs-gameplay.md G67, closed from the bytes rather than a
+     * capture. */
+    ctx->state.view_mode = ow->sector_lo ? 4 : 0xFF;
+    ow->view_mode = ctx->state.view_mode;
 
     /* CP7: a tower or a dungeon is populated by asm/147F, not by monxNN — the
      * sector-rulesets measurement is that monxNN "authors nothing" in {4,5}, and

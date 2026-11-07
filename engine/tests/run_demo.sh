@@ -607,6 +607,33 @@ printf '%s\n' "$OUT" | grep -q "DEMO PLAYED" \
     && bad "W26: it reported a clean playback after refusing a sector" \
     || ok "W26 control: a run that refused a sector does not report itself as played"
 
+# --- W27: the mode byte follows the sector, not the event ------------------------------
+# asm/0C1F writes DS:12 = 4, reads DS:4A, and falls through to asm/0C2B -- which writes
+# 0xFF -- only when that digit is zero. So the original's DS:12 is a function of the
+# sector's ones digit, re-derived every tick, and can never go stale. site_reload stamped a
+# constant 4, so leaving a site through the sector edge reloaded the world map and then
+# wrote the site's mode into it, and DS:12 stayed latched at 4 for every step afterwards --
+# reintroduced two lines after site_leave's own comment explaining why that must not happen.
+# The owner's 216-record demo carried DS:12 = 0x04 for records 116-171 while standing in
+# sector 20. docs/needs-gameplay.md G67, closed from the bytes with no capture.
+seed "$WORK/wm27"
+printf '0x12\nE\n0xf1\n0xf1\n0xf1\n0xf3\n0x12\n' > "$WORK/mode.keys"
+record mode27 "$WORK/wm27" "$WORK/mode.keys" --demo-snapshots
+M27="$WORK/d_mode27/mode27.demo"
+INSIDE=$(python3 tests/demo_field.py "$M27" 2 0x12 2>/dev/null)
+OUTSIDE=$(python3 tests/demo_field.py "$M27" 4 0x12 2>/dev/null)
+if [ "$INSIDE" = "04" ] && [ "$OUTSIDE" = "ff" ]; then
+    ok "W27: DS:12 is 04 inside the site and back to ff on the world map"
+else
+    bad "W27: DS:12 inside=$INSIDE after-departure=$OUTSIDE (want 04 then ff)"
+fi
+# The control is the constant: stamping 4 unconditionally makes record 4 read 04.
+if python3 tests/demo_field.py "$M27" 2 0x12 ff >/dev/null 2>&1; then
+    bad "W27 control: the in-site reading was already ff, so the leg is not seeing the site"
+else
+    ok "W27 control: the leg can tell inside-from-outside, which is what makes the ff meaningful"
+fi
+
 # --- W16: the delta is APPLIED at load, not merely parsed ----------------------
 # W18 gates the writer, and that turned out not to be enough. The reader was storing a
 # fixed 23-character slice of the whole line as the sector name, so no sector ever

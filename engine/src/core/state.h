@@ -76,6 +76,17 @@ typedef struct u2_state {
                                         * arms call, and DS:12 == 0xFF is how it decides
                                         * whether the viewport origin wraps (`and $0x3f`).
                                         * Live: 0xFF in sector 20, 4 in sector 32.
+                                        * DERIVED, NEVER LATCHED, and this is the part the
+                                        * engine got wrong until 2026-11-08: asm/0C1F writes
+                                        * 4, reads DS:4A, and falls through to asm/0C2B,
+                                        * which writes 0xFF, only when that digit is zero.
+                                        * So the byte is a function of the sector's ones
+                                        * digit, re-evaluated every tick, and it cannot go
+                                        * stale. `site_reload` stamped a constant 4, which
+                                        * meant the world map kept a settlement's mode after
+                                        * a departure until the next sector load. Closed
+                                        * from these bytes, no capture: docs/needs-gameplay.md
+                                        * G67, gated by W27 in tests/run_demo.sh.
                                         * The new name says what the byte selects: how the
                                         * view origin is computed. Nothing in the engine
                                         * reads it; it is written so the state block matches
