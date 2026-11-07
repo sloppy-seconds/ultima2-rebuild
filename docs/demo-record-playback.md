@@ -32,8 +32,10 @@ recording found), the roll counter, the creature layer, the stop toggle, the per
 non-contiguous version group (21) and the rule mode (22). The owner's 216-record demo verifies
 216/216 with exit 0 against a local copy of `original/`, with no override flags. What is left in the
 demo work is not a demo fault: the three older files in `engine/demos/` were recorded before option A
-and cannot be repaired retroactively, and `docs/needs-gameplay.md` G67 is a fidelity question the
-fixed playback exposed rather than caused.
+and cannot be repaired retroactively — `tests/drive_and_validate.sh` re-records them and all four
+real routes pass again, both rule modes, three backends each — and the fidelity question the fixed
+playback exposed (`docs/needs-gameplay.md` G67, `DS:12` latched after a site departure) is closed
+from `asm/0C1F` and gated by W27.
 
 **Every deviation from this plan, each one forced by a measurement; the count is whatever the
 list below ends in, and it is not repeated in prose on purpose.** They are
@@ -1442,7 +1444,8 @@ which was rejected as written — see the step 2c note. 2c-i, 2c-ii and 2c-v lan
 gated by W16–W20, plus W21 (the creature layer), W22 (the stop toggle), W23 (one version per load),
 W24 (those versions not being contiguous — see the record-116 section, which is why W23 alone
 was not enough), W25 (the rule mode the recording was made under — see the record-37 section) and
-W26 (a mid-run refusal ends the run and names its sector).
+W26 (a mid-run refusal ends the run and names its sector) and W27 (`DS:12` follows the sector after
+a departure rather than latching).
 
 **The first real recording found three bugs the fixtures could not.** The owner's demo on a real
 install (`demos/20261107T145757.demo`, 410 records, sector 20 with a six-cell delta) reproduced all
@@ -1752,11 +1755,21 @@ W23 stayed green throughout. Two fixtures for one contract, and only the tidy on
 fixture built in the shape the implementation happens to prefer tests the implementation, not the
 format.
 
-**One thing the fix exposed rather than caused, and it is not a demo fault.** With the playback now
+**One thing the fix exposed rather than caused, and it is now closed.** With the playback now
 agreeing, the recording's own bytes are readable as behaviour: `DS:12` is `0x04` for records 116-171
-while the player stands in sector 20, the world map. `site_reload` stamps 4 unconditionally and
-serves entry and departure alike, so the `0xFF` that `site_leave` writes — with a comment explaining
-exactly why it must survive — is overwritten before the frame is drawn. Whether the original leaves
-it latched is not on record; that is `docs/needs-gameplay.md` G67, agent-drivable, and the engine
-may be wrong about the viewport for every step after a player walks out of a town.
+while the player stands in sector 20, the world map. `site_reload` stamped 4 unconditionally and
+served entry and departure alike, so the `0xFF` that `site_leave` writes — with a comment explaining
+exactly why it must survive — was overwritten before the frame was drawn. **`asm/0C1F` settles it
+without a capture:** it writes 4, reads `DS:4A`, and falls through to `asm/0C2B`, which writes
+`0xFF`, only when that digit is zero — so the byte is `DS:4A ? 4 : 0xFF`, re-derived every tick and
+structurally unable to go stale. Fixed by deriving in `site_reload`, gated by W27, and recorded as
+`docs/needs-gameplay.md` G67.
+
+**And that fix invalidates every demo recorded before it, this one included.** `DS:12` is inside the
+digest scope, so a fidelity fix to a mirrored state byte makes old recordings diverge — here at
+record 116, the departure itself. That is the format behaving correctly rather than badly: a demo
+that plays back wrong is a failed playback, and it names the record. No `digest-version` bump, on
+purpose — a bump would downgrade the honest "diverged at 116" to a bland "unverifiable". The
+recordings that matter are re-made by `tests/drive_and_validate.sh`, and all four real routes pass
+again afterwards.
 

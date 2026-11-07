@@ -189,6 +189,25 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-08 — A derived value has to be re-derived everywhere the state it derives from
+  changes, not latched where the first caller needed it.** A mirror byte was defined by the
+  original as a pure function of one other byte, recomputed every tick. The port wrote it in two
+  places: correctly at the initial load, and as a hard-coded constant inside a shared reload
+  routine that served two different transitions — entering an interior and leaving one. Entering
+  wanted the constant; leaving wanted the derivation. So every departure left the byte describing
+  the place the player had just exited, and it stayed wrong until the next sector load. Two
+  transferable points. The function that computes a derived byte belongs next to the value, not
+  inside whichever routine first needed it — otherwise the second caller silently inherits the
+  first caller's constant. And when a code comment exists to argue that some value must survive,
+  read what runs *after* the comment before believing it does; in this case the contradicting
+  write was two lines later, inside a routine the commented call invoked.
+
+  Separately, and it is a property of digest-based replay formats generally: fixing a fidelity bug
+  in a mirrored state byte invalidates every recording made before the fix, because the digest
+  covers the byte the fix changed. The correct outcome is a loud divergence naming the record, not
+  a format-version bump — a bump downgrades "disagreed at record 116" to "unverifiable" and throws
+  away the diagnostic that made the bug findable. Treat old recordings as evidence about the old
+  build, and re-record rather than negotiate.
 * **2026-11-08 — Two things from one user-reported "it just died".** A replay run ended with no
   explanation at a state-machine transition, and the cause turned out to be an error return that
   every caller discarded with a void cast: the subsystem underneath had already detected the bad
