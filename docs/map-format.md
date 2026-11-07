@@ -238,6 +238,31 @@ occupied across 24 turns, **zero** were non-spawn cells whose mapx byte was not 
 on non-paving ground. Grade: the `0x70` outcome is **measured**; which mechanism produces it is
 **open**.
 
+**Closed 2026-11-08, and it is neither mechanism.** The two candidates were framed as a choice
+between *departure writes `0x70`* and *load clears to `0x70`*, and that framing is what hid the
+answer: **the original restores a per-slot saved terrain byte, and `0x70` was the paving case.**
+`asm/2233_sub_2233` is the departure site — `mov 0x1b7(%di),%al` + `mov %al,(%bx,%si)` writes
+`DS:1B7[slot]` back into the grid cell — and `asm/0CEE_spawn_tile_store` fills that byte at spawn
+from the rolled cell's own terrain, returned by `asm/50B3_map_tile_ptr` one instruction earlier.
+No `movb $0x70` into the grid exists anywhere in the corpus, so the constant is ruled out by the
+bytes and not by inference, and the Apple II twin (`LDA $4D80,X ; LDY #$0091 ; STA ($06),Y`) agrees
+independently.
+
+The shipped data corroborates it. Across all 33 sectors and 511 live `monx` slots, the column at
+`monx[128..159]` — which `engine/src/core/state.h` calls `mon_kind` and glosses as "kind index" —
+takes exactly two values, `0x70` (355 slots) and `0x08` (156), and for 469 of 502 baked slots it
+equals a real unbaked neighbour's terrain. It is a terrain byte, and it is only ever paving or land
+because that is where authored creatures stand. Sector 03 is a paving sector, which is exactly why
+restoring the slot byte was indistinguishable from writing a constant there, and exactly why § 9
+could not separate the two from that sector alone.
+
+Two consequences, neither applied yet. **`mon_kind` is misnamed**: it is the saved terrain, and the
+spawn arms' `cmp` on `[DI+0x1B7]` is a terrain test, not a kind dispatch. And
+**`u2_monsters_clear_spawn_cells` hard-codes `k_clear = 0x70`** where the original restores the
+slot's own byte, so it is right in towns and wrong in the field — the 2026-11-06 "only clear a baked
+cell" guard reaches the right outcome for the wrong reason. The visible half, a land creature
+leaving `0x08` behind rather than paving, still has no frame and is `docs/needs-gameplay.md` G66.
+
 ### Why this matters for the engine
 
 `u2_world_load_sector` reads mapx verbatim into `map_base`, and `u2_monsters_restamp` rebuilds
