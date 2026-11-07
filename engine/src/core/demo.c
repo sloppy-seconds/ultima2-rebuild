@@ -1195,6 +1195,25 @@ static void verify_record(u2_ctx *ctx, u2_demo *d, int idx)
     u2_demo_digest(ctx, now);
     if (strcmp(now, d->recs[idx].sha) == 0) return;
 
+    /* --demo-snapshots on the PLAYBACK side. The recorder's file already carries the full
+     * span at every record (`@snap`), so a hash mismatch is only a mystery because the
+     * live half of the comparison is thrown away. Dumping it beside the file turns "record
+     * 10 diverges" into "DS:0x163 recorded 22, live 00", which is a different and much
+     * shorter conversation. Written only on a divergence, and only under the flag that
+     * already exists for exactly this purpose. */
+    if (ctx->demo_snapshots) {
+        char p[1024];
+        snprintf(p, sizeof p, "%s.live", d->path);
+        FILE *f = fopen(p, idx == 0 ? "w" : "a");
+        if (f) {
+            const unsigned char *m = (const unsigned char *)&ctx->state;
+            fprintf(f, "@snap %d rolls=%u\n", idx + 1, (unsigned)ctx->rng_rolls);
+            for (size_t q = 0; q < U2_DEMO_SPAN; q++) fprintf(f, "%02x", m[q]);
+            fputc('\n', f);
+            fclose(f);
+        }
+    }
+
     d->diverged = idx;
     fprintf(stderr, "u2: DEMO DIVERGED at record %d (kind=%s, %d key%s, rolls=%u): "
                     "recorded %s, live %s\n",
