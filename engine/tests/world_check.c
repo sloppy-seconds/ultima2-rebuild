@@ -18,6 +18,7 @@
 #include <unistd.h>
 
 #include "core/ctx.h"
+#include "core/slot.h"
 #include "core/world.h"
 
 static int fails;
@@ -506,6 +507,62 @@ int main(int argc, char **argv)
         overlay_has_it = (n >= U2_SECTOR_TILES && readback[0 * U2_SECTOR_EDGE + 2] == 0x44);
     }
     CHECK(overlay_has_it, "storing the MAP wrote the slot's MAPX file, where the change belongs");
+
+    /* --- W17: each layer reads on its own, so a delta is measurable -----------
+     *
+     * docs/demo-record-playback.md § 13.11 needs "what this save changed" measured
+     * against "what shipped". That is only computable if the content bytes can be read
+     * while a slot overlay is live. If u2_world_read_content() ever fell through to the
+     * slot, both reads would agree, every delta would come out empty, and the demo
+     * subsystem would report success while carrying no information — the vacuous-pass
+     * shape AGENTS.md § 3 exists to stop. So the control is byte [7]: the slot copy
+     * carries a different value there, which makes agreement detectable rather than
+     * assumed.
+     */
+    {
+        static uint8_t content[U2_SECTOR_TILES], slotb[U2_SECTOR_TILES], got[U2_SECTOR_TILES];
+        char nm[32], slotdir[600];
+
+        fill_sector(content, sizeof content);
+        memcpy(slotb, content, sizeof slotb);
+        slotb[7] = 0x5A;                            /* the only difference */
+
+        path_for(p, sizeof p, dir, "mapx30");
+        CHECK(write_file(p, content, U2_SECTOR_TILES) == 0, "W17: content sector written");
+        CHECK(u2_slot_ensure(&ctx) == 0, "W17: the save slot exists");
+        u2_slot_dir(&ctx, slotdir, sizeof slotdir);
+        path_for(p, sizeof p, slotdir, "mapx30");
+        CHECK(write_file(p, slotb, sizeof slotb) == 0, "W17: slot overlay written");
+
+        memset(&w, 0, sizeof w);
+        CHECK(u2_world_load(&ctx, &w, 1, id) == U2_WORLD_OK, "W17: the sector loads");
+        CHECK(w.map_root && strcmp(w.map_root, U2_WORLD_SLOT_LAYER) == 0,
+              "W17 fixture: the live load came from the slot, not from content");
+        CHECK(w.map[7] == 0x5A, "W17 fixture: the live bytes carry the slot's difference");
+
+        CHECK(u2_world_read_content(&ctx, 1, id, got, sizeof got, nm, sizeof nm)
+                  == U2_WORLD_OK,
+              "W17: the content layer reads while a slot overlay is live");
+        CHECK(got[7] == content[7] && got[7] != 0x5A,
+              "W17: the content read is NOT the overlay, so a delta is measurable");
+        CHECK(strcmp(nm, "mapx30") == 0,
+              "W17: the resolved filename is reported, never guessed");
+
+        CHECK(u2_world_read_slot(&ctx, 1, id, got, sizeof got, nm, sizeof nm)
+                  == U2_WORLD_OK,
+              "W17: the slot layer reads on its own");
+        CHECK(got[7] == 0x5A, "W17: the slot read carries the overlay byte");
+
+        /* And with no overlay the delta is empty by construction, which is the clean
+         * recording case § 13.1 claims already works. */
+        unlink(p);
+        CHECK(u2_world_read_slot(&ctx, 1, id, got, sizeof got, nm, sizeof nm)
+                  == U2_WORLD_MISSING,
+              "W17: no overlay is reported MISSING, not as an empty read");
+        CHECK(u2_world_read_content(&ctx, 1, id, got, sizeof got, nm, sizeof nm)
+                  == U2_WORLD_OK && got[7] == content[7],
+              "W17: with no overlay the content read still works, so the delta is empty");
+    }
 
     printf(fails ? "world check: FAIL (%d)\n" : "world check: all checks passed\n",
            fails);

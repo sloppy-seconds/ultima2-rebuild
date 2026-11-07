@@ -295,6 +295,27 @@ u2_world_result u2_world_open(const u2_ctx *ctx);
  * names are case-insensitive and the Galaxy patch renames mapx -> mapg. */
 u2_world_result u2_world_load(u2_ctx *ctx, u2_world *w, int is_map, u2_sector_id id);
 
+/* Read one sector LAYER into a caller-owned buffer, leaving the live world alone.
+ *
+ * These exist for the demo subsystem (docs/demo-record-playback.md § 13.11). A delta is
+ * only meaningful as "what this save changed" measured against "what shipped", so the
+ * recorder needs both layers of the same sector at once, and neither can be reached
+ * through u2_world_load() without clobbering the running game. The bytes are returned
+ * exactly as the file has them: no stamping, no spawn-cell clearing, no shift. Both
+ * sides of a delta must be raw file bytes or the comparison is between two different
+ * pipelines rather than two worlds.
+ *
+ * out_name receives the filename the bytes came from ("mapx20"), and only on success.
+ * U2_WORLD_MISSING means that layer has no file for this sector, which is normal for the
+ * slot on a fresh install and for tlkx in several sectors.
+ */
+u2_world_result u2_world_read_content(const u2_ctx *ctx, int is_map, u2_sector_id id,
+                                      uint8_t *buf, size_t bufsz, char *out_name,
+                                      size_t out_name_sz);
+u2_world_result u2_world_read_slot(const u2_ctx *ctx, int is_map, u2_sector_id id,
+                                   uint8_t *buf, size_t bufsz, char *out_name,
+                                   size_t out_name_sz);
+
 /* Load the sector's tlkxNN dialogue buffer, 256 bytes, into w->tlkx.
  * Separate from u2_world_load rather than a third value of its is_map flag: is_map is a
  * boolean that tests and the save path already reason about, and dialogue is never stored,

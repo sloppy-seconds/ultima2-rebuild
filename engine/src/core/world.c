@@ -245,14 +245,39 @@ static int id_of(const u2_world *w, int is_map, u2_sector_id *out)
     return w->mon_loaded;
 }
 
-u2_world_result u2_world_load(u2_ctx *ctx, u2_world *w, int is_map, u2_sector_id id)
+/* Which layer a sector read may draw from. Three shapes, because the live game and the
+ * demo recorder need different questions answered: the game wants "what is this player's
+ * world", which is the slot if it has one and content otherwise. The demo wants "what did
+ * this save change", which is only meaningful as slot-against-content, so it needs each
+ * layer on its own. */
+#define LAYER_SLOT_THEN_CONTENT 0
+#define LAYER_CONTENT_ONLY      1
+#define LAYER_SLOT_ONLY         2
+
+/* Walk the candidate list into a caller-owned buffer, without touching u2_world.
+ *
+ * That last clause is the whole reason this is a separate function and not a flag on
+ * u2_world_load(): the demo path has to look at the content bytes of a sector while a
+ * DIFFERENT set of bytes is live in the world, and reading them through the normal load
+ * would clobber the running game out from under it.
+ *
+ * Reports the filename spelling and the layer it resolved. A name that is a guess must
+ * never be checked against a digest — the absent-tlkx defect in core/demo.c is the
+ * cautionary tale, and it is why out_name is filled only on success. */
+static u2_world_result read_layer(const u2_ctx *ctx, int is_map, u2_sector_id id,
+                                  int mode, uint8_t *buf, size_t bufsz,
+                                  const char **out_label, const char **out_root,
+                                  char *out_name, size_t out_name_sz)
 {
     char path[512];
-    size_t want = want_bytes(is_map);
+    const size_t want = want_bytes(is_map);
     size_t got = 0;
     int found = 0;
     const char *used = NULL;
     const char *used_root = "";
+
+    if (!buf || bufsz < want)
+        return U2_WORLD_SHORT;
 
     const char *const *prefixes;
     size_t nprefixes;
@@ -264,7 +289,9 @@ u2_world_result u2_world_load(u2_ctx *ctx, u2_world *w, int is_map, u2_sector_id
      * both kinds. */
     struct cand list[N_CAND];
     const int off_earth = ctx && ctx->state.world != 0 && ctx->state.world != 0x0A;
-    int n = build_cands(off_earth,
+    int n = 0;
+    if (mode != LAYER_SLOT_ONLY)
+        n = build_cands(off_earth,
                         is_map ? k_map_patch : k_mon_patch,
                         is_map ? (int)(sizeof k_map_patch / sizeof k_map_patch[0])
                                : (int)(sizeof k_mon_patch / sizeof k_mon_patch[0]),
@@ -280,7 +307,7 @@ u2_world_result u2_world_load(u2_ctx *ctx, u2_world *w, int is_map, u2_sector_id
      * mapx/monx only, and that is a ruling rather than an oversight: tlkx, pic*
      * and the executable are never written by anything, so overlaying them would
      * buy a second place for content to disagree with itself (D3). */
-    {
+    if (mode != LAYER_CONTENT_ONLY) {
         char sdir[448];
         const char *spfx[4];
         const size_t ns = slot_prefixes(off_earth, is_map, spfx, 4);
@@ -294,7 +321,7 @@ u2_world_result u2_world_load(u2_ctx *ctx, u2_world *w, int is_map, u2_sector_id
             FILE *f = fopen(path, "rb");
             if (!f)
                 continue;
-            got = fread(is_map ? w->map : w->mon, 1, want, f);
+            got = fread(buf, 1, want, f);
             fclose(f);
             found = 1;
             used = spfx[i];
@@ -302,17 +329,19 @@ u2_world_result u2_world_load(u2_ctx *ctx, u2_world *w, int is_map, u2_sector_id
         }
     }
 
-    for (int i = 0; i < n && !found; i++) {
-        FILE *f;
-        sector_path(path, sizeof path, ctx, list[i].root, list[i].prefix, id);
-        f = fopen(path, "rb");
-        if (!f)
-            continue;
-        got = fread(is_map ? w->map : w->mon, 1, want, f);
-        fclose(f);
-        found = 1;
-        used = list[i].label;
-        used_root = list[i].root;
+    if (mode != LAYER_SLOT_ONLY) {
+        for (int i = 0; i < n && !found; i++) {
+            FILE *f;
+            sector_path(path, sizeof path, ctx, list[i].root, list[i].prefix, id);
+            f = fopen(path, "rb");
+            if (!f)
+                continue;
+            got = fread(buf, 1, want, f);
+            fclose(f);
+            found = 1;
+            used = list[i].label;
+            used_root = list[i].root;
+        }
     }
 
     if (!found)
@@ -320,7 +349,27 @@ u2_world_result u2_world_load(u2_ctx *ctx, u2_world *w, int is_map, u2_sector_id
     if (got != want)
         return U2_WORLD_SHORT;
 
-    w->bytes_read = got;
+    if (out_label) *out_label = used;
+    if (out_root)  *out_root  = used_root;
+    if (out_name && out_name_sz)
+        snprintf(out_name, out_name_sz, "%.4s%u%u", used ? used : "",
+                 (unsigned)(id.hi & 0x0F), (unsigned)(id.lo & 0x0F));
+    return U2_WORLD_OK;
+}
+
+u2_world_result u2_world_load(u2_ctx *ctx, u2_world *w, int is_map, u2_sector_id id)
+{
+    const size_t want = want_bytes(is_map);
+    const char *used = NULL;
+    const char *used_root = "";
+
+    const u2_world_result r = read_layer(ctx, is_map, id, LAYER_SLOT_THEN_CONTENT,
+                                         is_map ? w->map : w->mon, want,
+                                         &used, &used_root, NULL, 0);
+    if (r != U2_WORLD_OK)
+        return r;
+
+    w->bytes_read = want;
     /* Per kind, never one shared field: see the note on the struct. The overworld loads
      * map then monsters into the same world, so a single field would always say "monx"
      * by the time anything is stored. */
@@ -339,6 +388,22 @@ u2_world_result u2_world_load(u2_ctx *ctx, u2_world *w, int is_map, u2_sector_id
         w->mon_dirty = 0;
     }
     return U2_WORLD_OK;
+}
+
+u2_world_result u2_world_read_content(const u2_ctx *ctx, int is_map, u2_sector_id id,
+                                      uint8_t *buf, size_t bufsz, char *out_name,
+                                      size_t out_name_sz)
+{
+    return read_layer(ctx, is_map, id, LAYER_CONTENT_ONLY, buf, bufsz,
+                      NULL, NULL, out_name, out_name_sz);
+}
+
+u2_world_result u2_world_read_slot(const u2_ctx *ctx, int is_map, u2_sector_id id,
+                                   uint8_t *buf, size_t bufsz, char *out_name,
+                                   size_t out_name_sz)
+{
+    return read_layer(ctx, is_map, id, LAYER_SLOT_ONLY, buf, bufsz,
+                      NULL, NULL, out_name, out_name_sz);
 }
 
 /* asm/22D5's dialogue read. Prefixes mirror the map/monster lists because the shipped pack
