@@ -1464,7 +1464,7 @@ the last key.
 
 ---
 
-### The open one: a creature that will not die
+### Record 37: a creature that will not die (open, and may be the same fault as 116)
 
 A 147-record `stop=toggle` demo (`demos/20261108T052450.demo`, 2026-11-08) verifies records 1-36 and
 diverges at 37. Twelve bytes differ, and they are one creature and its consequences:
@@ -1505,6 +1505,68 @@ one line compares 32 bytes and reports "0 differing" for a span that differs in 
 mistake produced a confidently wrong diagnosis and an almost-shipped digest change. And `--trace-rolls`
 covers the whole run, so the recorder's trace starts at roll 1 while playback starts at the
 checkpoint's count; compare the END roll, not the line count.
+
+### Record 58: a mid-session save rewrote the sector (CLOSED by option A)
+
+A 196-record demo diverged at 58 with four creatures present on the recorder and absent in
+playback -- `mon_x`, `mon_y`, `mon_hp`, `mon_type` and `mon_kind` at slots 25-28. The cause was
+sitting in a file timestamp: the slot's `mapx20` and `monx20` were written **seven seconds into
+the recording**, because the player pressed Q. A save rewrites the sector in the slot, which is
+faithful -- `asm/2340` (`mov $0x100,%cx; lea 0x137,%dx`) is the creature store and it is on the
+save path, and the original does the same -- so a later load of that file reads different bytes
+than the first load did. One delta per file could only describe the first.
+
+Fixed by emitting one `@world` line per **load whose bytes differed** and consuming them in load
+order: load *k* takes version *k*, and a load with no version of its own reuses the last, so an
+unchanged reload costs nothing. W23 gates it with a `dupworld` fixture; pinning the version to the
+first makes both loads hash identically and W23 goes red, which was run.
+
+Worth keeping as method: the hypothesis on the table was that the engine was writing sectors on
+sector *transitions*, which would have been a fidelity bug. It was already fixed in 2026-10-29 and
+has its own gate (`tests/site_state.py`); `asm/22FD`, long cited as the transition store, does no
+file I/O at all. Checking that cost one grep and redirected the whole diagnosis to saves. See the
+header of `asm/22FD_sub_22fd.asm` for the refutation and for the fact that the engine's old
+store-on-transition once rewrote `original/monx71`.
+
+### Record 116: the two runs are in different game modes (OPEN, and a different class)
+
+After option A, a 216-record demo (`demos/20261108T054331.demo`, 2026-11-08, `stop=toggle`, a
+mid-session save at +26s, `mapx20` carried twice and `monx20` three times) verifies 1-115 and
+diverges at 116 across **220 bytes**. The first line is the whole finding:
+
+```
+DS:0012  recorded 04  live ff   view_mode
+DS:0137..014D  recorded 00  live populated   mon_x[0..22]
+```
+
+`0x04` is inside a site, `0xFF` is outdoors, and the recorder's outdoor creature table is empty
+because it is not outdoors. **At record 116 the recorder is standing in a site and the playback is
+standing outside.** That is not a world-composition fault like 37, 58 and everything else today;
+it is a divergence in where the game is.
+
+Two shapes it could be, and they need different fixes:
+
+1. **An off-by-one at a boundary.** The recorder's record 116 is one poll after a site transition
+   and playback's is one before. The closing-digest fault was exactly this shape and has precedent
+   here, as does the note in `verify_record` about comparing at the same point in the loop.
+2. **A real transition difference.** Something about entering or leaving a site depends on state
+   the demo does not carry, so playback takes a different path through it.
+
+**The next thing to do is one command, not a theory:** diff records 115 and 117 as well.
+
+```
+python3 engine/tools/demo_span_diff.py <demo> <demo>.live 115
+python3 engine/tools/demo_span_diff.py <demo> <demo>.live 117
+```
+
+Only diverged records get a `.live` entry, so if 115 and 117 report "it VERIFIED" while 116 does
+not, the divergence is local and it is shape 1. If 115 already differs, it started earlier and 116
+is merely where the digest first noticed -- and then bisect backwards rather than forward.
+
+Note that record 37 above may be an early instance of this same fault rather than a separate one:
+it also showed a single creature slot present on one side and not the other, and the direction
+flipped between the two demos, which is more consistent with a timing offset than with a missing
+layer. Do not assume they are two bugs, and do not assume they are one, until 115 and 117 are read.
 
 Ruled out by measurement, so nobody re-walks them: not the theme, not the art, not the scratch-save
 redirect (all reproduce identically on the owner's install and on a local copy of the same content
