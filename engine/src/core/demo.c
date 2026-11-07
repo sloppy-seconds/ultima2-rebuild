@@ -675,6 +675,24 @@ void u2_demo_quiescent(u2_ctx *ctx, u2_demo_mode mode, const u2_world *world)
             ctx->demo_restamp_pending = 1;
     }
 
+    /* A stop request is honoured BEFORE the IDLE gate below, and that ordering is the
+     * whole bug: this block used to sit at the end of the function, behind
+     * `if (d->state != U2_DEMO_IDLE) return;`, and a recording is by definition not IDLE.
+     * So the second Ctrl-R set pending_stop, every caller dutifully reached a quiescent
+     * point, and the handler that turns that flag into a finished file could not be
+     * reached to do it. The only way a recording ever ended was the process-exit path in
+     * u2_demo_finish, which is why every demo this project has produced carries stop=exit
+     * and why the owner had to close the game to stop one.
+     *
+     * No gate caught it because no gate asserted stop=toggle; the scripted runs all ended
+     * the same accidental way and the file looked fine. W22 now asserts it. */
+    if (d->pending_stop && d->state == U2_DEMO_RECORDING) {
+        d->pending_stop = 0;
+        d->stopped_by_toggle = 1;
+        u2_demo_finish(ctx);
+        return;
+    }
+
     if (d->state != U2_DEMO_IDLE) return;
 
     if (d->pending_start && !d->started) {
@@ -758,11 +776,6 @@ void u2_demo_quiescent(u2_ctx *ctx, u2_demo_mode mode, const u2_world *world)
         return;
     }
 
-    if (d->pending_stop && d->state == U2_DEMO_RECORDING) {
-        d->pending_stop = 0;
-        d->stopped_by_toggle = 1;
-        u2_demo_finish(ctx);
-    }
 }
 
 int u2_demo_mark_auto_pass(u2_ctx *ctx)

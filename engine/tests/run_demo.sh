@@ -447,6 +447,16 @@ else
     bad "W21: monx70 delta missing or wrong (expected '$MONEXPECT')"
 fi
 
+# --- W22: the second Ctrl-R actually stops ---------------------------------------
+# The stop handler sat behind `if (d->state != U2_DEMO_IDLE) return;`, and a recording is
+# by definition not IDLE, so the handler was unreachable and every recording could only
+# end by process exit. The owner hit this as "Ctrl-R does nothing, I have to close the
+# game". No gate caught it because no gate asserted stop=toggle: the scripted runs all
+# ended the same accidental way and the file still looked complete.
+grep -q 'stop=toggle' "$DEMO" \
+    && ok "W22: a second Ctrl-R ends the recording, and the file says stop=toggle" \
+    || bad "W22: the toggle never stopped it (@end says $(grep -o 'stop=[a-z]*' "$DEMO"))"
+
 # --- W16: the delta is APPLIED at load, not merely parsed ----------------------
 # W18 gates the writer, and that turned out not to be enough. The reader was storing a
 # fixed 23-character slice of the whole line as the sector name, so no sector ever
