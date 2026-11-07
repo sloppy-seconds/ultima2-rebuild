@@ -159,7 +159,7 @@ int main(int argc, char **argv)
 
     u2_monsters_clear_spawn_cells(&ctx, &w);
 
-    int spawn_cleared = 1, plain_kept = 1;
+    int spawn_cleared = 1, plain_kept = 1, stamp_kept = 1;
     int c_other = -1; uint8_t k_other = 0;
     for (int i = 0; i < U2_MON_SLOTS; i++) {
         if (ctx.state.mon_type[i] == 0) continue;
@@ -169,8 +169,13 @@ int main(int argc, char **argv)
             if (w.map_base[c] != 0x08 || w.map[c] != 0x08) plain_kept = 0;
             continue;
         }
-        if (w.map_base[c] != ctx.state.mon_kind[i] || w.map[c] != ctx.state.mon_kind[i])
+        if (w.map_base[c] != ctx.state.mon_kind[i])
             spawn_cleared = 0;
+        /* Step 2c-i: the clear fixes the terrain record and leaves the display alone.
+         * In a saved sector the baked byte IS the stamp, so blanking it was always the
+         * wrong job - it is what forced the load-time rebuild to put it back. */
+        if (w.map[c] != ctx.state.mon_type[i])
+            stamp_kept = 0;
         if (i != 7 && c_other < 0) { c_other = c; k_other = ctx.state.mon_kind[i]; }
     }
     int others_kept = 1;
@@ -187,13 +192,15 @@ int main(int argc, char **argv)
         }
     }
     CHECK(spawn_cleared,
-          "every baked spawn cell was restored to its OWN slot's terrain byte, in both arrays");
+          "every baked spawn cell's map_base was restored to its OWN slot's terrain byte");
+    CHECK(stamp_kept,
+          "2c-i: map keeps the baked byte, because in a saved sector that byte IS the stamp");
     /* T1: the assertion that makes "its own byte" mean something. A restore that writes a
      * constant passes the loop above whenever the fixture happens to use that constant, and
      * the old fixture did use 0x70 for everything - which is how the constant hid. */
     if (c7 < U2_SECTOR_TILES)
-        CHECK(w.map_base[c7] == 0x08 && w.map[c7] == 0x08,
-              "T1: slot 7 restored to its own terrain 0x08, not to a constant");
+        CHECK(w.map_base[c7] == 0x08,
+              "T1: slot 7's terrain byte restored to its own 0x08, not to a constant");
     if (c_other >= 0)
         CHECK(w.map_base[c_other] == 0x0C && k_other == 0x0C,
               "T1: a second slot restored to a DIFFERENT terrain byte 0x0C");

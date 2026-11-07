@@ -155,6 +155,41 @@ int main(void)
     CHECK(ctx.state.mon_kind[3] == 0x0C,
           "asm/225A: the slot's terrain byte now names the cell it is standing on");
 
+    /* --- M3: the stamp is the occupancy rule, with no rebuild behind it ----------
+     *
+     * asm/2199 has no occupancy clause at all. What stops one creature walking onto
+     * another is that the first one's type byte is sitting in the grid cell and no
+     * creature type is in the gate's accept set. That only holds if the stamp is
+     * committed per creature - which is why the move-path rebuild could be dropped.
+     *
+     * Geometry is forced, not hoped for. The sweep runs slots 31 down to 1, so slot 4
+     * acts first and moves (5,5)->(6,6). Slot 3 at (5,6) tries (6,7) then (5,7), both
+     * walled here, and falls through to its third candidate (6,6) - the cell slot 4 has
+     * JUST entered. Without a per-creature stamp that cell still reads grass to the
+     * gate and the two stack. Delete the commit in ai.c and this goes red; that is the
+     * control, and it is the reason the assertion is worth having.
+     */
+    arm(&ctx, &w, GRASS, 4, 5, 5, 40, 0x30);
+    ctx.state.mon_role[4] = 1;
+    ctx.state.mon_x[3]    = 5;
+    ctx.state.mon_y[3]    = 6;
+    ctx.state.mon_hp[3]   = 40;
+    ctx.state.mon_type[3] = 0x30;
+    ctx.state.mon_role[3] = 1;
+    for (int i = 0; i < 2; i++) {                 /* wall (6,7) and (5,7) */
+        const int wx = 6 - i, wy = 7;
+        const int c = wy * U2_SECTOR_EDGE + wx;
+        w.map[c] = w.map_base[c] = 0x10;          /* asm/21bd: an explicit refusal */
+    }
+    u2_monsters_restamp(&ctx, &w);
+    rep = u2_ai_creature_turn(&ctx, &w, 8, 8);
+    CHECK(ctx.state.mon_x[4] == 6 && ctx.state.mon_y[4] == 6,
+          "M3 fixture: slot 4 moved (5,5)->(6,6) ahead of slot 3 in the sweep");
+    CHECK(!(ctx.state.mon_x[3] == 6 && ctx.state.mon_y[3] == 6),
+          "M3: slot 3 refused the cell slot 4 entered this same turn - the stamp IS the gate");
+    CHECK(u2_monsters_ghost_cells(&ctx, &w) == 0,
+          "M3: no cell is stamped with no creature behind it after the turn");
+
     /* --- the two HP thresholds are different numbers ------------------------ */
     arm(&ctx, &w, GRASS, 4, 5, 5, 15, 0x30);
     ctx.state.mon_role[4] = 1;

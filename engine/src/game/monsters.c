@@ -242,10 +242,14 @@ void u2_monsters_clear_spawn_cells(u2_ctx *ctx, u2_world *w)
          * right outcome for the wrong reason is why the constant survived this long. */
         if (w->map_base[cell] != s->mon_type[i])
             continue;
-        /* Both arrays: map_base is what restamp rebuilds from, so clearing only w->map would let
-         * the baked art reappear on the creature's first step off the cell - which is the bug. */
+        /* map_base ONLY, and that is the whole of step 2c-i. `map` keeps the baked
+         * byte, because in a saved sector the baked byte IS the creature's stamp -
+         * mapx and monx are a matched pair written by one save, so the stamp is
+         * already where the creature is. Fixing the terrain record without also
+         * blanking the display is what makes the load-time rebuild unnecessary rather
+         * than merely redundant. The rebuild is still in place for now (step 2c-iv
+         * keeps it), so this is behaviourally neutral today and correct in meaning. */
         w->map_base[cell] = s->mon_kind[i];
-        w->map[cell] = s->mon_kind[i];
     }
 }
 

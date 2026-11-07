@@ -205,12 +205,17 @@ static inline void u2_world_tile_put(u2_world *w, int x, int y, uint8_t v)
 /* A terrain write: the cell AND the pristine copy, for a tile the game changes for
  * good rather than covers temporarily.
  *
- * u2_world_tile_put() alone is not enough, and the reason is this module's own design
- * rather than anything in the bytes: the creature stamp is rebuilt from map_base on
- * every creature turn (u2_monsters_restamp), so a write that lands only in `map` is
- * erased the next time anything moves. A vehicle tile you boarded would reappear; a
- * door you opened would shut again. Anything that edits the world, as opposed to what
- * is standing in it, goes through here.
+ * u2_world_tile_put() alone is not enough, but the reason changed on 2026-11-08 and the
+ * old wording had outlived itself. It used to read "the creature stamp is rebuilt from
+ * map_base on every creature turn, so a write that lands only in `map` is erased" —
+ * true then, and the reason this function exists. The move-path rebuild is now gone
+ * (step 2c-ii), so that justification no longer holds.
+ *
+ * What does hold: `map_base` is the ground record, and `u2_world_ground_at()` serves it
+ * to the EGA compositor (`frame.c:308`), which draws terrain and then a sprite over it.
+ * A terrain edit that missed `map_base` would survive on the CGA path and show as stale
+ * ground under a sprite on the EGA one — a wrong answer that only one renderer can see,
+ * which is the worst shape for this. So both arrays, still.
  *
  * The vehicle arms of asm/2FAD are the site that forced the distinction: the live
  * sample in captures/spice86/ship-port-boniface read [DS:14] go 0x24 -> 0x00 on BOARD

@@ -126,8 +126,21 @@ static void creature_turn(u2_ctx *ctx, u2_overworld *ow)
     status_tick(ctx);
 
     const u2_ai_report rep = u2_ai_creature_turn(ctx, &ow->world, ow->x, ow->y);
-    if (rep.moved)
-        u2_monsters_restamp(ctx, &ow->world);
+    /* Step 2c-ii: the move-path rebuild is gone. asm/2199 has no occupancy clause —
+     * the stamp in the grid IS the rule that stops one creature walking onto another —
+     * so the stamp has to be current per creature, and ai.c commits it inside the loop
+     * for exactly that reason. Its own comment already called this call "redundant
+     * rather than wrong"; it is now removed rather than carried.
+     *
+     * This is also the divergence docs/map-format.md § 10 measured and told the engine
+     * not to do: "the original does not rebuild the grid from a pristine copy on a
+     * creature turn". The original patches one cell on departure (asm/2233) and one on
+     * arrival (asm/225A) and never rebuilds at all.
+     *
+     * Control, run before the removal: ai_check's M3 leg goes red when the per-creature
+     * commit is disabled, which proves the assertion measures the commit and not this
+     * call. Removing a redundant call is only safe with a test that can tell the two
+     * apart. */
     if (rep.moved || rep.stolen)
         u2_monsters_store(ctx, &ow->world);
 
