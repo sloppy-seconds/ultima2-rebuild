@@ -1124,28 +1124,47 @@ If that holds, one buffer plus restore-on-departure reproduces the original and 
 
 ### Step 2a — settle what `asm/2199` reads
 
-**There is a live contradiction in `ai.c` and it must be resolved before anything is removed.**
+**SETTLED 2026-11-08. The original has one grid, the gate reads the stamped one, and the engine
+already matches it. The contradiction flagged in the first draft of this section was my error and is
+retracted below.**
 
-`ai.c` argues that the stamp *is* the occupancy rule — *"no creature type is in the gate's accept set
-… so an occupied cell simply is not a cell a creature may enter"* — and that per-creature commit was
-added because a stale grid let two creatures share a cell. But `creature_may_enter` (`ai.c:116`) reads
-`u2_world_tile_at()`, which is `map_base` — the **unstamped** grid. So the gate cannot be seeing the
-stamps the comment says it depends on.
+The verdict, and it is short:
 
-Three possibilities, leading to different code:
+* `asm/2199`'s own name-evidence says the tile arrives in `AL` one instruction after
+  `call L_0052b3`. So the gate is handed a grid byte by `asm/50B3_map_tile_ptr`.
+* `asm/50B3` resolves the cell through `word[DS:472]`, and that word is `0x1800` in every live dump
+  (`asm/68C0`'s provenance). Grepping writes of `0x472` finds only `asm/2290` (sector read) and
+  `asm/2305` (sector store). **One pointer, one grid.** There is no unstamped copy for a probe to
+  read, so the accept set is evaluated over a grid that already carries creature type bytes. The
+  stamp *is* the occupancy rule, by construction.
+* The engine reproduces this correctly. `u2_world_tile_at()` returns `w->map` — the stamped grid —
+  and `u2_world_ground_at()` is the one that returns `map_base`. `creature_may_enter` uses the
+  former.
 
-1. `asm/2199` reads the stamped grid, the engine's `tile_at` is wrong here, and the per-creature
-   commit works for a different reason than recorded.
-2. `asm/2199` reads an unstamped copy, the occupancy story is wrong, and something else prevents stacking.
-3. Both readings exist in the original at different sites and `tile_at` picked the wrong one.
+**The retraction, recorded because a wrong claim in a plan is worse than an open question.** The first
+draft asserted that `creature_may_enter` read `map_base` and so could not be seeing the stamps its own
+comment depends on. That came from reading `world.h:194`'s `return w->map_base[...]` and attributing
+it to `u2_world_tile_at` instead of to `u2_world_ground_at` four lines below. It is wrong, there is no
+stacking bug, and `ai.c`'s occupancy story is correctly implemented. The check that caught it cost one
+`sed` over the right line range, which is the argument for doing step 2a as a read before treating any
+of its premises as fact.
 
-**How to settle it:** `asm/2199_creature_step_gate` is in the caller list of
-`asm/50B3_map_tile_ptr`, which resolves through `word[DS:472]` — the single grid pointer. If `2199`
-reaches the tile through `50B3` it reads the stamped grid, because there is only one. Read the chain,
-record the verdict in `asm/2199`'s header in the same commit per AGENTS.md § 3, and re-check the
-stacking datum the comment cites: 91,851 occupied slot-samples in
-`captures/spice86/fight-20261021-castle03` with zero stacked cells is strong evidence that *some*
-occupancy rule is live.
+**What survives, and it is narrower.** The § 10 contradiction is real but smaller than it looked:
+`monsters.c:163` does rebuild `w->map` from `map_base` on every creature turn, which the original does
+not do. But `map_base` also serves a purpose the original never needed — `u2_world_ground_at` feeds
+`view.h:ground[]` so an EGA renderer can draw terrain and then a sprite over it, and DOS draws exactly
+one art index per cell and has no such requirement. So the likely outcome is **partial**, not a
+one-buffer refactor: delete the rebuild and the dual writes, restore per slot on departure and kill,
+and **keep `map_base` as the enhanced renderer's ground source.** That is a smaller change than the
+one floated above, and it does not break the EGA path.
+
+**One loose end, noted and not chased.** `world.h`'s comment on `map_base` says a cell holds *"a
+creature's type byte, or 0x78 for the player"*, but nothing in the engine writes a player stamp into
+`w->map` — `0x78` is `DS:13`/`player_stamp`, a mode byte, and `u2_foot_stamp()` returns `0x78 + 2 *
+pclass`. Either that comment describes the original rather than the engine, or a stamp is missing.
+It matters for any code that asks `tile_at()` what the ground under the player is — `overworld.c:2137`
+does exactly that in the unlock path. **Check it before trusting that site**, and do not assume it is
+fine because nothing has complained.
 
 ### Step 2b — inventory before deciding
 
@@ -1154,8 +1173,9 @@ occupancy rule is live.
 | `monsters.c:restamp` | rebuild source | **deleted** |
 | `monsters.c:clear_spawn_cells` | restores baked cells at load | **deleted**; restore moves to the departure path |
 | `world.h:terrain_put`, `dungeon_terrain_put` | dual write | collapse to a single write |
-| `world.h:u2_world_tile_at` | `map_base` | the grid — **check every caller**, this is where the blast radius lives |
-| `ai.c:116,236,318` | `map_base` for the gate and the departure restore | the grid; departure restore becomes `w->map[old] = mon_terrain[slot]` |
+| `world.h:u2_world_tile_at` | **already `w->map`**, the stamped grid | unchanged — step 2a settled this |
+| `world.h:u2_world_ground_at` | `map_base`, and it is what feeds `view.h:ground[]` for EGA | **stays.** The original has no equivalent need, so this is the one legitimate reason the buffer survives |
+| `ai.c:236,318` | `map_base` directly, for the departure restore | becomes `w->map[old] = mon_terrain[slot]` |
 | `view.h:ground[]`, `view.c:110` | second read so EGA can draw terrain then a sprite | **needs an answer**: with one buffer, what goes under a sprite? |
 | `demo.c:1143` | digest source | already moving to raw file bytes in Phase 3 |
 | `world.c:335` | the load-time `memcpy` | deleted |
@@ -1168,9 +1188,14 @@ at that instant, and the view is rebuilt from the grid every frame.
 
 | outcome | when |
 | --- | --- |
-| **full one-buffer** | `tile_at` callers all tolerate a stamped grid **and** `view.h:ground[]` has a real answer |
-| **partial** | delete the rebuild and the dual writes; keep `map_base` as a load-time snapshot for the view only |
-| **no change** | `ground[]` has no answer, or stamped-grid reads break passability. Then § 10's contradiction stands, documented, and the engine stays a deliberate divergence |
+| **partial** — the leading candidate after step 2a | delete the rebuild-from-`map_base` and the dual writes; restore per slot on departure and on kill; keep `map_base` solely as `u2_world_ground_at`'s source for the enhanced renderer |
+| **full one-buffer** | only if `view.h:ground[]` proves derivable from the stamped grid plus `mon_terrain[slot]` for occupied cells, so `map_base` can go entirely |
+| **no change** | if removing the rebuild breaks door or vehicle durability (M1), or the per-slot restore turns out insufficient outside the departure path. Then § 10's contradiction stands, documented, and the engine stays a deliberate divergence |
+
+Worth stating plainly, because it changes what "faithful" means here: **the original has no EGA
+requirement at all.** It draws one art index per cell, so `ground_at` is an enhancement of ours and
+not a fidelity claim. Keeping `map_base` for it is therefore not a divergence from the bytes — it is
+extra machinery the bytes are silent about, which is a different and much more comfortable category.
 
 **Whatever is chosen, record it in `docs/map-format.md` § 10 next to the finding it resolves.** A
 measured finding the code contradicts, with no note saying why, is the shape AGENTS.md § 3 calls a
