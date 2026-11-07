@@ -45,7 +45,9 @@ gate that had passed; 20 and 21 came from the real recordings that followed — 
 two-layer workaround of 16 turned out to be a workaround rather than the design, and in
 21 the `@world` reader turned out to index one file's versions as if they were contiguous;
 22 came from the same demo as 21, one section later, and is the difference between recording
-the data of a run and recording the rules of it.
+the data of a run and recording the rules of it; 23 came from the owner watching a playback
+rather than reading a digest, which is how a swallowed mid-run refusal stayed invisible
+through every leg that had ever gated it.
 
 1. **The digest scope is not `u2_state_digest_json()` (D6).** The frozen CP2 scope
    embeds the engine version string and the platform backend names (`renderer`,
@@ -186,6 +188,16 @@ the data of a run and recording the rules of it.
     written, applied at the mount, announced, and refused when unrecognised; a file without one is
     told the mode is unknown rather than assumed. `U2_DEMO_VERSION` 2 → 3, so an old binary refuses
     a new file loudly instead of playing it wrongly. W25 gates it on a forced equality kill.
+23. **A sector that cannot be rebuilt ends the run, and says which one.** `site_enter` and
+    `site_leave` both called `(void)site_reload(...)`, so a refusal at a mid-run load left the
+    previous sector's grid under the new sector's position and mode byte and the loop carried on.
+    The only visible symptom was a window that closed, which is what "the demo playback died after
+    coming back from the town into the main overworld" was. A `reload_failed` flag now ends the loop
+    before the quiescent point — so a recording never checkpoints a state the engine knows is
+    broken — and playback exits 2 naming the sector, the same code the mount refusal uses. Two
+    defects found while gating it, both real: the overlay latch's `return -1` did not write a note,
+    so the message could blame a sector that was never involved, and the first version of W26 passed
+    with the flag never set at all. See hazard 11.
 
 Everything below is the plan as ruled on 2026-11-05, unchanged, with the D-numbers the
 implementation cites.
@@ -835,6 +847,16 @@ polish that makes it a subsystem rather than a feature.
     catch — but it will stop a full `make test` after any manual replay until the directory is
     removed. Replay from a copy outside `engine/`, or `rm -rf engine/demos/playback` afterwards.
 
+11. **A control that only adds a comment is not a control, and a leg can pass under it.** The first
+    W26 was written, went green, and was then "controlled" by editing the site-leave call to set the
+    flag with a trailing `/* CONTROL */` comment — which still set the flag. The leg passed, and for
+    a moment that read as the gate working. It was only caught because the run under that fake control
+    printed a refusal for the wrong sector, which led to the real finding: the overlay latch returned
+    -1 without writing a note, and a later unrelated failure printed a stale one. Two rules. A control
+    must delete behaviour, not annotate it — read the diff of the control and ask which line stops
+    executing. And when a leg passes under what you believe is its control, the leg is wrong before
+    the code is: strengthen it until the control goes red, then believe the green.
+
 ---
 
 ## 11. Owner rulings — all settled 2026-11-05
@@ -1419,7 +1441,8 @@ which was rejected as written — see the step 2c note. 2c-i, 2c-ii and 2c-v lan
 2c-i is a behavioural no-op until 2c-ii gives it a reason. Phase 3 is shipped: 3a, 3b, 3c and 3d,
 gated by W16–W20, plus W21 (the creature layer), W22 (the stop toggle), W23 (one version per load),
 W24 (those versions not being contiguous — see the record-116 section, which is why W23 alone
-was not enough) and W25 (the rule mode the recording was made under — see the record-37 section).
+was not enough), W25 (the rule mode the recording was made under — see the record-37 section) and
+W26 (a mid-run refusal ends the run and names its sector).
 
 **The first real recording found three bugs the fixtures could not.** The owner's demo on a real
 install (`demos/20261107T145757.demo`, 410 records, sector 20 with a six-cell delta) reproduced all

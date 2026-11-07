@@ -189,6 +189,26 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-08 — Two things from one user-reported "it just died".** A replay run ended with no
+  explanation at a state-machine transition, and the cause turned out to be an error return that
+  every caller discarded with a void cast: the subsystem underneath had already detected the bad
+  condition, printed it, and returned -1, but nothing upstream was obliged to look, so the program
+  carried on with half its state rebuilt from the previous step and exited minutes later for an
+  unrelated reason. Transferable rule one: a detector that no caller has to honour is a log line,
+  not a guard — when a routine can fail in a way that leaves shared state inconsistent, the harness
+  should make the failure impossible to ignore at the type level rather than rely on every call site
+  remembering to check, and the gate for it should assert that the run *stops*, not merely that a
+  message was printed somewhere.
+
+  Transferable rule two, and it stings more: the leg written for this passed under its own control,
+  because the "control" was an edit that added a comment beside the line that set the flag instead of
+  removing the line. A control has to delete behaviour; read the control's diff and ask which
+  statement stops executing. The fake was only spotted because the run under it printed a refusal
+  naming the wrong sector, which led to a second real defect — a sticky run-wide latch whose early
+  return did not write a per-failure message, so a later unrelated failure reported the first
+  failure's subject. A latch that outlives the thing it latched has to restate the current subject on
+  every trip, or the diagnostics it produces are about the past. When a leg passes under what you
+  believe is its control, treat the leg as broken until it goes red.
 * **2026-11-08 — A replay format must carry the rules the run used, not only its data, and a
   header field that is parsed and never applied is worse than a missing one.** A record/playback
   subsystem pinned the starting state, the clock-derived bytes and the content digests, and still
