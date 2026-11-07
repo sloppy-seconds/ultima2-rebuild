@@ -1344,6 +1344,8 @@ static int world_delta(const uint8_t *base, const uint8_t *now, size_t n,
     return cells;
 }
 
+static void note_layer_delta(u2_ctx *ctx, u2_demo *d, const u2_world *w, int is_map);
+
 void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
 {
     u2_demo *d = of(ctx);
@@ -1460,44 +1462,17 @@ void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
      * always the content layer, because that is the one thing a viewer is expected to
      * already have, which is what makes the § 13.1 refusal satisfiable again.
      *
-     * Only the map gets a delta. § 13.2's proven property is that the checkpoint's
-     * creature table drives the stamp, so creature state needs no delta and monx is
-     * base-only. That is the whole reason the delta stays a handful of bytes and the
-     * demo stays a text file.
+     * BOTH the map and the creature file carry a delta now. § 13.2 originally ruled monx
+     * base-only because the checkpoint's creature table drives the stamp, and that holds
+     * for the table -- but it was never true of what the file feeds at load time. Measured
+     * on the owner's demo at record 20: 13 bytes differed, and five of them were the last
+     * element of each 32-byte creature array (mon_x ends at DS:0156, mon_y at 0176, and so
+     * on), a slot the recorder did not have. monx20's overlay differs from content in 22
+     * bytes and the demo had no way to say so.
      */
-    if (d->state != U2_DEMO_PLAYING && w->map_loaded) {
-        static uint8_t content[U2_SECTOR_TILES], over[U2_SECTOR_TILES];
-        char nm[24] = "";
-        char delta[U2_DEMO_DELTA_MAX];
-        const char *dtxt = "none";
-
-        if (u2_world_read_content(ctx, 1, w->map_id, content, sizeof content,
-                                  nm, sizeof nm) == U2_WORLD_OK) {
-            /* One line per sector file, not one per visit. note_world now runs at every
-             * sector load, so a recording that steps out and back in would otherwise
-             * repeat a sector and grow the header with the walk. */
-            int seen = 0;
-            for (int k = 0; k < d->n_world; k++)
-                if (strcmp(d->world[k].name, nm) == 0) { seen = 1; break; }
-            if (!seen) {
-                if (w->map_root && strcmp(w->map_root, U2_WORLD_SLOT_LAYER) == 0 &&
-                    u2_world_read_slot(ctx, 1, w->map_id, over, sizeof over,
-                                       NULL, 0) == U2_WORLD_OK) {
-                    const int cells = world_delta(content, over, U2_SECTOR_TILES,
-                                                  delta, sizeof delta);
-                    if (cells > 0)      dtxt = delta;
-                    /* reported, never truncated */
-                    else if (cells < 0) dtxt = "too-big";
-                }
-                if (world_reserve(d) == 0) {
-                    snprintf(d->world[d->n_world].name, 24, "%.23s", nm);
-                    sha256_hex(content, U2_SECTOR_TILES, d->world[d->n_world].base);
-                    snprintf(d->world[d->n_world].delta, U2_DEMO_DELTA_MAX,
-                             "%.2047s", dtxt);
-                    d->n_world++;
-                }
-            }
-        }
+    if (d->state != U2_DEMO_PLAYING) {
+        if (w->map_loaded) note_layer_delta(ctx, d, w, 1);
+        if (w->mon_loaded) note_layer_delta(ctx, d, w, 0);
     }
 }
 
@@ -1518,14 +1493,53 @@ static int delta_cell(const char *tok, uint8_t *buf, size_t n)
     return 0;
 }
 
-int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id)
+/* Compute and store one `@world` line for one sector file, if the recording has not
+ * already carried that file. Split out of note_world so the map and the creature file go
+ * through identical logic rather than a copy of it. */
+static void note_layer_delta(u2_ctx *ctx, u2_demo *d, const u2_world *w, int is_map)
+{
+    static uint8_t content[U2_SECTOR_TILES], over[U2_SECTOR_TILES];
+    const size_t n = is_map ? U2_SECTOR_TILES : U2_MON_TILES;
+    const u2_sector_id id = is_map ? w->map_id : w->mon_id;
+    const char *root = is_map ? w->map_root : w->mon_root;
+    char nm[24] = "", delta[U2_DEMO_DELTA_MAX];
+    const char *dtxt = "none";
+
+    if (u2_world_read_content(ctx, is_map, id, content, n, nm, sizeof nm)
+            != U2_WORLD_OK) return;
+
+    /* One line per sector file, not one per visit: note_world runs at every sector load,
+     * and a step out and back in would otherwise repeat a line and grow the header with
+     * the walk. */
+    for (int k = 0; k < d->n_world; k++)
+        if (strcmp(d->world[k].name, nm) == 0) return;
+
+    if (root && strcmp(root, U2_WORLD_SLOT_LAYER) == 0 &&
+        u2_world_read_slot(ctx, is_map, id, over, n, NULL, 0) == U2_WORLD_OK) {
+        const int cells = world_delta(content, over, n, delta, sizeof delta);
+        if (cells > 0)      dtxt = delta;
+        /* reported, never truncated */
+        else if (cells < 0) dtxt = "too-big";
+    }
+
+    if (world_reserve(d) != 0) return;
+    snprintf(d->world[d->n_world].name, 24, "%.23s", nm);
+    sha256_hex(content, n, d->world[d->n_world].base);
+    snprintf(d->world[d->n_world].delta, U2_DEMO_DELTA_MAX, "%.2047s", dtxt);
+    d->n_world++;
+}
+
+int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id, int is_map)
 {
     u2_demo *d = of(ctx);
     char name[24], fname[24], sha[65];
+    const size_t n = is_map ? U2_SECTOR_TILES : U2_MON_TILES;
+    uint8_t *dst  = is_map ? w->map : w->mon;
+    uint8_t *dst2 = is_map ? w->map_base : NULL;
 
     if (!d || !w || d->state != U2_DEMO_PLAYING || d->n_world == 0) return 0;
 
-    sector_name(name, sizeof name, "mapx", id.hi, id.lo);
+    sector_name(name, sizeof name, is_map ? "mapx" : "monx", id.hi, id.lo);
     int idx = -1;
     for (int i = 0; i < d->n_world; i++)
         if (strcmp(d->world[i].name, name) == 0) { idx = i; break; }
@@ -1539,7 +1553,7 @@ int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id)
      * world that matches neither the recording nor their save — and would be told it
      * verified. § 7.4: playback does not read the player's slot. */
     uint8_t buf[U2_SECTOR_TILES];
-    if (u2_world_read_content(ctx, 1, id, buf, sizeof buf, fname, sizeof fname)
+    if (u2_world_read_content(ctx, is_map, id, buf, n, fname, sizeof fname)
             != U2_WORLD_OK) {
         fprintf(stderr, "u2: %s: the demo describes this sector but the content file"
                         " cannot be read, so it cannot be checked.\n", name);
@@ -1553,7 +1567,7 @@ int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id)
      * rewriting lets a wrong sector through in silence, which is the one thing § 13.1
      * exists to prevent. This is what a later, unchanged sector used to do: it carried a
      * base nobody read, and a mutated mapx71 played as if it had been checked. */
-    sha256_hex(buf, sizeof buf, sha);
+    sha256_hex(buf, n, sha);
     if (strcmp(sha, d->world[idx].base) != 0) {
         if (!ctx->demo_ignore_content) {
             fprintf(stderr, "u2: %s: your copy of this sector is not the one the"
@@ -1579,12 +1593,12 @@ int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id)
     if (nothing) {
         /* Only speak if it actually displaces something: a viewer with no overlay of
          * their own is already holding exactly these bytes. */
-        if (memcmp(w->map, buf, sizeof buf) != 0) {
+        if (memcmp(dst, buf, n) != 0) {
             fprintf(stderr, "u2: %s: your save holds an overlay of this sector and the"
                             " recording carries none, so the recording's bytes are used.\n",
                     name);
-            memcpy(w->map, buf, sizeof buf);
-            memcpy(w->map_base, buf, sizeof buf);
+            memcpy(dst, buf, n);
+            if (dst2) memcpy(dst2, buf, n);
         }
         return 0;
     }
@@ -1613,7 +1627,7 @@ int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id)
             if (len >= sizeof tok) { d->overlay_failed = 1; return -1; }
             memcpy(tok, p, len);
             tok[len] = '\0';
-            if (delta_cell(tok, buf, sizeof buf) != 0) {
+            if (delta_cell(tok, buf, n) != 0) {
                 fprintf(stderr, "u2: %s: the recorded delta does not describe these bytes"
                                 " (cell '%s'). Refusing rather than applying part of it.\n",
                         name, tok);
@@ -1626,19 +1640,18 @@ int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id)
         p = q + 1;
     }
 
-    /* Both buffers, because the loader fills map_base as a copy of map and the spawn
-     * clear edits map_base afterwards. Patching one alone would leave them disagreeing
-     * by the whole delta. */
-    memcpy(w->map, buf, sizeof buf);
-    memcpy(w->map_base, buf, sizeof buf);
-    /* Digested from w->map AFTER the copy, deliberately not from `buf`. Hashing the
-     * staging buffer made this leg pass with both memcpys commented out, because the
-     * message then described bytes that never reached the world. The observable has to
-     * be taken from the thing the claim is about or it proves nothing, which is the
-     * second vacuous assertion this leg has caught in itself.
+    /* Both map buffers, because the loader fills map_base as a copy of map and the spawn
+     * clear edits map_base afterwards. Patching one alone would leave them disagreeing by
+     * the whole delta. The creature file has no second buffer, so dst2 is NULL there. */
+    memcpy(dst, buf, n);
+    if (dst2) memcpy(dst2, buf, n);
+    /* Digested from the published buffer AFTER the copy, deliberately not from `buf`.
+     * Hashing the staging buffer made this leg pass with both memcpys commented out,
+     * because the message then described bytes that never reached the world. The
+     * observable has to be taken from the thing the claim is about or it proves nothing.
      * asm/2233 restores terrain without announcing it; a demo is not the original, and a
      * player has no other way to know where the ground came from. */
-    sha256_hex(w->map, sizeof buf, sha);
+    sha256_hex(dst, n, sha);
     fprintf(stderr, "u2: %s: rebuilt from the demo's recorded delta"
                     " (%d cells, sector now %.8s).\n", name, n_cells, sha);
     return 0;

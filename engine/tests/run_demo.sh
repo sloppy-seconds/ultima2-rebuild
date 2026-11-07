@@ -401,6 +401,7 @@ python3 tools/demo.py corpus "$WORK" --engine ./u2 >/dev/null 2>&1 || RC=$?
 # against a second run of the same code.
 seed "$WORK/wd"
 EXPECT=$(python3 tests/demo_delta_fixture.py "$WORK/wd")
+MONEXPECT=$(python3 tests/demo_delta_fixture.py "$WORK/wd" monx)
 if [ -z "$EXPECT" ]; then
     bad "W18: the dirty-slot fixture did not run"
 else
@@ -432,6 +433,20 @@ else
     fi
 fi
 
+# --- W21: the creature file carries a delta too ---------------------------------
+# § 13.2 ruled monx base-only because the checkpoint's creature table drives the stamp.
+# That holds for the table and not for what the file feeds at load time: the spawn copies
+# monx into the table and clear_spawn_cells then restores terrain from mon_kind, so a
+# playback that loads the content creature file ends up with a creature the recorder never
+# had. Measured on the owner's demo at record 20, where five of the thirteen differing bytes
+# were the last element of each 32-byte creature array.
+if [ -n "$MONEXPECT" ] && grep -q "^@world monx70 base=[0-9a-f]* delta=$MONEXPECT\$" \
+        "$WORK/d_dirty/dirty.demo"; then
+    ok "W21: the recording carries the creature file's delta, canonically ordered"
+else
+    bad "W21: monx70 delta missing or wrong (expected '$MONEXPECT')"
+fi
+
 # --- W16: the delta is APPLIED at load, not merely parsed ----------------------
 # W18 gates the writer, and that turned out not to be enough. The reader was storing a
 # fixed 23-character slice of the whole line as the sector name, so no sector ever
@@ -454,6 +469,11 @@ else
 fi
 [ "$RC" -ne 2 ] && ok "W16: replaying a dirty recording into a clean world is not a refusal" \
                 || bad "W16: it refused: $(printf '%s\n' "$OUT" | tail -2)"
+if printf '%s\n' "$OUT" | grep -q 'monx70: rebuilt from the demo.s recorded delta'; then
+    ok "W21: the clean world's creature file is rebuilt from the delta, not just the map"
+else
+    bad "W21: monx70 was never rebuilt, so the creature delta is inert"
+fi
 
 # Control: the base. A viewer holding a different pack must be told the demo cannot
 # rebuild their sector. This is the § 13.1 refusal, and it is now satisfiable: the
@@ -474,7 +494,7 @@ fi
 RC=0
 OUT=$("$U2" --headless --cleanroom --playback-ignore-content --data-dir "$WORK/wc/content" \
            --save-dir "$WORK/wc/save" --playback "$WORK/d_dirty/dirty.demo" 2>&1) || RC=$?
-if [ "$RC" -ne 2 ] && ! printf '%s\n' "$OUT" | grep -q 'rebuilt from' \
+if [ "$RC" -ne 2 ] && ! printf '%s\n' "$OUT" | grep -q 'mapx70: rebuilt' \
    && printf '%s\n' "$OUT" | grep -q 'NOT applied'; then
     ok "W16 control: with the override the delta is skipped out loud, not applied blind"
 else

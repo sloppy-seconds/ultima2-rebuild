@@ -240,7 +240,7 @@ void u2_demo_note_world(u2_ctx *ctx, const u2_world *w);
  * Returns 0 when there is nothing to apply — not playing back, no line for this
  * sector, delta=none, or the caller overrode the content check — and -1 when the
  * bytes on disk are not the bytes the delta claims to patch. */
-int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id);
+int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id, int is_map);
 
 /* Non-zero once a checked overlay has disagreed; the caller refuses. */
 int u2_demo_overlay_failed(const u2_ctx *ctx);

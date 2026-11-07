@@ -28,14 +28,51 @@ import sys
 CELLS = [(63, 63), (35, 23), (25, 22), (36, 21), (3, 4), (10, 0)]
 MARK = 0x44
 TILES = 4096
+# monx is 256 bytes, so four rows of 64. Descending again, for the same reason.
+MON_CELLS = [(60, 3), (3, 1), (10, 0)]
+
+
+def find(world, stem):
+    for root, _dirs, files in os.walk(os.path.join(world, "content")):
+        for name in files:
+            if name.startswith(stem):
+                return os.path.join(root, name)
+    return None
+
+
+def monx(world) -> int:
+    """Dirty the creature file the same way, and print the delta it must produce."""
+    src = find(world, "monx70")
+    if not src:
+        print("no monx70 in the seeded content", file=sys.stderr)
+        return 1
+    raw = bytearray(open(src, "rb").read())
+    origins = {}
+    for x, y in MON_CELLS:
+        i = y * 64 + x
+        if i >= len(raw):
+            print(f"cell ({x},{y}) is past the creature file", file=sys.stderr)
+            return 1
+        origins[(x, y)] = raw[i]
+        raw[i] = MARK
+    slot = os.path.join(world, "save", "PLAYER")
+    os.makedirs(slot, exist_ok=True)
+    with open(os.path.join(slot, "monx70"), "wb") as f:
+        f.write(bytes(raw))
+    parts = [f"{x},{y}:{origins[(x, y)]:02x}->{MARK:02x};" for x, y in
+             sorted(MON_CELLS, key=lambda c: c[1] * 64 + c[0])]
+    print("".join(parts))
+    return 0
 
 
 def main() -> int:
     if len(sys.argv) not in (2, 3):
-        print("usage: demo_delta_fixture.py WORLD_DIR [slot-sha]", file=sys.stderr)
+        print("usage: demo_delta_fixture.py WORLD_DIR [slot-sha|monx]", file=sys.stderr)
         return 2
     world = sys.argv[1]
     want = sys.argv[2] if len(sys.argv) == 3 else "delta"
+    if want == "monx":
+        return monx(world)
 
     src = None
     for root, _dirs, files in os.walk(os.path.join(world, "content")):

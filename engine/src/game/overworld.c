@@ -280,7 +280,7 @@ static int site_reload(u2_ctx *ctx, u2_overworld *ow)
      * spawn clear and the restamp, or those two run over bytes the recording never
      * had and the pipelines diverge for a reason that has nothing to do with the
      * player. The refusal text has already been printed by the time this returns -1. */
-    if (u2_demo_apply_world(ctx, &ow->world, id) != 0) {
+    if (u2_demo_apply_world(ctx, &ow->world, id, 1) != 0) {
         snprintf(ow->note, sizeof ow->note, "sector %d%d: demo world does not match",
                  ow->sector_hi, ow->sector_lo);
         return -1;
@@ -288,6 +288,17 @@ static int site_reload(u2_ctx *ctx, u2_overworld *ow)
 
     monsters_clear(ctx);
     const u2_world_result mr = u2_world_load(ctx, &ow->world, 0, id);
+    /* The creature file carries a delta too, and it has to land before the spawn: the
+     * spawn copies monx into the table, and clear_spawn_cells then restores terrain into
+     * the grid from mon_kind. Do that from the content creature file and the grid ends up
+     * with a creature the recorder never had -- which is exactly the 13-byte divergence
+     * measured at record 20 of the owner's demo, five of them the last element of each
+     * creature array. */
+    if (mr == U2_WORLD_OK && u2_demo_apply_world(ctx, &ow->world, id, 0) != 0) {
+        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo creatures do not match",
+                 ow->sector_hi, ow->sector_lo);
+        return -1;
+    }
     const int creatures = (mr == U2_WORLD_OK) ? u2_monsters_spawn(ctx, &ow->world) : 0;
     if (mr == U2_WORLD_OK)
         u2_monsters_clear_spawn_cells(ctx, &ow->world);
@@ -1366,7 +1377,7 @@ static int overworld_open(u2_ctx *ctx, u2_overworld *ow)
     /* The other of the two ways a sector becomes resident. Both need the delta, and a
      * fix in only one of them is the mistake this project has now made twice with the
      * restamp — see the comment at u2_monsters_restamp. */
-    if (u2_demo_apply_world(ctx, &ow->world, id) != 0) {
+    if (u2_demo_apply_world(ctx, &ow->world, id, 1) != 0) {
         snprintf(ow->note, sizeof ow->note, "sector %d%d: demo world does not match",
                  ow->sector_hi, ow->sector_lo);
         return -1;
@@ -1400,6 +1411,13 @@ static int overworld_open(u2_ctx *ctx, u2_overworld *ow)
      * (docs/monster-spawn.md § 6), and the original's own FCB open would simply
      * find nothing there. */
     const u2_world_result mr = u2_world_load(ctx, &ow->world, 0, id);
+    /* See the same pair at the other residency site: the recorded creature file has to be
+     * in place before the spawn copies it into the table. */
+    if (mr == U2_WORLD_OK && u2_demo_apply_world(ctx, &ow->world, id, 0) != 0) {
+        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo creatures do not match",
+                 ow->sector_hi, ow->sector_lo);
+        return -1;
+    }
     const int creatures = (mr == U2_WORLD_OK) ? u2_monsters_spawn(ctx, &ow->world) : 0;
     if (mr == U2_WORLD_OK)
         u2_monsters_clear_spawn_cells(ctx, &ow->world);
