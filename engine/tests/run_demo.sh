@@ -504,6 +504,68 @@ printf '%s\n' "$OUT" | grep -qi "not the one the recording" \
     && bad "W24: a spread version was read as another file's base and refused" \
     || ok "W24 control: neither load mistook its file for another sector's"
 
+# --- W25: the RULE mode travels with the recording -------------------------------
+# A demo is a recording of a game, and the game has two rule sets. `apply_damage_to_slot`
+# kills on `dmg >= hp` in enhanced mode and on `dmg > hp` in original mode, so a blow that
+# lands exactly on the remainder is a kill on one side and a live creature at zero hp on
+# the other. The header used to carry `enhanced`, which is the screen-layout knob, and the
+# playback applied neither, so an enhanced recording replayed under the default mode
+# diverged at the first equality kill and named a creature table instead of the rule. That
+# is record 37 of the owner's 147-record demo.
+# The fixture forces the equality rather than hoping for it: strength 0x40 with no readied
+# weapon is a 16-damage swing, the creature's hp is 16, and agility 0x80 makes every roll
+# a hit, so the leg cannot flake.
+python3 tests/demo_kill_fixture.py "$WORK/wk" >/dev/null 2>&1
+printf '0x12\nA\n0xf3\n0x12\n' > "$WORK/kill.keys"
+record kill "$WORK/wk" "$WORK/kill.keys" --enhanced
+if grep -q '^fidelity enhanced$' "$WORK/d_kill/kill.demo"; then
+    ok "W25: an enhanced recording names the rule it was played under"
+else
+    bad "W25: no fidelity line in the header ($(grep -c '^fidelity' "$WORK/d_kill/kill.demo" 2>/dev/null) found)"
+fi
+RC=0
+OUT=$("$U2" --headless --cleanroom --data-dir "$WORK/wk/content" --save-dir "$WORK/wk/save" \
+           --playback "$WORK/d_kill/kill.demo" 2>&1) || RC=$?
+printf '%s\n' "$OUT" | grep -q "rules pinned from the demo: fidelity=enhanced" \
+    && ok "W25: playback pins the recorded rule over the viewer's own default" \
+    || bad "W25: the pin never reached the ctx: $(printf '%s\n' "$OUT" | grep -i 'predates\|pinned' | head -1)"
+[ "$RC" -eq 0 ] && ok "W25: the equality kill reproduces under the pinned rule" \
+                 || bad "W25: it diverged anyway (exit $RC): $(printf '%s\n' "$OUT" | grep -i diverg | head -1)"
+
+# The control is the shape every pre-fix demo is: no line at all. The reader cannot tell
+# that from a recording made under the default mode, so it must say so and, when the rule
+# was in fact the other one, diverge rather than replay a different game quietly.
+python3 tests/demo_fixture.py dropfidelity "$WORK/d_kill/kill.demo" "$WORK/nofid.demo"
+RC=0
+OUT=$("$U2" --headless --cleanroom --data-dir "$WORK/wk/content" --save-dir "$WORK/wk/save" \
+           --playback "$WORK/nofid.demo" 2>&1) || RC=$?
+printf '%s\n' "$OUT" | grep -q "predates the fidelity header line" \
+    && ok "W25 control: a file with no fidelity line says it cannot know the rule" \
+    || bad "W25 control: a pre-fix file was read as if it had declared its rule"
+[ "$RC" -ne 0 ] && ok "W25 control: and the wrong rule diverges on the kill instead of passing" \
+                 || bad "W25 control: the wrong rule replayed clean, so the kill is not being checked"
+
+# The pin goes both ways: a recording made under the original rules must not be upgraded
+# by a viewer who runs --enhanced as a habit. Fresh world, same rule as every other
+# recording in this file: a run that writes a sector overlay must not decide what a later
+# run reads.
+python3 tests/demo_kill_fixture.py "$WORK/wk2" >/dev/null 2>&1
+record killorig "$WORK/wk2" "$WORK/kill.keys"
+RC=0
+OUT=$("$U2" --headless --enhanced --cleanroom --data-dir "$WORK/wk2/content" \
+           --save-dir "$WORK/wk2/save" --playback "$WORK/d_killorig/killorig.demo" 2>&1) || RC=$?
+if [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q "rules pinned from the demo: fidelity=original"; then
+    ok "W25: an original-mode recording survives a viewer who runs --enhanced"
+else
+    bad "W25: the pin did not override --enhanced (exit $RC)"
+fi
+python3 tests/demo_fixture.py fidelity "$WORK/d_kill/kill.demo" "$WORK/bogus.demo" sideways
+RC=0
+"$U2" --headless --cleanroom --data-dir "$WORK/wk/content" --save-dir "$WORK/wk/save" \
+      --playback "$WORK/bogus.demo" >/dev/null 2>&1 || RC=$?
+[ "$RC" -ne 0 ] && ok "W25 control: a fidelity value the engine has no rule for is refused" \
+                 || bad "W25 control: an unknown rule mode played anyway"
+
 # --- W16: the delta is APPLIED at load, not merely parsed ----------------------
 # W18 gates the writer, and that turned out not to be enough. The reader was storing a
 # fixed 23-character slice of the whole line as the sector name, so no sector ever

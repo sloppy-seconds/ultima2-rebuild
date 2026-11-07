@@ -125,6 +125,7 @@ typedef struct u2_demo {
     char       art[16];
     char       theme[40];
     int        enhanced;
+    int        fidelity;          /* the RULE mode; -1 when the file predates the line */
     int        sector_hi, sector_lo;
     char       save_sha[65];
     char       checkpoint_sha[65];
@@ -433,6 +434,14 @@ static void write_header(u2_ctx *ctx, u2_demo *d)
     emit(d, "art %s\n", ctx->art_mode == U2_ART_EGA ? "ega" : "cga");
     emit(d, "theme %s\n", (ctx->ega_theme && *ctx->ega_theme) ? ctx->ega_theme : "default");
     emit(d, "enhanced %d\n", ctx->enhanced_layout ? 1 : 0);
+    /* The rule mode, named for what it is. `enhanced` above is the screen-layout knob; it
+     * happens to be derived from this one today (main.c sets the layout wherever fidelity is
+     * ENHANCED) but it is not the rule, and a reader must not have to infer a rule from a
+     * window size. Fidelity changes STATE: a blow exactly equal to a creature's hp kills in
+     * enhanced mode and leaves a live creature at zero hp in original mode, and that single
+     * `>=` versus `>` is the whole of record 37 of the owner's 147-record demo. */
+    emit(d, "fidelity %s\n",
+         ctx->fidelity == U2_FIDELITY_ENHANCED ? "enhanced" : "original");
     emit(d, "\n");
 }
 
@@ -678,6 +687,22 @@ void u2_demo_quiescent(u2_ctx *ctx, u2_demo_mode mode, const u2_world *world)
             fprintf(stderr, "u2: speed pinned from the demo: DS:74=%04X DS:550=%04X\n",
                     (unsigned)ctx->state.speed, (unsigned)ctx->state.tick_low);
         }
+        /* The rule mode travels with the recording, for the same reason D5 pins the speed:
+         * a playback that ran a different rule set would diverge at the first blow that
+         * landed exactly on a creature's remaining hp, and the digest would name a creature
+         * table rather than the rule and send whoever read it hunting through the world
+         * loader. Absent means the file predates the line, and that is said out loud rather
+         * than resolved by assuming this build's mode was the recording's. */
+        if (d->fidelity >= 0) {
+            ctx->fidelity = (u2_fidelity)d->fidelity;
+            fprintf(stderr, "u2: rules pinned from the demo: fidelity=%s\n",
+                    ctx->fidelity == U2_FIDELITY_ENHANCED ? "enhanced" : "original");
+        } else {
+            fprintf(stderr, "u2: this recording predates the fidelity header line, so it"
+                            " plays under this build's mode (%s). If a digest diverges on a"
+                            " kill, that may be the rule and not the engine.\n",
+                    ctx->fidelity == U2_FIDELITY_ENHANCED ? "enhanced" : "original");
+        }
         if (u2_demo_mode_needs_world(d->mode))
             ctx->demo_restamp_pending = 1;
     }
@@ -906,6 +931,7 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
 
     if (!d) return -1;
     d->diverged = -1;
+    d->fidelity = -1;             /* absent until the header says otherwise */
     d->state = U2_DEMO_PLAYING;
     snprintf(d->path, sizeof d->path, "%.599s", path ? path : "");
     sha256_init(&framing);
@@ -1101,6 +1127,10 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
                 snprintf(d->theme, sizeof d->theme, "%.39s", val);
             } else if (!strcmp(key, "enhanced")) {
                 d->enhanced = atoi(val);
+            } else if (!strcmp(key, "fidelity")) {
+                if (!strcmp(val, "enhanced"))       d->fidelity = U2_FIDELITY_ENHANCED;
+                else if (!strcmp(val, "original"))  d->fidelity = U2_FIDELITY_ORIGINAL;
+                else return refuse_playback(d, "fidelity is neither enhanced nor original");
             }
         }
     }

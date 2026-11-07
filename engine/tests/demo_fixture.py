@@ -27,6 +27,10 @@ the ones docs/demo-record-playback.md § 9 names as controls.
   spreadworld IN OUT    the same duplicate, inserted after the LAST @world line instead of
                         beside its sibling. This is W24: a group whose versions are not
                         contiguous, which is the only shape a real recording produces.
+  dropfidelity IN OUT   delete the `fidelity` header line, repair framing. This is W25's
+                        control: the shape every pre-fix demo is, and the one case where the
+                        reader cannot know the rule and must say so.
+  fidelity   IN OUT VAL rewrite the `fidelity` value to VAL, repair framing. W25's refusal.
 
 Usage: demo_fixture.py SUBCOMMAND IN OUT [arg]
 """
@@ -270,8 +274,48 @@ def cmd_spreadworld(argv):
     return 0
 
 
+def cmd_dropfidelity(argv):
+    """Remove the `fidelity` header line and repair framing.
+
+    This is W25's control. A file with no `fidelity` line is what every demo written before
+    the line existed is, and the reader cannot tell that mode from the one it defaults to --
+    so it must say the difference out loud and, when the recording was made under the other
+    rule, diverge on the kill rather than quietly replay a different game.
+    """
+    lines = read(argv[0])
+    out = [l for l in lines if not l.startswith("fidelity ")]
+    if len(out) == len(lines):
+        print("demo_fixture: no fidelity line to drop", file=sys.stderr)
+        return 2
+    write(argv[1], repair_end(out))
+    return 0
+
+
+def cmd_fidelity(argv):
+    """Rewrite the `fidelity` header value to argv[1], repair framing.
+
+    W25's refusal leg: a mode the engine does not have must stop the run rather than play
+    under a silent default, because the difference between the two rules is a kill and a
+    zombie and nothing downstream can tell the two apart.
+    """
+    lines = read(argv[0])
+    hit = False
+    for i, line in enumerate(lines):
+        if line.startswith("fidelity "):
+            lines[i] = "fidelity %s\n" % argv[2]
+            hit = True
+            break
+    if not hit:
+        print("demo_fixture: no fidelity line to rewrite", file=sys.stderr)
+        return 2
+    write(argv[1], repair_end(lines))
+    return 0
+
+
 COMMANDS = {
     "dupworld": cmd_dupworld,
+    "dropfidelity": cmd_dropfidelity,
+    "fidelity": cmd_fidelity,
     "spreadworld": cmd_spreadworld,
     "version": cmd_version,
     "digest": cmd_digest,
