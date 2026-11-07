@@ -1241,6 +1241,48 @@ replaced by a stamp-only pass, but the demo-mount site (`:1944`) genuinely needs
 a checkpoint lands, and collapsing the two would couple Phase 2 to Phase 3. Leave it until Phase 3
 exists.
 
+### Steps 2c-i, 2c-ii, 2c-v — shipped 2026-11-08. Step 2c-iii — rejected as written
+
+**2c-i** `clear_spawn_cells` now writes `map_base` only. In a saved sector the baked byte *is* the
+stamp, so blanking it was always the wrong job — it is what forced the load rebuild to put it back.
+Behaviourally neutral while the load rebuild stands, and correct in meaning. `monsters_check` gained a
+`stamp_kept` assertion for the new contract: 38 checks, 0 failures.
+
+**2c-ii** the move-path rebuild is gone. This is the one that actually removes a divergence from
+§ 10. Its control was run *before* the removal: disabling `ai.c`'s per-creature stamp commit makes
+`ai_check`'s M3 leg go red — slot 3 stacks onto the cell slot 4 entered in the same turn — which
+proves the assertion measures the commit and not the call being deleted. Removing a redundant call
+without a test that can tell the two apart is just deleting coverage. 60 checks, 0 failures.
+
+**2c-v** `terrain_put`'s dual write stays, but its comment was lying. It said the write was needed to
+survive the rebuild; with 2c-ii gone that stopped being true the same day. The real reason now is
+`u2_world_ground_at` → `frame.c:308`: an edit that missed `map_base` would be right on CGA and show
+stale ground under a sprite on EGA — a wrong answer only one renderer can see.
+
+**2c-iii was wrong as planned, and the plan's own stop-and-ask caught it.** The step said "replace the
+kill-path rebuild with a targeted restore of the dead slot's cell". It cannot be done that way, in
+that order:
+
+```c
+/* combat.c, the lethal branch — runs FIRST */
+ctx->state.mon_kind[slot] = 0;      /* death clears hp, type and kind (file 0x30D2..0x30DC) */
+...
+/* overworld.c:1865, the r == 2 branch — runs SECOND */
+u2_monsters_restamp(ctx, &ow->world);
+```
+
+By the time the restore site is reached, the terrain byte has already been zeroed by the record clear.
+A naive targeted restore would write `0x00` — **water** — into the cell, which is the letter-A defect
+from that site's own comment wearing a different hat. The original gets away with it because it masks
+the cell *before* clearing the record, and because its mask (`and $0xF0`) is a dungeon nibble
+operation, not an overworld terrain restore.
+
+Doing it properly means moving the restore into `combat.c` ahead of the clear, and giving it a dungeon
+variant — a different change from the one the plan described, in a path with an owner-visible
+screenshot behind it (`captures/spice86/cp5-fight/screen3.png → screen4.png`). **Left undone on
+purpose.** The kill-path rebuild is correct today; it is merely not what the original does.
+
+
 
 **Whatever is chosen, record it in `docs/map-format.md` § 10 next to the finding it resolves.** A
 measured finding the code contradicts, with no note saying why, is the shape AGENTS.md § 3 calls a
@@ -1307,7 +1349,7 @@ three failures on first real use.
 Phase 1 ships alone. Phase 2 ships as a decision record even if the decision is "no change". Phase 3
 is indifferent to Phase 2's outcome by construction, which is what makes it safe to specify now.
 
-**Status after 2026-11-08:** Phase 1 and Phase 1b are shipped. Phase 2's decision is recorded above and
-its five steps are not — they are separately gated and 2c-i is a no-op until 2c-ii and 2c-iii land
-with it, so they move as one unit or not at all. Phase 3 is unchanged and still unbuilt.
+**Status after 2026-11-08:** Phase 1 and Phase 1b are shipped. Phase 2 is shipped except **2c-iii**,
+which was rejected as written — see the step 2c note. 2c-i, 2c-ii and 2c-v landed together, because
+2c-i is a behavioural no-op until 2c-ii gives it a reason. Phase 3 is unchanged and still unbuilt.
 

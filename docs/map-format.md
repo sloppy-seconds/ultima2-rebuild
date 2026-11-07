@@ -378,3 +378,19 @@ Two things this settles for the engine:
 
 The engine's `map_base` is an engine construct serving § 9's problem (telling baked art from
 terrain at load), and it must not be read as a model of the original's memory.
+
+**Resolved 2026-11-08 — the engine no longer rebuilds on a creature turn.** The bullet above was
+true of the engine when it was written and the engine was in breach of its own instruction:
+`u2_monsters_restamp` rebuilt all 4096 cells from `map_base` on every creature turn, exactly the
+thing this finding forbids. That call is now removed (`overworld.c`, step 2c-ii of
+`docs/demo-record-playback.md § 13.10`), and the engine patches one cell on departure and one on
+arrival, which is what `asm/2233` and `asm/225A` do.
+
+`map_base` itself **stays**, and not for the reason its header gave. The rebuild was its stated
+justification and the rebuild is gone; what actually keeps it alive is `u2_world_ground_at` feeding
+the EGA compositor at `frame.c:308`, which needs the ground under a sprite. That is an enhancement
+the original never needed — DOS draws one art index per cell — so `map_base` is now extra machinery
+the bytes are silent about rather than a divergence from them, which is a materially better place to
+be. Two rebuild sites remain deliberately: the sector-load paths, and the kill path, where the terrain
+byte is zeroed by the record clear before the site runs and a targeted restore would write water into
+the cell. Both are documented at their call sites.
