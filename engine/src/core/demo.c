@@ -31,7 +31,8 @@ const int U2_DEMO_EXCLUDE[U2_DEMO_EXCLUDE_COUNT] = {
 };
 
 #define U2_DEMO_MAX_KEYS_PER_REC 8
-#define U2_DEMO_MAX_OVERLAYS 3
+/* There used to be a U2_DEMO_MAX_OVERLAYS of 3 here, meaning one sector's three files.
+ * Both lists are heap-grown now; see overlay_reserve and world_reserve. */
 
 /* A sector delta is spelled `x,y:old->new` per differing byte, ascending by y*64+x,
  * joined by ';'. The cap is generous on purpose: a sector a player really edited is a
@@ -39,6 +40,24 @@ const int U2_DEMO_EXCLUDE[U2_DEMO_EXCLUDE_COUNT] = {
  * a game. Over-cap is reported, never silently truncated — a truncated delta that still
  * verifies is the vacuous-pass shape AGENTS.md § 3 exists to stop. */
 #define U2_DEMO_DELTA_MAX 2048
+
+/* One `overlay` / `overlay-slot` line: a sector file whose bytes reached the world.
+ * `checked` is per entry, not global: the comparison has to happen once per FILE, and a
+ * single latch made it happen once per RUN, so only the starting sector was ever
+ * verified. */
+struct demo_overlay {
+    char name[24];
+    char sha[65];
+    int  from_slot;
+    int  checked;
+};
+
+/* One `@world` line: what a viewer's content must hash to, and what this save changed. */
+struct demo_world {
+    char name[24];
+    char base[65];
+    char delta[U2_DEMO_DELTA_MAX];
+};
 #define U2_DEMO_LINEBUFSZ 768
 /* The saved record is 256 bytes at DS:36 (core/save.h). Named once here so the
  * two places that digest it cannot disagree about the span. */
@@ -105,15 +124,22 @@ typedef struct u2_demo {
     int        has_checkpoint;
     int        complete;              /* @end was seen */
 
-    struct { char name[24]; char sha[65]; int from_slot; } overlay[U2_DEMO_MAX_OVERLAYS];
+    struct demo_overlay *overlay;
     int        n_overlay;
+    int        cap_overlay;
     /* The § 13.3 world lines: the content-layer digest a viewer must match, plus the
      * cells this save changed. Carried ALONGSIDE `overlay` rather than replacing it, so
      * a v1 file still plays with v1 semantics and a v2 file is a superset of it. */
-    struct { char name[24]; char base[65]; char delta[U2_DEMO_DELTA_MAX]; }
-             world[U2_DEMO_MAX_OVERLAYS];
+    struct demo_world *world;
     int        n_world;
-    int        overlay_checked;       /* the comparison is a one-shot, see note_world */
+    int        cap_world;
+    /* How many `@world` lines write_header already put on disk. The header is written at
+     * the checkpoint, which is the START of a session, and a walk visits sectors after
+     * that moment; their lines go in the epilogue instead. Split, not moved: the header
+     * position is what a v2 reader of a single-sector demo sees, and the framing digest
+     * is a running hash over everything above `@end`, so lines emitted later are covered
+     * by it without changing what the digest means. */
+    int        n_world_written;
     int        overlay_failed;
     int        slot_note;             /* the slot-overlay caveat was printed once */
 
@@ -127,6 +153,34 @@ typedef struct u2_demo {
     int        closing_checked;       /* the @end state digest was compared */
     int        stop_at_exit;          /* the recording ended by quitting, not by toggle */
 } u2_demo;
+
+/* Both lists are heap-grown rather than fixed. The old cap of three was one sector's
+ * three files, and a recording that crosses a sector boundary needs more. The old code
+ * handled the excess by DROPPING it in silence, so a demo carrying four sectors shipped
+ * three of them and still verified — a wrong world reported as a correct one, which is
+ * the shape this project refuses over and over. Growth removes the failure mode instead
+ * of reporting it more politely. */
+static int overlay_reserve(u2_demo *d)
+{
+    if (d->n_overlay < d->cap_overlay) return 0;
+    const int next = d->cap_overlay ? d->cap_overlay * 2 : 8;
+    struct demo_overlay *p = realloc(d->overlay, sizeof *p * (size_t)next);
+    if (!p) return -1;
+    d->overlay = p;
+    d->cap_overlay = next;
+    return 0;
+}
+
+static int world_reserve(u2_demo *d)
+{
+    if (d->n_world < d->cap_world) return 0;
+    const int next = d->cap_world ? d->cap_world * 2 : 8;
+    struct demo_world *p = realloc(d->world, sizeof *p * (size_t)next);
+    if (!p) return -1;
+    d->world = p;
+    d->cap_world = next;
+    return 0;
+}
 
 /* ---- small helpers ------------------------------------------------------- */
 
@@ -346,6 +400,7 @@ static void write_header(u2_ctx *ctx, u2_demo *d)
     for (int i = 0; i < d->n_world; i++)
         emit(d, "@world %s base=%s delta=%s\n",
              d->world[i].name, d->world[i].base, d->world[i].delta);
+    d->n_world_written = d->n_world;
 
     emit(d, "art %s\n", ctx->art_mode == U2_ART_EGA ? "ega" : "cga");
     emit(d, "theme %s\n", (ctx->ega_theme && *ctx->ega_theme) ? ctx->ega_theme : "default");
@@ -736,6 +791,8 @@ static int refuse_playback(u2_demo *d, const char *why)
 {
     fprintf(stderr, "u2: %s\n", why);
     free(d->recs);
+    free(d->overlay);
+    free(d->world);
     free(d);
     return -1;
 }
@@ -915,10 +972,11 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
                 }
             } else if (!strcmp(key, "save-sha") && hex_ok(val)) {
                 snprintf(d->save_sha, sizeof d->save_sha, "%.64s", val);
-            } else if ((!strcmp(key, "overlay") || !strcmp(key, "overlay-slot"))
-                       && d->n_overlay < U2_DEMO_MAX_OVERLAYS) {
+            } else if (!strcmp(key, "overlay") || !strcmp(key, "overlay-slot")) {
                 char nm[24];
                 char sh[80];
+                if (overlay_reserve(d) != 0)
+                    return refuse_playback(d, "out of memory parsing the demo");
                 if (sscanf(val, "%23s %79s", nm, sh) == 2 && hex_ok(sh)) {
                     snprintf(d->overlay[d->n_overlay].name, 24, "%.23s", nm);
                     snprintf(d->overlay[d->n_overlay].sha, 65, "%.64s", sh);
@@ -926,17 +984,6 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
                     d->n_overlay++;
                 }
             } else if (!strcmp(key, "@world")) {
-                /* Overflow is a refusal, not a drop. A silently dropped delta applies
-                 * nothing for that sector, the world comes out as the viewer's own, and
-                 * the run still verifies — a wrong world reported as a correct one. */
-                if (d->n_world >= U2_DEMO_MAX_OVERLAYS) {
-                    char msg[160];
-                    snprintf(msg, sizeof msg,
-                             "demo carries more @world sectors than this build holds (%d);"
-                             " raise U2_DEMO_MAX_OVERLAYS in src/core/demo.c",
-                             U2_DEMO_MAX_OVERLAYS);
-                    return refuse_playback(d, msg);
-                }
                 /* `@world mapx20 base=<sha64> delta=<cells|none|too-big>`.
                  * Parsed with strstr rather than one wide sscanf so an over-long delta
                  * cannot walk off the buffer, and so a malformed line is dropped rather
@@ -946,6 +993,8 @@ int u2_demo_begin_playback(u2_ctx *ctx, const char *path)
                 const char *dp = strstr(val, " delta=");
                 char sh[80];
                 char nm[24];
+                if (world_reserve(d) != 0)
+                    return refuse_playback(d, "out of memory parsing the demo");
                 /* The name is the FIRST TOKEN of val, not 23 characters of it. A fixed
                  * slice stored [mapx70 base=0428859797292] as the name, so no sector ever
                  * matched its own line and every delta was silently treated as absent.
@@ -1252,15 +1301,17 @@ void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
         sha256_hex(f[i].bytes, f[i].n, sha);
 
         if (d->state == U2_DEMO_PLAYING) {
-            /* Once, at load. `mon` is the LIVE creature table and its hp bytes move in
-             * play, so re-checking it every frame would report that the content changed
-             * the first time anything was wounded. The question this answers is "did
-             * the viewer load the same world the recorder did", and that is settled the
-             * moment the sector is resident. */
-            if (d->overlay_checked) return;
-            d->overlay_checked = 1;
+            /* Once per FILE, not once per run. `mon` is the LIVE creature table and its
+             * hp bytes move in play, so re-checking it every frame would report that the
+             * content changed the first time anything was wounded — hence a latch. But
+             * the latch used to be global, so the one run-wide check bought whichever
+             * sector loaded first and every later sector went unchecked in silence. The
+             * flag now sits on the entry: each file is compared exactly once, and no
+             * sector is skipped because an earlier one got there first. */
             for (int k = 0; k < d->n_overlay; k++) {
                 if (strcmp(d->overlay[k].name, name) != 0) continue;
+                if (d->overlay[k].checked) continue;
+                d->overlay[k].checked = 1;
                 if (d->overlay[k].from_slot) {
                     if (!d->slot_note) {
                         d->slot_note = 1;
@@ -1315,7 +1366,7 @@ void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
             int seen = 0;
             for (int k = 0; k < d->n_overlay; k++)
                 if (strcmp(d->overlay[k].name, name) == 0) { seen = 1; break; }
-            if (!seen && d->n_overlay < U2_DEMO_MAX_OVERLAYS) {
+            if (!seen && overlay_reserve(d) == 0) {
                 snprintf(d->overlay[d->n_overlay].name, 24, "%.23s", name);
                 snprintf(d->overlay[d->n_overlay].sha, 65, "%.64s", sha);
                 d->overlay[d->n_overlay].from_slot = from_slot;
@@ -1338,8 +1389,7 @@ void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
      * base-only. That is the whole reason the delta stays a handful of bytes and the
      * demo stays a text file.
      */
-    if (d->state != U2_DEMO_PLAYING && w->map_loaded &&
-        d->n_world < U2_DEMO_MAX_OVERLAYS) {
+    if (d->state != U2_DEMO_PLAYING && w->map_loaded) {
         static uint8_t content[U2_SECTOR_TILES], over[U2_SECTOR_TILES];
         char nm[24] = "";
         char delta[U2_DEMO_DELTA_MAX];
@@ -1347,18 +1397,30 @@ void u2_demo_note_world(u2_ctx *ctx, const u2_world *w)
 
         if (u2_world_read_content(ctx, 1, w->map_id, content, sizeof content,
                                   nm, sizeof nm) == U2_WORLD_OK) {
-            if (w->map_root && strcmp(w->map_root, U2_WORLD_SLOT_LAYER) == 0 &&
-                u2_world_read_slot(ctx, 1, w->map_id, over, sizeof over,
-                                   NULL, 0) == U2_WORLD_OK) {
-                const int cells = world_delta(content, over, U2_SECTOR_TILES,
-                                              delta, sizeof delta);
-                if (cells > 0)      dtxt = delta;
-                else if (cells < 0) dtxt = "too-big";   /* reported, never truncated */
+            /* One line per sector file, not one per visit. note_world now runs at every
+             * sector load, so a recording that steps out and back in would otherwise
+             * repeat a sector and grow the header with the walk. */
+            int seen = 0;
+            for (int k = 0; k < d->n_world; k++)
+                if (strcmp(d->world[k].name, nm) == 0) { seen = 1; break; }
+            if (!seen) {
+                if (w->map_root && strcmp(w->map_root, U2_WORLD_SLOT_LAYER) == 0 &&
+                    u2_world_read_slot(ctx, 1, w->map_id, over, sizeof over,
+                                       NULL, 0) == U2_WORLD_OK) {
+                    const int cells = world_delta(content, over, U2_SECTOR_TILES,
+                                                  delta, sizeof delta);
+                    if (cells > 0)      dtxt = delta;
+                    /* reported, never truncated */
+                    else if (cells < 0) dtxt = "too-big";
+                }
+                if (world_reserve(d) == 0) {
+                    snprintf(d->world[d->n_world].name, 24, "%.23s", nm);
+                    sha256_hex(content, U2_SECTOR_TILES, d->world[d->n_world].base);
+                    snprintf(d->world[d->n_world].delta, U2_DEMO_DELTA_MAX,
+                             "%.2047s", dtxt);
+                    d->n_world++;
+                }
             }
-            snprintf(d->world[d->n_world].name, 24, "%.23s", nm);
-            sha256_hex(content, U2_SECTOR_TILES, d->world[d->n_world].base);
-            snprintf(d->world[d->n_world].delta, U2_DEMO_DELTA_MAX, "%.2047s", dtxt);
-            d->n_world++;
         }
     }
 }
@@ -1394,15 +1456,7 @@ int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id)
     if (idx < 0) return 0;
 
     const char *dt = d->world[idx].delta;
-    if (!dt[0] || !strcmp(dt, "none")) return 0;
-    if (!strcmp(dt, "too-big")) {
-        /* The writer refused to inline a change this large, so the demo carries no way
-         * to rebuild the sector. Announcing that beats the same lie as applying nothing
-         * quietly, which is a sector that verifies and is wrong. */
-        fprintf(stderr, "u2: %s: the recorded change is too large for a demo to carry,"
-                        " so this sector plays as your own copy.\n", name);
-        return 0;
-    }
+    const int nothing = (!dt[0] || strcmp(dt, "none") == 0);
 
     /* Re-read the CONTENT layer rather than patching whatever the loader picked. A
      * viewer holding their own overlay for this sector would otherwise get a third
@@ -1411,12 +1465,18 @@ int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id)
     uint8_t buf[U2_SECTOR_TILES];
     if (u2_world_read_content(ctx, 1, id, buf, sizeof buf, fname, sizeof fname)
             != U2_WORLD_OK) {
-        fprintf(stderr, "u2: %s: the demo carries a delta for this sector but the"
-                        " content file cannot be read, so it cannot be applied.\n", name);
+        fprintf(stderr, "u2: %s: the demo describes this sector but the content file"
+                        " cannot be read, so it cannot be checked.\n", name);
         d->overlay_failed = 1;
         return -1;
     }
 
+    /* The base is verified even when there is nothing to patch. `delta=none` is a claim
+     * that the recorder's sector WAS the shipped content, so a viewer holding different
+     * bytes there has a different world; skipping the check because no cells need
+     * rewriting lets a wrong sector through in silence, which is the one thing § 13.1
+     * exists to prevent. This is what a later, unchanged sector used to do: it carried a
+     * base nobody read, and a mutated mapx71 played as if it had been checked. */
     sha256_hex(buf, sizeof buf, sha);
     if (strcmp(sha, d->world[idx].base) != 0) {
         if (!ctx->demo_ignore_content) {
@@ -1437,6 +1497,28 @@ int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id)
         fprintf(stderr, "u2: %s: your copy is not the recording's base and"
                         " --playback-ignore-content was given, so the recorded delta is"
                         " NOT applied. This sector plays as your own bytes.\n", name);
+        return 0;
+    }
+
+    if (nothing) {
+        /* Only speak if it actually displaces something: a viewer with no overlay of
+         * their own is already holding exactly these bytes. */
+        if (memcmp(w->map, buf, sizeof buf) != 0) {
+            fprintf(stderr, "u2: %s: your save holds an overlay of this sector and the"
+                            " recording carries none, so the recording's bytes are used.\n",
+                    name);
+            memcpy(w->map, buf, sizeof buf);
+            memcpy(w->map_base, buf, sizeof buf);
+        }
+        return 0;
+    }
+
+    if (!strcmp(dt, "too-big")) {
+        /* The writer refused to inline a change this large, so the demo carries no way
+         * to rebuild the sector. Announcing that beats the same lie as applying nothing
+         * quietly, which is a sector that verifies and is wrong. */
+        fprintf(stderr, "u2: %s: the recorded change is too large for a demo to carry,"
+                        " so this sector plays as your own copy.\n", name);
         return 0;
     }
 
@@ -1504,9 +1586,25 @@ int u2_demo_finish(u2_ctx *ctx)
     if (d->state == U2_DEMO_RECORDING && d->file && !d->finished) {
         char sha[65], frame[65];
         uint8_t raw[32];
-        sha256_ctx c = d->framing;   /* copy: the epilogue is not inside its own digest */
 
         u2_demo_digest(ctx, sha);
+
+        /* Sectors discovered after the header was written — every one the walk visited
+         * past the starting sector. They belong to the recording as much as the first
+         * does: a demo that carried only its starting sector silently rebuilds a world
+         * the recorder never stood in, and the run diverges somewhere that looks exactly
+         * like an engine bug. Emitted here rather than in the header because the header
+         * is written at the checkpoint, which is the start of the session. */
+        for (int i = d->n_world_written; i < d->n_world; i++)
+            emit(d, "@world %s base=%s delta=%s\n",
+                 d->world[i].name, d->world[i].base, d->world[i].delta);
+
+        /* Copied AFTER the lines above and BEFORE `@end`, in that order and on purpose.
+         * The framing digest covers everything above `@end`, and the reader hashes those
+         * bytes in file order, so the epilogue `@world` lines have to be inside it or
+         * every multi-sector demo would read back as edited. `@end` itself stays outside
+         * its own digest, as before. */
+        sha256_ctx c = d->framing;
         sha256_final(&c, raw);
         hex64(raw, frame);
         /* Two digests, two jobs (hazard 4): `state=` is the closing state digest

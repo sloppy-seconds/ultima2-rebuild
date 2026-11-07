@@ -500,6 +500,35 @@ RC=0
 [ "$RC" -ne 0 ] && ok "W19 control: a file claiming a version past this build is refused" \
                 || bad "W19 control: udemo 99 was accepted, so nothing bounds the range"
 
+# --- W20: every sector the walk visits, not just the first ---------------------
+# § 13.7's per-sector item. The recording enters a site, so the recorder stands in two
+# sectors. Before this only the starting one was captured at all — note_world ran from
+# overworld_open alone — so a demo carried the sector it started in and said nothing
+# about the one it walked into, and a viewer rebuilt ground the recorder never saw.
+# The fixed three-entry list was the smaller half of the same defect.
+NW=$(grep -c '^@world' "$WORK/d_dirty/dirty.demo")
+if [ "$NW" -ge 2 ] && grep -q '^@world mapx71' "$WORK/d_dirty/dirty.demo"; then
+    ok "W20: a two-sector recording carries both sectors ($NW lines)"
+else
+    bad "W20: $NW @world lines and no mapx71, so the walk was not captured"
+fi
+
+# And a LATER sector's base has to be verified, not merely recorded. mapx71 carries
+# delta=none, so a reader that skips the base check when there is nothing to patch lets a
+# mutated sector play as though it had been checked. The byte is in mapx71, not mapx70,
+# so only this leg can catch it.
+seed "$WORK/w71"
+printf '\xfe' | dd of="$WORK/w71/content/mapx71" bs=1 seek=5 count=1 conv=notrunc status=none
+RC=0
+"$U2" --headless --cleanroom --data-dir "$WORK/w71/content" --save-dir "$WORK/w71/save" \
+      --playback "$WORK/d_dirty/dirty.demo" >/dev/null 2>"$WORK/w71.err" || RC=$?
+if [ "$RC" -ne 0 ] && grep -q 'mapx71.*not the one the recording was made against' \
+                           "$WORK/w71.err"; then
+    ok "W20 control: a later sector's base is checked and its refusal names it"
+else
+    bad "W20 control: a mutated mapx71 played unchecked (exit $RC)"
+fi
+
 echo
 if [ "$fail" -ne 0 ]; then
     echo "DEMO TEST: FAIL"

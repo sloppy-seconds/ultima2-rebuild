@@ -310,6 +310,14 @@ static int site_reload(u2_ctx *ctx, u2_overworld *ow)
      * creature happens to move. */
     ctx->diag_unstamped_at_load = u2_monsters_unstamped_cells(ctx, &ow->world);
 
+    /* The same digest-and-delta capture overworld_open does. Without it a recording only
+     * ever carried the sector it STARTED in: walk into a neighbour your save had dirtied
+     * and the demo had nothing to say about it, so a viewer rebuilt the original ground
+     * and the run diverged somewhere that looked exactly like an engine bug. This is the
+     * § 13.7 per-sector item; the cap was the smaller half of it. */
+    u2_demo_note_world(ctx, &ow->world);
+    if (u2_demo_overlay_failed(ctx)) return -1;
+
     /* asm/343F tail, reached by every arm: `mov $0x4,%al; mov %al,0x12`. */
     ctx->state.view_mode = 4;
     ow->view_mode = 4;

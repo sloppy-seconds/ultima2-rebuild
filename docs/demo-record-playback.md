@@ -1319,14 +1319,14 @@ rewriting § 13.3, so the reasoning that produced the wrong version stays visibl
    before `clear_spawn_cells` runs, so it goes immediately after `u2_world_load(map)` at
    `overworld.c:~1355` and in `site_reload` at `~265` — not beside `demo_restamp_pending`.
 
-Build order, cheapest proof first. Status as of 2026-11-08: 3a, 3b and 3c are shipped; 3d is not.
+Build order, cheapest proof first. Status as of 2026-11-08: 3a, 3b, 3c and 3d are shipped.
 
 | step | work | leg | control | state |
 | --- | --- | --- | --- | --- |
 | 3a | content-only sector read into a caller buffer; must not touch the live world | **W17** | re-point the existing `dd` mutation at `run_demo.sh:304` from digest to `base` | done |
 | 3b | writer: delta at note time, file-vs-file, canonical order by `y*64+x` | **W18** | two recordings of one edit emit identical `@world` lines | done |
 | 3c | reader + apply at the two load sites; `format-version` 1 → 2, v1 files still play | **W19** | claim `udemo 99` and require refusal | done |
-| 3d | per-sector: `U2_DEMO_MAX_OVERLAYS` 3 → growable list, `overlay_checked` latch keyed by sector | **W16** | record dirty-slot, replay clean, require clean verification; strip the delta and it must diverge | not built |
+| 3d | per-sector: `U2_DEMO_MAX_OVERLAYS` 3 → growable list, `overlay_checked` latch keyed by sector | **W20** | a two-sector recording carries both sectors; mutate the later sector's content and require a refusal | not built |
 
 Two legs landed somewhere other than this table, and the table says so rather than being
 quietly right. W17 became the layer-read assertion in `world_check.c` (the content read must not
@@ -1344,6 +1344,20 @@ found by running the control. With the two `memcpy`s that publish the rebuilt se
 W16 still passed: the "rebuilt" message digested the staging buffer, so it described bytes that
 never reached the world. The digest is taken from `w->map` after the copy for that reason. An
 observable has to be measured from the thing the claim is about.
+
+3d turned out to be a different change than the one § 13.7 anticipated, and the anticipated one was
+the smaller half. The cap of three was real but minor; the defect was that `note_world` was called
+from `overworld_open` only, so a recording captured the sector it STARTED in and nothing about any
+sector it walked into. A demo entering a site carried `mapx70` and was silent about `mapx71`, and a
+viewer rebuilt original ground where the recorder had stood on changed ground. Fixing that exposed
+a second gap behind it: `apply_world` returned early on `delta=none`, before verifying the base, so
+an unchanged later sector had a base that nobody read and a mutated `mapx71` played as though it
+had been checked. The base is now the contract for every sector a demo names, patched or not.
+
+Because the header is written at the checkpoint — the start of a session — sectors discovered by the
+walk cannot appear in it. Their lines go in the epilogue, emitted before `@end` so the running
+framing digest covers them; the copy that excludes `@end` from its own digest is taken after those
+lines and before it, which is the whole reason the order in `u2_demo_finish` is what it is.
 
 **W16 is the reason.** It is the leg that cannot be written today because it cannot pass today, and
 `docs/harness-portability.md` records exactly this gap: fifteen controls on a synthetic fixture and
