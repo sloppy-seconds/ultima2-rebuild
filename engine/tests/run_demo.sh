@@ -26,6 +26,17 @@ trap 'rm -rf "$WORK"' EXIT
 U2=./u2
 FIX="python3 tests/demo_fixture.py"
 
+# Every leg of this gate records into $WORK. If one forgets --demo-dir the engine falls
+# back to ./demos and the gate quietly writes into the repo: gitignored, so nothing
+# catches it, and the files then look exactly like real recordings to anything that walks
+# the directory afterwards. This happened -- one Ctrl-R leg left a fixture per run.
+DEMO_DIR_POLLUTION=0
+if [ -d demos ]; then
+    ls demos > "$WORK/demos.before" 2>/dev/null || : > "$WORK/demos.before"
+else
+    : > "$WORK/demos.before"
+fi
+
 printf 'engine demo record/playback test\n'
 [ -x "$U2" ] || { bad "engine not built: run make first"; exit 1; }
 
@@ -103,7 +114,8 @@ grep -qi "ILLEGAL" "$WORK/nt.out" && bad "W2 control: 0x12 reached the command d
 
 seed "$WORK/wlone"
 "$U2" --headless --play-map --cleanroom --data-dir "$WORK/wlone/content" \
-      --save-dir "$WORK/wlone/save" --script "$WORK/lone.keys" > "$WORK/lone.out" 2>&1
+      --save-dir "$WORK/wlone/save" --script "$WORK/lone.keys" \
+      --demo-dir "$WORK/d_lone" --demo-name lone > "$WORK/lone.out" 2>&1
 grep -qi "ILLEGAL" "$WORK/lone.out" && bad "W2 control: a lone 0x12 was an illegal command" \
                                      || ok "W2 control: a lone 0x12 displaces no shortcut"
 
@@ -698,6 +710,21 @@ else
 fi
 
 echo
+# The pollution check, last so every leg has had its chance. A leg that records without
+# --demo-dir writes into ./demos: gitignored, invisible to CI, and indistinguishable from a
+# real recording to anything that walks the directory later.
+if [ -d demos ]; then
+    ls demos > "$WORK/demos.after" 2>/dev/null || : > "$WORK/demos.after"
+else
+    : > "$WORK/demos.after"
+fi
+STRAY=$(comm -13 "$WORK/demos.before" "$WORK/demos.after" 2>/dev/null | head -5)
+if [ -n "$STRAY" ]; then
+    bad "no leg writes into engine/demos — the gate owns $WORK only (stray: $(printf '%s' "$STRAY" | tr '\n' ' '))"
+else
+    ok "no leg writes into engine/demos (every recording lands in the gate's own scratch)"
+fi
+
 if [ "$fail" -ne 0 ]; then
     echo "DEMO TEST: FAIL"
     exit 1
