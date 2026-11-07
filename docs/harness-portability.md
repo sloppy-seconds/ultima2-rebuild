@@ -189,6 +189,23 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-08 — A replay format must carry the rules the run used, not only its data, and a
+  header field that is parsed and never applied is worse than a missing one.** A record/playback
+  subsystem pinned the starting state, the clock-derived bytes and the content digests, and still
+  replayed a different game: the binary has two rule sets that differ in one comparison operator on
+  the lethal branch, so a blow landing exactly on a creature's remaining hp is a kill under one and a
+  live creature at zero hit points under the other. The header did carry a line naming the mode — but
+  it named the *screen-layout* knob, which the build happens to set alongside the rule, and the reader
+  stored it into a field it never read. Two transferable rules. When a program has a mode that can
+  change state, the mode belongs in the recording and must be applied on replay, and its absence must
+  be announced rather than resolved by a default, because a silent default makes the replay a
+  different program that agrees until the first input that distinguishes them. And treat "we write it
+  to the header" as unproven until someone points at the reader that consumes it: a parsed-but-unused
+  field is the most convincing kind of gap, because it reads as handled in both the writer and the
+  parser and only the bytes disagree. The diagnostic that found it was arithmetic rather than
+  observation — the state block keeps a shift history, so the exact sequence of random bytes consumed
+  between two verified checkpoints is readable out of the two snapshots, and comparing the two sides'
+  roll counts localises a divergence to one call site without a single new capture.
 * **2026-11-08 — A fixture shaped the way the implementation happens to work tests the
   implementation, not the format.** A replay subsystem stores one record per file-load in
   append order, and the reader resolved the *k*-th record of a given file as "index of the

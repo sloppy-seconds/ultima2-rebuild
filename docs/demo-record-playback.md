@@ -34,7 +34,9 @@ The first fifteen came from building it; 16 to 19 came from the owner playing it
 real install the day after it shipped, and each of those four was invisible to every
 gate that had passed; 20 and 21 came from the real recordings that followed — in 20 the
 two-layer workaround of 16 turned out to be a workaround rather than the design, and in
-21 the `@world` reader turned out to index one file's versions as if they were contiguous.
+21 the `@world` reader turned out to index one file's versions as if they were contiguous;
+22 came from the same demo as 21, one section later, and is the difference between recording
+the data of a run and recording the rules of it.
 
 1. **The digest scope is not `u2_state_digest_json()` (D6).** The frozen CP2 scope
    embeds the engine version string and the platform backend names (`renderer`,
@@ -167,6 +169,14 @@ two-layer workaround of 16 turned out to be a workaround rather than the design,
 21. **A file's `@world` versions are not contiguous, and the reader assumed they were.** The
     indexing fix, the reason the owner's 216-record demo now verifies end to end, and the reason
     W23's fixture was the wrong shape: see the record-116 section, which is the full account.
+22. **The rule mode is part of what a demo records.** The header carried `enhanced`, which is the
+    screen-layout knob, and the reader parsed it into a field it never read. The mode that changes
+    state — `fidelity`, which decides whether a blow equal to a creature's remaining hp kills — was
+    not recorded at all, so an enhanced recording replayed under the default mode diverged at the
+    first equality kill and named a creature table instead of the rule. A `fidelity` line is now
+    written, applied at the mount, announced, and refused when unrecognised; a file without one is
+    told the mode is unknown rather than assumed. `U2_DEMO_VERSION` 2 → 3, so an old binary refuses
+    a new file loudly instead of playing it wrongly. W25 gates it on a forced equality kill.
 
 Everything below is the plan as ruled on 2026-11-05, unchanged, with the D-numbers the
 implementation cites.
@@ -808,6 +818,14 @@ polish that makes it a subsystem rather than a feature.
    that path may feed state; W8 decides. Until W8 passes, do not claim SDL playback is verified — say
    "headless verified, SDL unproven" exactly as `plan-cross-game-replay.md` § 6 does.
 
+10. **Playing a demo from `engine/demos/` writes a sector file inside `engine/`, and CP4 is right to
+    shout about it.** The scratch save directory is derived from the demo's own path (§ 7.4), so a
+    playback of a file under `engine/demos/` creates `engine/demos/playback/PLAYER/mapx20`, and
+    `tests/content_immutable.py` fails the suite on any `mapx*`/`monx*` under `engine/`. It is not a
+    false positive — a real sector file sitting inside the tree is exactly what that guard exists to
+    catch — but it will stop a full `make test` after any manual replay until the directory is
+    removed. Replay from a copy outside `engine/`, or `rm -rf engine/demos/playback` afterwards.
+
 ---
 
 ## 11. Owner rulings — all settled 2026-11-05
@@ -1390,9 +1408,9 @@ is indifferent to Phase 2's outcome by construction, which is what makes it safe
 **Status after 2026-11-08:** Phase 1 and Phase 1b are shipped. Phase 2 is shipped except **2c-iii**,
 which was rejected as written — see the step 2c note. 2c-i, 2c-ii and 2c-v landed together, because
 2c-i is a behavioural no-op until 2c-ii gives it a reason. Phase 3 is shipped: 3a, 3b, 3c and 3d,
-gated by W16–W20, plus W21 (the creature layer), W22 (the stop toggle), W23 (one version per load)
-and W24 (those versions not being contiguous — see the record-116 section, which is why W23 alone
-was not enough).
+gated by W16–W20, plus W21 (the creature layer), W22 (the stop toggle), W23 (one version per load),
+W24 (those versions not being contiguous — see the record-116 section, which is why W23 alone
+was not enough) and W25 (the rule mode the recording was made under — see the record-37 section).
 
 **The first real recording found three bugs the fixtures could not.** The owner's demo on a real
 install (`demos/20261107T145757.demo`, 410 records, sector 20 with a six-cell delta) reproduced all
@@ -1473,7 +1491,7 @@ the last key.
 
 ---
 
-### Record 37: a creature that will not die (open; NOT the same fault as 116, measured 2026-11-08)
+### Record 37: a creature that will not die (CLOSED 2026-11-08 — the demo did not carry the rule set)
 
 **Re-measured after the record-116 fix, and it did not move.** `20261108T052450.demo` still diverges
 at 37 with the same twelve bytes, against the fixed build and a local copy of `original/`, with
@@ -1485,6 +1503,63 @@ file, so there was no group for the reader to walk off the end of. Second, its o
 the playback had 500 and 1100, so the recorder had already killed more, and the RNG difference is
 the consequence of a damage roll that went differently, not its cause. That is combat, and it is
 still open.
+
+**Closed the same day, and it is not combat either.** The roll arithmetic below is what cracked it,
+and it also retires the paragraph above: the reward difference is not a kill that happened earlier, it
+is this kill, and damage involves no roll at all.
+The register at `DS:23F..244` is a shift history, so the bytes pushed since the last verified record
+are readable straight out of the two snapshots, and they are:
+
+```
+recorder  36, 2f, 94, 44        playback  36, 2f, 94
+```
+
+Three rolls in common and one extra on the recorder. A melee swing consumes exactly one roll — the
+hit test — and damage is deterministic, `(readied_weapon * 8 + strength) >> 2`, with no roll in it
+at all. A kill then rolls its reward: `gold = (rand & 0x17) | 1` and `exp = rand & 7`. Taking the
+common bytes as hit, gold, exp: `0x2f & 0x17 | 1 = 7` and the recorder's `gold_hi` moved `11 -> 18`,
+and `0x94 & 7 = 4` and its `exp_hi` moved `05 -> 09`. **Both rewards match the recorded bytes
+exactly**, which says the recorder's swing killed and paid, and the playback's swing consumed the
+same three rolls and paid nothing.
+
+So the same roll, the same state and the same damage went one way on the recorder and the other in
+playback. Instrumenting the playback said why, in one line:
+
+```
+[dmg] slot=24 hp=16 dmg=16 fid=0 lethal=0
+```
+
+Sixteen damage on sixteen hit points. `apply_damage_to_slot` kills on `dmg >= hp` in enhanced mode
+and on `dmg > hp` in original mode — the byte-proven `stc; cmc; sbb; cmc; jae` that leaves a live
+creature at zero hp when the blow lands exactly on the remainder, kept or removed by the owner's
+2026-10-26 ruling. The recording was made with `--enhanced`. The playback ran at the default, and
+**nothing in the file said so.** The header carried `enhanced 1`, but that is `ctx->enhanced_layout`,
+the 640x480 screen-layout knob, which `main.c` happens to set wherever fidelity is enhanced and
+which the demo reader parsed into a field it never read. The rule itself was never recorded.
+
+The fix is that the rule travels with the recording, for the same reason D5 pins the speed: a
+playback that runs a different rule set is not a failed replay, it is a different game that happens
+to agree until the first equality kill. A `fidelity enhanced|original` header line is written, applied
+at the mount, and announced; a file without it is told to be unrepeatable-in-principle rather than
+silently assumed to have used the viewer's mode; an unknown value refuses. `U2_DEMO_VERSION` goes to
+3, so an old binary refuses a new file loudly instead of playing it wrongly — free under the
+2026-11-08 ruling that the existing demos do not matter.
+
+**Measured after the fix:** with the mode matched, `20261108T052450.demo` verifies records **1-87**
+where it had stopped at 36. It then diverges at 88, and that one is not a new fault: the divergence
+is the creature table after a site departure, the recorder reloaded 10 creatures and the playback 7,
+and this file carries **one** `@world` version per sector file — it was recorded before option A, so
+the second load of `monx20` had no version of its own to take. The file cannot be repaired
+retroactively; it is stale evidence, and the fault it now shows is the one already closed above.
+
+**W25 is the leg, and it is behavioural rather than textual.** `tests/demo_kill_fixture.py` seeds one
+creature at hp 16 one cell east of a character whose swing is exactly 16, with agility 0x80 so every
+roll is a hit — the equality case is forced, not hoped for. The leg records in enhanced mode, replays
+under the default, and requires the pin, the announcement and a clean verification; then requires the
+same in reverse (an original-mode recording survives a viewer who runs `--enhanced`). Its controls:
+strip the line and the reader must say it cannot know the rule **and** diverge on the kill rather than
+pass; name a mode the engine has not got and it must refuse. Both were run red before the fix was
+believed.
 
 A 147-record `stop=toggle` demo (`demos/20261108T052450.demo`, 2026-11-08) verifies records 1-36 and
 diverges at 37. Twelve bytes differ, and they are one creature and its consequences:
