@@ -26,12 +26,15 @@ it proves is the narrow thing worth proving: a second renderer, a real event loo
 real clock between the same records cannot move the DS state. W13 is done as
 overworld → site → overworld; see deviation 5 for why creation is refused.
 
-**Sixteen deviations from this plan, each one forced by a measurement.** They are
+**Every deviation from this plan, each one forced by a measurement; the count is whatever the
+list below ends in, and it is not repeated in prose on purpose.** They are
 listed here rather than edited silently into the body, because the body is the owner's
 spec and a spec that gets quietly rewritten is worse than a spec with a defect list.
 The first fifteen came from building it; 16 to 19 came from the owner playing it on a
 real install the day after it shipped, and each of those four was invisible to every
-gate that had passed.
+gate that had passed; 20 and 21 came from the real recordings that followed — in 20 the
+two-layer workaround of 16 turned out to be a workaround rather than the design, and in
+21 the `@world` reader turned out to index one file's versions as if they were contiguous.
 
 1. **The digest scope is not `u2_state_digest_json()` (D6).** The frozen CP2 scope
    embeds the engine version string and the platform backend names (`renderer`,
@@ -160,6 +163,10 @@ gate that had passed.
     the real-install case testable as gate leg W16. **§ 13 is design only and unbuilt**; the
     five assertions that prove its load-bearing property are shipped and gated. **The build order is
     written out below the amendment: Phase 1 terrain restore, Phase 2 `map_base`, Phase 3 the delta.**
+
+21. **A file's `@world` versions are not contiguous, and the reader assumed they were.** The
+    indexing fix, the reason the owner's 216-record demo now verifies end to end, and the reason
+    W23's fixture was the wrong shape: see the record-116 section, which is the full account.
 
 Everything below is the plan as ruled on 2026-11-05, unchanged, with the D-numbers the
 implementation cites.
@@ -1383,7 +1390,9 @@ is indifferent to Phase 2's outcome by construction, which is what makes it safe
 **Status after 2026-11-08:** Phase 1 and Phase 1b are shipped. Phase 2 is shipped except **2c-iii**,
 which was rejected as written — see the step 2c note. 2c-i, 2c-ii and 2c-v landed together, because
 2c-i is a behavioural no-op until 2c-ii gives it a reason. Phase 3 is shipped: 3a, 3b, 3c and 3d,
-gated by W16–W20.
+gated by W16–W20, plus W21 (the creature layer), W22 (the stop toggle), W23 (one version per load)
+and W24 (those versions not being contiguous — see the record-116 section, which is why W23 alone
+was not enough).
 
 **The first real recording found three bugs the fixtures could not.** The owner's demo on a real
 install (`demos/20261107T145757.demo`, 410 records, sector 20 with a six-cell delta) reproduced all
@@ -1464,7 +1473,18 @@ the last key.
 
 ---
 
-### Record 37: a creature that will not die (open, and may be the same fault as 116)
+### Record 37: a creature that will not die (open; NOT the same fault as 116, measured 2026-11-08)
+
+**Re-measured after the record-116 fix, and it did not move.** `20261108T052450.demo` still diverges
+at 37 with the same twelve bytes, against the fixed build and a local copy of `original/`, with
+`--playback-continue` giving snapshots for all 112 diverged records. Two things follow. First, the
+guess below ("may be the same fault as 116") is refuted: that demo carries one `@world` version per
+file, so there was no group for the reader to walk off the end of. Second, its own first line — slot
+24 alive in playback and dead on the recorder — is now readable without the mode-byte noise, and the
+`DS:0057` / `DS:0059` pair is `exp_hi` and `gold_hi`: the recorder had 900 EXP and 1800 gold where
+the playback had 500 and 1100, so the recorder had already killed more, and the RNG difference is
+the consequence of a damage roll that went differently, not its cause. That is combat, and it is
+still open.
 
 A 147-record `stop=toggle` demo (`demos/20261108T052450.demo`, 2026-11-08) verifies records 1-36 and
 diverges at 37. Twelve bytes differ, and they are one creature and its consequences:
@@ -1528,7 +1548,7 @@ file I/O at all. Checking that cost one grep and redirected the whole diagnosis 
 header of `asm/22FD_sub_22fd.asm` for the refutation and for the fact that the engine's old
 store-on-transition once rewrote `original/monx71`.
 
-### Record 116: the two runs are in different game modes (OPEN, and a different class)
+### Record 116: the two runs are in different game modes (CLOSED 2026-11-08 — it was a reader indexing bug, and the mode reading was a shadow)
 
 After option A, a 216-record demo (`demos/20261108T054331.demo`, 2026-11-08, `stop=toggle`, a
 mid-session save at +26s, `mapx20` carried twice and `monx20` three times) verifies 1-115 and
@@ -1574,4 +1594,55 @@ and save); not the RNG, whose shift register lives at DS:0x23F and is inside the
 the speed pin, reported as pinned to the recorded values. An earlier note here claimed the
 recorded and live `rolls=` counts agreed -- they were never compared. The printed `rolls=` is the
 record's own metadata, and reading it as a live comparison was an over-read.
+
+**Closed the same day, and neither of the two shapes above was it.** The proposed next step was also
+not runnable as written: playback stops at the first divergence, so only record 116 has a `.live`
+entry and 115 and 117 report "no live snapshot" rather than "it verified". The flag that makes the
+bisect possible already existed and had not been used: `--playback-continue`.
+
+With it, the demo replays locally against a copy of `original/` and prints the cause before the
+divergence:
+
+```
+u2: mapx20: your copy of this sector is not the one the recording was made against.
+    recorded base 5341e6b2...    your copy 8b51b2af...
+```
+
+`5341e6b2` is not a map digest at all — it is `monx20`'s base, the digest of an all-zero creature
+file. The second load of `mapx20` had been handed `monx20`'s line.
+
+The reader indexed a file's versions as `first + k`: the index of the group's first entry, plus the
+load number. That is only correct when a group's lines are **contiguous**, and they never are in a
+real recording. The header carries the `@world` lines known at the checkpoint and the epilogue
+appends the ones the walk discovered (§ 13.11), so this file's order was `mapx20, monx20, mapx22,
+monx22, mapx20, monx20, monx20` — and `first + 1` for `mapx20` landed on `monx20`. A different file,
+a different length, a different digest, so `apply_world` refused, `site_reload` returned early, and
+the two halves of its body that had already run are the whole 220-byte diff: the creature table was
+still the site's 32, and `DS:12` kept the `0xFF` that `u2_overworld_site_leave` writes before calling
+the reload that never finished. **So the two runs were never in different modes.** The recorder was
+in sector 20 with the world's creatures; the playback was in sector 20 with sector 22's creatures
+still loaded and the mode byte the leave had set. "Different game modes" was the shadow of a
+refusal, and the direction of the diff was read backwards for a day because the creature counts
+were assumed rather than looked up: 9 populated slots is sector 20, 32 is sector 22.
+
+The fix is to walk the group entry by entry over the lines that name the file, and to stop at the
+last when there are fewer versions than loads. **The demo now verifies 216/216 with exit 0 against a
+local copy of `original/`, with no `--playback-ignore-content`.**
+
+**Why no gate saw it, which is the part worth keeping.** `dupworld`, W23's fixture, inserts the
+duplicate version *beside its sibling*. That is the one shape that makes `first + k` correct, so
+W23 passed for the same reason the reader was broken: it tested versioning with contiguous
+versions. The new leg is `spreadworld` — the same duplicate, inserted after the **last** `@world`
+line — and it was watched going red against the old indexing before the fix was believed, while
+W23 stayed green throughout. Two fixtures for one contract, and only the tidy one was gated; a
+fixture built in the shape the implementation happens to prefer tests the implementation, not the
+format.
+
+**One thing the fix exposed rather than caused, and it is not a demo fault.** With the playback now
+agreeing, the recording's own bytes are readable as behaviour: `DS:12` is `0x04` for records 116-171
+while the player stands in sector 20, the world map. `site_reload` stamps 4 unconditionally and
+serves entry and departure alike, so the `0xFF` that `site_leave` writes — with a comment explaining
+exactly why it must survive — is overwritten before the frame is drawn. Whether the original leaves
+it latched is not on record; that is `docs/needs-gameplay.md` G67, agent-drivable, and the engine
+may be wrong about the viewport for every step after a player walks out of a town.
 

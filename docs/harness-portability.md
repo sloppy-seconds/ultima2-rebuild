@@ -189,6 +189,25 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-08 — A fixture shaped the way the implementation happens to work tests the
+  implementation, not the format.** A replay subsystem stores one record per file-load in
+  append order, and the reader resolved the *k*-th record of a given file as "index of the
+  first one, plus *k*" — correct only if a file's records sit next to each other. The gate
+  built its fixture by duplicating a record immediately beside its original, so the
+  positional assumption held by construction and the leg passed for the same reason the
+  reader was broken. Real output cannot have that shape: the header is written at the
+  checkpoint and later records are appended in an epilogue, so a file's second record lands
+  after every other file's. The symptom was not an index error but a downstream refusal
+  against a digest belonging to a different record, and two days were spent reading it as a
+  semantic divergence in the replayed program rather than as a lookup landing in the wrong
+  row. Transferable rules. Index a group by walking the members that match its key, never
+  by arithmetic on positions, unless contiguity is a property the writer is *gated* to
+  maintain. When a fixture and a real artifact disagree on structure, the real artifact is
+  the contract: generate the fixture's shape from a sample of real output, or add the leg
+  that reproduces the real ordering and watch it go red before the fix. And when a
+  comparison reports a large disagreement, check the direction of the diff against a
+  quantity that is cheap to look up; an assumed direction can survive a day of otherwise
+  careful measurement and send the whole diagnosis the wrong way.
 * **2026-11-07 — A verification gate that only ever runs synthetic fixtures will pass
   right up until a real user runs it once.** The record/playback subsystem cleared
   fifteen checks with their red controls and then failed on the owner's first real
