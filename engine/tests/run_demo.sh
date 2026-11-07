@@ -457,6 +457,29 @@ grep -q 'stop=toggle' "$DEMO" \
     && ok "W22: a second Ctrl-R ends the recording, and the file says stop=toggle" \
     || bad "W22: the toggle never stopped it (@end says $(grep -o 'stop=[a-z]*' "$DEMO"))"
 
+# --- W23: one sector file, two loads, two versions --------------------------------
+# A mid-session save rewrites the sector in the slot -- asm/2340 is on the save path and the
+# original does the same thing -- so a later load reads different bytes than the first load
+# did. A single per-file delta could only ever describe the first. The owner's 196-record demo
+# showed four creatures present on the recorder and absent in playback at record 58, and the
+# slot timestamps proved a save seven seconds into the session had rewritten monx20.
+#
+# The fixture duplicates the mapx70 line with a shifted target byte, and the site script
+# enters a site and comes back, so sector 70 is loaded twice and the two loads must land on
+# two different versions.
+seed "$WORK/wc2"
+python3 tests/demo_fixture.py dupworld "$WORK/d_dirty/dirty.demo" "$WORK/two.demo"
+RC=0
+OUT=$("$U2" --headless --cleanroom --data-dir "$WORK/wc2/content" \
+           --save-dir "$WORK/wc2/save" --playback "$WORK/two.demo" 2>&1) || RC=$?
+N1=$(printf '%s\n' "$OUT" | grep -o 'mapx70: rebuilt.*sector now [0-9a-f]*' | sed 's/.*sector now //' | sed -n '1p')
+N2=$(printf '%s\n' "$OUT" | grep -o 'mapx70: rebuilt.*sector now [0-9a-f]*' | sed 's/.*sector now //' | sed -n '2p')
+if [ -n "$N1" ] && [ -n "$N2" ] && [ "$N1" != "$N2" ]; then
+    ok "W23: two loads of one file apply two versions ($N1 then $N2)"
+else
+    bad "W23: both loads applied the same version (got '$N1' '$N2')"
+fi
+
 # --- W16: the delta is APPLIED at load, not merely parsed ----------------------
 # W18 gates the writer, and that turned out not to be enough. The reader was storing a
 # fixed 23-character slice of the whole line as the sector name, so no sector ever

@@ -22,6 +22,8 @@ the ones docs/demo-record-playback.md § 9 names as controls.
   version  IN OUT N     rewrite the `udemo` magic's version to N, repair framing. This
                         is W19: a v1 file must still play under a v2 reader, and a
                         version beyond the reader's must refuse.
+  dupworld IN OUT       duplicate the first @world line with a shifted target byte, repair
+                        framing. This is W23: one file loaded twice with different bytes.
 
 Usage: demo_fixture.py SUBCOMMAND IN OUT [arg]
 """
@@ -193,7 +195,39 @@ def cmd_version(argv):
     return 0
 
 
+def cmd_dupworld(argv):
+    """Duplicate the first `@world` line with a different target byte.
+
+    This is W23's fixture: one sector file loaded twice with DIFFERENT bytes, which is what a
+    mid-session save produces in a real recording (asm/2340 is on the save path, so the slot
+    legitimately changes and a later load reads the new state). The duplicate's `new` values
+    are shifted by one so the two versions hash differently, while every `old` still matches
+    the content file -- apply re-reads content per load, so an untruthful `old` would make the
+    delta refuse itself, which is a different test.
+
+    Without per-load versioning both loads apply the first version and hash identically.
+    """
+    lines = read(argv[0])
+    for i, line in enumerate(lines):
+        if line.startswith("@world "):
+            break
+    else:
+        print("demo_fixture: no @world line", file=sys.stderr)
+        return 2
+    if " delta=" not in line or line.rstrip().endswith("delta=none"):
+        print("demo_fixture: first @world carries no cells to duplicate", file=sys.stderr)
+        return 2
+    dup = line.replace("->44", "->45")
+    if dup == line:
+        print("demo_fixture: expected a ->44 cell to shift", file=sys.stderr)
+        return 2
+    lines.insert(i + 1, dup)
+    write(argv[1], repair_end(lines))
+    return 0
+
+
 COMMANDS = {
+    "dupworld": cmd_dupworld,
     "version": cmd_version,
     "digest": cmd_digest,
     "rawdigest": cmd_rawdigest,

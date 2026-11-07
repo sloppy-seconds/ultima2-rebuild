@@ -52,11 +52,15 @@ struct demo_overlay {
     int  checked;
 };
 
-/* One `@world` line: what a viewer's content must hash to, and what this save changed. */
+/* One `@world` line: what a viewer's content must hash to, and what this save changed.
+ * A sector file may appear MORE THAN ONCE, one line per load whose bytes differed from the
+ * load before it; `loads` is the playback's counter for the group and lives on the first
+ * entry of that group only. See u2_demo_apply_world. */
 struct demo_world {
     char name[24];
     char base[65];
     char delta[U2_DEMO_DELTA_MAX];
+    int  loads;
 };
 /* Sized for the longest line the writer can legitimately emit, which is an `@world`:
  * prefix + name + base + ` delta=` + a full U2_DEMO_DELTA_MAX delta. The value used to be
@@ -187,6 +191,9 @@ static int world_reserve(u2_demo *d)
     const int next = d->cap_world ? d->cap_world * 2 : 8;
     struct demo_world *p = realloc(d->world, sizeof *p * (size_t)next);
     if (!p) return -1;
+    /* realloc does not zero, and `loads` is a counter a stale heap byte would corrupt into
+     * a version index that never matches the recording. Zero the grown region. */
+    memset(p + d->cap_world, 0, sizeof *p * (size_t)(next - d->cap_world));
     d->world = p;
     d->cap_world = next;
     return 0;
@@ -1531,12 +1538,6 @@ static void note_layer_delta(u2_ctx *ctx, u2_demo *d, const u2_world *w, int is_
     if (u2_world_read_content(ctx, is_map, id, content, n, nm, sizeof nm)
             != U2_WORLD_OK) return;
 
-    /* One line per sector file, not one per visit: note_world runs at every sector load,
-     * and a step out and back in would otherwise repeat a line and grow the header with
-     * the walk. */
-    for (int k = 0; k < d->n_world; k++)
-        if (strcmp(d->world[k].name, nm) == 0) return;
-
     if (root && strcmp(root, U2_WORLD_SLOT_LAYER) == 0 &&
         u2_world_read_slot(ctx, is_map, id, over, n, NULL, 0) == U2_WORLD_OK) {
         const int cells = world_delta(content, over, n, delta, sizeof delta);
@@ -1545,9 +1546,31 @@ static void note_layer_delta(u2_ctx *ctx, u2_demo *d, const u2_world *w, int is_
         else if (cells < 0) dtxt = "too-big";
     }
 
+    char sha[65];
+    sha256_hex(content, n, sha);
+
+    /* One line per LOAD whose bytes differed, not one line per file.
+     *
+     * A mid-session save rewrites the sector in the slot -- faithfully, because asm/2340 is
+     * on the save path and the original does the same thing -- so a later load of that file
+     * reads different bytes than the first one did. A single per-file delta could only ever
+     * describe the first, and the playback re-applied it on every re-entry: measured on the
+     * owner's 196-record demo, four creatures present on the recorder and absent in
+     * playback at record 58, because a save seven seconds in rewrote monx20.
+     *
+     * Repeats are still suppressed, because a session that crosses a sector edge forty times
+     * would otherwise carry forty identical deltas and buy nothing: the playback reuses the
+     * last version for a load with no new one, so an unchanged reload needs no line.
+     */
+    int last = -1;
+    for (int k = 0; k < d->n_world; k++)
+        if (strcmp(d->world[k].name, nm) == 0) last = k;
+    if (last >= 0 && strcmp(d->world[last].delta, dtxt) == 0 &&
+            strcmp(d->world[last].base, sha) == 0) return;
+
     if (world_reserve(d) != 0) return;
     snprintf(d->world[d->n_world].name, 24, "%.23s", nm);
-    sha256_hex(content, n, d->world[d->n_world].base);
+    snprintf(d->world[d->n_world].base, 65, "%.64s", sha);
     snprintf(d->world[d->n_world].delta, U2_DEMO_DELTA_MAX, "%.2047s", dtxt);
     d->n_world++;
 }
@@ -1563,10 +1586,19 @@ int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id, int is_map)
     if (!d || !w || d->state != U2_DEMO_PLAYING || d->n_world == 0) return 0;
 
     sector_name(name, sizeof name, is_map ? "mapx" : "monx", id.hi, id.lo);
-    int idx = -1;
+    int first = -1, nver = 0;
     for (int i = 0; i < d->n_world; i++)
-        if (strcmp(d->world[i].name, name) == 0) { idx = i; break; }
-    if (idx < 0) return 0;
+        if (strcmp(d->world[i].name, name) == 0) { if (first < 0) first = i; nver++; }
+    if (first < 0) return 0;
+
+    /* Versions are emitted in LOAD order, one per load whose bytes differed. This is load
+     * number `loads` of this file, so it takes version `loads`; a load with no version of
+     * its own reuses the last one, which is what lets an unchanged reload cost no line.
+     * The counter lives on the group's first entry and both sides count loads the same way,
+     * because playback replays the same keys that produced the recorder's transitions. */
+    const int k = d->world[first].loads;
+    d->world[first].loads = k + 1;
+    const int idx = first + (k < nver ? k : nver - 1);
 
     const char *dt = d->world[idx].delta;
     const int nothing = (!dt[0] || strcmp(dt, "none") == 0);
