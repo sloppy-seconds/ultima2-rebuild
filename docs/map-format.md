@@ -260,8 +260,14 @@ Two consequences, neither applied yet. **`mon_kind` is misnamed**: it is the sav
 spawn arms' `cmp` on `[DI+0x1B7]` is a terrain test, not a kind dispatch. And
 **`u2_monsters_clear_spawn_cells` hard-codes `k_clear = 0x70`** where the original restores the
 slot's own byte, so it is right in towns and wrong in the field — the 2026-11-06 "only clear a baked
-cell" guard reaches the right outcome for the wrong reason. The visible half, a land creature
-leaving `0x08` behind rather than paving, still has no frame and is `docs/needs-gameplay.md` G66.
+cell" guard reaches the right outcome for the wrong reason.
+
+**And now observed, not just read off the bytes.** `captures/spice86/g66-departure/` loaded a
+character into sector 00 — land, `DS:1B7 = 0x08` for every creature, so the restore and a constant
+`0x70` are distinguishable there in a way they were not in paving sector 03 — ran the creature sweep,
+and read the live grid either side of it. Over 8 clean departures the vacated cell became the slot's
+own terrain byte **8 times out of 8**, with zero `0x70` and zero ghosts. The two engine consequences
+above were fixed the same day and shipped.
 
 ### Why this matters for the engine
 
