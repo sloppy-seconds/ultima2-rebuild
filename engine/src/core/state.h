@@ -418,9 +418,23 @@ typedef struct u2_state {
                                        * 0x68 Merchant, 0xF0 Fighter. asm/40CB compares
                                        * it against 0x6c. NOT the art index — art comes
                                        * from the map cell, docs/art-index.md. */
-    /* 0x1B7 */ uint8_t mon_kind[32]; /* monx[128..159]. Kind index; asm/0AD3 dispatches
-                                       * the special attacks on it. Does not hold across
-                                       * every sector (docs/monster-spawn.md § 6). */
+    /* 0x1B7 */ uint8_t mon_kind[32]; /* monx[128..159]. NOT a kind index, despite the
+                                       * name, and the name is an open question (see
+                                       * docs/demo-record-playback.md § 13.9). In the
+                                       * overworld this is the terrain byte saved under
+                                       * the creature: asm/0CEE_spawn_tile_store fills it
+                                       * at spawn from the rolled cell, and asm/2233
+                                       * restores it into the grid on departure. Measured
+                                       * in the shipped data: across 511 live slots it is
+                                       * only ever 0x70 or 0x08. In a site asm/147F fills
+                                       * it with slot>>1 and it is a FLOOR instead, which
+                                       * is why the field is not simply renamed. Corrected
+                                       * 2026-11-08; docs/map-format.md § 9.
+                                       * FALSE, and removed: "asm/0AD3 dispatches the
+                                       * special attacks on it". asm/0AD3 reads [DI+0x197],
+                                       * the TYPE byte, and never touches 0x1B7.
+                                       * Does not hold across every sector
+                                       * (docs/monster-spawn.md § 6). */
     /* 0x1D7 */ uint8_t mon_role[32]; /* monx[160..191]. Per-slot state/identity.
                                        * 0 = empty slot (asm/102B tests it for zero);
                                        * 0x81/0x82/0x83 = scripted recipients, enumerated
