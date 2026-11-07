@@ -171,7 +171,7 @@ attacking (everything here set it by hitting things), and what distinguishes `0x
 
 Writer attribution also corrected: the writer is `asm/114A_sub_114a` (`mov %al,0x1d7(%di);
 dec %di; jns` — a downward fill loop at runtime `114A..1150`), which **precedes**
-`asm/1151_dungeon_darkness` (`1151..12DA`) and is not part of it. An earlier note here
+`asm/1151_dungeon_turn` (`1151..12DA`) and is not part of it. An earlier note here
 cited `1151`.
 
 ### Which sectors author monsters at all — and it is the site-kind scheme again
@@ -465,7 +465,7 @@ search target changes completely.
 * **This is not the creature movement AI.** Nothing here computes a new coordinate; every
   store takes `AL` from a caller or a species branch. The AI is whoever feeds it.
 * **`asm/152E` is not an overworld pursuit primitive.** Its only caller is
-  `asm/1151_dungeon_darkness`. It was flagged as "a vector from a creature to the player"
+  `asm/1151_dungeon_turn`. It was flagged as "a vector from a creature to the player"
   and that is true, but it is dungeon code. The lead was wrong.
 * **No `call` reaches this cluster** — `grep 'call L_000ec0'` and friends return nothing,
   because entry is by fall-through from `0E9A` (itself a split artefact: `jmp 0xe9a`).
@@ -799,7 +799,7 @@ command falls through to, dispatches on the sector's second decimal digit:
 | --- | --- | --- |
 | `0` — the world map | the sweep at `asm/0A6D` | **nothing**: `asm/0A6D..0AB5` reads `mon_role` nowhere in its span |
 | `1`, `2`, `3` — towns and interiors | runtime `1213`/`1214`/`1215`, i.e. the `asm/1013/1015` chain above | `mon_role` |
-| `4`, `5` — dungeons | runtime `135E`/`135F`, inside `asm/1151`'s span | unread, and parked per `AGENTS.md` § 3 |
+| `4`, `5` — dungeons | runtime `135E`/`135F`, inside `asm/1151`'s span | the dungeon creature turn. **Read in full 2026-10-29 for G54** — this row said "unread, and parked per `AGENTS.md` § 3" for ten days after that, which is why `asm/1151` was renamed from `dungeon_darkness` to `dungeon_turn`: the darkness tail is only the last third |
 | `6..9` | falls through to `asm/0A6D` | nothing, as digit 0 |
 
 On the ungated sweep the ring at `asm/0AAA`/`0AB6`/`0AC0` still applies, but its escape is a

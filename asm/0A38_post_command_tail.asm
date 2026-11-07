@@ -15,7 +15,10 @@
 #           creature sweep at asm/1013/1015 -- runtime 1213/1214/1215 land on the loop whose
 #           body at asm/101C tests mon_type and then mon_role (docs/monster-spawn.md § 14).
 #           Digits 4 and 5 land at runtime 135E/135F, which is inside asm/1151's span: the
-#           dungeon flow, parked per AGENTS.md § 3. So the sweep this tail jumps to for digit 0
+#           dungeon flow. CORRECTED 2026-11-08: this line said "parked per AGENTS.md § 3",
+#           which had already stopped being true -- the park was lifted 2026-10-29, asm/1151
+#           was read in full the same day for G54, and the engine implements it as a second
+#           AI in engine/src/game/dungeon.c. So the sweep this tail jumps to for digit 0
 #           is the WORLD-MAP sweep, and it reads mon_role nowhere in asm/0A6D..0AB5: every live
 #           slot in range gets the full pass. The engine had been applying the town gate here,
 #           which froze the overworld -- owner-reported 2026-10-28 and fixed in
@@ -25,8 +28,9 @@
 # provenance: static reassembly 2026-10-28 (docs/monster-spawn.md § 15.2), corroborated
 #           by a stop at 17D:0CEE reached during an arrow-key walk in the same session
 # confidence: high for the flow and for DS:49/4A's identity; high for the 1..3 arms (the
-#           branch targets are bytes and the target loop is § 14's), none for the 4/5 arms,
-#           which land inside asm/1151 and are unread
+#           branch targets are bytes and the target loop is § 14's), and high for the 4/5
+#           arms as of 2026-11-08 -- the earlier "unread" note predated asm/1151 being read
+#           in full on 2026-10-29 for G54, and outlived it by ten days
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 sub_0a38:
 L_000c38:
