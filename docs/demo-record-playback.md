@@ -158,7 +158,8 @@ gate that had passed.
     format to carry a **terrain delta against content** instead of a digest of whatever the
     run loaded, which retires the split, retires `--demo-embed-overlays`, and finally makes
     the real-install case testable as gate leg W16. **§ 13 is design only and unbuilt**; the
-    five assertions that prove its load-bearing property are shipped and gated.
+    five assertions that prove its load-bearing property are shipped and gated. **The build order is
+    written out below the amendment: Phase 1 terrain restore, Phase 2 `map_base`, Phase 3 the delta.**
 
 Everything below is the plan as ruled on 2026-11-05, unchanged, with the D-numbers the
 implementation cites.
@@ -1003,4 +1004,236 @@ answerable later with a content-version stamp in the slot rather than a format c
 overlay also stays faithful to `asm/2305`, which writes the stamped grid, and `asm/2305`'s own header
 still reads `confidence: low` and "behavior not yet reviewed". Changing a format to deviate from a
 routine nobody has finished reading is not a trade worth making twice.
+
+---
+
+## Implementation plan — terrain restore, then `map_base`, then the demo delta
+
+**Owner ruling 2026-11-08: this ordering, and the architecture work is more important than the demo
+work.** Phases are sequential on purpose. Phase 1 is a small faithful correction that everything else
+cites. Phase 2 is a question before it is a diff. Phase 3 is § 13 and is built to be indifferent to
+how Phase 2 resolves.
+
+Each phase lists its stop-and-ask points, because a plan that predicts every outcome is lying.
+
+## 13.9 Phase 1 — the terrain byte: rename and restore
+
+**The finding, in one line.** `DS:1B7[slot]` is the terrain byte saved under that creature.
+`asm/0CEE_spawn_tile_store` writes it at spawn from the rolled cell, and `asm/2233_sub_2233`
+restores it into the grid when the creature departs. The engine calls the field `mon_kind`, glosses
+it as "kind index", and hard-codes `0x70` where the original restores the slot's own byte.
+
+**Evidence, and its grades.**
+
+| claim | grade | source |
+| --- | --- | --- |
+| `asm/2233` restores `DS:1B7[di]` into the grid cell on departure | **observed** | `mov 0x1b7(%di),%al` + `mov %al,(%bx,%si)` |
+| `asm/0CEE` fills it at spawn from the cell's terrain | **observed** | header: "the terrain tile of the rolled spawn coordinate, returned by `asm/50B3_map_tile_ptr` one instruction earlier" |
+| no constant `0x70` is ever stored to the grid | **measured** | `grep -rn '\$0x70' asm/*.asm` returns three `cmp`s, one unrelated `DS:23E` store, one `add` |
+| the Apple II implementation agrees independently | **observed** | `LDA $4D80,X ; LDY #$0091 ; STA ($06),Y` |
+| `monx[128..159]` holds terrain, only ever `0x70` or `0x08` | **measured** | 511 live slots across 33 sectors; 355 × `0x70`, 156 × `0x08` |
+| it matches a real unbaked neighbour 469/502 times | **measured, corroborating only** | a neighbour's terrain is not necessarily the creature's |
+| a land creature visibly leaves `0x08` and not paving | **inferred — no frame** | `docs/needs-gameplay.md` G66 |
+
+### The complication: `DS:1B7` has three claims on it
+
+This is the thing most likely to go wrong, so it goes before any diff.
+
+| claim | where it comes from | status |
+| --- | --- | --- |
+| terrain byte | `asm/2233`, `asm/0CEE`, the shipped-data measurement | best evidenced |
+| dungeon floor | `asm/147F` fills it with `slot>>1`; `dungeon.c:657,700,795,867` and `monsters.c:181` read it as a floor | live code, five sites |
+| "demonstrably **not** a floor" | `asm/330C_cast_target_finder`'s header, and `state.h:129` | also live |
+
+These are not obviously reconcilable and **the plan does not resolve them by fiat.** The reading that
+fits all three is that `DS:1B7` is "what is under this creature" — a terrain byte on the world map, a
+floor index in a site, because a floor is a dungeon's answer to the same question. That is
+**inferred**, and Phase 1 must not depend on it.
+
+**So Phase 1 is deliberately narrow: change only the overworld restore path.** Do not touch
+`dungeon.c`, do not rename the dungeon's use, and do not assert a single meaning for the field. The
+rename below leaves the dungeon sites reading the same bytes with the same behaviour.
+
+### The changes
+
+1. **`engine/src/core/state.h:421` — rename and correct.** `mon_kind` → `mon_terrain`. The current
+   comment is wrong twice over, and both errors belong in the new comment so they cannot return:
+   - *"`asm/0AD3` dispatches the special attacks on it"* — **false.** `asm/0AD3`'s own header says it
+     "reads the type byte from `[DI+0x197]`" and dispatches `0x34`/`0x38`/`0xF8`/`0x3C` from **type**.
+     It never touches `0x1B7`.
+   - *"Kind index"* — superseded by § 9's closure.
+
+   Also record that the 2026-10-22 retraction in `asm/0AD3`'s header was **half right**: it correctly
+   refuted "sprite" and correctly observed the values `0x08`/`0x0C`, then mislabelled them a kind
+   index when they are two members of the step gate's terrain accept set `{0x08, 0x0C, 0x5C, 0x70,
+   0x00}`.
+
+   Keep `_Static_assert(U2_OFF(mon_terrain) == 0x1B7)`. **The offset is body-adjacent: the value must
+   not move, only the name.**
+2. **`engine/src/game/monsters.c:199` — `u2_monsters_clear_spawn_cells`.** Replace `k_clear = 0x70`
+   with `s->mon_terrain[i]`. Keep the baked-cell guard (`map_base[cell] != mon_type[i] → skip`);
+   it is still correct, because it restricts the pass to cells the shipped file actually baked, which
+   is the case § 9 measured. What changes is *what gets written*. Say in the comment that the guard
+   reaching the right outcome for the wrong reason is why this was missed, and that the original needs
+   no guard at all — it restores unconditionally on departure, and the guard exists only because the
+   engine restores at load instead.
+3. **`engine/src/game/monsters.c:465` — leave alone.** The spawner already writes
+   `s->mon_terrain[slot] = tile;`. The variable at the store site is already named `tile`, which is
+   the strongest sign available that the field's meaning was known here and lost at the read sites.
+4. **Mechanical rename only, no behaviour change:** `combat.c:284`, `combat.h:41`, `overworld.c:246`,
+   `dump_state.c:145`, `monsters.h:5`, `monsters.c:12,45,94,247`.
+
+### Gate legs
+
+| leg | assertion | red control |
+| --- | --- | --- |
+| **T1** | a baked spawn cell is restored to **its slot's own terrain byte**, not a constant | set two slots' terrain bytes to `0x08` and `0x70`, assert the two cells differ after the clear. Today both become `0x70`, so this is red before it is green |
+| **T2** | a slot whose cell is **not** baked is untouched | the existing `monsters_check.c` assertion already covers this and must stay green |
+| **T3** | the dungeon sites are unaffected | `make test-cp7` unchanged, and `dungeon.c` absent from the diff |
+| **T4** | the offset did not move | the `0x1B7` `_Static_assert` must survive the rename |
+
+`monsters_check.c:162,177,187` assert `0x70` by name and must be rewritten to assert the slot's byte.
+**Rewrite them first and watch them go red against the unmodified `monsters.c`** — that is the
+control, and per AGENTS.md § 3 it runs before the fix, not after.
+
+### Stop and ask if
+
+- the land-sector frame from G66 contradicts the restore value. A screenshot showing paving left
+  behind where the slot byte says `0x08` would mean the restore is not what `asm/2233` appears to
+  say, and that outranks this whole section.
+- the rename forces a change in `dungeon.c` to compile. That means the two meanings are entangled in
+  code and not just in prose, and Phase 1 should stop and be absorbed into Phase 2.
+
+## 13.10 Phase 2 — does `map_base` still need to exist?
+
+**This phase begins with a measurement, not a diff.** Do not start it by deleting the buffer.
+
+`docs/map-format.md` § 10 states as measured fact that *"the original does not rebuild the grid from a
+pristine copy on a creature turn, and the engine must not either."* The engine does exactly that:
+`u2_monsters_restamp` runs `for (i...) w->map[i] = w->map_base[i]` on every creature turn. Three
+constructs exist only to survive that self-inflicted erasure:
+
+| construct | why it exists |
+| --- | --- |
+| `u2_world_terrain_put` | its own comment: "the reason is **this module's own design rather than anything in the bytes**" |
+| `u2_world_dungeon_terrain_put` | the paged twin, same reason |
+| `u2_monsters_clear_spawn_cells` | baked art would otherwise return from `map_base` on the first step |
+
+`DS:1B7` answers the baked-art question per slot, which is the only reason `map_base` was invented.
+If that holds, one buffer plus restore-on-departure reproduces the original and deletes all three.
+
+### Step 2a — settle what `asm/2199` reads
+
+**There is a live contradiction in `ai.c` and it must be resolved before anything is removed.**
+
+`ai.c` argues that the stamp *is* the occupancy rule — *"no creature type is in the gate's accept set
+… so an occupied cell simply is not a cell a creature may enter"* — and that per-creature commit was
+added because a stale grid let two creatures share a cell. But `creature_may_enter` (`ai.c:116`) reads
+`u2_world_tile_at()`, which is `map_base` — the **unstamped** grid. So the gate cannot be seeing the
+stamps the comment says it depends on.
+
+Three possibilities, leading to different code:
+
+1. `asm/2199` reads the stamped grid, the engine's `tile_at` is wrong here, and the per-creature
+   commit works for a different reason than recorded.
+2. `asm/2199` reads an unstamped copy, the occupancy story is wrong, and something else prevents stacking.
+3. Both readings exist in the original at different sites and `tile_at` picked the wrong one.
+
+**How to settle it:** `asm/2199_creature_step_gate` is in the caller list of
+`asm/50B3_map_tile_ptr`, which resolves through `word[DS:472]` — the single grid pointer. If `2199`
+reaches the tile through `50B3` it reads the stamped grid, because there is only one. Read the chain,
+record the verdict in `asm/2199`'s header in the same commit per AGENTS.md § 3, and re-check the
+stacking datum the comment cites: 91,851 occupied slot-samples in
+`captures/spice86/fight-20261021-castle03` with zero stacked cells is strong evidence that *some*
+occupancy rule is live.
+
+### Step 2b — inventory before deciding
+
+| site | today | with one buffer |
+| --- | --- | --- |
+| `monsters.c:restamp` | rebuild source | **deleted** |
+| `monsters.c:clear_spawn_cells` | restores baked cells at load | **deleted**; restore moves to the departure path |
+| `world.h:terrain_put`, `dungeon_terrain_put` | dual write | collapse to a single write |
+| `world.h:u2_world_tile_at` | `map_base` | the grid — **check every caller**, this is where the blast radius lives |
+| `ai.c:116,236,318` | `map_base` for the gate and the departure restore | the grid; departure restore becomes `w->map[old] = mon_terrain[slot]` |
+| `view.h:ground[]`, `view.c:110` | second read so EGA can draw terrain then a sprite | **needs an answer**: with one buffer, what goes under a sprite? |
+| `demo.c:1143` | digest source | already moving to raw file bytes in Phase 3 |
+| `world.c:335` | the load-time `memcpy` | deleted |
+
+`view.h:ground[]` is the hard one and the likely reason Phase 2 does not fully land. `DS:1B7` may
+answer it per creature — it *is* the terrain under that creature — but that covers only cells occupied
+at that instant, and the view is rebuilt from the grid every frame.
+
+### Step 2c — decide, in writing
+
+| outcome | when |
+| --- | --- |
+| **full one-buffer** | `tile_at` callers all tolerate a stamped grid **and** `view.h:ground[]` has a real answer |
+| **partial** | delete the rebuild and the dual writes; keep `map_base` as a load-time snapshot for the view only |
+| **no change** | `ground[]` has no answer, or stamped-grid reads break passability. Then § 10's contradiction stands, documented, and the engine stays a deliberate divergence |
+
+**Whatever is chosen, record it in `docs/map-format.md` § 10 next to the finding it resolves.** A
+measured finding the code contradicts, with no note saying why, is the shape AGENTS.md § 3 calls a
+gate that cannot go red.
+
+### Gate legs
+
+| leg | assertion | red control |
+| --- | --- | --- |
+| **M1** | an opened door survives a creature turn (`site_state.py` case C) | must stay green through every step |
+| **M2** | a creature leaving a cell restores that slot's terrain byte via the **departure** path, not a load pass | remove the departure restore: must go red |
+| **M3** | no two creatures share a cell | seed `monx61 (31,44)`, the one shipped stacked cell, and assert the outcome matches the original's data |
+| **M4** | `make test` CP0–CP7 green at every commit in this phase | — |
+
+### Stop and ask if
+
+- step 2a shows `asm/2199` reads an unstamped grid. Then the original *does* keep a second copy,
+  `map_base` is faithful after all, and Phase 2 becomes a documentation change rather than a refactor.
+- `view.h:ground[]` turns out to need a full second buffer. That is a legitimate answer, not a
+  failure, and it should be written down as one.
+
+## 13.11 Phase 3 — the demo world delta
+
+§ 13.1–13.8 stand. Two corrections from the last two days apply, recorded here rather than by
+rewriting § 13.3, so the reasoning that produced the wrong version stays visible:
+
+1. **The digest and the delta are both raw file bytes, never `map_base`.** `map_base` is mutated by
+   `clear_spawn_cells` before `note_world` runs (`overworld.c:1365`, then `:1473`), so digesting it
+   ties the digest to whichever restore mechanism the engine implements — i.e. to Phases 1 and 2.
+   Owner ruling 2026-11-08: **the existing demo does not matter**, so the `digest-version` bump that
+   follows is free. File-vs-file also dodges the 2-row-shift hazard in `map-format.md` entirely,
+   because live grid state is never diffed.
+2. **The apply hook is at sector load, not at the quiescent point.** A delta must land in the grid
+   before `clear_spawn_cells` runs, so it goes immediately after `u2_world_load(map)` at
+   `overworld.c:~1355` and in `site_reload` at `~265` — not beside `demo_restamp_pending`.
+
+Build order, cheapest proof first:
+
+| step | work | leg | control |
+| --- | --- | --- | --- |
+| 3a | content-only sector read into a caller buffer; must not touch the live world | **W17** | re-point the existing `dd` mutation at `run_demo.sh:304` from digest to `base` |
+| 3b | writer: delta at note time, file-vs-file, canonical order by `y*64+x` | **W18** | two recordings of one edit emit identical `@world` lines |
+| 3c | reader + apply at the two load sites; `format-version` 1 → 2, v1 files still play | **W19** | claim `udemo 99` and require refusal |
+| 3d | per-sector: `U2_DEMO_MAX_OVERLAYS` 3 → growable list, `overlay_checked` latch keyed by sector | **W16** | record dirty-slot, replay clean, require clean verification; strip the delta and it must diverge |
+
+**W16 is the reason.** It is the leg that cannot be written today because it cannot pass today, and
+`docs/harness-portability.md` records exactly this gap: fifteen controls on a synthetic fixture and
+three failures on first real use.
+
+### Stop and ask if
+
+- the load-time apply hook needs the demo parsed before the world loads. That is staging, not
+  mount-at-quiescent, and it reshapes playback ordering rather than adding a feature.
+- a site-mode delta is requested before the cell encoding for paged grids is ruled (§ 13.7).
+
+## 13.12 Sequencing summary
+
+| phase | size | risk | unblocks |
+| --- | --- | --- | --- |
+| 1 | small, ~6 files | low; one behaviour change, one rename | G66's frame, and an honest `state.h` |
+| 2 | unknown until 2a | **the real risk is here**, and 2a is cheap enough to find out early | whether `terrain_put` and `clear_spawn_cells` can go |
+| 3 | medium, well-specified | low once 1 and 2 settle | shareable demos, W16 |
+
+Phase 1 ships alone. Phase 2 ships as a decision record even if the decision is "no change". Phase 3
+is indifferent to Phase 2's outcome by construction, which is what makes it safe to specify now.
 
