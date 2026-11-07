@@ -1586,19 +1586,36 @@ int u2_demo_apply_world(u2_ctx *ctx, u2_world *w, u2_sector_id id, int is_map)
     if (!d || !w || d->state != U2_DEMO_PLAYING || d->n_world == 0) return 0;
 
     sector_name(name, sizeof name, is_map ? "mapx" : "monx", id.hi, id.lo);
-    int first = -1, nver = 0;
+    int first = -1;
     for (int i = 0; i < d->n_world; i++)
-        if (strcmp(d->world[i].name, name) == 0) { if (first < 0) first = i; nver++; }
+        if (strcmp(d->world[i].name, name) == 0) { first = i; break; }
     if (first < 0) return 0;
 
     /* Versions are emitted in LOAD order, one per load whose bytes differed. This is load
      * number `loads` of this file, so it takes version `loads`; a load with no version of
      * its own reuses the last one, which is what lets an unchanged reload cost no line.
      * The counter lives on the group's first entry and both sides count loads the same way,
-     * because playback replays the same keys that produced the recorder's transitions. */
+     * because playback replays the same keys that produced the recorder's transitions.
+     *
+     * The versions of one file are NOT contiguous in the array, and indexing them as if they
+     * were is what broke record 116 of the owner's 216-record demo. The header carries the
+     * lines known at the checkpoint and the epilogue appends the ones the walk discovered
+     * (§ 13.11), so a sector's second version lands after every other sector's line. The
+     * file order there was mapx20, monx20, mapx22, monx22, mapx20, monx20, monx20: the old
+     * `first + k` sent the second load of mapx20 to monx20's line, which is a different
+     * file, a different length and a different digest, so the sector refused and the
+     * playback kept the site's creature table while the recorder had the world's. So walk
+     * entry by entry over the ones that name this file, and stop at the last when there are
+     * fewer versions than loads. */
     const int k = d->world[first].loads;
     d->world[first].loads = k + 1;
-    const int idx = first + (k < nver ? k : nver - 1);
+    int idx = first;
+    for (int step = 0; step < k; step++) {
+        int j = idx + 1;
+        while (j < d->n_world && strcmp(d->world[j].name, name) != 0) j++;
+        if (j >= d->n_world) break;
+        idx = j;
+    }
 
     const char *dt = d->world[idx].delta;
     const int nothing = (!dt[0] || strcmp(dt, "none") == 0);

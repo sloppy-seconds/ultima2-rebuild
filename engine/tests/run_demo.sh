@@ -480,6 +480,30 @@ else
     bad "W23: both loads applied the same version (got '$N1' '$N2')"
 fi
 
+# --- W24: the two versions are NOT beside each other -------------------------------
+# W23's fixture inserts the duplicate next to its sibling, which is the one shape a real
+# recording never produces. The header carries the @world lines known at the checkpoint and
+# the epilogue appends the ones the walk discovered, so a file's second version lands after
+# every other sector's line. The reader indexed a group as `first + k` and so walked off the
+# end of the group: on the owner's 216-record demo the second load of mapx20 read monx20's
+# line, a different file with a different digest, and the sector refused. Record 116 was
+# that refusal, and 220 bytes of "the two runs are in different game modes" were its shadow.
+seed "$WORK/wc3"
+python3 tests/demo_fixture.py spreadworld "$WORK/d_dirty/dirty.demo" "$WORK/spread.demo"
+RC=0
+OUT=$("$U2" --headless --cleanroom --data-dir "$WORK/wc3/content" \
+           --save-dir "$WORK/wc3/save" --playback "$WORK/spread.demo" 2>&1) || RC=$?
+S1=$(printf '%s\n' "$OUT" | grep -o 'mapx70: rebuilt.*sector now [0-9a-f]*' | sed 's/.*sector now //' | sed -n '1p')
+S2=$(printf '%s\n' "$OUT" | grep -o 'mapx70: rebuilt.*sector now [0-9a-f]*' | sed 's/.*sector now //' | sed -n '2p')
+if [ -n "$S1" ] && [ -n "$S2" ] && [ "$S1" != "$S2" ]; then
+    ok "W24: two versions separated by other sectors' lines still find their own file ($S1 then $S2)"
+else
+    bad "W24: the spread group did not resolve (got '$S1' '$S2', exit $RC): $(printf '%s\n' "$OUT" | grep -i 'refus\|not the one' | head -1)"
+fi
+printf '%s\n' "$OUT" | grep -qi "not the one the recording" \
+    && bad "W24: a spread version was read as another file's base and refused" \
+    || ok "W24 control: neither load mistook its file for another sector's"
+
 # --- W16: the delta is APPLIED at load, not merely parsed ----------------------
 # W18 gates the writer, and that turned out not to be enough. The reader was storing a
 # fixed 23-character slice of the whole line as the sector name, so no sector ever

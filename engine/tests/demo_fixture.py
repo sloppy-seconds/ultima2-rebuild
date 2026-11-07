@@ -24,6 +24,9 @@ the ones docs/demo-record-playback.md § 9 names as controls.
                         version beyond the reader's must refuse.
   dupworld IN OUT       duplicate the first @world line with a shifted target byte, repair
                         framing. This is W23: one file loaded twice with different bytes.
+  spreadworld IN OUT    the same duplicate, inserted after the LAST @world line instead of
+                        beside its sibling. This is W24: a group whose versions are not
+                        contiguous, which is the only shape a real recording produces.
 
 Usage: demo_fixture.py SUBCOMMAND IN OUT [arg]
 """
@@ -226,8 +229,50 @@ def cmd_dupworld(argv):
     return 0
 
 
+def cmd_spreadworld(argv):
+    """Duplicate the first `@world` line, but at the END of the `@world` block.
+
+    This is W24, and it is W23's fixture with the one property that matters moved. A real
+    recording cannot put a file's versions next to each other: the header carries the lines
+    known at the checkpoint and the epilogue appends the ones the walk discovered, so the
+    second load of mapx20 lands after mapx22 and monx22. The reader used to index a group
+    as `first + k`, which is only correct when a group is contiguous, and on the owner's
+    216-record demo it sent the second load of mapx20 into monx20's line -- a different
+    file, a different length, a different digest.
+
+    `dupworld` inserts the copy beside its sibling and so cannot see this at all: two
+    fixtures for one contract, and only the tidy one was gated.
+    """
+    lines = read(argv[0])
+    first = last = -1
+    for i, line in enumerate(lines):
+        if line.startswith("@world "):
+            if first < 0:
+                first = i
+            last = i
+    if first < 0:
+        print("demo_fixture: no @world line", file=sys.stderr)
+        return 2
+    line = lines[first]
+    if " delta=" not in line or line.rstrip().endswith("delta=none"):
+        print("demo_fixture: first @world carries no cells to duplicate", file=sys.stderr)
+        return 2
+    if last == first:
+        print("demo_fixture: only one @world line, so spreading it proves nothing",
+              file=sys.stderr)
+        return 2
+    dup = line.replace("->44", "->45")
+    if dup == line:
+        print("demo_fixture: expected a ->44 cell to shift", file=sys.stderr)
+        return 2
+    lines.insert(last + 1, dup)
+    write(argv[1], repair_end(lines))
+    return 0
+
+
 COMMANDS = {
     "dupworld": cmd_dupworld,
+    "spreadworld": cmd_spreadworld,
     "version": cmd_version,
     "digest": cmd_digest,
     "rawdigest": cmd_rawdigest,
