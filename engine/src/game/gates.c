@@ -102,25 +102,42 @@ void u2_gate_turn(u2_ctx *ctx, struct u2_overworld *ow)
 {
     if (!gate_is_on_world_map(ctx))
         return;
-    /* Observed sequence is 8,7,6,...,2,1 and then the next tick reloads to 8 with the
-     * index advanced — the reload happens ON the 1, not on a tick at zero.
+    /* Mirrors asm/2701 directly: `decb 0x6f ; je L_002908`. Decrement the byte, and rotate only
+     * when the DECREMENTED value is zero. That form is chosen over the observation it came from
+     * ("the reload happens ON the 1") because it gets both live measurements right at once, and
+     * the previous `countdown <= 1` form got only one:
      *
-     * The UNIT of this tick is not a turn. captures/spice86/g73-6f-unit measured it three ways and
-     * found one decrement per consumed keypress plus one per ~8 s of no input; 20 ILLEGAL COMMAND
-     * keys moved the countdown 20 and the world zero. This function is called on an accepted turn,
-     * which agrees for the API case (one command, one key) and diverges for a rejected key. Left
-     * deliberately, and named here so the next reader does not "fix" the correlation back into the
-     * mechanism. See docs/moongates.md section 2. */
-    if (ctx->state.gate_countdown <= 1) {
-        ctx->state.gate_countdown = U2_GATE_COUNTDOWN_RELOAD;
-        ctx->state.gate_index = (uint8_t)((ctx->state.gate_index + 2) & 0x7);
-        /* The rotation is what puts a door on the map. Before the first one there is
-         * nothing to step on, even though the index already points at slot 0. */
-        if (ow)
-            ow->gate_stamped = 1;
+     *   - from 8 the sequence is 7,6,...,1,0 -> reload 8, so eight turns per rotation and a
+     *     watcher never samples the zero. That is what docs/moongates.md recorded live.
+     *   - at load the byte is 0 (U2_GATE_COUNTDOWN_AT_LOAD, observed twice). The first tick makes
+     *     it 0xff and nothing rotates until it comes all the way back round, about 256 turns.
+     *     Seen directly in captures/spice86/g73-6f-unit: DS:6F read 0x00 at load, 0xfe moments
+     *     later, and DS:6E sat at 00 for the whole session.
+     *
+     * Under the old form a cold load rotated on turn 1 and put a door on the map that the
+     * original would not produce for roughly 256 turns. A bot built on that engine would go
+     * looking for a door the real game has not made yet.
+     *
+     * The unit IS turns, and a turn ends on any consumed keypress -- including one the game
+     * rejects -- or on the idle auto-PASS at asm/08FF, roughly every 8-10 s. That is
+     * captures/spice86/turn-or-second's conclusion with captures/spice86/g73-6f-unit's rejected-
+     * key arm added; an earlier note here claimed the countdown was not turn-driven at all, which
+     * was an overcorrection. This function is called on an accepted turn, so it agrees for the
+     * API case (one command, one key) and differs for rejected keys and for idle auto-PASS turns,
+     * neither of which the API produces. Named rather than plumbed.
+     *
+     * What is still NOT attributed: which code reloads the byte to 8. gates.h is explicit that a
+     * stop at 17D:2908 refuted asm/2744 as the source, and the number is sound because it was
+     * measured in memory. This mirrors the observable, not a mechanism nobody has found. */
+    ctx->state.gate_countdown = (uint8_t)(ctx->state.gate_countdown - 1u);
+    if (ctx->state.gate_countdown != 0)
         return;
-    }
-    ctx->state.gate_countdown--;
+    ctx->state.gate_countdown = U2_GATE_COUNTDOWN_RELOAD;
+    ctx->state.gate_index = (uint8_t)((ctx->state.gate_index + 2) & 0x7);
+    /* The rotation is what puts a door on the map. Before the first one there is
+     * nothing to step on, even though the index already points at slot 0. */
+    if (ow)
+        ow->gate_stamped = 1;
 }
 
 int u2_gate_current_cell(const u2_ctx *ctx, const struct u2_overworld *ow, int *x, int *y)

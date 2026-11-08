@@ -2535,9 +2535,11 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
 
         creature_turn(ctx, ow);
 
-        /* One world turn of the door rotation. The original's countdown is wall-clock and
-         * this is turn-based; see gates.h for why that substitution is stated rather than
-         * hidden. */
+        /* One world turn of the door rotation. The original counts turns too — one drop per
+         * turn, a turn ending on a consumed keypress or on the idle auto-PASS at asm/08FF
+         * (captures/spice86/turn-or-second, with the rejected-key arm from
+         * captures/spice86/g73-6f-unit). This is not a substitution for a wall-clock original;
+         * an earlier version of this comment said it was, and that was the refuted reading. */
         u2_gate_turn(ctx, ow);
     }
     if (ctx->frame_dump_path) {

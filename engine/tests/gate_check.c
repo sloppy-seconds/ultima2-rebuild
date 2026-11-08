@@ -120,6 +120,51 @@ int main(int argc, char **argv)
     CHECK(ctx.state.gate_index == 0, "index wraps 06 -> 00 after four rotations, got %u",
           ctx.state.gate_index);
 
+    /* --- a cold load does NOT get a door for ~256 turns --------------------
+     * asm/2701 is `decb 0x6f ; je`, so a byte that starts at zero walks ff, fe, fd ... and
+     * only rotates when it comes back round to zero. Observed directly:
+     * captures/spice86/g73-6f-unit found DS:6F = 0x00 at load and 0xfe moments later, with
+     * DS:6E fixed at 00 for the whole session. The previous `countdown <= 1` form rotated on
+     * turn 1, which is a door the original has not made yet -- the kind of difference a bot
+     * built against the engine would never see and would fail on against the game. */
+    memset(&ctx, 0, sizeof ctx);
+    ctx.state.sector_first = 2;
+    ctx.state.gate_countdown = U2_GATE_COUNTDOWN_AT_LOAD;
+    ctx.state.gate_index = 0;
+    static u2_overworld ow_cold;          /* static: it carries tiles and frame buffers */
+    memset(&ow_cold, 0, sizeof ow_cold);
+    u2_gate_turn(&ctx, &ow_cold);
+    CHECK(ctx.state.gate_countdown == 0xff,
+          "the first tick from a cold load wraps to 0xff, got %u", ctx.state.gate_countdown);
+    CHECK(ctx.state.gate_index == 0 && !ow_cold.gate_stamped,
+          "and nothing rotates and no door appears on that tick");
+    int cx = 0, cy = 0;
+    CHECK(!u2_gate_current_cell(&ctx, &ow_cold, &cx, &cy),
+          "a cold load has no door to step on");
+    for (int i = 0; i < 255; ++i)          /* 1 already spent above, 256 total */
+        u2_gate_turn(&ctx, &ow_cold);
+    CHECK(ctx.state.gate_index == 2 && ctx.state.gate_countdown == U2_GATE_COUNTDOWN_RELOAD,
+          "the first rotation lands on turn 256, got index %u cd %u",
+          ctx.state.gate_index, ctx.state.gate_countdown);
+    CHECK(ow_cold.gate_stamped, "and that rotation is what stamps the door");
+    /* Control on the count itself: one turn short must not have rotated, one turn more must
+     * be back to a plain 8-turn cycle. Without this the 256 could be an off-by-one that
+     * still looks like a long wait. */
+    memset(&ctx, 0, sizeof ctx);
+    ctx.state.sector_first = 2;
+    ctx.state.gate_countdown = U2_GATE_COUNTDOWN_AT_LOAD;
+    for (int i = 0; i < 255; ++i)
+        u2_gate_turn(&ctx, NULL);
+    CHECK(ctx.state.gate_index == 0, "255 turns from cold is not yet a rotation, got %u",
+          ctx.state.gate_index);
+    u2_gate_turn(&ctx, NULL);
+    CHECK(ctx.state.gate_index == 2, "256 is, got %u", ctx.state.gate_index);
+    for (int i = 0; i < 8; ++i)
+        u2_gate_turn(&ctx, NULL);
+    CHECK(ctx.state.gate_index == 4,
+          "and from there it is the ordinary 8-turn cycle, got %u", ctx.state.gate_index);
+
+
     /* --- a settlement has no doors, and no clock ---------------------------
      * Measured 2026-11-02 inside Port Boniface (sector 31, ones digit 1) with the rotation
      * armed: the town grid held no 0xC0 at all, and DS:6F sat unchanged across six moves

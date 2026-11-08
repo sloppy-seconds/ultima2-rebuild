@@ -9,12 +9,19 @@
  * refuted by an earlier document in this repo on a census that looked only at stores
  * of the byte, and it is easy to re-introduce that mistake.
  *
- * SCOPE, and it is deliberate. The table is decoded for all five eras, but only two
- * gate indices have an OBSERVED partner era: index 1 pairs eras 1 and 2, index 2 pairs
- * eras 2 and 3. Indices 0 and 3 are unobserved, so u2_gate_partner_era() reports them
- * as unknown and no transit is offered there. A door that opens onto a guessed era is
- * worse than no door: it reads as finished and is silently wrong, which is the failure
- * mode AGENTS.md § 3 was written against.
+ * SCOPE, and it changed on 2026-11-08. The table is decoded for all five eras, and so is the
+ * destination: asm/26B7 + asm/26C3 + asm/26C6 are one routine that says
+ *
+ *     target_era = slot if slot < era else slot + 1
+ *
+ * so all four slots have a destination in every era and u2_gate_partner_era() no longer reports
+ * unknown for any of them. It used to carry a four-row table of the pairings ever watched live and
+ * refuse the other two, which was the right call while the rule was undiscovered — a door onto a
+ * guessed era reads as finished and is silently wrong, the failure mode AGENTS.md § 3 was written
+ * against. The rule is not a guess: it reproduces both watched transits unchanged, and
+ * tools/gate_graph.py checks it against the Codex's five general rules and four named two-way
+ * connections. Two of the four slots are still derived rather than observed; docs/moongates.md
+ * section 3b and needs-gameplay G73 say so.
  *
  * Also deliberately NOT modelled: stamping 0xC0 into the resident sector. Two reasons,
  * both recorded in docs/moongates.md § 7. The substitute art for that byte is under
@@ -78,10 +85,15 @@ int u2_gate_current_cell(const u2_ctx *ctx, const struct u2_overworld *ow, int *
 #define U2_GATE_STAGING 0x60
 
 /*
- * The era a door leads to, or -1 when the pairing has never been observed.
- * Observed live, both directions for index 1 and both for index 2:
- *   era1 slot1 (47,28) <-> era2 slot1 (48,24)
- *   era2 slot2 (42,24) <-> era3 slot2 (33,23)
+ * The era a door leads to, or -1 for an era/slot the table does not cover.
+ * From asm/26B7+26C3+26C6: `target = slot if slot < era else slot + 1`. The slot IS the
+ * destination, expressed as a position in the sorted list of the other four eras, so gate 0 always
+ * leads to the earliest other era and gate 3 always to the latest. Consequence: slot k is the
+ * two-way link between era k and era k+1, and nothing else round-trips.
+ *   era1 slot1 (47,28) <-> era2 slot1 (48,24)      watched live
+ *   era2 slot2 (42,24) <-> era3 slot2 (33,23)      watched live
+ *   era2 slot0 (16,16)  -> era0 slot0 (29,56)      derived, never watched
+ *   era2 slot3 (19,52)  -> era4 slot3 (8,11)       derived, never watched
  * The destination is always the SAME SLOT in the partner era; only the era changes.
  */
 int u2_gate_partner_era(int era, int slot);
@@ -100,18 +112,23 @@ int u2_gate_slot(uint8_t gate_index);
  * at a time with a 0.55 s gap all landed, and DS:6F fell by exactly 12 — 1.00 drops per
  * landed turn — while idling 20 s moved it only 2 (captures/spice86/turn-or-second).
  * Standing still looks like a slow clock because a turn also ends on the idle auto-PASS
- * timeout (asm/08FF), measured at about one every 10 s. So the recalled "every 8 turns"
+ * timeout (asm/08FF), measured at about one every 8-10 s. So the recalled "every 8 turns"
  * was right throughout; an earlier note here "corrected" it to time and was itself wrong.
- * It also means the engine's turn-driven loop needs no substitution — the original counts
- * turns and so does this.
+ *
+ * One refinement from captures/spice86/g73-6f-unit: **a turn also ends on a key the game
+ * rejects.** 20 arrow keys sent to a run started without --patch-arrows were every one ILLEGAL
+ * COMMAND, the player never moved, and DS:6F fell exactly 20. turn-or-second could not have seen
+ * that, because its method verified each key by the position change and so excludes rejected keys
+ * by construction. The engine ticks on an accepted turn, so it differs for rejected keys and for
+ * idle auto-PASS turns — neither of which the play API produces, since the API deliberately does
+ * not fire the auto-PASS (see platform/input_api.c). Named, not plumbed.
  */
 void u2_gate_turn(u2_ctx *ctx, struct u2_overworld *ow);
 
 /*
- * If the player is standing on the active gate cell and that slot has an observed
- * partner, perform the transit: the era digit changes, the position becomes the same
- * slot in the partner era, and the rotation advances as it did live (countdown reloaded,
- * index +2 mod 8).
+ * If the player is standing on the active gate cell, perform the transit: the era digit changes,
+ * the position becomes the same slot in the partner era, and the rotation advances as it did live
+ * (countdown reloaded, index +2 mod 8).
  *
  * Returns 0 with nothing done until the first rotation has stamped a door — at load the
  * index points at slot 0 but no gate exists, and transiting there would be a door the
