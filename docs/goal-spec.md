@@ -255,9 +255,16 @@ This is the highest-value capture on the list and it needs someone to reach Shad
 
 The tell is a **string**, which makes it engine-checkable in principle: a policy can talk to
 a candidate guard and read the message tap for that text before spending an attack. That is
-exactly what the API's `message` field exists for (§ 7). Grade: **recalled**, though the
-string's existence in the binary is checkable with `tools/strings_atlas.py` and has not been
-checked as part of writing this file.
+exactly what the API's `message` field exists for (§ 7).
+
+**Checked, and it fails.** `AMUSING`, `Amusing`, `NO ANSWER`, `No answer`, `NO REPLY`,
+`WILL NOT TALK` and `INVULN` do not occur anywhere in `original/ultimaii.exe` — searched over
+the whole file, case-insensitively, on 2026-11-08. So this particular tell is **not available
+in the DOS binary**, and a policy written to it would never fire. What survives is the
+underlying claim, which is separately plausible and separately unverified: that some guards
+cannot be killed. The mechanism for detecting that in this port is unknown, and the likely
+answer is that the invulnerability is a creature-type or HP property rather than a dialogue
+response. Grade: **refuted for the tell, recalled for the phenomenon.**
 
 ---
 
@@ -344,9 +351,20 @@ on numbers, which raises the prior on the other numeric claims in § 3 and § 1 
 does not prove any of them. **Second**, the Apple II aside in § 5 now reads correctly: the
 author says a 1989-era Apple build cannot raise Strength, so it must be created at **29 or
 31** — which are precisely Reflect's and Power's thresholds from this table. That is a
-third-party claim about a different port that our own bytes independently explain. It does not
-generalise: the unchecked rows are unchecked, and the discount percentage, the price bands,
-the 9900 HP and the whole Shadowguard interior are still third-party assertions.
+third-party claim about a different port that our own bytes independently explain.
+
+**A third thing falls out, and the walkthrough never states it.** Power armour needs strength
+31 and the quicksword needs agility 49, and creation gives 90 points with a floor of 10 per
+stat. Even taking the male +5 and fighter +15 strength bonuses, reaching both thresholds
+costs 16 + 49 + 4×10 = 105 points. **So the endgame's own equipment requirements make the
+Hotel California grind mandatory rather than optional** — a character cannot be created ready,
+and P2 sits on the critical path to W2 and W3 instead of being a way to get there faster.
+Checked against the engine: the largest legal vector that still shows the bonuses landing is
+20/20/10/10/10/20, which is exactly the budget, and AP11 pins it.
+
+None of the above generalises downward to the rest of the page: the unchecked rows stay
+unchecked, and the discount percentage, the price bands, the 9900 HP and the whole Shadowguard
+interior are still third-party assertions.
 
 **Method note, for `docs/harness-portability.md`:** a community walkthrough's *numbers* can be
 validated against a reimplementation's arithmetic even when its *route* cannot be validated at
@@ -399,20 +417,29 @@ same argument D1–D6 made for save-scoped worlds.
 
 ### 7.3 What the API needs before a Python bot is worth writing
 
-Ranked by what blocks the most layers. Each is a small change to `core/api.c`; none is a
-design problem, and all of them are the kind of gap that is cheaper to name now than to
-discover at 2am against a bot that cannot see its own inventory.
+Ranked by what blocks the most layers. **Items 1, 2 and 3 were built on 2026-11-08** and are
+marked as such; 4, 5 and 6 remain open. A fourth thing was found and fixed while building
+them, and it is recorded first because it blocked everything else.
 
-1. **Inventory, weapons and armour in the observation.** `items_held[16]`, `weapons_owned[10]`,
+0. **`create` did not enter the world.** *(built)* The first API build wrote a character and
+   left the title flow running, so a caller that created a character and then sent game keys
+   was driving the menu. The handoff lives in `title.c`'s `case 'C'`, which the API never
+   passes through. Fixed by setting `enter_world` — the engine's own request-to-play flag —
+   and teaching `flow_stopped()` and `wait_choice` to see it. Without this, items 1–3 would
+   have produced a bot that could read its inventory while standing at a splash screen.
+
+1. **Inventory, weapons and armour in the observation.** *(built — `char.weapons`,
+   `char.items`, `char.armour`, `char.wield`, `char.worn`; gated by AP8 and AP11)* `items_held[16]`, `weapons_owned[10]`,
    `armour_owned[6]`, `readied_weapon`, `worn_armour` are all on the state block and **none is
    in `u2_state_json`**. Without them the bot cannot evaluate a single predicate from § 2, and
    W1–W3 of the win condition are unreadable. This is the blocking item. Extend the `char`
    block the API already emits rather than growing `u2_state_json`, for the reason recorded in
    `docs/play-api.md` deviation 4.
-2. **A defeat signal.** Something that says "this character is dead and this run is over".
+2. **A defeat signal.** *(built — `char.dead`, gated by AP10 in both directions)* Something that says "this character is dead and this run is over".
    Today a caller would infer it from HP, and HP is packed decimal, so an inference bug looks
    like a bot playing a corpse.
-3. **HP as a decoded number, not two packed bytes.** The bot should not have to know about
+3. **HP as a decoded number, not two packed bytes.** *(built — `char.hp`, and `food`, `exp`
+   and `gold` likewise, all read through `u2_state_bcd_pair`)* The bot should not have to know about
    BCD. The engine already has `unpack_bcd`; the observation should use it. This is also what
    makes W4 testable rather than arguable.
 4. **The era and world as named fields.** `sector_first` doubles as the era index on Earth and

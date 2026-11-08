@@ -45,6 +45,26 @@ name.** They are listed here rather than edited silently into § 3 and § 4.
    resolves the renderer itself, so testing `renderer_choice` refused a perfectly good
    `--headless --api` run. What matters is whether something will actually draw on stdout.
 
+9. **`create` did not enter the world, and `mode` said it had.** The plan assumed a created
+   character was a playable one. It was not: `u2_creation_apply` writes the record and the
+   state, but the interactive flow's handoff lives in `title.c`'s `case 'C'`, which the API
+   never passes through, so the title flow kept cycling its splash while `mode` reported
+   `world` off the name heuristic. Fixed by setting the engine's own `enter_world` flag and
+   adding it to `flow_stopped()` and `wait_choice`'s stop test — a request made from outside a
+   flow's key handling is invisible to a loop that only reads keys. `mode` gained a third
+   value, `created`, for the state between "has a character" and "is in the world", because
+   collapsing those two is what hid the bug. Gated by AP9, whose first version asserted on the
+   sector and passed with the handoff disabled — the record carries sector 20 either way — so
+   the discriminator is now the overworld's own `CMD:` prompt.
+10. **The observation grew a gear block, because a bot could create a character and not see
+    it.** `items_held[16]`, `weapons_owned[10]`, `armour_owned[6]`, `readied_weapon`,
+    `worn_armour`, decoded `hp`/`food`/`exp`/`gold`, and a `dead` flag. See
+    `docs/goal-spec.md` § 7.3, whose items 1–3 this closes. Two encodings are handled inside
+    the engine rather than being handed to the caller: the armour counts are indexed one below
+    the menu digit (`armour_owned[0]` is CLOTH), and the ledger fields are packed decimal read
+    through `u2_state_bcd_pair`, the same accessor the panel uses.
+
+
 Everything below is the plan as written, unchanged, with the D-numbers and A-numbers the
 implementation cites.
 

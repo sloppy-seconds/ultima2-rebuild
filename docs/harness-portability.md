@@ -1725,3 +1725,20 @@ round numbers. The general form is that a port-independent *rule* shows up as a
 port-independent *number*, and a number is cheap to check. Corollary worth recording: the same
 ledger can explain a claim about a **different port** that the source makes in passing, which
 is a stronger signal than agreeing about the port under study.
+
+2026-11-08. A request that arrives from outside a flow's own input handling is invisible to a
+loop that only reads input, and the fix is to widen the loop's stop test rather than to
+interrupt it. Adding a machine-readable play seam exposed this squarely: the seam's create
+command wrote the character record and the state, but the handoff into the world lived in the
+title flow's own key switch, which the new command path never passes through. The result was a
+session that had a character, reported itself as being in the world, and was still cycling the
+splash screen — and every key the caller then sent went to the menu. Two candidate fixes, and
+only one is safe: interrupting the wait, or setting the flag the flow already uses to mean
+"play requested" and adding that flag to the predicates the wait already checks each
+iteration. The second was chosen because the flag already existed with exactly the right
+meaning, and because a widened stop test is visible to the next reader where an injected
+interrupt is not. Two generalisations. A state the caller can act on needs a distinct name:
+collapsing "has a character" and "is in the world" into one reported value is what hid the
+defect behind a plausible answer. And a gate for a handoff must assert on something only the
+handoff produces — the first version asserted on a sector number that the record carried either
+way and passed with the fix disabled; the command prompt the world emits is the discriminator.
