@@ -126,7 +126,7 @@ run: $(BIN)
 headless: $(BIN)
 	./$(BIN) --headless --script tests/title.keys --dump-state
 
-test: test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo
+test: test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo test-api
 
 # Re-record the real playthroughs and verify every one under three backends. Needs the
 # gitignored game content AND the save slot those recordings started from, so it is not
@@ -141,6 +141,13 @@ drive: $(BIN)
 
 test-demo: $(BIN)
 	bash tests/run_demo.sh
+
+test-api: $(BIN)
+	bash tests/run_api.sh
+
+# Drive the API from a shell the way a bot would. Needs nothing but the binary.
+api: $(BIN)
+	U2="$PWD/$(BIN)" python3 tools/u2api.py
 
 test-cp0: $(BIN)
 	bash tests/run_cp0.sh
