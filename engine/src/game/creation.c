@@ -78,6 +78,8 @@
  * hardcoded game string. Engine-authored text is marked "[engine]".
  */
 
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 #include "game/creation.h"
 #include "core/save.h"
@@ -642,6 +644,88 @@ static void commit(u2_ctx *ctx, form *f)
      * holds 0 there and the saved record carries it as the overworld digit. */
     st->hp = 4; st->food = 4;                          /* 0x5BEB..0x5BF3 */
     st->gold_lo = 4; st->gold_hi = 0;
+}
+
+/* ---- declarative creation (docs/play-api.md A4, A5) --------------------- */
+
+static void refuse(char *why, int whysize, const char *fmt, ...)
+{
+    if (!why || whysize <= 0) return;
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(why, (size_t)whysize, fmt, ap);
+    va_end(ap);
+}
+
+int u2_creation_apply(u2_ctx *ctx, const u2_character *c, char *why, int whysize)
+{
+    form f;
+
+    if (!ctx || !c) {
+        refuse(why, whysize, "no character given");
+        return -1;
+    }
+
+    memset(&f, 0, sizeof f);
+    for (int i = 0; i < 6; i++)
+        f.val[i] = c->stat[i];
+    f.sex  = c->sex;
+    f.race = c->race;
+    f.cls  = c->cls;
+
+    /* Every rule below is the form's, quoted from the same constants it uses, so the two
+     * cannot disagree. Order matters only in which refusal a doubly-invalid spec reports
+     * first; the stat floor goes first because asm/5C69 checks it before the budget. */
+    for (int i = 0; i < 6; i++) {
+        if (c->stat[i] < STAT_MIN) {
+            refuse(why, whysize, "stat %d is %d, below the floor of %d (asm/5C69)",
+                   i, c->stat[i], STAT_MIN);
+            return -1;
+        }
+        if (c->stat[i] > 99) {
+            refuse(why, whysize, "stat %d is %d, over two packed digits", i, c->stat[i]);
+            return -1;
+        }
+    }
+    if (spent(&f) > unpack_bcd(BUDGET_START)) {
+        refuse(why, whysize, "stats spend %d of the %d-point budget (asm/56E6)",
+               spent(&f), unpack_bcd(BUDGET_START));
+        return -1;
+    }
+    if (c->sex != 'M' && c->sex != 'F') {
+        refuse(why, whysize, "sex must be M or F");
+        return -1;
+    }
+    if (c->race < '1' || c->race > '4') {
+        refuse(why, whysize, "race must be 1..4 (human, elf, dwarf, hobbit)");
+        return -1;
+    }
+    if (c->cls < '1' || c->cls > '4') {
+        refuse(why, whysize, "class must be 1..4 (fighter, cleric, wizard, thief)");
+        return -1;
+    }
+    if (!c->name || !c->name[0]) {
+        refuse(why, whysize, "name must not be empty");
+        return -1;
+    }
+    const size_t nlen = strlen(c->name);
+    if (nlen > NAME_MAX) {
+        refuse(why, whysize, "name is %u characters, the form caps at %d (asm/5BB7)",
+               (unsigned)nlen, NAME_MAX);
+        return -1;
+    }
+    memcpy(f.name, c->name, nlen);
+    f.name_len = (int)nlen;
+
+    commit(ctx, &f);
+
+    /* The same write the form's [S]AVE does, so a created character is resumable by
+     * --play-map and by a later API session rather than living only in this process. */
+    if (u2_save_store(ctx) != U2_SAVE_OK) {
+        refuse(why, whysize, "the save could not be written");
+        return -1;
+    }
+    return 0;
 }
 
 /* [S]AVE / [R]ESET are standing shortcuts on the confirm line (D9), handled in

@@ -31,4 +31,41 @@
 
 int u2_creation_flow(u2_ctx *ctx);
 
+/*
+ * Declarative character creation, for the play API (docs/play-api.md A4, A5).
+ *
+ * The reason this exists next to u2_creation_flow() rather than instead of it: the form's
+ * cursor -- which field is highlighted, which dropdown is open -- lives in a local struct and
+ * NOT in the DS mirror. That is measured, not assumed (docs/demo-record-playback.md
+ * deviation 5, which is also why recording is refused mid-form). A keystroke-level API would
+ * therefore have to reimplement the form to know what it currently holds, and a second
+ * hand-maintained copy of the form is exactly the thing this repo keeps being bitten by.
+ *
+ * So this builds a `form` and calls the same commit() the interactive flow calls. One source
+ * for the BCD bonuses, the `sub $0x31` race/class conversions, the entry cell, and the
+ * starting HP/food/gold. The API adds no rules and cannot drift from the form's.
+ *
+ * Validation is the form's own, from the same constants: each stat >= STAT_MIN, the six
+ * stats within the 90-point budget, the name within the 12-byte input cap, and sex/race/class
+ * inside the dropdown tables. A declarative API that accepted any stat would be a cheat
+ * engine, and every digest taken over a state the game cannot reach would be evidence about
+ * nothing.
+ *
+ * NOT modelled, deliberately: the original restarts the whole generation on an overspend or a
+ * stat below the floor (asm/5C66 -> 0x5698). The interactive form already deviates by
+ * refusing instead, so the API follows the form. `why` names the rule that refused.
+ *
+ * Returns 0 on success and writes the record the same way the form's [S]AVE does; -1 when
+ * refused (with `why` filled) or when the save could not be written.
+ */
+typedef struct u2_character {
+    const char *name;      /* <= 12 characters, asm/5BB7 */
+    int sex;               /* 'M' or 'F' */
+    int race;              /* 1 human, 2 elf, 3 dwarf, 4 hobbit */
+    int cls;               /* 1 fighter, 2 cleric, 3 wizard, 4 thief */
+    int stat[6];           /* decimal, in commit() order: STR AGI STA CHA WIS INT */
+} u2_character;
+
+int u2_creation_apply(u2_ctx *ctx, const u2_character *c, char *why, int whysize);
+
 #endif /* U2_CREATION_H */
