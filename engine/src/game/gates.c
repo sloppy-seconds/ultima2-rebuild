@@ -62,25 +62,34 @@ int u2_gate_slot(uint8_t gate_index)
     return (gate_index & 0x7) / 2;
 }
 
-/* The doors belong to the world map and to nothing else.
+/* The doors belong to Earth's world map and to nothing else.
  *
- * Measured 2026-11-02 inside Port Boniface (sector 31, ones digit 1), entered the honest way
- * through its wilderness mouth so a return cell was on record. Two separate things stop there,
- * and each was proven on its own:
+ * Two independent refusals, and the second one is newer than this file:
  *
- *   - **nothing stamps.** With the rotation armed by a poke to DS:6F and the live slot at 2, the
- *     whole 64x64 town grid held no 0xC0 at all; the four era-3 table cells held 0x70 paving and
- *     0x78 the player stamp. The control, same session, same era and slot, in sector 30, produced
- *     exactly one 0xC0 at the table cell (33,23).
- *   - **the clock is stopped.** The same poke left DS:6F at 01 across six moves with DS:6E fixed,
- *     where the wilderness advanced the slot within four moves.
- *
- * Two mechanisms failing independently is why both are gated here rather than one standing in for
- * the other: a stamp test alone would still let the index rotate invisibly inside a town and come
- * back out of step. captures/spice86/s31-south-edge/. */
+ *   - **not off-Earth.** `asm/26F9` is the only caller of the countdown decrement and it opens
+ *     `mov 0x6d,%al ; cmp $0x0,%al ; je L_002901`. The clock never ticks while the world byte is
+ *     nonzero, so a planet has no rotating door and no door at all. This matters beyond the clock:
+ *     off-Earth the sector's tens digit IS the world index (`asm/7030` writes DS:49 from DS:6D on
+ *     landing), and the era row this file indexes with that digit is a different axis. Mercury is
+ *     not the Pangea of 9,000,000 BC; it is a planet that happens to arrive in sector 10. Before
+ *     this check existed the engine rotated era-1 doors on Mercury, and nothing in the suite could
+ *     see it because every leg ran on Earth.
+ *   - **not inside a settlement.** Measured 2026-11-02 inside Port Boniface (sector 31, ones digit
+ *     1), entered the honest way through its wilderness mouth so a return cell was on record:
+ *     with the rotation armed by a poke to DS:6F and the live slot at 2, the whole 64x64 town grid
+ *     held no 0xC0 at all, and DS:6F sat unchanged across six moves where the wilderness advanced
+ *     the slot within four. Two mechanisms failing independently is why both are gated here rather
+ *     than one standing in for the other: a stamp test alone would still let the index rotate
+ *     invisibly inside a town and come back out of step. captures/spice86/s31-south-edge/.
+ */
+static int gate_is_on_earth(const u2_ctx *ctx)
+{
+    return ctx->state.world == 0;
+}
+
 static int gate_is_on_world_map(const u2_ctx *ctx)
 {
-    return ctx->state.sector_second == 0;
+    return gate_is_on_earth(ctx) && ctx->state.sector_second == 0;
 }
 
 void u2_gate_turn(u2_ctx *ctx, struct u2_overworld *ow)

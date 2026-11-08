@@ -130,6 +130,45 @@ int main(int argc, char **argv)
     CHECK(ctx.state.gate_index == 6,
           "the same tick on the world map does rotate, got index %u", ctx.state.gate_index);
 
+    /* --- a planet has no doors and no clock --------------------------------
+     * `asm/26F9`, the only caller of the countdown decrement, opens `mov 0x6d,%al ;
+     * cmp $0x0,%al ; je`, so the clock is stopped outright off-Earth. The reason this is
+     * not merely a missing animation is that the era row is indexed with the sector's tens
+     * digit, and off-Earth that digit is the WORLD index: Mercury arriving in sector 10
+     * would otherwise be read as era 1 and get Pangea's doors. Every other leg in this file
+     * runs on Earth, so none of them could see it. */
+    static u2_overworld ow_planet;        /* static: it carries tiles and frame buffers */
+    memset(&ow_planet, 0, sizeof ow_planet);
+    ow_planet.gate_stamped = 1;           /* armed: on Earth this WOULD stamp */
+    memset(&ctx, 0, sizeof ctx);
+    ctx.state.world = 1;                  /* Mercury */
+    ctx.state.sector_first = 1;           /* sector 10, which is world 1, not era 1 */
+    ctx.state.sector_second = 0;          /* outdoors, so the site test cannot be what refuses */
+    ctx.state.gate_index = 4;             /* slot 2 */
+    ctx.state.gate_countdown = 1;
+    int pgx = -1, pgy = -1;
+    CHECK(!u2_gate_current_cell(&ctx, &ow_planet, &pgx, &pgy),
+          "off-Earth the armed door answers no cell");
+    /* Control, same shape as the settlement one: identical state with the world byte at 0
+     * does stamp, so what refused is the world test and not the stamp flag, the slot
+     * arithmetic or the table. Era row 1 slot 2 is (36,56). */
+    ctx.state.world = 0;
+    pgx = pgy = -1;
+    CHECK(u2_gate_current_cell(&ctx, &ow_planet, &pgx, &pgy) && pgx == 36 && pgy == 56,
+          "the same state on Earth stamps (36,56), got (%d,%d)", pgx, pgy);
+    /* And the clock, with its own control. */
+    ctx.state.world = 1;
+    ctx.state.gate_countdown = 1;
+    for (int i = 0; i < 6; ++i)
+        u2_gate_turn(&ctx, &ow_planet);
+    CHECK(ctx.state.gate_index == 4 && ctx.state.gate_countdown == 1,
+          "the countdown does not advance off-Earth (index %u, cd %u)",
+          ctx.state.gate_index, ctx.state.gate_countdown);
+    ctx.state.world = 0;
+    u2_gate_turn(&ctx, &ow_planet);       /* one tick on Earth, cd was 1 */
+    CHECK(ctx.state.gate_index == 6,
+          "the same tick on Earth does rotate, got index %u", ctx.state.gate_index);
+
     /* --- the two transit refusals that need no sector load -----------------
      * Both return before u2_world_load, so they run without a content directory.
      * The positive legs (era2 slot1 <-> era1 slot1, era2 slot2 <-> era3 slot2) are the

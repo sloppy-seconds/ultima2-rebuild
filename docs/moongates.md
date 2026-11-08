@@ -290,6 +290,24 @@ Modelled: the table for all five eras, the countdown and index rotation, the tra
 the active cell, and the era change on the sector's tens digit with the world byte left alone. The
 door is now also **drawn** — see the stamp note below.
 
+**Earth-only, and that is a byte rule, not a simplification.** `asm/26F9` is the only caller of
+the countdown decrement and it opens `mov 0x6d,%al ; cmp $0x0,%al ; je L_002901`, so the clock never
+ticks while the world byte is nonzero. The full condition, read end to end:
+
+```
+0C1F  mov [DS:12],4 ; if DS:4A != 0 -> jump over
+0C2B  mov [DS:12],0xFF ; call 26F9        <- outdoors arm only
+26F9  if DS:6D == 0 -> 2701               <- Earth only
+2701  decb [DS:6F] ; je -> 2708 rotate
+```
+
+The consequence is worse than a door that fails to animate. Off-Earth the sector's tens digit **is**
+the world index — `asm/7030` writes `DS:49` from `DS:6D` on landing — and this file indexes its era
+row with that same digit. Mercury arriving in sector 10 reads as era 1 and gets Pangea's doors. The
+engine did exactly that until 2026-11-08, and nothing in the suite could see it because every leg
+ran on Earth; `gate_check.c` now has an off-Earth leg with its own control, and the control was
+proven red before the fix was believed.
+
 **Deliberately not modelled, each for a stated reason:**
 
 * **Slots 0 and 3.** Never transited, so `u2_gate_partner_era()` returns unknown and no transit is
