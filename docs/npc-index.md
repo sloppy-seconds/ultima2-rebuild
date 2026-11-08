@@ -36,6 +36,34 @@ Sector 93, Planet X, castle:
 `THE FLOPY FIGHTER` handing out a random weapon because he owns one of everything is not a
 guess at meaning — it is what the bytes do, and the joke is the confirmation.
 
+## 1a. The quicksword cannot be bought, and that is a design statement
+
+Worth recording because it looks, at first, like a shop item: the weapons shoppe's own printed
+catalogue is
+
+```
+THE WEAPONS SHOPPE:
+1-DA, 2-MA, 3-AX, 4-BO,
+5-SW, 6-GR, 7-LI, 8-PH.
+YOUR INTEREST?
+```
+
+Eight entries, ending at **8-PH** — DAGGER through PHASER. QUICK SWORD is pool index 9 and is
+**not on the menu at all**. It is not gated or hidden; the catalogue simply does not list it, and
+`asm/1E4F` bounds the accepted digit at 8 (`shop_weapons` passes that bound, and menu 3 = AX was
+confirmed live against `DS:79`). So **PHASER is the ceiling of what money can buy**, and the
+quicksword's only source in the binary is Santre.
+
+That closes a loop rather than opening one. `cmd_O` role `0x81` sets `DS:7F`, and
+`weapons_owned` is `DS:76..7F` — so `DS:7F` is `weapons_owned[9]`, the quicksword's own slot.
+`ENILNO IS YOURS!` literally means "you now own one QUICK SWORD". And the other offer arm,
+role `0x83`, grants `DS:76 + (rng & 7) + 1`, i.e. indices 1..8 — DAGGER..PHASER, **never 9**.
+There is no third path.
+
+The consequence for `docs/goal-spec.md` W2: the quicksword is a **quest item, not
+merchandise**, so no amount of the Hotel California gold-grinding substitutes for talking to
+Santre in sector 32. It is the one endgame requirement that cannot be bought out of.
+
 ## 2. The endgame chain is now byte-proven end to end
 
 This is what the index actually bought:
