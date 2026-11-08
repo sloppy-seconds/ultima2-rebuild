@@ -1710,3 +1710,18 @@ reason the tap belongs on the state block rather than behind a call into the pro
 the emitter is usually compiled into small harnesses that do not link the protocol layer, and
 a dependency added there breaks builds that have nothing to do with the new feature. Put the
 tap where the emitter can reach it without a new edge, and let the protocol module drain it.
+
+
+2026-11-08. A community walkthrough is checkable in exactly one place, and it is not the part
+it is mostly made of. Route prose — go north, find the castle, talk to the old man — cannot
+be validated against a reimplementation at all, because validating it needs navigation and
+navigation is the thing the prose never supplies. But a stated **minimum stat to wield or
+wear an item** is a claim about a comparison, and the comparison is already in the asm. So
+when third-party documentation carries a requirements table, run it against the rule rather
+than dismissing the whole document as unverifiable: in this project one arithmetic rule
+(menu digit times eight, compared against a packed-decimal stat byte) reproduced every row of
+two such tables, and the boundary cases were what made it convincing rather than the
+round numbers. The general form is that a port-independent *rule* shows up as a
+port-independent *number*, and a number is cheap to check. Corollary worth recording: the same
+ledger can explain a claim about a **different port** that the source makes in passing, which
+is a stronger signal than agreeing about the port under study.
