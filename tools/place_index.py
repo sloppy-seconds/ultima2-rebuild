@@ -221,6 +221,8 @@ def main():
     ap.add_argument("--content-dir", default="original")
     ap.add_argument("--tsv", help="write the full index here (generated; never hand-edited)")
     ap.add_argument("--sector", help="dump every decoded run for one sector")
+    ap.add_argument("--verify", action="store_true",
+                    help="assert the hand-checked place names still decode (a control)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -245,6 +247,57 @@ def main():
             for r in rows:
                 f.write("\t".join(str(r[c]).replace("\t", " ") for c in cols) + "\n")
         print(f"wrote {args.tsv}: {len(rows)} sectors")
+
+    if args.verify:
+        # A control, not a summary. Two layers, because the obvious one is not enough: when this
+        # was first written, clipping Z out of the mapping left every check below green, because
+        # none of the six place names contains a Z. A gate that cannot go red where it claims to
+        # guard is the defect AGENTS.md § 3 names, so the letter table is now pinned directly and
+        # the corpus is measured, not just sampled.
+        for byte, want in ((0x80, "A"), (0xCC, "T"), (0xB8, "O"), (0xAC, "L"),
+                           (0xA0, "I"), (0xE4, "Z")):
+            got = art_to_letter(byte)
+            if got != want:
+                print(f"VERIFY FAIL: byte {byte:#04x} decoded {got!r}, expected {want!r}")
+                return 1
+        if art_to_letter(0xC0) is not None:
+            print("VERIFY FAIL: art 0x30 decoded as a letter, but it is the wall tile -- "
+                  "there is no Q glyph in the game")
+            return 1
+        total = sum(len(re.sub(r"[^A-Z]", "", r["candidate"] + r["rooms"])) for r in rows)
+        # Measured on this corpus, with headroom: a mapping that silently drops a letter or a
+        # gap rule that shreds phrases takes this number down and this check with it.
+        if total < 600:
+            print(f"VERIFY FAIL: only {total} decoded letters across {len(rows)} sectors; "
+                  f"the corpus measured 700+, so the decode has regressed")
+            return 1
+        # The gap rule's own negative control, because the place names do not exercise it:
+        # widening GAP_JOIN until it swallows a neighbouring sign leaves all six names intact
+        # and the check green. mapx31 y=0 holds two separate signs, "THINGS ARE NOT AS THEY
+        # SEEM" and "SAIL OUT THE NORTH CHANNEL", 9 cells apart. If they ever merge, the
+        # threshold has grown past the evidence that set it.
+        s31 = decode_sector(open(os.path.join(args.content_dir, "mapx31"), "rb").read()[:4096])
+        joined = [t for *_, t in s31 if "SEEM" in t and "SAIL" in t]
+        if joined:
+            print(f"VERIFY FAIL: mapx31 y=0 merged two separate signs into {joined[0]!r}; "
+                  f"GAP_JOIN has grown past the 6-cell evidence that set it")
+            return 1
+        expect = {"11": "BARADINS TOWN", "22": "TOWNE LINDA", "31": "PORT BONIFICE",
+                  "82": "TOWNE MAKLER", "92": "TOWNE BASKO", "93": "CASTLE BARATARIA"}
+        got = {r["sector"]: r["candidate"] for r in rows}
+        bad = [(s, e, got.get(s, "")) for s, e in expect.items() if e not in got.get(s, "")]
+        for s, e, g in bad:
+            print(f"VERIFY FAIL sector {s}: expected {e!r}, decoded {g!r}")
+        # And the negative control: a name the game cannot spell, because there is no Q tile.
+        if any("QUEEN" in r["rooms"] + r["candidate"] for r in rows):
+            print("VERIFY FAIL: a QUEEN was decoded, but art 0x30 is a wall tile and there is "
+                  "no Q glyph -- the letter mapping is wrong")
+            bad.append(("Q", "no QUEEN", "found one"))
+        if bad:
+            return 1
+        print(f"VERIFY OK: letter table pinned, {total} decoded letters, "
+              f"{len(expect)} place names, and no Q was found")
+        return 0
 
     named = [r for r in rows if r["candidate"]]
     print(f"{len(rows)} sectors decoded; {len(named)} carry a candidate place name\n")

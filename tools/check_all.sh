@@ -196,6 +196,13 @@ opt_run "recut_bytes selftest" original/ultimaii.exe -- python3 tools/recut_byte
 echo "== Apple II 6502 side (needs gitignored inputs) =="
 opt_run "apple2_seeds selftest" references/apple decompiled/apple2 -- python3 tools/apple2_seeds.py --selftest
 opt_run "apple2_anchor_map" original/ultimaii.exe decompiled/apple2 -- python3 tools/apple2_anchor_map.py --selftest
+
+# The place index needs the player's content to decode, so it is an opt leg like the other
+# content-dependent gates. --verify is a control with four ways to fail: the letter table, the
+# no-Q wall tile, the decoded-volume floor, and the two-signs-on-mapx31 gap check. All four
+# were exercised before this line was added, because the first version of the control passed
+# vacuously when Z was clipped from the mapping.
+opt_run "place_index" original/mapx22 -- python3 tools/place_index.py --verify
 opt_run "apple2 index fresh" /var/tmp/u2-apple2-6502/u2_6502.tsv -- python3 tools/apple2_index.py --check
 
 echo
