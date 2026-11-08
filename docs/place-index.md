@@ -52,13 +52,21 @@ every threshold in the tool is a number with the samples that produced it in a c
    directly above it overlapping in x is one name split over two rows. `mapx11` writes
    `BARADINS` at y=35 x=28..35 and `TOWN` at y=36 x=30..33. Written as a rule, not a
    special case, because the next stacked two-liner would need a second special case.
-3. **Structural fill.** A run of one repeated glyph is structure, not text. The common case
-   is `I` (art `0x28`), used as posts and fence lines, which decodes as `I I` once the gap
-   rule joins adjacent posts. Dungeons and towers are the extreme case: `mapx15`, `mapx24`,
-   `mapx25`, `mapx34`, `mapx35`, `mapx44`, `mapx45`, `mapx85` come out as dozens of rows of
-   `AAAA…`, which is the map using a letter index as wall fill. `docs/tile-art-spec.md` § 7
+3. **Structural fill.** Two rules, because the first was not enough on its own. *Per run*: a
+   single glyph repeated is structure — the common case is `I` (art `0x28`), used as posts and
+   fence lines, which decodes as `I I` once the gap
+   rule joins adjacent posts. *Per sector*: if a sector's letter cells use **at most three
+   distinct glyphs**, it is drawn with letters rather than spelled with them, and everything in
+   it is fill. That threshold is measured, not tuned: across all 33 root sectors, every tower and
+   dungeon (15, 24, 25, 34, 35, 44, 45, 85) uses **exactly two** glyphs — `A` (art `0x20`, wall)
+   and `Y` (art `0x39`, corner) — across 1,499 to 2,863 letter cells, while every sector with
+   real text uses ten or more distinct glyphs across 46 to 162 cells and never concentrates more
+   than 28% of its cells in its two commonest letters. The two populations do not overlap on this
+   measure by any wide margin. `docs/tile-art-spec.md` § 7
    warned of exactly this — *"in some sectors these same indices are used as structural fill
-   rather than as letters"* — and it is the reason a naive decode looks broken.
+   rather than as letters"* — and it is the reason a naive decode looks broken. Before the
+   sector-level rule, dungeons reported `AYAYA A A Y` as if it were unnamed content, which was
+   worse than reporting nothing.
 4. **Name candidate.** A phrase is offered as a *name* when it opens with `TOWNE`/`TOWN`/
    `PORT`/`CASTLE`, closes with `TOWN`, or is the only non-fill run in a settlement sector.
    Everything else is reported as `rooms` — real decoded text, not claimed as a name. The
@@ -197,6 +205,54 @@ Earth-Aftermath and Jupiter genuinely share that map, which is consistent with i
 planet map that was never overwritten because it was never distinct.
 
 
+## 3d. Towers and dungeons: anonymous in the game, named by the wiki, joined by filename
+
+Every settlement the game draws a title for is in § 3. **No tower or dungeon is** — all twelve of
+their sector-rows use only the `A`/`Y` wall glyphs and contain no text at all. That is not a hole
+in the decode; the game simply never names them, which is exactly why the Codex keeps a separate
+*Dungeon solutions* page.
+
+The join turned out to be unusually clean. The wiki's own map images carry the sector in the
+filename — `Earth_tower_1423BC-x24-Map15.png`, `Mercury-g15-Map00.png`, `Pluto-g85-Map00.png` —
+so the citation is from their data to ours rather than from prose to bytes:
+
+| sector | layer | kind | the wiki's name | their filename |
+| --- | --- | --- | --- | --- |
+| 15 | mapx | dungeon | Dungeon in Greenland | `Earth_dungeon-x15-Map00.png` |
+| 15 | mapg | dungeon | Dungeon on Mercury | `Mercury-g15-Map00.png` |
+| 24 | mapx | tower | Tower in South America (1423 B.C.) | `Earth_tower_1423BC-x24-Map15.png` |
+| 34 | mapx | tower | Tower in Egypt (1990 A.D.) | `Earth_tower_1990AD-x34-Map15.png` |
+| 44 | mapg | tower | Tower on Jupiter | `Jupiter_tower-g44-Map15.png` |
+| 45 | mapg | dungeon | Dungeon on Jupiter | (their column images are mislabelled `g44`) |
+| 85 | mapg | dungeon | Dungeon on Pluto | `Pluto-g85-Map00.png` |
+
+**This also resolves the Jupiter ambiguity left open in § 3c.** That section recorded the wiki as
+ambiguous about whether "Jupiter Tower" meant sector 44 or 45. The dungeon page lists *Tower on
+Jupiter* and *Dungeon on Jupiter* as **two separate entries**, and our kinds say 44 = tower and
+45 = dungeon, so both now have a name and the `unresolved` row is gone.
+
+Two rows stay `unresolved` on purpose: sectors **25 and 35** are Earth kind-5 dungeons in the
+1423 B.C. and 1990 A.D. eras, and the wiki says Earth has exactly one dungeon, in Greenland,
+reachable "in all ages". They decode to identical tile structure, so they are plausibly the same
+Greenland dungeon reached in another age — but the wiki never names a 1423 B.C. dungeon, so
+saying so would be inventing. Recorded as a question, not an answer.
+
+## 3e. Coordinates are in the artefact now
+
+Each named place carries `candidate_at` — the row and cell range where the sign is drawn:
+
+```
+mapx 11  BARADINS TOWN      y=35 x=28..35      (two-line name, second line at y=36)
+mapx 22  TOWNE LINDA        y=63 x=24..39
+mapx 31  PORT BONIFICE      y=30 x=7..19  and  y=57 x=25..38
+mapx 93  CASTLE BARATARIA   y=3  x=24..41
+mapg 32  TOWNE MARY         y=63 x=24..38
+```
+
+The town names sit on **y=63**, the bottom edge, in four of five cases — worth noting as a
+pattern rather than smoothing over, and only visible once the coordinates stopped being thrown
+away. Port Boniface is the exception, with two signs inside the map.
+
 ## 4. What is still open
 
 * **`candidate` is a claim, not a proof.** The name rules are heuristics over layout. A
@@ -213,10 +269,12 @@ planet map that was never overwritten because it was never distinct.
   strongest third-party join in the index: the game refuses to name the place, but it will not
   do the quest-critical things anywhere else either. Grade stays `inferred`, because the name is
   still supplied from outside this binary.
-* **Sectors with no decoded text at all**: 00, 20, 30, 40, 50, 60, 70, 80, 90 are the
-  wilderness sectors, and 10, 44, 45, 15, 24, 25, 34, 35, 85 are towers and dungeons whose
-  only "text" is fill. A wilderness sector has no name to find, which is consistent and worth
-  stating rather than leaving as a hole.
+* **No routing.** The index says where places *are*; it does not say how to get between them.
+  `docs/moongates.md` has the rotation rule but no per-sector door list, and the rocket's
+  survivable landing cells are a separate problem. This is the largest remaining gap for a bot.
+* **Sectors with no decoded text at all**: 00, 20, 30, 40, 50, 60, 70, 80, 90 are the wilderness
+  sectors — 19 rows across both layers, zero letter cells. A wilderness sector has no name to
+  find, which is consistent and worth stating rather than leaving as a hole.
 
 ## 5. Cross-checks that agree
 

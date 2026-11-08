@@ -1758,3 +1758,18 @@ against the renderer's index space, not the file's byte space. And a second-orde
 next to it: dialogue in a sidecar file may be stored with the high bit set, so the same empty
 conclusion arrives from a file that does contain text — before reporting an absence, check
 whether the reader applied the transform the writer did.
+
+2026-11-08. A control can pass for the wrong reason and look identical to success, and it
+happened twice in one session on the same tool, so the pattern is worth naming. Both times a
+check asserted a *quantity* — "at least eight sectors are classified as anonymous", "all six
+place names decode" — and the quantity was already satisfied by a population the check was not
+about. Disabling the classification rule left nineteen unrelated sectors (they had no text at
+all, trivially anonymous) holding the count up, and the control stayed green while the rule it
+guarded did nothing. The fix is to assert on the population the claim is actually about: not
+"at least N rows are anonymous" but "every row of kind tower or dungeon is anonymous, and there
+are at least N such rows". Two separate assertions, one for the property and one for the
+coverage, because collapsing them is what created the hole. The same trap catches coordinate and
+metadata assertions: a check that a name decodes passes whether or not the location field was
+ever populated. When writing a control, ask which single-line change to the *guarded* code would
+make it fail, and then make that change and watch. Both holes here were found that way, and both
+were green before it.

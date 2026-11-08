@@ -6,9 +6,20 @@
 # Grades per AGENTS.md section 5. `inferred` here means: the sector is identified by bytes, and
 # the NAME is supplied from outside this binary. Nothing in this file is game text.
 #
+# The towers and dungeons join unusually well, because the wiki's own map images carry the
+# sector in the filename -- `Earth_tower_1423BC-x24-Map15.png`, `Mercury-g15-Map00.png`,
+# `Pluto-g85-Map00.png`. That is a citation from their data to ours, not a guess from prose.
+#
 # Columns: layer, sector, wiki_name, evidence, grade, source
-layer	sector	wiki_name	evidence	grade	source
-mapg	41	Village of the Preppies	decoded tile signs in this sector read EAT PREPPIES and IZOD BURGERS; the wiki name almost certainly derives from the same signs the game draws, so it is corroborated but is not a name the game itself gives	inferred	Ultima Codex, Ultima II walkthrough
-mapg	44	Jupiter Tower	world 4 is JUPITER (string table at exe file 0x72B9) and kind 4 is tower (u2_site_kind, asm/343F); the sector has no tile text and no dialogue, so the name is entirely external	inferred	Ultima Codex, Ultima II walkthrough
-mapg	45	Jupiter Tower (alternative reading)	the same wiki page describes Jupiter Tower as a dungeon on Jupiter, and kind 5 is dungeon; 44 and 45 are the only Jupiter dungeon-class sectors and neither carries text, so the bytes cannot choose between them	unresolved	Ultima Codex, Ultima II walkthrough
-mapx	32	New San Antonio	STRENGTHENED 2026-11-08: asm/3C2E cmd_O gates its whole special-offer path on DS:4A==2 AND DS:49==3, i.e. sector 32 and nowhere else, so the game hard-codes 32 as the place where the quicksword, the ring and the stat-raising offers work. tlkx32 also says A CLERK STATES: WELCOME TO THE HOTEL CALIFORNIA! and the game abbreviates to NEW SAN. in tlkx82. Still nothing in sector 32's own tiles spells its name	inferred	Ultima Codex, Ultima II walkthrough
+layer	sector	wiki_name	evidence	wiki image filename	grade	source
+mapx	15	Dungeon in Greenland	kind 5 = dungeon, era 1 = Pangea; the wiki lists exactly one Earth dungeon and notes it is reachable in all ages but not in Pangea on some ports	Wiki File:Earth_dungeon-x15-Map00.png	inferred	Ultima Codex, Dungeon solutions for Ultima II
+mapg	15	Dungeon on Mercury	kind 5 = dungeon on world 1 = MERCURY (exe world table); the wiki lists a Mercury dungeon accessible only in 2112 A.D.	Wiki File:Mercury-g15-Map00.png	inferred	Ultima Codex, Dungeon solutions for Ultima II
+mapx	24	Tower in South America	kind 4 = tower, era 2 = 1423 B.C.; the wiki lists one tower per age except Pangea	Wiki File:Earth_tower_1423BC-x24-Map15.png	inferred	Ultima Codex, Dungeon solutions for Ultima II
+mapx	34	Tower in Egypt	kind 4 = tower, era 3 = 1990 A.D.	Wiki File:Earth_tower_1990AD-x34-Map15.png	inferred	Ultima Codex, Dungeon solutions for Ultima II
+mapg	44	Tower on Jupiter	kind 4 = tower on world 4 = JUPITER. RESOLVES the earlier ambiguity: the wiki lists Jupiter Tower and the Jupiter Dungeon as two separate entries, so 44 is the tower	Wiki File:Jupiter_tower-g44-Map15.png	inferred	Ultima Codex, Dungeon solutions for Ultima II
+mapg	45	Dungeon on Jupiter	kind 5 = dungeon on world 4 = JUPITER; the wiki's Jupiter-dungeon column images are mislabelled tower-g44, so the join is by kind and world rather than by their filename	Wiki File:Jupiter_tower-g44-Map00.png (mislabelled)	inferred	Ultima Codex, Dungeon solutions for Ultima II
+mapg	85	Dungeon on Pluto	kind 5 = dungeon on world 8 = PLUTO	Wiki File:Pluto-g85-Map00.png	inferred	Ultima Codex, Dungeon solutions for Ultima II
+mapx	25	Dungeon in Greenland (1423 B.C. copy?)	the wiki says Earth has only one dungeon, in Greenland, reachable in all ages; sector 25 is kind 5 in era 2 and is byte-identical in structure to 35, so it is plausibly the same dungeon reached in another age. NOT asserted -- the wiki never names a 1423 B.C. dungeon		unresolved	Ultima Codex, Dungeon solutions for Ultima II
+mapx	35	Dungeon in Greenland (1990 A.D. copy?)	as sector 25; mapx25 and mapx35 decode to identical tile text and identical structure		unresolved	Ultima Codex, Dungeon solutions for Ultima II
+mapx	32	New San Antonio	STRENGTHENED 2026-11-08: asm/3C2E cmd_O gates its whole special-offer path on DS:4A==2 AND DS:49==3, i.e. sector 32 and nowhere else, so the game hard-codes 32 as the place where the quicksword, the ring and the stat-raising offers work. tlkx32 also says A CLERK STATES: WELCOME TO THE HOTEL CALIFORNIA! and the game abbreviates to NEW SAN. in tlkx82. Still nothing in sector 32's own tiles spells its name		inferred	Ultima Codex, Ultima II walkthrough
+mapg	41	Village of the Preppies	decoded tile signs in this sector read EAT PREPPIES and IZOD BURGERS; the wiki name almost certainly derives from the same signs the game draws, so it is corroborated but is not a name the game itself gives		inferred	Ultima Codex, Ultima II walkthrough
