@@ -1,6 +1,56 @@
 # Plan — a play API: character creation and `step(action) -> observation`
 
-## 0. Status — planned, not built
+## 0. Status — built 2026-11-08, gated by `make test-api`
+
+`--api` works: line-delimited JSON on stdin/stdout, the engine speaks first, and a session
+of `create` then keys drives the title flow into the world. `engine/tools/u2api.py` is the
+client and `engine/tests/run_api.sh` is the gate (17 legs, each with the control that makes
+it red — the budget check was disabled to prove AP3 can fail, and it failed).
+
+Wired into `make test` as `test-api`, plus `make api` for a one-command smoke.
+
+**Eight deviations from this plan, each forced by a measurement or by a gap the plan did not
+name.** They are listed here rather than edited silently into § 3 and § 4.
+
+1. **`turn` became `rolls`.** There is no turn counter on the state block — `ow->turns`
+   lives in the overworld struct and does not exist at the title or in creation. The
+   observation reports `rng_rolls`, which is already inside the digest scope and so
+   correlates with the digest it sits next to.
+2. **`mode` is derived, not tracked.** § 4 promised `title|creation|overworld|site|dungeon|
+   space`. There is no phase field, so it is read from the state: no name means `title`,
+   `sector_second` non-zero means `site`, otherwise `world`. Dungeon and space are **not**
+   distinguished, and saying so here is better than a field that guesses. Adding a real
+   phase is a small change to `game.c`, not to this file.
+3. **`awaiting` is always `key`.** The plan said it would be derived from the site that
+   blocked. Nothing records which call blocked, so the honest value is the one that is
+   always true: the engine is blocked on a key. A finer answer needs a seam change.
+4. **A `char` block was added to the observation.** `u2_state_json` does not expose stats or
+   name, so a bot could create a character and then not be able to see it. Rather than grow
+   the debug serializer — which CP2's evidence is read through — the API emits its own
+   `char` block from the state fields. `u2_state_json` is untouched.
+5. **`--api` refuses `--dump-state`.** Hazard 1 in practice: the dump writes to the stdout
+   the protocol owns. Refused with a message rather than silently suppressed, because a flag
+   that looks like it is working and is quietly dropped is the failure mode this repo
+   refuses everywhere else.
+6. **The key alphabet moved to `core/keys.c`.** The plan did not anticipate that the API
+   would need `--script`'s vocabulary, and copying `named_key` plus the hex and single-char
+   rules would have been a second copy of an alphabet — the exact class of defect § A4
+   exists to avoid. `input_script.c` now calls the same function the API calls.
+7. **`u2_api_attach` and `u2_api_begin` are two calls.** The input backend's `init` needs a
+   session to exist, but the first observation reads the renderer, input and clock names off
+   `ctx`, and those are null until the backends are wired. Attaching early and speaking after
+   is the fix; the first attempt segfaulted in `u2_state_json`, which is the more honest way
+   to discover an ordering constraint than a silent empty observation.
+8. **The terminal-renderer refusal checks the resolved renderer, not the flag.** `--headless`
+   resolves the renderer itself, so testing `renderer_choice` refused a perfectly good
+   `--headless --api` run. What matters is whether something will actually draw on stdout.
+
+Everything below is the plan as written, unchanged, with the D-numbers and A-numbers the
+implementation cites.
+
+---
+
+## 0.1 Original status — planned, not built
 
 Requested by the owner 2026-11-08, after he asked how far the bot had gotten. The honest answer
 was: no policy exists, and the one structural thing missing is this. Scope as given: *"at
@@ -174,10 +224,11 @@ can tell our output from a stray print.
 {"cmd":"quit"}
 ```
 
-`key` is one key in the same alphabet `--script` uses, so `A`, `0xf3`, `<CR>`, `<ESC>` all
-work and there is no second vocabulary to learn. A multi-character `key` is an error rather
-than a silent split: a caller that means three keys sends three messages and sees three
-observations.
+`key` is one key in the same alphabet `--script` uses — `A`, `0xf3`, `CR`, `ESC`, `WAIT` —
+parsed by the shared `u2_key_from_token()` in `core/keys.c`, so there is no second
+vocabulary to learn and no second table to drift. A multi-character token that is not in
+the alphabet is an `unknown_key` error rather than a silent split: a caller that means
+three keys sends three messages and sees three observations.
 
 ### The observation
 
