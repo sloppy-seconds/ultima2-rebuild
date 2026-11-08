@@ -98,9 +98,15 @@ static const txt POEM[] = {
 #define NARR(x) ((int)(sizeof (x) / sizeof (x)[0]))
 
 /* Stop condition for the scripted/headless flow: end of input or a quit. */
+/* `enter_world` belongs in this predicate for the same reason `exit_code` does: it is a
+ * request made from *outside* the flow's own key handling, and a flow that only looks at
+ * keys will never notice it. The interactive path does not need it because the enhanced-mode
+ * creation tail sets the flag and returns explicitly. The play API does need it, because a
+ * `create` command is delivered by the input backend from inside seam_key_poll, so nothing
+ * unwinds unless a stop test sees the flag. */
 static int flow_stopped(const u2_ctx *ctx)
 {
-    return ctx->exit_code || ctx->input_exhausted;
+    return ctx->exit_code || ctx->input_exhausted || ctx->enter_world;
 }
 
 /* The original's intro hold, asm/0688_sub_0688.asm (dx = 0x6000 iterations of
@@ -302,7 +308,7 @@ static int wait_choice(u2_ctx *ctx)
          * is what made `SDL_VIDEODRIVER=dummy --dump-screen` write its frame
          * and then spin here for ever (T6, measured 2026-10-20: the PPM was
          * on disk, the process had to be killed). */
-        if (ctx->exit_code || ctx->input_exhausted)
+        if (ctx->exit_code || ctx->input_exhausted || ctx->enter_world)
             return -1;
         /* The headless clause that used to sit in the test above is gone, and its
          * absence is deliberate rather than an oversight: it conflated "no key this

@@ -178,6 +178,118 @@ else
     bad "AP7: the client failed (exit $RC): $(tail -2 "$WORK/ap7.out")"
 fi
 
+# --- AP8: the gear block a bot needs is present, complete, and offset-correct ------
+printf '{"cmd":"create","name":"GEAR","sex":"M","race":1,"class":1,"stats":[10,10,10,10,10,40]}\n{"cmd":"quit"}\n' \
+    | session ap8
+GEAR=$(python3 -c '
+import json,sys
+for l in open(sys.argv[1]):
+    l=l.strip()
+    if not l: continue
+    try: o=json.loads(l)
+    except Exception: continue
+    if o.get("event")!="created": continue
+    c=o["obs"]["char"]
+    items=list(c["items"]); arm=list(c["armour"])
+    toks=["ANKH","TRI-LITHIUM","BLUE TASSLE","SKULL KEY","BRASS BUTTON"]
+    print("items",len(items),"weaps",len(c["weapons"]),"arm",len(arm),
+          "tokens",all(t in items for t in toks),
+          "hp",c["hp"],"food",c["food"],"gold",c["gold"],"dead",c["dead"],
+          "armorder","".join(a[0] for a in arm),
+          "wield",c["wield"]["index"],c["wield"]["name"],
+          "worn",c["worn"]["index"],c["worn"]["name"])
+    break' "$WORK/ap8.out")
+case "$GEAR" in
+  *"items 16 weaps 10 arm 7 tokens True"*"hp 400 food 400 gold 400 dead False"*"wield 0 HANDS"*"worn 0 SKIN"*)
+    ok "AP8: gear block is complete (16 items, 10 weapons, 7 armour, all five vehicle tokens, decoded 400/400/400, not dead)" ;;
+  *) bad "AP8: gear block is wrong or incomplete: $GEAR" ;;
+esac
+# The armour pool is offset by one (armour_owned[0] is CLOTH, not SKIN, because the Z loop
+# reads 0x96(%di) with di = the menu digit). Pinning the name ORDER is what catches a
+# regression that silently shifts every armour count by one. SCCPRP is the first letter of
+# each key in order: SKIN, CLOTH, LEATHER, CHAIN, PLATE, REFLECT, POWER.
+case "$GEAR" in
+  *"armorder SCLCPRP"*) ok "AP8 control: armour names run SKIN,CLOTH,LEATHER,CHAIN,PLATE,REFLECT,POWER -- the offset is applied, not assumed" ;;
+  *) bad "AP8 control: armour name order is wrong, so the off-by-one is not being handled" ;;
+esac
+
+# --- AP9: create actually enters the world ---------------------------------------
+# The first build created a character and left the title flow running, so a caller that sent
+# game keys was driving the menu. Sector 20 is where creation puts you (asm/5BDC..5BE8).
+# The discriminator is the command prompt, not the sector: `create` writes sector 20 into
+# the record either way, so a sector read passes even when the title flow still owns the
+# keys. `CMD:` is only ever emitted by the overworld, so it is the thing that actually proves
+# the handoff happened. (Measured while writing this leg: the sector check passed with the
+# handoff disabled, which is why it is not the assertion.)
+if grep -q 'CMD:' "$WORK/ap8.out"; then
+    ok "AP9: create hands off into the world -- the overworld's CMD: prompt was emitted"
+else
+    bad "AP9: no CMD: prompt after create; the title flow still owns the keys"
+fi
+MODE=$(field "$WORK/ap8.out" created mode)
+[ "$MODE" = "world" ] && ok "AP9: mode reports world once the handoff happened" \
+                      || bad "AP9: mode after create is '$MODE', want world"
+# And the negative half: with no character the mode must not claim a world.
+printf '{"cmd":"quit"}\n' | session ap9b
+M0=$(field "$WORK/ap9b.out" ready mode)
+[ "$M0" = "title" ] && ok "AP9 control: with no character the mode is title, so the field can go red" \
+                    || bad "AP9 control: mode with no character is '$M0', want title"
+
+# --- AP10: the death signal, in both directions ----------------------------------
+# asm/0C62_death.asm zeroes DS:51..59 and prints "<name> IS DEAD!"; the capture named in that
+# header shows all four ledger fields at 0000. So the signature is the whole ledger, not HP
+# alone, and a predicate that watched only HP would call a wounded character a corpse.
+python3 -c '
+import sys
+b = bytearray(0x280)
+nm = b"DEADBOT"
+b[0x36:0x36+len(nm)] = nm
+b[0x49] = 2; b[0x4A] = 0
+sys.stdout.write(" ".join("%02x" % x for x in b) + "\n")' > "$WORK/dead.ds"
+printf '{"cmd":"create","name":"LIVE","sex":"M","race":1,"class":1,"stats":[10,10,10,10,10,40]}\n{"cmd":"quit"}\n' \
+    | session ap10 --load-ds "$WORK/dead.ds"
+DEAD=$(field "$WORK/ap10.out" end char.dead)
+DNAME=$(field "$WORK/ap10.out" end char.name)
+if [ "$DEAD" = "True" ] && [ "$DNAME" = "DEADBOT" ]; then
+    ok "AP10: a zeroed ledger over a named character reads dead=true (the asm/0C62 signature)"
+else
+    bad "AP10: dead=$DEAD name=$DNAME -- the death signature is not being detected"
+fi
+grep -q '"dead":false' "$WORK/ap8.out" \
+    && ok "AP10 control: a living character reads dead=false, so the predicate is not always true" \
+    || bad "AP10 control: a fresh character was reported dead"
+
+# --- AP11: every win-condition predicate in docs/goal-spec.md § 1 is readable ------
+# § 7.3 item 1 existed because not one dependency-graph predicate could be read through
+# --api. This leg says they can be now. The stat vector is the largest legal one that still
+# shows the class and sex bonuses landing: 20+20+10+10+10+20 is exactly the 90-point budget,
+# and male +5 STR plus fighter +15 STR turns base 20 into 40, while human +5 INT turns the
+# trailing 20 into 25. Note what CANNOT be created: STR 31 and AGI 49 together need 105
+# points even after the fighter bonus, so the endgame's own equipment thresholds make the
+# Hotel California grind mandatory rather than optional. That is goal-spec § 3 P2.
+printf '{"cmd":"create","name":"W","sex":"M","race":1,"class":1,"stats":[20,20,10,10,10,20]}\n{"cmd":"quit"}\n' \
+    | session ap11
+WOK=$(python3 -c '
+import json,sys
+for l in open(sys.argv[1]):
+    l=l.strip()
+    if not l: continue
+    try: o=json.loads(l)
+    except Exception: continue
+    if o.get("event")!="created": continue
+    c=o["obs"]["char"]
+    have=all(k in c["items"] for k in ["RING","ANKH","TRI-LITHIUM","BLUE TASSLE","SKULL KEY","BRASS BUTTON"])
+    print("gates", 1 if have else 0,
+          "qs", 1 if "QUICK SWORD" in c["weapons"] else 0,
+          "pw", 1 if "POWER" in c["armour"] and "REFLECT" in c["armour"] else 0,
+          "str", c["stats"]["str"], "agi", c["stats"]["agi"])
+    break' "$WORK/ap11.out")
+case "$WOK" in
+  "gates 1 qs 1 pw 1 str 40 agi 20")
+    ok "AP11: every W-predicate reads from the observation (ring/ankh/tassle/skull/button/lithium, quicksword, reflect+power), and the male-fighter bonuses land" ;;
+  *) bad "AP11: a win-condition predicate is not readable: $WOK" ;;
+esac
+
 echo
 [ "$fail" -ne 0 ] && { echo "API TEST: FAIL"; exit 1; }
 [ "$skips" -ne 0 ] && echo "API TEST: PASS ($skips leg(s) skipped)" || echo "API TEST: PASS"

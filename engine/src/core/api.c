@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "core/api.h"
+#include "core/pool_names.h"
 #include "core/keys.h"
 #include "core/demo.h"
 #include "debug/dump_state.h"
@@ -175,6 +176,38 @@ static size_t bounded_len(const char *s, size_t max)
     return n;
 }
 
+/* The death signature, measured rather than guessed. `asm/0C62_death.asm` is nine zero
+ * stores over DS:51..59 followed by the "<name> IS DEAD!" tail, and it is screen-proven at
+ * captures/spice86/cp5-weak-fight/death1.png, which reads H.P., FOOD, EXP and GOLD all at
+ * 0000. So the signature is the whole ledger zeroed, not HP alone -- and the distinction
+ * matters, because a bot that watches only HP would call the moment a hit lands at exactly
+ * zero on the high pair while food and gold are intact, which is a wounded character and not
+ * a corpse.
+ *
+ * The name test is not decoration. A process that has not created a character yet also has
+ * nine zero bytes, and reporting that as `dead` would tell a caller the run is over before it
+ * started. Death is "the ledger was zeroed on somebody", so there has to be a somebody. */
+static int char_is_dead(const u2_state *st)
+{
+    if (!st->name[0]) return 0;
+    return !st->hp && !st->unk_52 && !st->food && !st->food_hi && !st->food_lo
+        && !st->exp_lo && !st->exp_hi && !st->gold_lo && !st->gold_hi;
+}
+
+/* One owned-count pool as "NAME":count pairs. Keyed by name rather than by index because
+ * the whole point of this block is that a caller should not have to know that armour counts
+ * are indexed one below the menu digit while weapon counts are not -- that off-by-one is
+ * recorded in state.h precisely because it is the kind of thing a caller gets wrong silently.
+ * Names come from the generated pools, the same tables the panel and the Z screen read, so
+ * there is no fourth copy. U2_POOL_NAME is not used here because it token-pastes `tbl##_N`
+ * and so needs a literal table name; the caller passes that table's own _N, which makes
+ * every index in range by construction. */
+static void emit_counts(const char *const *tbl, int n, const uint8_t *counts)
+{
+    for (int i = 0; i < n; i++)
+        printf("%s\"%s\":%u", i ? "," : "", tbl[i], (unsigned)counts[i]);
+}
+
 static void emit_char(const u2_ctx *ctx)
 {
     static const char *names[6] = { "str", "agi", "sta", "cha", "wis", "int" };
@@ -194,6 +227,47 @@ static void emit_char(const u2_ctx *ctx)
     for (int i = 0; i < 6; i++)
         printf("%s\"%s\":%u", i ? "," : "", names[i],
                (unsigned)(((*st[i] >> 4) * 10) + (*st[i] & 0x0F)));
+    printf("}");
+
+    /* Decoded counters. The caller should not have to know these are packed decimal; the
+     * engine already has one accessor that says which byte pair each field reads, and using
+     * it here is what keeps the API's numbers agreeing with the panel's. FOOD is the
+     * DISPLAYED four digits -- the original hides a third byte that a step actually charges,
+     * which is why a step looks like it costs nothing until the shown number moves. */
+    uint8_t msb, lsb;
+    u2_state_bcd_pair(&ctx->state, U2_BCD_HP,   &msb, &lsb); printf(",\"hp\":%d", u2_bcd16(msb, lsb));
+    u2_state_bcd_pair(&ctx->state, U2_BCD_FOOD, &msb, &lsb); printf(",\"food\":%d", u2_bcd16(msb, lsb));
+    u2_state_bcd_pair(&ctx->state, U2_BCD_EXP,  &msb, &lsb); printf(",\"exp\":%d", u2_bcd16(msb, lsb));
+    u2_state_bcd_pair(&ctx->state, U2_BCD_GOLD, &msb, &lsb); printf(",\"gold\":%d", u2_bcd16(msb, lsb));
+    printf(",\"dead\":%s", char_is_dead(&ctx->state) ? "true" : "false");
+
+    /* What is equipped, as both the index and the name. A policy comparing `wield.index`
+     * against a goal predicate wants the number; a human reading a log wants the name, and
+     * making the caller look the name up is how a second table gets written. */
+    printf(",\"wield\":{\"index\":%u,\"name\":\"%s\"},\"worn\":{\"index\":%u,\"name\":\"%s\"}",
+           (unsigned)ctx->state.readied_weapon,
+           U2_POOL_NAME(U2_T_WEAPONS, ctx->state.readied_weapon),
+           (unsigned)ctx->state.worn_armour,
+           U2_POOL_NAME(U2_T_ARMOUR, ctx->state.worn_armour));
+
+    printf(",\"weapons\":{");
+    emit_counts(U2_T_WEAPONS, (int)(sizeof ctx->state.weapons_owned / sizeof ctx->state.weapons_owned[0]),
+                ctx->state.weapons_owned);
+    printf("},\"items\":{");
+    emit_counts(U2_T_ITEMS, (int)(sizeof ctx->state.items_held / sizeof ctx->state.items_held[0]),
+                ctx->state.items_held);
+    /* Armour counts are offset by one: armour_owned[0] is CLOTH, not SKIN, because the Z
+     * loop reads `0x96(%di)` with di = the menu digit and the digits start at 1. Handled
+     * here so no caller has to. SKIN gets a key with a zero count rather than a synthetic
+     * one, because no byte tracks it -- and the same is true of HANDS in the weapon pool,
+     * whose slot is present and zero. Both digits are exempt from the ownership gate
+     * (cmd_R's note records the original walking digit 0 past the ownership test), so a
+     * zero here means "nothing to consume", not "refused". Inventing a 1 would be the
+     * engine asserting a state the bytes do not hold. */
+    printf("},\"armour\":{\"SKIN\":0,");
+    for (int i = 0; i < (int)(sizeof ctx->state.armour_owned / sizeof ctx->state.armour_owned[0]); i++)
+        printf("%s\"%s\":%u", i ? "," : "",
+               U2_POOL_NAME(U2_T_ARMOUR, i + 1), (unsigned)ctx->state.armour_owned[i]);
     printf("}}");
 }
 
@@ -209,13 +283,16 @@ static void emit_obs(u2_ctx *ctx)
     /* `rolls`, not `turns`: there is no turn counter on the state block (ow->turns lives in
      * the overworld struct and does not exist at the title or in creation), and rng_rolls is
      * already inside the digest scope, so a caller can correlate it with the digest. */
-    /* Mode, and the signal it is read from. There is no phase field on the state block, so
-     * this is derived: a name means a character exists, and sector_second is the settlement
-     * digit. `title` therefore means "no character yet", which is what the caller can act
-     * on; the finer modes (dungeon, space) are not distinguished here and are named as a
-     * gap in docs/play-api.md rather than guessed at from the grid. */
+    /* Mode, and the signal each value is read from. There is no phase field on the state
+     * block, so this is derived: no name means no character yet, `enter_world` is the
+     * engine's own request-to-play flag, and `sector_second` is the settlement digit. The
+     * middle state exists because the play API can create a character without the world
+     * having been entered, and reporting that as `world` was a lie a caller would act on.
+     * Dungeon and space are still NOT distinguished, and are named as a gap in
+     * docs/play-api.md rather than guessed at from the grid. */
     const char *mode = !ctx->state.name[0] ? "title"
-                     : (ctx->state.sector_second ? "site" : "world");
+                     : (!ctx->enter_world ? "created"
+                      : (ctx->state.sector_second ? "site" : "world"));
     printf("{\"u2api\":%d,\"mode\":\"%s\",\"awaiting\":\"key\",\"rolls\":%u,\"digest\":\"%s\","
            "\"message\":\"",
            U2_API_PROTO, mode, (unsigned)ctx->rng_rolls, digest);
@@ -327,6 +404,15 @@ static int do_create(u2_ctx *ctx, const char *line)
         u2_api_error(ctx, "create_refused", why);
         return 0;
     }
+    /* Finish the handoff the interactive flow would have made. Without this the character
+     * exists on disk and in memory while the title flow keeps cycling its splash, so a
+     * caller that created a character and then sent game keys was driving the menu, not the
+     * world -- and the observation said `mode: world` the whole time, because mode is derived
+     * from the name (docs/play-api.md deviation 2). `enter_world` is the engine's own
+     * request-to-play signal, set by the enhanced-mode creation tail at title.c; reusing it
+     * is deliberate, because inventing a second "the API wants in" flag would be a second
+     * answer to one question. */
+    ctx->enter_world = 1;
     return 1;
 }
 
