@@ -19,6 +19,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <string.h>
+#include "core/api.h"
 #include "core/ctx.h"
 #include "core/version.h"
 #include "core/licenses.h"
@@ -279,6 +280,23 @@ static int wire_backends(u2_ctx *ctx)
         ctx->audio    = &u2_audio_beep;
         ctx->clock    = &U2_CLOCK_HOST;
         ctx->input    = &u2_input_term;
+    }
+
+    /* --api replaces the input backend the same way --playback does, and for the same
+     * reason: the caller owns time. There is no wall-clock idle between commands, so the
+     * idle auto-PASS has nothing to fire on and must be stood down rather than left to
+     * spin. Everything else — renderer, clock, audio — stays whatever the mode chose. */
+    if (ctx->api_mode) {
+        ctx->input = &u2_input_api;
+        ctx->auto_pass_polls = -1;
+        /* Checked here rather than off the flag, because --headless resolves the renderer:
+         * what matters is whether something is actually going to draw onto the protocol's
+         * stdout, not which word the player typed. */
+        if (ctx->renderer == &u2_renderer_term) {
+            fprintf(stderr, "u2: --api with the terminal renderer is refused: it draws to"
+                            " the same stdout the protocol speaks on. Use --headless.\n");
+            return -1;
+        }
     }
 
     /* --playback replaces the input backend and nothing else. The renderer stays
@@ -543,6 +561,9 @@ int main(int argc, char **argv)
             dump_ds_path = argv[++i];
         } else if (strcmp(a, "--trace-rolls") == 0 && i + 1 < argc) {
             roll_trace_path = argv[++i];
+        } else if (strcmp(a, "--api") == 0) {
+            /* The play API: line-delimited JSON on stdin/stdout. docs/play-api.md. */
+            ctx.api_mode = 1;
         } else if (strcmp(a, "--dump-state") == 0) {
             ctx.dump_state = 1;
         } else if (strcmp(a, "--dump-map") == 0 && i + 1 < argc) {
@@ -754,6 +775,22 @@ int main(int argc, char **argv)
     if (ctx.playback_path && ctx.script_path) {
         fprintf(stderr, "u2: --playback and --script together is refused: a demo and a"
                         " key script are two sources of the same keystrokes.\n");
+        return 2;
+    }
+
+    /* A8 (docs/play-api.md): --api owns stdin for commands and stdout for observations.
+     * Anything else that claims either one is refused rather than resolved by a precedence
+     * nobody asked for -- the same shape as the two refusals above. The terminal renderer
+     * is refused because it draws to stdout, and one stray escape sequence corrupts a
+     * protocol line mid-way and the caller sees garbage instead of an error. */
+    if (ctx.api_mode && ctx.script_path) {
+        fprintf(stderr, "u2: --api and --script together is refused: the API and a key"
+                        " script are two sources of the same keystrokes.\n");
+        return 2;
+    }
+    if (ctx.api_mode && ctx.playback_path) {
+        fprintf(stderr, "u2: --api and --playback together is refused: a replay and a"
+                        " live caller cannot both deliver the next key.\n");
         return 2;
     }
 
@@ -970,8 +1007,21 @@ int main(int argc, char **argv)
         return rc == 0 ? 0 : 1;
     }
 
+    if (ctx.api_mode && u2_api_attach(&ctx) != 0) {
+        fprintf(stderr, "u2: could not start the API session.\n");
+        return 1;
+    }
+
     if (wire_backends(&ctx) != 0) {
         fprintf(stderr, "u2: backend initialisation failed\n");
+        u2_trace_close(&ctx);
+        return 1;
+    }
+    /* After the backends, before anything runs: the first observation names the renderer,
+     * input and clock, and those only exist once wire_backends has chosen them. */
+    if (ctx.api_mode && u2_api_begin(&ctx) != 0) {
+        fprintf(stderr, "u2: could not open the API channel.\n");
+        release_backends(&ctx);
         u2_trace_close(&ctx);
         return 1;
     }
@@ -1078,6 +1128,19 @@ int main(int argc, char **argv)
     u2_game_shutdown(&ctx);
     seam_present(&ctx);
     release_backends(&ctx);
+
+    if (ctx.api_mode) u2_api_end(&ctx, "end");
+
+    /* Hazard 1 of docs/play-api.md: one stray write to stdout corrupts a protocol line
+     * mid-way and the caller sees garbage instead of an error. The debug dumps are the
+     * obvious way to do that from inside main itself, so in an API session they are
+     * refused rather than silently redirected -- a flag that looks like it is working and
+     * is quietly dropped is the failure this file refuses elsewhere. */
+    if (ctx.api_mode && ctx.dump_state) {
+        fprintf(stderr, "u2: --dump-state writes to stdout, which --api owns. The"
+                        " observation already carries the screen and the state.\n");
+        return 1;
+    }
 
     if (ctx.dump_state) {
         u2_dump_screen(&ctx, stdout);

@@ -99,6 +99,22 @@ void seam_str_out(u2_ctx *ctx, const char *s)
         flat[n] = '\0';
         u2_trace(ctx, "str_out", "4FDF", "text=%s", flat);
     }
+    /* The play API's text tap (docs/play-api.md A6). This is the emitter the game uses to
+     * say something to the player, so it is where "what did the game just tell me" is
+     * answerable without re-reading the grid. A no-op unless --api is running, so a normal
+     * run pays nothing. The owner's no-silence rule says every action and every effect must
+     * produce a message; an API that returned only numbers would make a bot blind to exactly
+     * that rule. */
+    if (ctx->msg_tap.on) {
+        struct u2_msg_tap *t = &ctx->msg_tap;   /* see ctx.h for why this is a field */
+        for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
+            const char c = (*p == '\r' || *p == '\n') ? ' ' : (char)(*p & 0x7F);
+            if (t->len + 1 < sizeof t->text) t->text[t->len++] = c;
+            else { t->truncated = 1; break; }   /* announced, never dropped quietly */
+        }
+        t->text[t->len] = '\0';
+    }
+
     /* str_out's loop (asm/4FF0..asm/4FFE) calls char_print per byte. */
     for (const char *p = s; *p; p++)
         seam_char_print(ctx, (uint8_t)*p);

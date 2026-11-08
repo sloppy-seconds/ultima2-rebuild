@@ -131,6 +131,9 @@ typedef struct u2_ctx {
     } trace;
 
     int dump_state;         /* --dump-state */
+    /* --api: serve the play API (core/api.h). Chosen at launch like every other
+     * backend decision, and it replaces the input backend rather than adding one. */
+    int api_mode;
     /* --dump-frame FILE: write the last composed framebuffer to FILE as a PPM when the
      * overworld loop ends. --dump-map renders the OPENING frame and returns; this is the
      * one that can show what a scripted run ended looking at, which is what CP7's
@@ -200,6 +203,21 @@ typedef struct u2_ctx {
      * struct every translation unit compiles. NULL means neither, and the seam tap
      * costs one null test on a normal run. */
     void *demo;
+    /* The play API's session state, NULL unless --api. Same shape as `demo` above:
+     * the struct lives in core/api.c and nothing else reaches into it. */
+    void *api;
+    /* The text tap (docs/play-api.md A6): what the game asked to print, since the last
+     * observation. It lives HERE rather than behind a call into core/api.c on purpose --
+     * seam.c is compiled into small test harnesses that do not link the API, and a tap
+     * that dragged in api.c (and through it game/creation.c) made CP0's key-wait harness
+     * unbuildable. A field the seam writes and the API drains keeps that dependency out.
+     * `on` is 0 for every normal run, so the cost is one branch in seam_str_out. */
+    struct u2_msg_tap {
+        char text[512];
+        unsigned len;
+        int truncated;
+        int on;
+    } msg_tap;
     const char *demo_dir;    /* --demo-dir DIR; "demos" when unset (core/demo.h) */
     const char *demo_name;   /* --demo-name NAME; pins the filename a gate needs */
     int demo_snapshots;      /* --demo-snapshots: per-record DS dumps, debug only */

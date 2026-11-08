@@ -133,6 +133,10 @@ extern const u2_input    u2_input_script;
  * and never together with --script: two input backends is a configuration with no
  * meaning, and main refuses it loudly rather than picking one. */
 extern const u2_input    u2_input_demo;
+/* The play API (platform/input_api.c): blocks for the caller's next command on stdin.
+ * Wired only by --api, and --api refuses --script and --playback for the same reason
+ * those two refuse each other. */
+extern const u2_input    u2_input_api;
 extern const u2_audio    u2_audio_beep;
 extern const u2_audio    u2_audio_null;
 extern const u2_clock    u2_clock_posix;
