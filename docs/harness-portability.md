@@ -1682,3 +1682,31 @@ applying the intact prefix — a partially applied record reads as a fully appli
 the destination whenever a line outgrows the buffer; a formatter that hashes what it wrote must
 clamp before it hashes. Verify the enlarged fixture goes red against the old buffer before
 believing it goes green against the new one.
+
+2026-11-08. Two findings from giving the engine a machine-readable play seam (a line protocol
+over stdio), both method rather than anything about this binary.
+
+**A field-name lookup in a line protocol must scan, not find.** The first parser took a key
+name, built `"name"` and `strstr`'d it, then expected a colon. `{"cmd":"key","key":"P"}`
+matched the `"key"` that is the *value* of `cmd`, found no colon after it, and reported the
+real `key` field as absent — so a legal command came back as "field required". A substring
+search for a field name will find that name inside another field's name or value, and it does
+so confidently: the failure is a missing field, which is a legal outcome the caller can act
+on wrongly. The rule is to keep scanning past every match that is not followed by the
+delimiter, and to gate it with a case where the key name also appears as a value, because
+that is the shape that passes a hand-checked example and fails a real one. The same defect
+class as a search for `sha` matching inside `save-sha`; it recurs because a field name is
+short and ordinary English.
+
+**An observation channel that concatenates emitted strings loses layout, and that is
+acceptable only if it is named.** A game that prints through one emitter can be tapped there,
+which gives a caller the message stream without re-rendering anything. But positioned text —
+a string emitted, then a cursor jump, then another — arrives with no separator, so a title
+screen becomes one long word. The fix is not to guess at spacing: it is to carry both the text
+grid and the stream, and to say in the contract which is authoritative for which question.
+Reconstructing layout from the grid is a rendering problem the harness already solves once;
+re-solving it inside the tap would be a second renderer to keep in step. Related, and the
+reason the tap belongs on the state block rather than behind a call into the protocol module:
+the emitter is usually compiled into small harnesses that do not link the protocol layer, and
+a dependency added there breaks builds that have nothing to do with the new feature. Put the
+tap where the emitter can reach it without a new edge, and let the protocol module drain it.
