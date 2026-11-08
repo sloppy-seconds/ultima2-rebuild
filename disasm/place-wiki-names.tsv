@@ -1,0 +1,14 @@
+# Third-party place names, joined to sectors this tool decodes from the bytes.
+# Source data, not a derived view: it is hand-curated on purpose, and every row names its
+# evidence and its grade. The byte-derived name lives in the `candidate` column of
+# place-index.tsv; this column is separate so the two can never be confused.
+#
+# Grades per AGENTS.md section 5. `inferred` here means: the sector is identified by bytes, and
+# the NAME is supplied from outside this binary. Nothing in this file is game text.
+#
+# Columns: layer, sector, wiki_name, evidence, grade, source
+layer	sector	wiki_name	evidence	grade	source
+mapg	41	Village of the Preppies	decoded tile signs in this sector read EAT PREPPIES and IZOD BURGERS; the wiki name almost certainly derives from the same signs the game draws, so it is corroborated but is not a name the game itself gives	inferred	Ultima Codex, Ultima II walkthrough
+mapg	44	Jupiter Tower	world 4 is JUPITER (string table at exe file 0x72B9) and kind 4 is tower (u2_site_kind, asm/343F); the sector has no tile text and no dialogue, so the name is entirely external	inferred	Ultima Codex, Ultima II walkthrough
+mapg	45	Jupiter Tower (alternative reading)	the same wiki page describes Jupiter Tower as a dungeon on Jupiter, and kind 5 is dungeon; 44 and 45 are the only Jupiter dungeon-class sectors and neither carries text, so the bytes cannot choose between them	unresolved	Ultima Codex, Ultima II walkthrough
+mapx	32	New San Antonio	STRENGTHENED 2026-11-08: asm/3C2E cmd_O gates its whole special-offer path on DS:4A==2 AND DS:49==3, i.e. sector 32 and nowhere else, so the game hard-codes 32 as the place where the quicksword, the ring and the stat-raising offers work. tlkx32 also says A CLERK STATES: WELCOME TO THE HOTEL CALIFORNIA! and the game abbreviates to NEW SAN. in tlkx82. Still nothing in sector 32's own tiles spells its name	inferred	Ultima Codex, Ultima II walkthrough

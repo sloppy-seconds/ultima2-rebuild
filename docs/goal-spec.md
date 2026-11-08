@@ -173,17 +173,33 @@ The rule, and the reason the numbers are 95 and 155 rather than 99 and 160:
 
 ```
 loop while gold >= 100 and max(stat) < 95 and (cha + int) < 155:
-    O, "100", CR
-    P            # pass turns: the gain probability is a function of turn count
+    O, "100", CR     # only works in sector 32 -- see below
     read state; re-evaluate
 ```
 
-The 4-point margin is the walkthrough protecting itself against the **wrap**, and the wrap is
-real in our bytes: stats are one packed decimal byte each with **no ceiling guard on any add
-site** (`docs/phase4-state.md`, the owner-recalled-and-then-confirmed wrap). A stat that
-crosses 99 does not clamp, it resets. So 95 is not superstition, it is the largest stop point
-that leaves room for a multi-point gain. **Grade: the wrap is measured; the 95/155 margins
-and the turn-count dependence are recalled.**
+**This one has since been decoded from the bytes, and it is no longer a recalled claim.**
+`asm/3C2E_cmd_O.asm` at `L_003f7e` is the generic bit-7 offer, and it does one RNG draw that
+decides everything: `r = rng & 7`, the raise fires when `r < 6`, and the stat raised is
+`DS:4B + r`. So:
+
+| claim | bytes say | grade |
+| --- | --- | --- |
+| 75% raise / 25% "thank you" | **exactly right** — 6 of 8 vs 2 of 8 | **measured** |
+| +4 per 100 gold | **exactly right** — four `adc 0x27 / daa` BCD adds, so the gain is 4 × (hundreds offered) | **measured** |
+| a random attribute | **yes**, and uniformly: the same `r` indexes the six stats | **measured** |
+| no ceiling guard, so stats wrap | **confirmed** — the result writes straight back to `DS:4B+r` with no compare | **measured** |
+| stop at 95 | **now derived, not advised**: 95 + 4 = 99 is the last safe raise, and 96 + 4 wraps | **measured** |
+| "chance is based on your turn count" | **wrong for this binary** — there is no turn term anywhere in the path. The first walkthrough said this; the bytes disagree, and the bytes win | **refuted** |
+| location is the Hotel in New San Antonio, 1990 A.D. | the whole special-offer path is gated on `DS:4A==2 && DS:49==3`, i.e. **sector 32 and nowhere else** | **measured** (sector), **inferred** (that it is the Hotel) |
+
+The 155 stop for the Int+Cha sum is the same arithmetic one level up: it leaves room for one
++4 without crossing the 160 cliff the walkthrough describes.
+
+Two things this does **not** settle. That the bit-7 NPC in sector 32 is the Hotel clerk is
+third-party-corroborated inference — the listing cannot name an NPC. And the save-and-reload
+tip is a strategy the game neither supports nor blocks: death is memory-only
+(`docs/handoff-2026-11-03.md`), and whether a mid-run manual save is worth the turns is a
+policy question, not a byte one.
 
 Note the conflict P1 creates with P2: grinding pushes `Int+Cha` up toward 155, straight
 through the ≈86 band and past the ≈160 cliff. A policy has to decide the order — spend the
@@ -321,7 +337,7 @@ predicate without a DOS-specific capture.
 | "If you are playing the original **Apple II** version, it is impossible to raise Strength during the game, therefore you must set it to 29 or 31 during character creation. This is fixed in the 1989 release." | About a different binary. Ours is the DOS port, and `references/apple/` is a corroborator and not a parent (`docs/apple2-reference.md`). Recorded here only because it explains *why* the armour minimums in § 6 are 29 and 31 — the author is writing for a build where those numbers are the only ones available. |
 | The C64 ending screenshot | Different port, different artefact. Our ground truth is `original/ultimaii.exe`. |
 | "Japanese versions: consumable" (blue tassles) | Different port. Our tassle gate reads `items_held[12] != 0` and does not consume — and that is measured, so the DOS answer is already known and it is "permanent". |
-| Force field ring price: **500 GP** in the items table, **900 gold** in the walkthrough prose | The source contradicts itself. Neither number is verified against our price table, and the price table is not decoded. Do not put either in a predicate. |
+| Force field ring price: **500 GP** in the items table, **900 gold** in the walkthrough prose | The source contradicts itself, and **the bytes have now voted**: `asm/3C2E_cmd_O.asm` gates the ring grant on `cmp $0x5` against the hundreds offered, so the threshold is **500**. The prose's 900 is wrong, or is what someone paid after a failed attempt. The price *charged* is still not decoded — only the gate is. |
 
 ---
 

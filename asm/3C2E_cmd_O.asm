@@ -19,6 +19,36 @@
 #        recipient. Because the high values are compared one by one, [DI+0x1D7] is a
 #        role/identity byte, not a flag-and-count pair, and bit 7 is not aggro.
 #        See docs/monster-spawn.md § 6.
+#        DECODED 2026-11-08 (static, from the bytes; no capture) -- the generic bit-7 arm at
+#        L_003f7e is the stat-raising offer the third-party walkthrough calls Hotel California:
+#          L_003f7e  call L_005417 ; and $0x7,%al ; cmp $0x6,%al ; jb raise ; else THANK YOU
+#        so ONE rng draw decides both outcomes and the target: r = rng & 7 (eight values), the
+#        raise fires when r < 6 -- **6 of 8 = 75%, and 2 of 8 = 25% refusal** -- and the stat
+#        raised is DS:4B + r, i.e. the same r indexes the six stats 0..5. Every stat is equally
+#        likely conditional on firing. There is no turn-count term anywhere in this path.
+#        The increment is four BCD adds of DS:27 (the "HOW MUCH (*100)" amount):
+#          adc 0x27,%al ; daa   x4
+#        so the gain is **4 x (hundreds offered)**: 100 gold buys +4. It writes straight back to
+#        DS:4B+di with **no ceiling guard at all**, which is why a stat past 99 wraps instead of
+#        clamping, and why the walkthrough's "stop at 95" is arithmetic rather than superstition:
+#        95 + 4 = 99 is the last safe raise. The third-party claim of +4 per 100 and a 75/25 split
+#        is therefore exactly right for this binary, and the claim that the chance depends on turn
+#        count is not.
+#        The whole special-recipient path is gated on [DS:4A]==2 AND [DS:49]==3 -- sector 32,
+#        era 1990 A.D., kind town -- so the game hard-codes sector 32 as the only place any of
+#        these offers do anything. That is a byte-level anchor for sector 32 being the Hotel
+#        California town (docs/place-index.md § 3c), which tile text alone could not give.
+#        Thresholds: 0x81 (ENILNO IS YOURS!, the quicksword) and 0x82 (the ring) both require
+#        cmp $0x5 / jb, i.e. **at least 5 hundreds = 500 gold**. The walkthrough's own two
+#        numbers for the ring were 500 in its table and 900 in its prose; the bytes gate on 500.
+#        0x82 additionally requires [DS:6C] != 0 to grant ("THE RING IS YOURS!", sets DS:D6=1)
+#        and prints "EARN THE RING!" when it is zero -- so DS:6C is the flag the Father Antos
+#        blessing must set, which is what docs/needs-gameplay.md G61 was still asking for.
+#        0x83 ("HERE TAKE THIS!") grants a random weapon: di = (rng & 7) + 1, then
+#        adc $0x1 / daa on DS:76+di, i.e. one of DAGGER..PHASER, never QUICK SWORD.
+#        Grade: the arithmetic and the gates are measured from bytes; that the NPC carrying the
+#        generic bit-7 role in sector 32 IS the Hotel clerk is third-party-corroborated
+#        inference, not something the listing can say.
 cmd_O:
 cmd_O:
 L_003e2e:

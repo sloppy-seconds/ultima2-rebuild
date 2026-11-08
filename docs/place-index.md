@@ -160,8 +160,41 @@ hide the single most interesting fact about the off-Earth data.
 `TOWNE MARY` is in the `--verify` controls, so the MAPG layer is guarded and not merely
 printed.
 
-**Still unnamed:** the Jupiter village (sector 41). Its decoded text is shop signs — `IZOD
-BURGERS`, `YACHTS` — with no title phrase, and no other source names it.
+**Still unnamed by the game:** the Jupiter village (sector 41) and the Jupiter tower-class
+sector (44 or 45). Their decoded text is shop signs or nothing at all.
+
+### 3c. The third-party crosswalk, and what it does and does not prove
+
+Community names now live in `disasm/place-wiki-names.tsv` and land in a **separate `wiki`
+column**, never in `candidate`. That separation is the whole design: a reader can always tell
+what the bytes said from what a wiki said. `--verify` fails if a crosswalk row names a sector
+the tool cannot resolve, so a typo'd sector cannot sit in the table pretending to be a
+supported identification. Control exercised: pointing a row at sector 49, which does not
+exist, goes red.
+
+Two Jupiter names, and they are worth different amounts.
+
+**Village of the Preppies (sector 41) — corroborated, with a catch.** Our own decode of
+`MAPG41` reads `EAT PREPPIES` and `IZOD BURGERS`. So the wiki and the bytes are looking at the
+same thing. The catch is what those signs *are*: they are shopfronts, and parodies at that
+(*Eat Preppy Foods* is a restaurant chain; Izod is a clothing label), not a title sign for the
+settlement. The honest statement is that the wiki name almost certainly **derives from the same
+signs we decoded**, which makes it consistent with the data rather than confirmed by it. The
+game still does not name this village.
+
+**Jupiter Tower (sector 44 or 45) — unresolvable from the bytes, and said so.** The name is
+exactly what our derived tables would predict without any external input: world 4 is JUPITER
+(the string table at exe `0x72B9`) and kind 4 is tower (`u2_site_kind`, `asm/343F`). But the
+wiki's own entry is ambiguous — it calls it *Jupiter Tower* and describes it as a *dungeon on
+Jupiter* — and there are two dungeon-class Jupiter sectors: 44 (kind 4, tower) and 45 (kind 5,
+dungeon). **Neither contains a single letter of tile text, and neither has a dialogue file**, so
+there is nothing in the data to choose between them. The crosswalk carries 44 as the primary
+reading and 45 as `unresolved`, which is the truth rather than a coin flip dressed as a finding.
+
+One incidental fact fell out of checking this: **sector 44 is the only sector in the collision
+range whose root `mapx` and patched `MAPG` are byte-identical** (40, 41 and 45 all differ). So
+Earth-Aftermath and Jupiter genuinely share that map, which is consistent with it being the one
+planet map that was never overwritten because it was never distinct.
 
 
 ## 4. What is still open
@@ -170,13 +203,16 @@ BURGERS`, `YACHTS` — with no title phrase, and no other source names it.
   sector could carry its name in a phrase the rules do not match, and `SHADOW GUARD` is
   sitting in the `rooms` column right now as evidence that they can.
 
-* **Sector 32 on Earth has no title sign at all.** It is 1990 A.D., kind town, and its decoded
+* **Sector 32 on Earth has no title sign at all — but the game hard-codes it.** Its decoded
   text is `AIR PORT`, `PRISON`, `ARMOURY`, `SWASHBUCKLERS SWIM AT OWN RISK`, `PUB AND PIZZA`,
-  `CUSTOMS`. Its `tlkx32` says `A CLERK STATES: WELCOME TO THE HOTEL CALIFORNIA!`. The wiki
-  calls it **New San Antonio** and the game abbreviates to `NEW SAN.` in `tlkx82`. So the
-  identification is well-supported and **entirely inferred** — nothing in sector 32's own tiles
-  names it. Grade: `inferred`, third party plus game dialogue, and it is the one place where a
-  community name is doing real work rather than echoing tile text.
+  `CUSTOMS`; nothing spells its name. Two independent byte facts now anchor it to the wiki's
+  **New San Antonio**: `tlkx32` says `A CLERK STATES: WELCOME TO THE HOTEL CALIFORNIA!` (and the
+  game abbreviates the place to `NEW SAN.` in `tlkx82`), and `asm/3C2E_cmd_O.asm` gates its
+  entire special-offer path on `DS:4A==2 && DS:49==3` — **sector 32 and nowhere else** — so the
+  quicksword, the force field ring and the stat-raising offer all only work there. That is the
+  strongest third-party join in the index: the game refuses to name the place, but it will not
+  do the quest-critical things anywhere else either. Grade stays `inferred`, because the name is
+  still supplied from outside this binary.
 * **Sectors with no decoded text at all**: 00, 20, 30, 40, 50, 60, 70, 80, 90 are the
   wilderness sectors, and 10, 44, 45, 15, 24, 25, 34, 35, 85 are towers and dungeons whose
   only "text" is fill. A wilderness sector has no name to find, which is consistent and worth
