@@ -46,7 +46,7 @@ One gate is active at a time. It is replaced on a fixed cycle driven by two byte
 
 | byte | role | observed |
 | --- | --- | --- |
-| `DS:6F` | countdown | reloaded to exactly **8** on each rotation, and falls by one **per turn** — measured at 1.00 drops per landed turn |
+| `DS:6F` | countdown | reloaded to exactly **8** on each rotation, and falls by one **per consumed keypress**, or once per ~8 s when nothing is pressed — see the correction below |
 | `DS:6E` | gate index | advances by **2**, wrapped to 3 bits, so the cycle is `00 → 02 → 04 → 06 → 00` |
 
 The full rotation as watched in era 2, with the gate cell in the live grid:
@@ -58,9 +58,41 @@ The full rotation as watched in era 2, with the gate cell in the live grid:
 | `0x04` | `(42,24)` |
 | `0x06` | `(19,52)` |
 
-This is the owner's recollection — *one door active, a new one every 8 turns, always at the same
-coordinates* — and **it is right in every particular.** An earlier draft of this page claimed the unit
-was time rather than turns; that was wrong, and the correction is below.
+### The countdown unit: a second correction, and this page had it wrong
+
+This section has now been wrong in **both** directions, which is worth more than the answer.
+
+The first draft said the unit was time. § 2 was then rewritten to say turns, "measured at 1.00 drops
+per landed turn", and `asm/2744`'s header was left carrying the opposite claim — that the countdown
+ran at a steady rate with no input at all. Both documents were dated the same day and both cited
+measurement. **`captures/spice86/g73-6f-unit` settles it, and both were half right:**
+
+| phase | what happened | `DS:6F` |
+| --- | --- | --- |
+| A | no input at all, 65 s | fell 8 times, ~8.1 s apart |
+| B | 20 arrow keys in 12.1 s, **arrows unpatched so every one was `ILLEGAL COMMAND!`** | fell exactly 20, position never moved |
+| C | 5 keys spaced ~5.7 s apart, 28.7 s | fell exactly 5, each right after the send |
+
+**One decrement per consumed keypress, and one per ~8 s when nothing is pressed.** Not per turn, not
+per second. The status block runs once per input-loop iteration and the loop wakes on a key or on a
+timeout.
+
+`asm/2744`'s "steady rate with no input" was true — that is phase A. § 2's "1.00 drops per landed
+turn" was also true as measured, because a player pressing one movement key per turn produces
+exactly that. It was an **accidental match, not the mechanism**, and phase B is what separates them:
+20 rejected keys moved the countdown 20 and the world zero. A turn that never happened still advanced
+the doors, because a key was consumed.
+
+The trap is the general one: a rate measured while doing the thing you also measure is not evidence
+about which variable drives it. Two sessions each watched one variable move while another was
+coincidentally correlated, wrote down the correlation as the cause, and disagreed with each other from
+the same truth.
+
+**What the engine does.** `u2_gate_turn()` decrements on an accepted turn. For a bot driving the API
+one command is one keypress, so the two agree; they diverge for a mistyped key, and for any input
+layer that buffers or replays. Left as-is and named, because changing the unit is a design decision
+rather than a fidelity fix — but see the underflow note in the capture's README, which is a real
+difference the engine does not model.
 
 ### Turns, not seconds — a wrong "correction" retracted
 
@@ -346,9 +378,12 @@ no substitute, and the 47-tile `PENDING_REDRAW` list is a post-enhanced-mode que
 gate work. When the redraw does happen it still cannot be done by whoever read the live screenshots,
 and several sessions now have; it needs a fresh implementer working from the spec alone, per
 `docs/cleanroom-procedure.md`.
-* **The countdown unit is settled: turns, not seconds.** Measured at 1.00 drops per landed turn
-  (§ 2), so the engine's turn-driven `u2_gate_turn()` matches the original rather than substituting
-  for it. The earlier note here claiming a wall-clock unit and an unproven mapping was wrong.
+* ~~**The countdown unit is settled: turns, not seconds.**~~ **Corrected again 2026-11-08 by
+  `captures/spice86/g73-6f-unit`: it is neither.** One decrement per consumed keypress, plus one per
+  ~8 s of no input. The turn reading was a real measurement of a real correlation and the wrong
+  mechanism; phase B of that capture moved the countdown 20 with 20 illegal keys while the player
+  never moved. See § 2. The engine's turn-driven `u2_gate_turn()` agrees for the API case (one
+  command, one key) and diverges for rejected keys; named, not re-plumbed.
 
 Still open for a future session, in the order that would unblock the most: transit era-2 slot 0
 `(16,16)` and slot 3 `(19,52)` to complete the partner map; measure whether a stamped gate survives

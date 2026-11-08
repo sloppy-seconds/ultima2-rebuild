@@ -103,7 +103,14 @@ void u2_gate_turn(u2_ctx *ctx, struct u2_overworld *ow)
     if (!gate_is_on_world_map(ctx))
         return;
     /* Observed sequence is 8,7,6,...,2,1 and then the next tick reloads to 8 with the
-     * index advanced — the reload happens ON the 1, not on a tick at zero. */
+     * index advanced — the reload happens ON the 1, not on a tick at zero.
+     *
+     * The UNIT of this tick is not a turn. captures/spice86/g73-6f-unit measured it three ways and
+     * found one decrement per consumed keypress plus one per ~8 s of no input; 20 ILLEGAL COMMAND
+     * keys moved the countdown 20 and the world zero. This function is called on an accepted turn,
+     * which agrees for the API case (one command, one key) and diverges for a rejected key. Left
+     * deliberately, and named here so the next reader does not "fix" the correlation back into the
+     * mechanism. See docs/moongates.md section 2. */
     if (ctx->state.gate_countdown <= 1) {
         ctx->state.gate_countdown = U2_GATE_COUNTDOWN_RELOAD;
         ctx->state.gate_index = (uint8_t)((ctx->state.gate_index + 2) & 0x7);

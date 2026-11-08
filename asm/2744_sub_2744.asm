@@ -13,6 +13,11 @@
 #           CORRECTION to a recalled detail worth recording: the cycle is TIME, not turns. The
 #           countdown ran at a steady rate with no input at all, so "every 8 steps" is wrong in
 #           the unit even though the 8 is right.
+#           HALF RIGHT, and the other half is in docs/moongates.md section 2. Settled 2026-11-08 by
+#           captures/spice86/g73-6f-unit, which found the answer is BOTH and neither: one decrement
+#           per consumed keypress, plus one per ~8 s when nothing is pressed. "Steady rate with no
+#           input" was a true observation of the timeout arm. The turn reading in docs/moongates.md
+#           was a true observation of the keypress arm. Neither session noticed the other variable.
 #           ATTRIBUTION REFUTED 2026-10-29 — see asm/2708. The listing's shape matched the live
 #           rotation and that match was coincidence, not causation: a stop at 17D:2908 never
 #           fired across a window in which the gate rotated twice. The OBSERVED paragraph above
