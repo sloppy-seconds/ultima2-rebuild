@@ -275,10 +275,16 @@ complete. It is not, in four specific ways.
 
 1. **No spatial or map knowledge at all.** Every location is a name — New San Antonio, Pirate
    Harbour, Castle Barataria, "the red square", "the northeast corner" — and none is a
-   coordinate. The engine has sector maps (`mapxNN`) and a site-kind byte, but no name→sector
-   table, and this project has never built one. **A bot cannot use this file to navigate.**
-   Navigation is a separate deliverable, and `docs/needs-gameplay.md` does not currently carry
-   an item for "build the place-name → sector index".
+   coordinate. **This gap has since closed from an unexpected direction, and the closure is
+   `docs/place-index.md`:** the game spells its place names as alphabet tiles inside the
+   sector maps, so `mapx22` contains `TOWNE LINDA` and `mapx93` contains `CASTLE BARATARIA`
+   as map data. `tools/place_index.py` decodes all 33 sectors, and the result is a
+   byte-derived name→sector index — which is the deliverable § 7.3 called impossible to base
+   on the walkthrough. What the walkthrough still does not provide is *routes between* places;
+   it no longer owns the names. One correction to the earlier reading on this page: the
+   community names are mostly the game's own text, not third-party invention, and the one that
+   is genuinely third-party (sector 32 = New San Antonio) is supported by `tlkx32`'s Hotel
+   California line rather than by the map.
 2. **No recovery from failure states.** The walkthrough assumes a successful run. It names one
    soft-lock (P4) and offers no exit from it. It says nothing about death, about running out
    of gold, about spending the last tri-lithium in deep space, or about the case the
@@ -296,6 +302,11 @@ complete. It is not, in four specific ways.
    self-corrections. **Where the two disagree, our document wins, because it was measured
    from this binary.** The era rotation is time-dependent and the walkthrough describes gates
    as fixed places.
+5. **It does not know that place identity is not the sector number.** `mapx23` and `mapx33`
+   have identical decoded interiors — Lord British's castle in 1423 B.C. and again in 1990
+   A.D. — so two sectors are one place, while `PORT BONIFICE` exists in exactly one era. A
+   bot that keys reachability on sector rather than on (name, kind) will get this wrong
+   silently. `docs/place-index.md` § 3a.
 
 ---
 
@@ -397,7 +408,7 @@ is independently testable because each one's preconditions are predicates in thi
 | --- | --- | --- | --- | --- |
 | 0 | `bot/creation.py` | pick the stat vector (P1), call `create()` | § 3 P1 | **yes** — `u2_creation_apply` is gated by AP2/AP3 |
 | 1 | `bot/economy.py` | Hotel California grind, shopping, the discount window | § 3 P1, P2 | **no** — needs inventory and prices visible (§ 7.3) |
-| 2 | `bot/navigation.py` | era/sector movement, time doors, place→sector | § 4.1, `docs/moongates.md` | **no** — needs a place index that does not exist anywhere |
+| 2 | `bot/navigation.py` | era/sector movement, time doors, place→sector | § 4.1, `docs/moongates.md` | **partly now** — the place→sector index exists (`docs/place-index.md`, `tools/place_index.py`); what is missing is routing between sectors and the rotating time-door table applied |
 | 3 | `bot/combat.py` | engage/disengage, board-then-kill, negate-to-bypass | § 3 P6, P7 | **partly** — `creatures` with `mon_type` is already in the observation |
 | 4 | `bot/recovery.py` | checkpointing saves, death detection, soft-lock escape | § 4.2 | **no** — needs a death/defeat signal |
 | 5 | `bot/goal.py` | the W1–W7 conjunction, the Minax loop | § 1 | **partly** — W1, W2, W3, W6, W7 are readable; W4 needs an HP decode |

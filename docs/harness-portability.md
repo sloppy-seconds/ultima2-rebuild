@@ -1742,3 +1742,19 @@ collapsing "has a character" and "is in the world" into one reported value is wh
 defect behind a plausible answer. And a gate for a handoff must assert on something only the
 handoff produces — the first version asserted on a sector number that the record carried either
 way and passed with the fix disabled; the command prompt the world emits is the discriminator.
+
+2026-11-08. A text search finds text; it does not find *language*, and the difference cost a
+project its entire place-name vocabulary. Every string tool in a DOS harness — the string
+atlas, the resource extractor, the executed-instruction printer — scans for runs of character
+codes, because that is how text is stored when a program prints it. But a game that renders a
+label by drawing one tile per letter stores the label as tile indices, and tile indices are
+not ASCII for anything: the word is invisible to every tool that looks for words, and a search
+that returns nothing is then reported as "the game has no names". The check that found them was
+asking what the renderer would draw at those cells rather than what the bytes spell, and the
+confirmation came from the data rather than the hypothesis: with no glyph for one letter, the
+game misspells a title to avoid it, and that single misspelling proves the mapping. Two
+generalisations. Any text a program *draws* rather than *prints* needs a decoder written
+against the renderer's index space, not the file's byte space. And a second-order trap sits
+next to it: dialogue in a sidecar file may be stored with the high bit set, so the same empty
+conclusion arrives from a file that does contain text — before reporting an absence, check
+whether the reader applied the transform the writer did.
