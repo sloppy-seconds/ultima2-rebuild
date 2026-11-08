@@ -30,10 +30,22 @@ non-fill run in a sector whose site kind is a settlement. That is a heuristic an
 labelled `candidate`, not `proven`. The provenance column always says which rule fired, so a
 wrong name is traceable to the rule that invented it.
 
-THIRD-PARTY NAMES. `--wiki` attaches community names from `disasm/place-wiki-names.tsv`.
-Those are a hypothesis the bytes get to veto, exactly like `bestiary/`: the name comes from
-the wiki, the sector comes from this tool, and a row only agrees when both say so. Grades
-per AGENTS.md § 5. Nothing here is hand-kept except the crosswalk, which is source data.
+PLANETS. The world names are read out of the executable at run time, not transcribed: at file
+`0x72B9` sits `YOU ARE ORBITING `, eight `jz rel8` arms, and then the nine names EARTH through
+PLUTO, so the table order IS the world byte's order and `--verify` fails if the read falls
+back to the hard-coded list. Sectors 50-99 therefore print as URANUS, NEPTUNE, PLUTO and
+PLANET X rather than as anonymous world numbers. When `original/updated/` is present the
+Galaxy patch's `MAPG` files are decoded as a second layer, because sector 32 is New San
+Antonio on Earth and TOWNE MARY on Mars and the filename cannot tell them apart -- only the
+world byte can, which is why `layer` and `world` are columns instead of the two sets being
+merged.
+
+THIRD-PARTY NAMES ARE DELIBERATELY NOT STORED HERE. Almost every community place name turned
+out to be the game's own tile text, so there is nothing for a crosswalk to add except
+unverified guesses. The one genuine case -- sector 32 on Earth is "New San Antonio", from
+`tlkx32`'s Hotel California line rather than from any tile -- is argued in
+`docs/place-index.md` § 4 with its grade, where a reader will meet it, rather than in a
+generated table that would imply the bytes said it.
 
 Usage:
     python3 tools/place_index.py                 # human summary
@@ -57,9 +69,38 @@ EARTH_ERAS = {
     3: "1990 A.D. (ANOS: 1990 A.D.)",
     4: "2112 A.D. Aftermath (ANOS: 2112 A.D.)",
 }
-# Off Earth the same digit is a world index. The names below are the community ordering and
-# are marked third-party wherever they are printed; the byte fact is only "not Earth".
-OFF_EARTH = {5: "world 5", 6: "world 6", 7: "world 7", 8: "world 8", 9: "world 9 (Planet X)"}
+# Off Earth the same digit is a world index, and the names are NOT third-party: they are a
+# string table in the executable. Derive them rather than hard-coding them -- see
+# world_names() below, which reads them out of the binary and refuses to guess.
+FALLBACK_WORLDS = ["EARTH", "MERCURY", "VENUS", "MARS", "JUPITER",
+                   "SATURN", "URANUS", "NEPTUNE", "PLUTO"]
+# World 9 is printed as `X` from a separate routine (docs/handoff-2026-11-03.md: "9 prints X
+# from a routine past 0x729B"), and 0x0A is deep space. Neither is in the nine-name table.
+WORLD_X = "PLANET X"
+
+
+def world_names(exe_path):
+    """The nine world names, read out of the executable.
+
+    At file ~0x72D0 the binary holds `YOU ARE ORBITING ` followed by eight `jz rel8` arms and
+    then nine NUL-terminated names, so the game prints `YOU ARE ORBITING MERCURY.` by
+    concatenation. Reading them here rather than typing them is the point: the order is the
+    world byte's order, and a table that is transcribed cannot be checked against the thing it
+    came from. Returns (names, provenance) and never guesses -- if the exe is absent it says so
+    in the provenance string rather than silently substituting the fallback.
+    """
+    if not os.path.exists(exe_path):
+        return FALLBACK_WORLDS, "fallback (no executable to read)"
+    data = open(exe_path, "rb").read()
+    anchor = data.find(b"YOU ARE ORBITING ")
+    if anchor < 0:
+        return FALLBACK_WORLDS, "fallback (orbit string not found)"
+    found = [m.group(1).decode() for m in
+             re.finditer(rb"([A-Z]{4,8})\.", data[anchor:anchor + 400])]
+    if len(found) != 9 or found[0] != "EARTH":
+        return FALLBACK_WORLDS, f"fallback (parsed {found!r}, expected 9 names from EARTH)"
+    return found, f"derived from {os.path.basename(exe_path)} at file {anchor:#07x}"
+
 
 # Site kinds: engine/src/core/world.h u2_site_kind, which carries its own grade per value.
 SITE_KINDS = {
@@ -176,43 +217,87 @@ def classify(text, all_runs_in_row):
 def tlkx_lines(path):
     """Decode a tlkx file: the original stores dialogue with the high bit set, and
     engine/src/core/world.c u2_world_tlkx_record masks 0x7F the same way."""
-    if not os.path.exists(path):
+    if not path or not os.path.exists(path):
         return []
     raw = open(path, "rb").read()[:256]          # CX=0x100 at asm/22D5; the tail is not text
     txt = bytes((b & 0x7F) for b in raw).decode("latin1")
     return [r.strip() for r in re.split(r"[^\x20-\x7e]+", txt) if len(r.strip()) >= 5]
 
 
-def build(content_dir):
+def classify_sector(sec, tiles, dialogue_path):
+    """Decode one sector's tiles into the row fields that do not depend on the layer."""
+    ones = int(sec[1])
+    runs = decode_sector(tiles)
+    kinds = {}
+    for (y, x0, x1, text) in runs:
+        cls, rule = classify(text, runs)
+        kinds.setdefault(cls, []).append((y, x0, x1, text, rule))
+    # A settlement with no name-rule hit but exactly one non-fill run: offer that run.
+    if not kinds.get("candidate") and ones in (1, 2, 3):
+        only = kinds.get("room", [])
+        if len(only) == 1:
+            y, x0, x1, text, _ = only[0]
+            kinds["candidate"] = [(y, x0, x1, text, "only non-fill run in a settlement")]
+            kinds["room"] = []
+    return {
+        "sector": sec, "tens": int(sec[0]), "ones": ones,
+        "kind": SITE_KINDS.get(ones, "unknown"),
+        "candidate": "; ".join(t for *_, t, _ in kinds.get("candidate", [])),
+        "rooms": "; ".join(t for *_, t, _ in kinds.get("room", [])),
+        "fill_rows": len(kinds.get("fill", [])),
+        "dialogue": len(tlkx_lines(dialogue_path)),
+    }
+
+
+def build(content_dir, worlds):
+    """Every sector in the content root and, when present, the Galaxy patch's MAPG set.
+
+    The two layers are kept apart rather than merged because a sector number is genuinely
+    ambiguous: sector 32 is Earth-1990 AND Mars, and which one you get depends on the world
+    byte, not the filename (docs/planet-maps-galaxy-patch.md § 3). Collapsing them would hide
+    the only interesting fact about the off-Earth set.
+    """
     rows = []
     for fn in sorted(os.listdir(content_dir)):
         if not fn.startswith("mapx") or len(fn) != 6:
             continue
         sec = fn[4:]
-        tens, ones = int(sec[0]), int(sec[1])
-        data = open(os.path.join(content_dir, fn), "rb").read()
-        tiles = data[:4096]
-        runs = decode_sector(tiles)
-        kinds = {}
-        for (y, x0, x1, text) in runs:
-            cls, rule = classify(text, runs)
-            kinds.setdefault(cls, []).append((y, x0, x1, text, rule))
-        # A settlement with no name-rule hit but exactly one non-fill run: offer that run.
-        if not kinds.get("candidate") and ones in (1, 2, 3):
-            only = kinds.get("room", [])
-            if len(only) == 1:
-                y, x0, x1, text, _ = only[0]
-                kinds["candidate"] = [(y, x0, x1, text, "only non-fill run in a settlement")]
-                kinds["room"] = []
-        rows.append({
-            "sector": sec, "tens": tens, "ones": ones,
-            "era": EARTH_ERAS.get(tens, OFF_EARTH.get(tens, "unknown")),
-            "kind": SITE_KINDS.get(ones, "unknown"),
-            "candidate": "; ".join(t for *_, t, _ in kinds.get("candidate", [])),
-            "rooms": "; ".join(t for *_, t, _ in kinds.get("room", [])),
-            "fill_rows": len(kinds.get("fill", [])),
-            "tlkx": len(tlkx_lines(os.path.join(content_dir, "tlkx" + sec))),
-        })
+        tens = int(sec[0])
+        row = classify_sector(sec, open(os.path.join(content_dir, fn), "rb").read()[:4096],
+                              os.path.join(content_dir, "tlkx" + sec))
+        row["layer"] = "mapx"
+        # Earth's five time periods occupy 00-49 and collided with worlds 1-4; sectors 50-99
+        # have no Earth counterpart, so a root mapx there IS the planet map.
+        if tens <= 4:
+            row["world"] = worlds[0]
+            row["era"] = EARTH_ERAS.get(tens, "unknown")
+            row["note"] = ("" if tens == 0 else
+                           f"doubles as {worlds[tens]} when the Galaxy patch is absent")
+        else:
+            row["world"] = worlds[tens] if tens < len(worlds) else WORLD_X
+            row["era"] = ""
+            row["note"] = "no Earth era for this tens digit"
+        rows.append(row)
+
+    upd = os.path.join(content_dir, "updated")
+    if os.path.isdir(upd):
+        for fn in sorted(os.listdir(upd)):
+            if fn[:4].upper() != "MAPG" or len(fn) != 6:
+                continue
+            sec = fn[4:]
+            tens = int(sec[0])
+            dlg = next((os.path.join(upd, p + sec) for p in ("TLKG", "tlkg")
+                        if os.path.exists(os.path.join(upd, p + sec))), None)
+            row = classify_sector(sec, open(os.path.join(upd, fn), "rb").read()[:4096], dlg)
+            row["layer"] = "mapg"
+            row["world"] = worlds[tens] if tens < len(worlds) else WORLD_X
+            row["era"] = ""
+            root = os.path.join(content_dir, "mapx" + sec)
+            same = os.path.exists(root) and open(root, "rb").read() == open(
+                os.path.join(upd, fn), "rb").read()
+            row["note"] = ("identical to the root mapx" if same else
+                           "the real planet map; the root mapx is an Earth clone")
+            rows.append(row)
     return rows
 
 
@@ -230,6 +315,8 @@ def main():
         print(f"no content dir at {args.content_dir}", file=sys.stderr)
         return 2
 
+    worlds, wsrc = world_names(os.path.join(args.content_dir, "ultimaii.exe"))
+
     if args.sector:
         fn = os.path.join(args.content_dir, "mapx" + args.sector)
         tiles = open(fn, "rb").read()[:4096]
@@ -238,9 +325,10 @@ def main():
             print(f"  y={y:2d} x={x0:2d}..{x1:2d}  {cls:9s}  {text!r}   [{rule}]")
         return 0
 
-    rows = build(args.content_dir)
+    rows = build(args.content_dir, worlds)
     if args.tsv:
-        cols = ["sector", "era", "kind", "candidate", "rooms", "fill_rows", "tlkx"]
+        cols = ["sector", "layer", "world", "era", "kind", "candidate",
+                "rooms", "fill_rows", "dialogue", "note"]
         with open(args.tsv, "w") as f:
             f.write("# generated by tools/place_index.py -- do not hand-edit\n")
             f.write("\t".join(cols) + "\n")
@@ -266,10 +354,18 @@ def main():
             return 1
         total = sum(len(re.sub(r"[^A-Z]", "", r["candidate"] + r["rooms"])) for r in rows)
         # Measured on this corpus, with headroom: a mapping that silently drops a letter or a
-        # gap rule that shreds phrases takes this number down and this check with it.
-        if total < 600:
+        # gap rule that shreds phrases takes this number down and this check with it. The floor
+        # rose when the MAPG layer was added, because the planet maps are extra decoded text.
+        if total < 1000:
             print(f"VERIFY FAIL: only {total} decoded letters across {len(rows)} sectors; "
-                  f"the corpus measured 700+, so the decode has regressed")
+                  f"the corpus measured 1200+, so the decode has regressed")
+            return 1
+        # The world names must come from the binary, not from the fallback list. This is the
+        # check that makes the derivation real: without it a broken parse would print the
+        # hard-coded names and look identical.
+        if "fallback" in wsrc:
+            print(f"VERIFY FAIL: world names came from the fallback ({wsrc}); the table in the "
+                  f"executable was not read, so the planet names are unverified")
             return 1
         # The gap rule's own negative control, because the place names do not exercise it:
         # widening GAP_JOIN until it swallows a neighbouring sign leaves all six names intact
@@ -282,12 +378,16 @@ def main():
             print(f"VERIFY FAIL: mapx31 y=0 merged two separate signs into {joined[0]!r}; "
                   f"GAP_JOIN has grown past the 6-cell evidence that set it")
             return 1
-        expect = {"11": "BARADINS TOWN", "22": "TOWNE LINDA", "31": "PORT BONIFICE",
-                  "82": "TOWNE MAKLER", "92": "TOWNE BASKO", "93": "CASTLE BARATARIA"}
-        got = {r["sector"]: r["candidate"] for r in rows}
+        expect = {("mapx", "11"): "BARADINS TOWN", ("mapx", "22"): "TOWNE LINDA",
+                  ("mapx", "31"): "PORT BONIFICE", ("mapx", "82"): "TOWNE MAKLER",
+                  ("mapx", "92"): "TOWNE BASKO", ("mapx", "93"): "CASTLE BARATARIA",
+                  # The Galaxy patch's own name, and the reason the MAPG layer is worth
+                  # decoding: sector 32 is a DIFFERENT place on Mars than on Earth.
+                  ("mapg", "32"): "TOWNE MARY"}
+        got = {(r["layer"], r["sector"]): r["candidate"] for r in rows}
         bad = [(s, e, got.get(s, "")) for s, e in expect.items() if e not in got.get(s, "")]
         for s, e, g in bad:
-            print(f"VERIFY FAIL sector {s}: expected {e!r}, decoded {g!r}")
+            print(f"VERIFY FAIL sector {s[0]}{s[1]}: expected {e!r}, decoded {g!r}")
         # And the negative control: a name the game cannot spell, because there is no Q tile.
         if any("QUEEN" in r["rooms"] + r["candidate"] for r in rows):
             print("VERIFY FAIL: a QUEEN was decoded, but art 0x30 is a wall tile and there is "
@@ -295,19 +395,23 @@ def main():
             bad.append(("Q", "no QUEEN", "found one"))
         if bad:
             return 1
-        print(f"VERIFY OK: letter table pinned, {total} decoded letters, "
-              f"{len(expect)} place names, and no Q was found")
+        print(f"VERIFY OK: world names {wsrc}; letter table pinned; {total} decoded letters; "
+              f"{len(expect)} place names; no Q found")
         return 0
 
     named = [r for r in rows if r["candidate"]]
-    print(f"{len(rows)} sectors decoded; {len(named)} carry a candidate place name\n")
-    for r in rows:
-        if r["candidate"]:
-            print(f"  {r['sector']}  {r['kind']:9s}  {r['era']:38s}  {r['candidate']}")
+    print(f"world names: {', '.join(worlds)} (+ {WORLD_X}) -- {wsrc}")
+    print(f"{len(rows)} sectors decoded across mapx and MAPG; "
+          f"{len(named)} carry a candidate place name\n")
+    for r in named:
+        where = r["era"] or r["world"]
+        print(f"  {r['layer']} {r['sector']}  {r['world']:9s} {r['kind']:9s} "
+              f"{where:38s}  {r['candidate']}")
     if args.verbose:
         for r in rows:
             if not r["candidate"] and r["rooms"]:
-                print(f"  {r['sector']}  {r['kind']:9s}  (no name)  rooms: {r['rooms']}")
+                print(f"  {r['layer']} {r['sector']}  {r['world']:9s} {r['kind']:9s} "
+                      f"(no name)  {r['rooms'][:96]}")
     return 0
 
 

@@ -113,22 +113,70 @@ property of the appearance rather than of the place.
 And the converse holds too: `PORT BONIFICE` appears only in sector 31, era 3. Some places
 are era-bound and some are not, and the index is what tells you which is which.
 
+### 3b. The planets, and their names are in the binary too
+
+The world names are **not** third-party. At file `0x72B9` the executable holds
+`YOU ARE ORBITING `, then eight `jz rel8` arms (`0x74` followed by monotonically increasing
+offsets `0x23, 0x2D, 0x39, 0x43, 0x4C, 0x58, 0x63, 0x6E`), then nine NUL-terminated names:
+
+```
+EARTH.  MERCURY.  VENUS.  MARS.  JUPITER.
+SATURN. URANUS.   NEPTUNE. PLUTO.
+```
+
+The game prints `YOU ARE ORBITING MERCURY.` by concatenation, so the table order **is** the
+world byte's order: `0`–`8` = EARTH … PLUTO, `9` = **X** (printed from a separate routine
+past `0x729B`, per `docs/handoff-2026-11-03.md`), `0x0A` = deep space. It sits in the same
+code region as the world coordinate table at `0x7212` that the rocket work found, which is a
+consistency check in itself.
+
+`tools/place_index.py` reads this table at run time rather than transcribing it, and
+`--verify` **fails if the read falls back to the hard-coded list** — otherwise a broken parse
+would print the same nine names and look identical.
+
+#### The Galaxy patch, decoded
+
+`original/updated/` holds 21 `MAPG` files, and decoding their tiles confirms
+`docs/planet-maps-galaxy-patch.md`'s measured collision boundary from a completely
+different direction — the root `mapx` files for sectors 10–45 are Earth clones, and 50–93
+are identical to the patch.
+
+| sector | world | kind | the planet's own text | vs root `mapx` |
+| --- | --- | --- | --- | --- |
+| 32 | **MARS** | town | **TOWNE MARY**, WEAPONS, ARMOURY, THE PUB, TRANSPORT | **different** — root 32 is Earth-1990 |
+| 41 | **JUPITER** | village | EAT PREPPIES, IZOD BURGERS, SEER, YACHTS, MAGIC | **different** — root 41 is Earth-Aftermath |
+| 61 | **URANUS** | village | MONKEY, SEARS, JACK IN DE BOX, VISIT FOOLS ISLAND, DARE THE SWAMP, NEW JESTER | mostly same |
+| 71 | **NEPTUNE** | village | CABIN ONE…NINE, CAMP FIRE, POOR DEBBIES POOL, COMPUTER | same |
+| 81 | **PLUTO** | village | **TOMMERSVILLE**, SOFTALK, KURTS CLERGY | identical |
+| 82 | **PLUTO** | town | **TOWNE MAKLER**, GEORGES ARMS, BETHS ARMOR, ADAMS PUB | identical |
+| 92 | **PLANET X** | town | **TOWNE BASKO**, OZY ARMOURY, GET DRUNK AT OZYS | identical |
+| 93 | **PLANET X** | castle | **CASTLE BARATARIA**, KUEEN SUSANS ROOM, KING OZYS ROOM | identical |
+
+**Sector 32 is two different places.** Earth-1990 gives New San Antonio; Mars gives Towne
+Mary. The filename cannot tell them apart and the world byte can, which is why the index
+carries `layer` and `world` columns instead of merging the two sets — collapsing them would
+hide the single most interesting fact about the off-Earth data.
+
+`TOWNE MARY` is in the `--verify` controls, so the MAPG layer is guarded and not merely
+printed.
+
+**Still unnamed:** the Jupiter village (sector 41). Its decoded text is shop signs — `IZOD
+BURGERS`, `YACHTS` — with no title phrase, and no other source names it.
+
+
 ## 4. What is still open
 
 * **`candidate` is a claim, not a proof.** The name rules are heuristics over layout. A
   sector could carry its name in a phrase the rules do not match, and `SHADOW GUARD` is
   sitting in the `rooms` column right now as evidence that they can.
-* **Sector 32 has no title sign at all.** It is 1990 A.D., kind town, and its decoded text is
-  `AIR PORT`, `PRISON`, `ARMOURY`, `SWASHBUCKLERS SWIM AT OWN RISK`, `PUB AND PIZZA`,
+
+* **Sector 32 on Earth has no title sign at all.** It is 1990 A.D., kind town, and its decoded
+  text is `AIR PORT`, `PRISON`, `ARMOURY`, `SWASHBUCKLERS SWIM AT OWN RISK`, `PUB AND PIZZA`,
   `CUSTOMS`. Its `tlkx32` says `A CLERK STATES: WELCOME TO THE HOTEL CALIFORNIA!`. The wiki
   calls it **New San Antonio** and the game abbreviates to `NEW SAN.` in `tlkx82`. So the
-  identification is well-supported and **entirely inferred** — nothing in sector 32's own
-  tiles names it. Grade: `inferred`, third party plus game dialogue, and it is the one place
-  where a community name is doing real work rather than echoing tile text.
-* **Off-Earth numbering.** `docs/needs-gameplay.md` G45 resolved that the tens digit is the
-  era on Earth and the world index off Earth, and `docs/planet-maps-galaxy-patch.md` records
-  that sector 20 is *both* Earth-1423 and Venus. So `world 6/7/8/9` in the table above is the
-  byte fact plus a community ordering, not a proven name. Which planet is which is still open.
+  identification is well-supported and **entirely inferred** — nothing in sector 32's own tiles
+  names it. Grade: `inferred`, third party plus game dialogue, and it is the one place where a
+  community name is doing real work rather than echoing tile text.
 * **Sectors with no decoded text at all**: 00, 20, 30, 40, 50, 60, 70, 80, 90 are the
   wilderness sectors, and 10, 44, 45, 15, 24, 25, 34, 35, 85 are towers and dungeons whose
   only "text" is fill. A wilderness sector has no name to find, which is consistent and worth
