@@ -1,0 +1,15 @@
+# Third-party NPC names, joined to (sector, record index) -- the identity the bytes support.
+# Source data, hand-curated on purpose. The game's own text lives in the `speaker` column of
+# npc-index.tsv; this file only supplies a label where the game gave a job title or a description
+# instead of a name. Owner ruling 2026-11-08: wiki names are acceptable for NPCs the game does
+# not name. They are NOT used to overwrite a name the game does give -- Santre, Father Antos,
+# Queen Susan and the rest are the game's own and need no help.
+#
+# Columns: layer, sector, record, wiki_name, evidence, grade, source.
+# The layer matters: sector 32 is Earth-1990 AND Mars, and the Galaxy patch gives Mars a
+# completely different cast in the same roles (Marlin Perkins, Owen K. Garriott, Hecate,
+# The Historian), all of whom the game DOES name. A crosswalk without the layer would have
+# labelled Owen K. Garriott "Old man", which is exactly the wrong kind of confident.
+layer	sector	record	wiki_name	evidence	grade	source
+mapx	32	4	The Clerk	the game's text is "A CLERK STATES: WELCOME TO THE HOTEL CALIFORNIA!" -- a job title, not a name. The wiki treats him as an entity ("The clerk at the Hotel California in New San Antonio"), and the bytes support the join independently: cmd_O's generic bit-7 arm handles exactly the roles its special list does not name, and this record is the one that reaches the stat-raising path	inferred	Ultima Codex, Ultima II walkthrough
+mapx	32	2	Old man	the game's text is "AN OLD MAN MUMBLES: I'M AN OLD MAN." -- a description, not a name. The wiki calls him an old man under a tree in New San Antonio who sells the force field ring, and cmd_O role 0x82 in sector 32 is the only ring grant in the binary, so the join is by function rather than by name	inferred	Ultima Codex, Ultima II walkthrough

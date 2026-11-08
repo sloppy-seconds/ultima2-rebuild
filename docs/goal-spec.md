@@ -112,7 +112,7 @@ third-party opinion, it is partly our own evidence with a community label on top
 | skull key → board plane | `items_held[U2_ITEM_SKULL_KEY] != 0` | `overworld.h:254`, DS:DF, `asm/3048` | **measured** |
 | brass button → launch plane | `items_held[U2_ITEM_BRASS_BUTTON] != 0` | `overworld.h:255`, DS:E1, `asm/38B0`, refusal `MISSING A BRASS BUTTON!` | **measured** |
 | reflect/power armour → survive space | `worn_armour >= 5` | **measured, and implemented**: `u2_space_armour_ok()` in `engine/src/game/space.c:69` is exactly `worn_armour >= 5`, and **G60** closed the question by capture (`captures/spice86/g60-plate-halt`) | **measured** — with two sharp edges the walkthrough does not mention: the check is **not on the launch path** (a PLATE character launched fine and got `HYPERWARP ENGAGED!`), and failing it is an **unrecoverable freeze**, not a refusal and not a death. So "mandatory for space flight" is true and misleading at once |
-| Father Antos blessing → force field ring available | **no engine field.** There is no `blessed` flag in `state.h` | the ring's gate is `items_held[0]` alone (W1); the *offering* precondition is unmodelled | **unverified, and currently unrepresentable** — see § 7.3 |
+| Father Antos blessing → force field ring available | **`DS:6C`** — one byte, with a named writer and a named reader | `asm/4209` sets `DS:6C=1` when talking to role `0x81` with `DS:6D==9` and `DS:4A==3` (Father Antos, `tlkx93` record 1); `asm/3C2E_cmd_O` grants `DS:D6=1` (the ring) only when `DS:6C != 0`. Closed 2026-11-08; see `docs/npc-index.md` § 2 and G61 | **measured** (static) — this row said "unrepresentable" and was wrong in the good direction |
 | force field ring → survive Shadowguard fields | `items_held[0] != 0` | `overworld.c:856`; the alternative branch prints `FIELD CAUSES 1000 DAMAGE!` and the routine's own comment records "minus 1000, and death if that goes below zero" | **measured** |
 | keys → open locked doors | **no item-pool entry.** `cmd_O`'s key consumption is not modelled by `items_held` | the walkthrough says keys come only from killing guards, two per guard | **unverified** — `cmd_O` is implemented, but its key accounting is not a predicate today |
 | quicksword → harm Minax | `readied_weapon == 9` | no byte has been found that makes any other weapon fail against type `0x40` | **recalled**, and the source itself hedges: "in some ports of *Ultima II*, any weapon will do" |
@@ -125,13 +125,13 @@ two launches. That is a shape, not a coincidence: the original put the vehicle-t
 in two places, so a bot's dependency resolution is really "get these five bytes non-zero",
 and the engine can answer that question today with five array reads.
 
-**The unverified edges are all *story flags*, and the engine has no story-flag vocabulary for
-them.** `state.h` has exactly one such byte, `story_flag` at DS:0x239, described as
-"story/poem shown". Father Antos' blessing, the old man's willingness to sell, and
-Santre's willingness to hand over the quicksword are all of this kind, and none is
-represented. This is the single largest gap between "the engine can model the goal" and
-"the engine can *check* the goal", and it is a capture problem before it is a code problem:
-nobody has watched the blessing happen, so nobody knows which byte it writes.
+**The story-flag edges have now largely collapsed into bytes, which is the opposite of what
+this section first said.** The blessing is `DS:6C`, the ring is `DS:D6`, the quicksword grant is
+`DS:7F` — three quest bytes with named writers and readers, all found statically from `asm/4209`
+and `asm/3C2E_cmd_O` without a single capture. What remains genuinely unrepresented is much
+smaller than the original claim: whether the *ring blocks anything*, since nothing reads `DS:D6`
+except the force-field damage path (`overworld.c:856`). `state.h` still has only one general
+story byte (`story_flag`, DS:0x239), but the quest chain turned out not to need one.
 
 ---
 
@@ -500,7 +500,7 @@ gap is perception, not control.
 
 | # | Question | Blocks | Who can answer it |
 | --- | --- | --- | --- |
-| Q1 | Which byte does Father Antos' blessing write, and does the old man's offer read it? **Already registered as G61** — `tlkx92`/`tlkx93` carry the chain and the ring is `items_held[0]` at DS:D6; what is unevidenced is the last link | the whole § 2 story-flag row, and any endgame detector that wants to *prove* the chain rather than assert the item | needs a capture; agent-drivable if the Planet X route can be scripted, otherwise owner-play |
+| Q1 | ~~Which byte does Father Antos' blessing write, and does the old man's offer read it?~~ **CLOSED 2026-11-08, statically: `DS:6C`, written by `asm/4209` and read by `cmd_O`'s ring arm.** The remaining sliver of G61 — whether the ring gates Minax herself — is still open and still needs the endgame route | only the "does the ring matter to the fight" question | owner-play, and only for that sliver |
 | Q2 | Is Minax killable with a weapon other than the quicksword in **this** binary? | W2, and whether the readiness conjunction is real or folklore | needs a capture at Shadowguard; owner-play, since it needs the full chain |
 | Q3 | Does the 38% discount exist, and what is the price curve against `Int+Cha`? **Registered as G68.** | P1, P2's ordering conflict | agent: two seeded characters, one purchase each, read gold |
 | Q4 | Do frigate cannons really not consume food? **Registered as G69.** | P5 | agent: A/B with a food read |

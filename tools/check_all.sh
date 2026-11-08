@@ -203,6 +203,7 @@ opt_run "apple2_anchor_map" original/ultimaii.exe decompiled/apple2 -- python3 t
 # were exercised before this line was added, because the first version of the control passed
 # vacuously when Z was clipped from the mapping.
 opt_run "place_index" original/mapx22 -- python3 tools/place_index.py --verify
+opt_run "npc_index" original/tlkx32 -- python3 tools/npc_index.py --verify
 opt_run "apple2 index fresh" /var/tmp/u2-apple2-6502/u2_6502.tsv -- python3 tools/apple2_index.py --check
 
 echo
