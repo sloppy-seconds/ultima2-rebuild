@@ -185,9 +185,12 @@ static void emit_char(const u2_ctx *ctx)
      * than this API needs. A bot needs its own character, and this is it. */
     printf("\"char\":{\"name\":\"");
     emit_escaped((const char *)ctx->state.name, bounded_len((const char *)ctx->state.name, 16));
+    /* +1 on race and class: the state block stores them 0..3 (asm/5A7A's `sub $0x31`),
+     * and the create command takes them 1..4, so reporting the raw byte would make a
+     * caller send 1 and read back 0. The observation and the command speak one numbering. */
     printf("\",\"sex\":\"%c\",\"race\":%u,\"class\":%u,\"stats\":{",
            ctx->state.sex ? ctx->state.sex : '?',
-           (unsigned)ctx->state.race, (unsigned)ctx->state.pclass);
+           (unsigned)ctx->state.race + 1, (unsigned)ctx->state.pclass + 1);
     for (int i = 0; i < 6; i++)
         printf("%s\"%s\":%u", i ? "," : "", names[i],
                (unsigned)(((*st[i] >> 4) * 10) + (*st[i] & 0x0F)));

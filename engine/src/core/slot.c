@@ -105,6 +105,27 @@ int u2_slot_adopt_legacy(const u2_ctx *ctx)
     return adopt_flat_record(dir, slot);
 }
 
+/* Create every missing component of `dir`. u2_slot_ensure used to mkdir only the last one,
+ * so `--save-dir /var/tmp/newthing/save` failed with ENOENT whenever /var/tmp/newthing did
+ * not exist, and the caller saw "the save could not be written" -- true but not the reason,
+ * and not something a caller can act on. A bot harness hands the engine a fresh scratch
+ * directory far more often than a person does, because a harness makes one per run. */
+static int mkdir_parents(const char *dir)
+{
+    char buf[430];
+    size_t n = strlen(dir);
+    if (n == 0 || n >= sizeof buf) return -1;
+    memcpy(buf, dir, n + 1);
+    for (char *p = buf + 1; *p; p++) {
+        if (*p != '/') continue;
+        *p = '\0';
+        if (mkdir(buf, 0755) != 0 && errno != EEXIST) return -1;
+        *p = '/';
+    }
+    if (mkdir(buf, 0755) != 0 && errno != EEXIST) return -1;
+    return 0;
+}
+
 int u2_slot_ensure(const u2_ctx *ctx)
 {
     char dir[430], slot[448];
@@ -114,7 +135,7 @@ int u2_slot_ensure(const u2_ctx *ctx)
     if (stat(dir, &st) == 0) {
         if (!S_ISDIR(st.st_mode))
             return -1;             /* a file where the save directory belongs */
-    } else if (mkdir(dir, 0755) != 0 && errno != EEXIST) {
+    } else if (mkdir_parents(dir) != 0) {
         return -1;
     }
 

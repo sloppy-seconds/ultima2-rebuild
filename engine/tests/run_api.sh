@@ -98,6 +98,19 @@ fi
     && ok "AP2: the created character is written to the save, so a session is resumable" \
     || bad "AP2: create left no save record"
 
+# AP2b: the numbering round-trips. The state stores race/class 0..3 and create takes 1..4,
+# so a caller that sends race 2 must read race 2 back and not 1.
+printf '{"cmd":"create","name":"ROUNDTRIP","sex":"F","race":2,"class":3,"stats":[10,10,10,10,10,40]}\n{"cmd":"quit"}\n' \
+    | session ap2b
+R=$(field "$WORK/ap2b.out" created char.race)
+C=$(field "$WORK/ap2b.out" created char.class)
+X=$(field "$WORK/ap2b.out" created char.sex)
+if [ "$R" = "2" ] && [ "$C" = "3" ] && [ "$X" = "F" ]; then
+    ok "AP2b: race/class/sex round-trip in one numbering (sent 2/3/F, read $R/$C/$X)"
+else
+    bad "AP2b: round-trip is $R/$C/$X, want 2/3/F"
+fi
+
 # --- AP3: every A5 rule refuses on its own --------------------------------------
 refuses() { # refuses LABEL JSON
     printf '%s\n{"cmd":"quit"}\n' "$2" | session "ap3_$1"
