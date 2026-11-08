@@ -128,6 +128,17 @@ headless: $(BIN)
 
 test: test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo
 
+# Re-record the real playthroughs and verify every one under three backends. Needs the
+# gitignored game content AND the save slot those recordings started from, so it is not
+# part of `test` and never runs in CI: a gate that skips silently when its input is absent
+# is the defect AGENTS.md § 3 warns about, so this refuses with the reason instead.
+# Scratch lives under /var/tmp; override with SCRATCH=.
+#   SAVE_SOURCE=~/Games/u2/saves make drive    # everything in engine/demos
+#   SAVE_SOURCE=... SRC_DEMOS=demos/x.demo make drive   # one recording
+drive: $(BIN)
+	@test -f ../original/mapx20 || { echo "drive: needs ../original (the player's own game files); nothing to record against."; exit 1; }
+	SAVE_SOURCE="$${SAVE_SOURCE:-$(HOME)/Games/u2/saves}" bash tests/drive_and_validate.sh
+
 test-demo: $(BIN)
 	bash tests/run_demo.sh
 

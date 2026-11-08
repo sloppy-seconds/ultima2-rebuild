@@ -26,6 +26,7 @@ U2=$ENGINE/u2
 SDL=$ENGINE/u2-sdl-static
 S=${SCRATCH:-/var/tmp/u2drive}
 SRC_DEMOS=${SRC_DEMOS:-$ENGINE/demos}
+SAVE_SOURCE=${SAVE_SOURCE:-}
 
 # Accepts a directory (the default) or one or more files, so a single demo can be
 # re-run while iterating without moving it out of the corpus.
@@ -45,6 +46,49 @@ ok()  { printf '  PASS  %s\n' "$1"; pass=$((pass+1)); }
 bad() { printf '  FAIL  %s\n' "$1"; fail=$((fail+1)); }
 
 [ -x "$U2" ]  || { echo "build engine/u2 first"; exit 1; }
+
+# Seed the scratch from the player's own content if it is not there yet, so `make drive`
+# is one command rather than a ritual. The save slot starts empty on purpose: a fresh slot
+# is what makes the recorder emit a delta against content at all, which is the only shape
+# where the @world machinery does real work (a clean-install recording carries delta=none
+# and would pass every delta assertion by carrying nothing).
+SRC_CONTENT=${SRC_CONTENT:-$ENGINE/../original}
+if [ ! -d "$S/content" ]; then
+    [ -f "$SRC_CONTENT/mapx20" ] || { echo "drive: no $SRC_CONTENT to record against, and $S is not seeded"; exit 1; }
+    mkdir -p "$S/content" "$S/save/PLAYER"
+    cp "$SRC_CONTENT"/* "$S/content/" 2>/dev/null
+    printf 'seeded %s from %s\n' "$S" "$SRC_CONTENT"
+fi
+
+# The save is applied every run, not only on first seeding: a scratch can outlive the save it
+# was built with, and a stale slot producing eight silent no-ops is the worst possible failure.
+if [ -n "$SAVE_SOURCE" ]; then
+    [ -d "$SAVE_SOURCE/PLAYER" ] || { echo "drive: SAVE_SOURCE=$SAVE_SOURCE does not contain a PLAYER/ directory"; exit 1; }
+    rm -rf "$S/save"; mkdir -p "$S/save"
+    cp -r "$SAVE_SOURCE/PLAYER" "$S/save/"
+    printf 'seeded save from %s\n' "$SAVE_SOURCE"
+fi
+# A re-recorded route needs the save the original session started from. --load-ds pins the
+# DS mirror but not the sector digits the world opens from, so recording against the stock
+# release `player` silently starts the character in sector 00 and the exported keys drive a
+# different game in a different place -- which records nothing and looks like an engine
+# fault. SAVE_SOURCE must point at a directory holding PLAYER/ (PLAYER, mapxNN, monxNN).
+if [ ! -f "$S/save/PLAYER/PLAYER" ]; then
+    cat >&2 <<'NEEDS'
+drive: these recordings start from a save this machine does not have.
+
+--load-ds pins the DS mirror but not the sector the world opens from, so re-recording
+against the stock release `player` drives a different character in a different sector and
+records nothing. Point SAVE_SOURCE at the directory that CONTAINS a `PLAYER/` slot (inside
+it: PLAYER, mapxNN, monxNN) -- the saves directory the original session used:
+
+  SAVE_SOURCE=/path/to/saves make drive
+
+On the owner's machine that is ~/Games/u2/saves; copy it or mount it.
+NEEDS
+    exit 1
+fi
+
 [ -d "$S/content" ] || { echo "scratch $S not seeded"; exit 1; }
 
 for demo in "${DEMOS[@]}"; do
