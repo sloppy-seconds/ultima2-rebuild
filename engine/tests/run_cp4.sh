@@ -29,9 +29,14 @@ else
 fi
 
 # --- the time doors -------------------------------------------------------
-# The gate table, the two observed era pairings, and the rotation. The spec is written
-# to reject invention: slots 0 and 3 have never been transited and must report unknown.
-# Evidence: docs/moongates.md, captures/spice86/moongate-cycle.
+# The gate table, the destination rule, and the rotation. The pairings used to be a table of
+# the two era pairs ever watched live, with the spec asserting the other slots report unknown so a
+# guess could not ship as a door; asm/26B7+26C3+26C6 turned out to carry the rule for all four
+# slots, so the spec now asserts the rule's GRID PROPERTIES instead -- every era reaches the other
+# four exactly once, and only the four adjacent-era pairs round-trip. A wrong rule goes red on the
+# two legs that were watched live as well as on the properties, which is the control.
+# Evidence: docs/moongates.md sections 3 and 3b, captures/spice86/moongate-cycle,
+# tools/gate_graph.py.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/gate_check" \
    tests/gate_check.c src/game/gates.c src/core/world.c src/core/roots.c src/core/slot.c src/core/state.c 2>"$WORK/cc-gate.err"
 if [ $? -ne 0 ]; then

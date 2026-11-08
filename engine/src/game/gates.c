@@ -30,15 +30,29 @@ static const struct gate_cell k_gates[5][U2_GATE_SLOTS] = {
     { { 18, 23 }, { 50, 34 }, { 52, 24 }, {  8, 11 } },   /* era 4 */
 };
 
-/* Observed pairings only. Absence here means "never seen", not "does not exist": in the
- * original all four doors stamp and rotate in every era, and the two unlisted slots do
- * transit somewhere. They are left unimplemented rather than guessed at. */
-static const struct { uint8_t era, slot, partner; } k_pairs[] = {
-    { 1, 1, 2 },
-    { 2, 1, 1 },
-    { 2, 2, 3 },
-    { 3, 2, 2 },
-};
+/* The destination era, by gate index. Read out of asm/26B7 + asm/26C3 + asm/26C6, which are one
+ * contiguous routine (26B7..26CB) that the Phase 2 map cut into three fragments:
+ *
+ *     k = DS:6E >> 1
+ *     target = k if k < era else k + 1
+ *     DS:49 = target
+ *
+ * The gate index IS the destination, as a position in the sorted list of the other four eras: gate
+ * 0 always leads to the earliest other era, gate 3 always to the latest. Consequences, all of them
+ * checked in gate_check.c rather than asserted in prose: every era reaches the other four exactly
+ * once; gate k is the two-way link between era k and era k+1 and nothing else round-trips.
+ *
+ * This replaced a four-row table of observed pairings. Two of the four slots had never been watched
+ * transiting and the engine refused to offer a door there, which was the right call while the rule
+ * was unknown and is now a gap the bytes close. The rule reproduces both watched transits unchanged
+ * (era 2 slot 1 -> 1, era 2 slot 2 -> 3), and tools/gate_graph.py checks it against the Codex's
+ * five general rules and four named two-way connections. docs/moongates.md section 3b. */
+int u2_gate_partner_era(int era, int slot)
+{
+    if (era < 0 || era >= 5 || slot < 0 || slot >= U2_GATE_SLOTS)
+        return -1;
+    return slot < era ? slot : slot + 1;
+}
 
 int u2_gate_cell(int era, int slot, int *x, int *y)
 {
@@ -47,14 +61,6 @@ int u2_gate_cell(int era, int slot, int *x, int *y)
     if (x) *x = k_gates[era][slot].x;
     if (y) *y = k_gates[era][slot].y;
     return 1;
-}
-
-int u2_gate_partner_era(int era, int slot)
-{
-    for (size_t i = 0; i < sizeof k_pairs / sizeof k_pairs[0]; ++i)
-        if (k_pairs[i].era == era && k_pairs[i].slot == slot)
-            return k_pairs[i].partner;
-    return -1;
 }
 
 int u2_gate_slot(uint8_t gate_index)
@@ -138,7 +144,7 @@ int u2_gate_transit(u2_ctx *ctx, struct u2_overworld *ow)
 
     const int partner = u2_gate_partner_era(era, slot);
     if (partner < 0)
-        return 0;                       /* unobserved pairing: no door offered */
+        return 0;                       /* not an era/slot the table covers */
     int px = 0, py = 0;
     if (!u2_gate_cell(partner, slot, &px, &py))
         return 0;

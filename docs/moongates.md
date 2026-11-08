@@ -310,10 +310,15 @@ proven red before the fix was believed.
 
 **Deliberately not modelled, each for a stated reason:**
 
-* **Slots 0 and 3.** Never transited, so `u2_gate_partner_era()` returns unknown and no transit is
-  offered there. The spec asserts that unknown-ness on every era, so filling those slots with a guess
-  goes red rather than shipping a door that opens onto an invention. They **are** drawn, because the
-  original draws them: all four slots stamp in every era, and only the destination is unknown.
+* ~~**Slots 0 and 3.**~~ **Closed 2026-11-08 by § 3b.** These were the two slots never watched
+  transiting, so `u2_gate_partner_era()` returned unknown and no door was offered there — the right
+  call while the rule was unknown, and the spec asserted that unknown-ness on every era so a guess
+  would go red rather than ship a door onto an invention. § 3b's rule fills all four slots from the
+  bytes, so the refusal is gone and the spec inverted: `gate_check.c` now asserts the rule's *grid
+  properties* — every era reaches the other four exactly once, and only the four adjacent-era pairs
+  round-trip, from both ends, which is eight legs and not four — and an off-by-one in the rule goes
+  red on the two watched-live pairings as well as on the properties. The two new slots are still
+  **derived and not observed**; G73 names the four seeded transits that would change that grade.
 * **The stamp into the resident sector.** The door is stamped into the **view**, not the map. The
   original stamps `0xC0` into the resident grid, and whether that survives a save back into `mapxNN`
   is untested — so the engine draws the door without dirtying the sector it stands on, which keeps an

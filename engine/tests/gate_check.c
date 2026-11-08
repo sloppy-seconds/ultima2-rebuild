@@ -3,7 +3,8 @@
  *
  * Every expectation here is a live observation from 2026-10-29 (docs/moongates.md,
  * captures/spice86/moongate-cycle). The point of this file is not only to pin what is
- * known but to REJECT what is not: the unobserved pairings must report unknown, so an
+ * known and to REJECT what is not: the pairings the rule derives must match the two that were
+ * watched live, and the grid properties the rule implies are asserted rather than tabulated.
  * implementation that quietly invents a destination era for slot 0 or 3 goes red here
  * rather than shipping a door that opens onto a guess.
  *
@@ -61,10 +62,36 @@ int main(int argc, char **argv)
 
     /* The control that makes this spec able to fail in the place that matters. Slots 0
      * and 3 were never transited; a partner here is an invention, not a finding. */
+    /* The two slots that had never been watched, now derived from asm/26B7+26C3+26C6 rather
+     * than observed. The rule is `target = k if k < era else k + 1`, so gate k is the two-way
+     * link between era k and era k+1. Asserted as a property over the whole grid, not as five
+     * more rows of expected values, because the property is what the Codex independently agrees
+     * with and a wrong rule shows up somewhere in it even if a table is copied correctly. */
+    CHECK(u2_gate_partner_era(2, 0) == 0, "era2 slot0 -> era0 (derived, never watched)");
+    CHECK(u2_gate_partner_era(2, 3) == 4, "era2 slot3 -> era4 (derived, never watched)");
     for (int era = 0; era < 5; ++era) {
-        CHECK(u2_gate_partner_era(era, 0) == -1, "era%d slot0 stays unobserved", era);
-        CHECK(u2_gate_partner_era(era, 3) == -1, "era%d slot3 stays unobserved", era);
+        int seen[5] = { 0, 0, 0, 0, 0 };
+        for (int slot = 0; slot < U2_GATE_SLOTS; ++slot)
+            seen[u2_gate_partner_era(era, slot)]++;
+        int ok = (seen[era] == 0);
+        for (int e = 0; e < 5; ++e)
+            if (e != era) ok = ok && seen[e] == 1;
+        CHECK(ok, "era%d's four doors reach the other four eras exactly once", era);
     }
+    for (int k = 0; k < U2_GATE_SLOTS; ++k)
+        CHECK(u2_gate_partner_era(k, k) == k + 1 && u2_gate_partner_era(k + 1, k) == k,
+              "slot%d is the two-way link between era%d and era%d", k, k, k + 1);
+    /* And nothing else round-trips. Four adjacent-era pairs, and each pair makes the round trip
+     * from both ends, so the leg count is eight and not four -- the first draft of this check
+     * said four and was wrong about its own arithmetic, not about the rule. */
+    int round = 0;
+    for (int era = 0; era < 5; ++era)
+        for (int slot = 0; slot < U2_GATE_SLOTS; ++slot) {
+            int p = u2_gate_partner_era(era, slot);
+            if (u2_gate_partner_era(p, slot) == era) round++;
+        }
+    CHECK(round == 8, "only the four adjacent-era pairs round-trip, from both ends = 8 legs, "
+                      "got %d", round);
 
     /* --- index to slot ---------------------------------------------------- */
     CHECK(u2_gate_slot(0x00) == 0, "index 00 -> slot 0");
@@ -184,10 +211,21 @@ int main(int argc, char **argv)
     ow.gate_stamped = 1;
     ctx.state.gate_index = 0;             /* slot 0: stamped, but never observed a partner */
     ow.x = 16; ow.y = 16;
-    CHECK(u2_gate_transit(&ctx, &ow) == 0, "era2 slot0 offers no door: partner unobserved");
-    ctx.state.gate_index = 6;             /* slot 3, same refusal */
+    /* The two slots the rule now fills. Asserted as a destination rather than as a driven
+     * transit: u2_gate_transit ends in u2_world_load, which needs a sector store this harness
+     * has none of, and a leg that half-applies an era change before failing to load is not
+     * evidence of anything. The pairings themselves are pinned by the grid checks above. */
+    ctx.state.gate_index = 0;             /* slot 0, era 2 -> era 0 */
+    ow.x = 16; ow.y = 16;
+    CHECK(u2_gate_partner_era(2, 0) == 0, "era2 slot0 has a destination now, not a refusal");
+    int dx = 0, dy = 0;
+    CHECK(u2_gate_cell(0, 0, &dx, &dy) && dx == 29 && dy == 56,
+          "era2 slot0 arrives at era0 slot0 = (29,56), got (%d,%d)", dx, dy);
+    ctx.state.gate_index = 6;             /* slot 3, era 2 -> era 4 */
     ow.x = 19; ow.y = 52;
-    CHECK(u2_gate_transit(&ctx, &ow) == 0, "era2 slot3 offers no door: partner unobserved");
+    CHECK(u2_gate_partner_era(2, 3) == 4, "era2 slot3 has a destination now, not a refusal");
+    CHECK(u2_gate_cell(4, 3, &dx, &dy) && dx == 8 && dy == 11,
+          "era2 slot3 arrives at era4 slot3 = (8,11), got (%d,%d)", dx, dy);
     ctx.state.gate_index = 4;             /* slot 2, but the player is not standing on it */
     ow.x = 1; ow.y = 1;
     CHECK(u2_gate_transit(&ctx, &ow) == 0, "no transit unless the player is on the cell");
