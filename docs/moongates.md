@@ -148,10 +148,74 @@ era2 idx1 (48,24)   ->  era1 idx1 (47,28)
 fixed coordinate — the index is preserved and only the era changes. That is why the pairs looked
 reciprocal: they are the same column of the table in two rows.
 
-**What is still open is the destination era per index.** Observed so far: index 1 pairs eras 2 and 1,
-index 2 pairs eras 2 and 3. Indices 0 and 3 are unobserved, and the behaviour at the era boundaries
-(era 0 and era 4) is unknown. A gate therefore has a *partner era* per index, and that mapping is not
-yet derived from the bytes.
+**What was still open — the destination era per index — is now closed from the bytes.** See § 3b.
+
+## 3b. The destination rule, read out of the code (2026-11-08)
+
+§ 3 left one hole: a gate had a cell, but nothing said what era it led to. Indices 0 and 3 had never
+been watched, and the era boundaries were unknown. The answer was in the listing the whole time, in
+three fragments the Phase 2 map cut apart — the same failure as `cmd_C`, `cmd_D` and `cmd_K`:
+
+```
+asm/26B7_time_door_target_era.asm   k = DS:6E >> 1 ;  cmp k, DS:49 ;  jb down
+asm/26C3_time_door_target_era_up.asm                clc ; adc $1,%al      ; k + 1
+asm/26C6_time_door_set_era.asm                     DS:49 = AL ; rebuild the world
+```
+
+So, in one line:
+
+```
+target_era = k if k < era else k + 1        # and you arrive at index k of the target era
+```
+
+**The gate index is the destination, expressed as a position in the sorted list of the other four
+eras.** Gate 0 always leads to the earliest other era, gate 3 always to the latest. That is why the
+observed pairs looked reciprocal: **gate k is the two-way link between era k and era k+1**, and
+nothing else is two-way.
+
+| era | gate 0 | gate 1 | gate 2 | gate 3 |
+| --- | --- | --- | --- | --- |
+| Legends | -> Pangea | -> 1423 BC | -> 1990 | -> Aftermath |
+| Pangea | -> Legends | -> 1423 BC | -> 1990 | -> Aftermath |
+| 1423 BC | -> Legends | -> Pangea | -> 1990 | -> Aftermath |
+| 1990 | -> Legends | -> Pangea | -> 1423 BC | -> Aftermath |
+| Aftermath | -> Legends | -> Pangea | -> 1423 BC | -> 1990 |
+
+Both live transits from § 3 fall out of it: era 2 gate 1 gives 1 (Pangea) and era 2 gate 2 gives 3
+(1990), which is exactly what was watched.
+
+### The Codex agrees, including on the two things it flagged as exceptions
+
+The [Codex gate-location page](https://wiki.ultimacodex.com/wiki/List_of_time_gate_locations)
+states five general rules and names four two-way connections. Third-party data is a hypothesis the
+bytes get to veto, so this is checked mechanically by **`tools/gate_graph.py --verify`**, which
+derives the graph from the rule and asserts it — the wiki is a control, not a source.
+
+* *each period has four gates and all other four are available* — ✓ every row is the other four
+  eras exactly once.
+* *travel to the Time of Legends always leads to Legends 1* — ✓ gate 0 of every other era, arriving
+  at index 0.
+* *travel to Pangea always leads to Eurasia (east), **except when coming from the Time of
+  Legends*** — ✓ gate 1 arrives at index 1, and from Legends it is gate 0 that leads there, so it
+  arrives at index 0. The exception is not special-cased in the rule; it falls out.
+* *travel to 2112 A.D. always leads to the North-West American gate* — ✓ gate 3 from every era,
+  arriving at Aftermath index 3 `(8,11)`.
+* *all gates going to 1990 A.D. lead to Great Britain, **except the one in North-West America in
+  the Aftermath*** — ✓ gates 2 of eras 0-2 arrive at 1990 index 2 `(33,23)`, and the Aftermath's
+  gate 3 arrives at index 3 `(20,52)`. Again the rule produces the exception without knowing about
+  it.
+* *four two-way connections* — ✓ exactly four, and they are the four adjacent-era pairs the Codex
+  names: Legends-Pangea, Pangea-1423 BC, 1423 BC-1990, 1990-Aftermath.
+
+Two of the wiki's five rules are exceptions to its own generalisations, and a rule fitted to the
+two observations alone could easily have got both wrong. That it reproduces them unforced is the
+part worth having a gate for rather than a paragraph.
+
+**Grade.** The rule is `measured` from the listing and reproduces two `observed` transits. Gates 0
+and 3 have still never been watched transiting — that is `needs-gameplay.md` G73, agent-drivable,
+and it would upgrade two of four indices from derived to observed. The reciprocity claim is the
+strongest single check available without a session: it is what makes the four two-way pairs fall
+out rather than being asserted.
 
 ## 4. G45 resolved: the tens digit is the era axis
 
