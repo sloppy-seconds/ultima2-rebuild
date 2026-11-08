@@ -19,28 +19,13 @@
 #include <string.h>
 #include <strings.h>
 #include "core/ctx.h"
+#include "core/keys.h"
 
 typedef struct script_input {
     u2_key *keys;
     size_t  n;
     size_t  i;
 } script_input;
-
-static int named_key(const char *tok, u2_key *k)
-{
-    struct { const char *name; int ch; } table[] = {
-        { "SP", ' ' }, { "CR", '\r' }, { "LF", '\n' }, { "TAB", '\t' },
-        { "ESC", 0x1b }, { "BS", 0x08 }, { "NUL", 0x00 }, { "DEL", 0x7f },
-    };
-    for (size_t j = 0; j < sizeof table / sizeof table[0]; j++) {
-        if (strcasecmp(tok, table[j].name) == 0) {
-            k->ch = (uint8_t)table[j].ch;
-            k->scan = 0;
-            return 1;
-        }
-    }
-    return 0;
-}
 
 static int script_input_init(u2_ctx *ctx)
 {
@@ -64,7 +49,7 @@ static int script_input_init(u2_ctx *ctx)
         if (hash) *hash = '\0';
         p = strtok(p, " \t\r\n");
         if (!p) continue;
-        if (strcmp(p, "EOF") == 0) break;
+        if (strcmp(p, "EOF") == 0) break;     /* a legitimate end-of-script marker */
         if (si->n == cap) {
             cap *= 2;
             u2_key *grown = realloc(si->keys, cap * sizeof *si->keys);
@@ -72,16 +57,7 @@ static int script_input_init(u2_ctx *ctx)
             si->keys = grown;
         }
         u2_key k = { 0, 0 };
-        if (strcmp(p, "WAIT") == 0) {
-            k.ch = 0xFF; /* sentinel: "no key this poll" */
-        } else if (named_key(p, &k)) {
-            /* filled by named_key */
-        } else if (strncmp(p, "0x", 2) == 0 || strncmp(p, "0X", 2) == 0) {
-            long v = strtol(p, NULL, 16);
-            k.ch = (uint8_t)(v & 0xFF);
-        } else if (strlen(p) == 1) {
-            k.ch = (uint8_t)(unsigned char)p[0];
-        } else {
+        if (!u2_key_from_token(p, &k)) {
             fprintf(stderr, "u2: %s:%zu: unknown key token '%s'\n", path, si->n + 1, p);
             free(si->keys); free(si); fclose(f);
             return -1;
