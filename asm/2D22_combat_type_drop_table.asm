@@ -1,6 +1,7 @@
 # sub_2d22 — mechanical clean (bulk wave); behavior not yet reviewed
 # func 2D22..2D8B  len 006A B  evidence: seed+reko
 # calls: L_002f8c, L_005417
+# provenance: static:bytes (both type branches read from the listing, function complete at 0x6A bytes) + live:play-test-live -- the HELM 1->2 and STAFF 1->2 kills in the sector-00 fight are these two branches, predicted before they were matched.
 # confidence: low (bytes proven by check_func.py)
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 # RESOLVED 2026-11-09: this is the NON-THIEF arm of the kill-drop dispatch, reached by

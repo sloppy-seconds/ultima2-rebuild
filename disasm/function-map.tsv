@@ -584,14 +584,7 @@ start	end	len	evidence	name_hint
 2CCD	2CD2	0006	seed+reko	
 2CD3	2CD7	0005	seed+reko	
 2CD8	2CE4	000D	seed+reko	
-2CE5	2CE8	0004	seed+reko	
-2CE9	2CF1	0009	seed+reko	
-2CF2	2CF5	0004	seed+reko	
-2CF6	2CFF	000A	seed+reko	
-2D00	2D02	0003	seed+reko	
-2D03	2D06	0004	seed+reko	
-2D07	2D16	0010	seed+reko	
-2D17	2D21	000B	seed+reko	
+2CE5	2D21	003D	seed+reko+live	
 2D22	2D8B	006A	seed+reko	
 2D8C	2DB3	0028	seed+reko	
 2DB4	2DB6	0003	seed+reko	

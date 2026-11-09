@@ -160,7 +160,7 @@ do not all live in the same place.
 | --- | --- | --- | --- |
 | STRANGE COIN | `items_held[13]` = `DS:E3` | `cmd_N` NEGATE TIME falls into `asm/3C04`, which does `stc ; cmc ; sbb $1,%al ; das ; cmc` and stores back, then writes `0x14` to `DS:26A` (creature-move freeze) | **observed** — `captures/spice86/cmd-nr-live`, coin read back at 0 both sides |
 | TRI-LITHIUM | `items_held[15]` = `DS:E5` | space travel: `asm/6999` (whose own label for the slot is `  FUEL=`) and `asm/6DFD` both subtract and store | static — never observed; space is CP7 |
-| TOOLS | **`DS:66`, not an item slot** | a dungeon trap: `asm/277B` prints `ARGH! A TRAP!`, reads `DS:66`, prints `ESCAPED! BY USE OF TOOLS!`, and stores the decremented byte. Gained via `asm/2CF6_tools_add_one` | static — dungeons are parked (AGENTS.md § 3); open as **G47** in `docs/needs-gameplay.md`, which lists the four things a dungeon session still has to observe |
+| TOOLS | **`DS:66`, not an item slot** | a dungeon trap: `asm/277B` prints `ARGH! A TRAP!`, reads `DS:66`, prints `ESCAPED! BY USE OF TOOLS!`, and stores the decremented byte. Gained on a thief kill: `asm/2CE5` is the kill-drop dispatch and its thief arm adds 1 to `DS:66` at 25% | static for the spend, **live for the gain** (`captures/spice86/baseline-fight` reaches the increment by fall-through) — the spend is still open as **G47** in `docs/needs-gameplay.md` |
 
 **Why TOOLS looked absent, and why that was the project's error and not the owner's.**
 The item name table at file `0x501D` has sixteen entries and none of them is TOOLS, so

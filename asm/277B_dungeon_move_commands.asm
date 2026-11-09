@@ -35,7 +35,10 @@
 #           entry at all, which is how a scan scoped to the item array concluded the game had no
 #           such thing. Owner recollection supplied the mechanic; the bytes confirm it. Static
 #           grade: dungeons are parked (AGENTS.md § 3) and no capture has filmed this. The
-#           increment side is asm/2CF6_tools_add_one. See docs/save-format.md § 5.
+#           increment side is asm/2CE5, the kill-drop dispatch: its thief arm adds 1 to
+#           DS:66 on a 25% roll. That side is now LIVE evidence, not static — the increment
+#           is reached by fall-through in captures/spice86/baseline-fight. See
+#           docs/save-format.md § 5.
 # func 277B..29D1  len 0257 B  evidence: seed+reko
 # strings: "CMD: "; "CMD: "; "PASS"; "ADVANCE" (+7 more)
 # calls: L_000911, L_000bfb, L_000c30, L_000c33, L_000e62, L_002a61, L_002b12, L_002b44 (+8 more)
