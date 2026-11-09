@@ -195,10 +195,24 @@ def name_maps(maps, places):
         m['names'] = names
         head = world.title() if world else 'sector ' + m['sector']
         m['grouplabel'] = ' · '.join(x for x in (head, era) if x) or ('group ' + m['sector'][0])
-        # Prefer the game's own decoded text; fall back to a wiki label only where the tiles
-        # spell nothing, which is the case for most towers and dungeons.
-        shown = '; '.join([n for n in names.split('; ') if n][:2]) or (wiki and wiki + ' (wiki)')
-        m['label'] = ' · '.join(x for x in (m['sector'] + ' ' + kind, shown) if x) or m['name']
+        # The place NAME and the decoded tile TEXT are different facts and must stay apart.
+        # A village's tiles usually spell shop signs ("WEAPONS LTD", "SEER", "CABIN SIX");
+        # the NAME of the place is a wiki join for most villages, because no byte rule says
+        # which run names the town and which names a shop. Where the game does spell its own
+        # name -- Pluto's 81 tiles read TOMMERSVILLE -- it shows up in the text, not the name.
+        # The grade is carried into the label on purpose: a reader must be able to see that a
+        # name came from outside this binary rather than off its bytes.
+        place, grade = (wiki.split(' [', 1) + [''])[:2] if wiki else ('', '')
+        grade = grade.rstrip(']')
+        runs = '; '.join([n for n in names.split('; ') if n][:2])
+        m['place'] = place
+        m['grade'] = grade
+        bits = []
+        if place:
+            bits.append(place + (' [' + grade + ']' if grade else ''))
+        if runs:
+            bits.append(runs)
+        m['label'] = ' · '.join([m['sector'] + ' ' + kind] + bits) or m['name']
     return maps
 
 
@@ -306,7 +320,9 @@ $('c').addEventListener('mousemove',e=>{
   const b=m.bytes[r*64+col], a=b>>2, art=ART[a]||{};
   const n=m.bytes.filter(v=>v===b).length;
   const who=[m.world,m.era,m.kind].filter(x=>x).join(' · ');
-  $('info').innerHTML='<b>'+m.name+'</b>'+(who?' <span style="color:#8fa">'+who+'</span>':'')+
+  const place=[m.place,m.grade?'['+m.grade+']':''].filter(x=>x).join(' ');
+  $('info').innerHTML='<b>'+m.name+'</b>'+(place?' <span style="color:#fc6">'+place+'</span>':'')+
+    (who?' <span style="color:#8fa">'+who+'</span>':'')+
     ' at x='+col+' y='+r+
     (m.names?'<br><small style="color:#8fa">tiles here read: '+m.names+'</small>':'')+
     '<br>byte 0x'+b.toString(16).padStart(2,'0')+' &rarr; art 0x'+a.toString(16).padStart(2,'0')+

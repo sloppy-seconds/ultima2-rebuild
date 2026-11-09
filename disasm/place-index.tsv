@@ -18,14 +18,14 @@ sector	layer	world	era	kind	candidate	candidate_at	wiki	rooms	glyphs	dialogue	te
 34	mapx	EARTH	1990 A.D. (ANOS: 1990 A.D.)	tower			Tower in Egypt [inferred]		2	0	no text: 2 glyphs used as structure	doubles as MARS when the Galaxy patch is absent
 35	mapx	EARTH	1990 A.D. (ANOS: 1990 A.D.)	dungeon			Dungeon in Greenland (1990 A.D. copy?) [unresolved]		2	0	no text: 2 glyphs used as structure	doubles as MARS when the Galaxy patch is absent
 40	mapx	EARTH	2112 A.D. Aftermath (ANOS: 2112 A.D.)	overworld					0	0	no text: 0 glyphs used as structure	doubles as JUPITER when the Galaxy patch is absent
-41	mapx	EARTH	2112 A.D. Aftermath (ANOS: 2112 A.D.)	village				CCCP DEFENCE DA KGB; CCCP TEST LAUNCH EXIT HERE; CONTROL; MINIS RY; PIRATES COVE; OF; PROPAGA DA; SEER; IS OUT; RED LOBSTE; TASS; CCCP; DA RED; SKWARE; RED; MAGIC; CATOLIK; PIRATES HARBOUR	23	10	text present	doubles as JUPITER when the Galaxy patch is absent
+41	mapx	EARTH	2112 A.D. Aftermath (ANOS: 2112 A.D.)	village			Pirates Harbour [inferred]	CCCP DEFENCE DA KGB; CCCP TEST LAUNCH EXIT HERE; CONTROL; MINIS RY; PIRATES COVE; OF; PROPAGA DA; SEER; IS OUT; RED LOBSTE; TASS; CCCP; DA RED; SKWARE; RED; MAGIC; CATOLIK; PIRATES HARBOUR	23	10	text present	doubles as JUPITER when the Galaxy patch is absent
 44	mapx	EARTH	2112 A.D. Aftermath (ANOS: 2112 A.D.)	tower					2	0	no text: 2 glyphs used as structure	doubles as JUPITER when the Galaxy patch is absent
 45	mapx	EARTH	2112 A.D. Aftermath (ANOS: 2112 A.D.)	dungeon					2	0	no text: 2 glyphs used as structure	doubles as JUPITER when the Galaxy patch is absent
 50	mapx	SATURN		overworld					0	0	no text: 0 glyphs used as structure	no Earth era for this tens digit
 60	mapx	URANUS		overworld					0	0	no text: 0 glyphs used as structure	no Earth era for this tens digit
-61	mapx	URANUS		village				MONKEY; MORE; WARD; SEARS; TO GO; SEAR; SEARS; JACK IN DE BOX; BIG; TOP; VISIT FOOLS; ISLAND; MAGIC IS FUN; DRUID; MAGIC; DARE THE SWAMP; IF YOU DARE; NEW JESTER	24	10	text present	no Earth era for this tens digit
+61	mapx	URANUS		village			New Jester [inferred]	MONKEY; MORE; WARD; SEARS; TO GO; SEAR; SEARS; JACK IN DE BOX; BIG; TOP; VISIT FOOLS; ISLAND; MAGIC IS FUN; DRUID; MAGIC; DARE THE SWAMP; IF YOU DARE; NEW JESTER	24	10	text present	no Earth era for this tens digit
 70	mapx	NEPTUNE		overworld					0	0	no text: 0 glyphs used as structure	no Earth era for this tens digit
-71	mapx	NEPTUNE		village				CABIN EIGHT; CAMP FIRE; SEER; COOK; CABIN SIX; MESS HALL; CABIN FOUR; CRAFTS; CABIN THREE; CABIN TWO; POOR DEBBIES POOL; CAMP; MAGIC; CABIN NINE; GOOD MAGIC; CABIN ONE; COMPUTER; CAMP	21	9	text present	no Earth era for this tens digit
+71	mapx	NEPTUNE		village			Computer Camp [inferred]	CABIN EIGHT; CAMP FIRE; SEER; COOK; CABIN SIX; MESS HALL; CABIN FOUR; CRAFTS; CABIN THREE; CABIN TWO; POOR DEBBIES POOL; CAMP; MAGIC; CABIN NINE; GOOD MAGIC; CABIN ONE; COMPUTER; CAMP	21	9	text present	no Earth era for this tens digit
 80	mapx	PLUTO		overworld					0	0	no text: 0 glyphs used as structure	no Earth era for this tens digit
 81	mapx	PLUTO		village				SOFTALK; YOUR CHEF; KURTS; CLERGY; CORNER; TOMMERSVILLE	18	8	text present	no Earth era for this tens digit
 82	mapx	PLUTO		town	TOWNE MAKLER	y=63 x=24..40		GEORGES ARMS; BETHS ARMOR; HORSE; ADAMS PUB	18	8	text present	no Earth era for this tens digit
@@ -44,9 +44,9 @@ sector	layer	world	era	kind	candidate	candidate_at	wiki	rooms	glyphs	dialogue	te
 45	mapg	JUPITER		dungeon			Dungeon on Jupiter [inferred]		2	0	no text: 2 glyphs used as structure	the real planet map; the root mapx is an Earth clone
 50	mapg	SATURN		overworld					0	0	no text: 0 glyphs used as structure	identical to the root mapx
 60	mapg	URANUS		overworld					0	0	no text: 0 glyphs used as structure	identical to the root mapx
-61	mapg	URANUS		village				MONKEY; MORE; WARD; SEARS; TO GO; SEAR; SEARS; JACK IN DE BOX; BIG; TOP; VISIT FOOLS; ISLAND; MAGIC IS FUN; DRUID; MAGIC; DARE THE SWAMP; IF YOU DARE; NEW JESTER	24	8	text present	identical to the root mapx
+61	mapg	URANUS		village			New Jester [inferred]	MONKEY; MORE; WARD; SEARS; TO GO; SEAR; SEARS; JACK IN DE BOX; BIG; TOP; VISIT FOOLS; ISLAND; MAGIC IS FUN; DRUID; MAGIC; DARE THE SWAMP; IF YOU DARE; NEW JESTER	24	8	text present	identical to the root mapx
 70	mapg	NEPTUNE		overworld					0	0	no text: 0 glyphs used as structure	identical to the root mapx
-71	mapg	NEPTUNE		village				CABIN EIGHT; CAMP FIRE; SEER; COOK; CABIN SIX; MESS HALL; CABIN FOUR; CRAFTS; CABIN THREE; CABIN TWO; POOR DEBBIES POOL; CAMP; MAGIC; CABIN NINE; GOOD MAGIC; CABIN ONE; COMPUTER; CAMP	21	8	text present	identical to the root mapx
+71	mapg	NEPTUNE		village			Computer Camp [inferred]	CABIN EIGHT; CAMP FIRE; SEER; COOK; CABIN SIX; MESS HALL; CABIN FOUR; CRAFTS; CABIN THREE; CABIN TWO; POOR DEBBIES POOL; CAMP; MAGIC; CABIN NINE; GOOD MAGIC; CABIN ONE; COMPUTER; CAMP	21	8	text present	identical to the root mapx
 80	mapg	PLUTO		overworld					0	0	no text: 0 glyphs used as structure	identical to the root mapx
 81	mapg	PLUTO		village				SOFTALK; YOUR CHEF; KURTS; CLERGY; CORNER; TOMMERSVILLE	18	8	text present	identical to the root mapx
 82	mapg	PLUTO		town	TOWNE MAKLER	y=63 x=24..40		GEORGES ARMS; BETHS ARMOR; HORSE; ADAMS PUB	18	8	text present	identical to the root mapx
