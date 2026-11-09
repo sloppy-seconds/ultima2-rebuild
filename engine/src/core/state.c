@@ -74,6 +74,23 @@ uint8_t u2_bcd_dec1(uint8_t v)
     return (uint8_t)(v - 1u);
 }
 
+/* Packed-decimal add one, with the original's MISSING ceiling guard: a count at 99 goes to
+ * 00 and keeps going. Note the asymmetry with u2_bcd_dec1 above, which does clamp at zero --
+ * the two are not a matched pair, because the sites they come from are not symmetric. dec1
+ * serves the tool spend, which the bytes guard; inc1 serves the kill drops and the chest
+ * grants (asm/2D07, asm/2CD8, asm/363B), none of which contain a compare anywhere. Adding n
+ * by calling this n times is byte-equivalent to one `adc $n ; daa`, including across the
+ * nibble carry and the 99 wrap; combat_check walks both forms rather than assuming it. */
+uint8_t u2_bcd_inc1(uint8_t v)
+{
+    unsigned t = (unsigned)v + 1u;
+    if ((t & 0xFu) > 9u)
+        t += 6u;
+    if (t > 0x99u)
+        t += 0x60u;              /* and the carry falls off the end, by design */
+    return (uint8_t)(t & 0xFFu);
+}
+
 int u2_bcd16(uint8_t lo, uint8_t hi)
 {
     return (((lo >> 4) * 10 + (lo & 0x0F)) * 100) +

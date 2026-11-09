@@ -42,7 +42,6 @@ void    u2_combat_set_item(u2_ctx *ctx, uint16_t item_ds, uint8_t count);
 uint8_t u2_combat_item(const u2_ctx *ctx, uint16_t item_ds);
 uint16_t u2_combat_thief_steal(u2_ctx *ctx);
 void    u2_combat_kill_drop(u2_ctx *ctx, uint8_t dead_type);
-void    u2_bcd_inc1_test(uint8_t *p);
 uint8_t u2_bcd_add2_test(uint8_t v);
 /* C4: magic missile. Non-zero when damage applies. Must consume NO random
  * byte — there is no save to roll. spec: asm/0F12 */
@@ -490,8 +489,8 @@ static void test_kill_drop(void)
         static const uint8_t seeds[] = { 0x00, 0x07, 0x08, 0x09, 0x10, 0x97, 0x98, 0x99 };
         for (unsigned i = 0; i < sizeof seeds; ++i) {
             uint8_t two = seeds[i];
-            u2_bcd_inc1_test(&two);
-            u2_bcd_inc1_test(&two);
+            two = u2_bcd_inc1(two);
+            two = u2_bcd_inc1(two);
             uint8_t one = seeds[i];
             one = u2_bcd_add2_test(one);
             CHECK(two == one, "0x%02x +2: two increments gave %02x, one adc gave %02x",

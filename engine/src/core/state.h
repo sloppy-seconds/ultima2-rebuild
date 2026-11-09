@@ -696,6 +696,7 @@ int  u2_bcd16(uint8_t lo, uint8_t hi);
  * Shared because torches, keys, tools, gold and every item count are BCD and
  * three modules now spend them. */
 uint8_t u2_bcd_dec1(uint8_t v);
+uint8_t u2_bcd_inc1(uint8_t v);
 
 void u2_state_init(u2_state *s);
 

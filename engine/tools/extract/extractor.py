@@ -306,6 +306,10 @@ MANIFEST = [
     ("U2_S_TRI_LITHIUM",       "363B_cmd_G.asm",          ("run", 0x395D, 12, "TRI-LITHIUM!")),
     ("U2_S_GET_A",             "363B_cmd_G.asm",          ("run", 0x3954,  2, "A ")),
     ("U2_S_GET",               "363B_cmd_G.asm",          ("run", 0x383E,  3, "GET")),
+    ("U2_S_GET_WEAPON",        "363B_cmd_G.asm",          ("run", 0x3868,  7, " WEAPON")),
+    ("U2_S_GET_ARMOUR",        "363B_cmd_G.asm",          ("run", 0x389E,  7, " ARMOUR")),
+    ("U2_S_GET_EMPTY",         "363B_cmd_G.asm",          ("run", 0x3890,  6, " EMPTY!")),
+    ("U2_S_GET_WHAT",          "363B_cmd_G.asm",          ("run", 0x385B,  6, " WHAT?")),
     # The gold-for-HP tribute: TRANSACT aimed at a creature of type 0x6C. Observed live
     # 2026-10-29 (captures/spice86/lord-british-tribute), all four rungs of the ladder.
     # The charge line carries a leading AND a trailing 0x8d line marker; the offsets below

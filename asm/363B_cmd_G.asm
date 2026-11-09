@@ -7,6 +7,23 @@
 # provenance: live:airport32 (+1 other harvests), static
 #           entry executed in 2 of 214 harvests; derived by tools/provenance_from_traces.py
 # confidence: medium (flow + messages proven by bytes; NPC/quest semantics inferred)
+# RESOLVED 2026-11-09: the town/site arm is decoded, and the earlier note blaming "asm/361C's
+#           unread table" was wrong. asm/361C (L_00381c, filed inside asm/3611) is the CELL
+#           CLEARING helper -- `cmpb $0x4,0x4a`, then stamp 0x08 land over the tile via
+#           L_0052b3 -- and the item index comes from the roll that follows it. The arm is:
+#             DS:4A < 4 selects the town path; the cell under the player is then
+#             0x2a -> " ARMOUR", rand & 3   -> armour_owned[idx] += 1   (DS:96+idx)
+#             0x2c -> " WEAPON", rand & 7   -> weapons_owned[idx] += 1  (DS:76+idx)
+#             idx == 0 -> " EMPTY!" ; anything else -> " WHAT?"
+#           The clear happens BEFORE the roll, so an empty chest is still consumed.
+#           Weapon indices 1..7 are DAGGER..LIGHT SWORD, which is what the third-party guide
+#           claims independently ("up to the light sword (n.7)"); index 7 of the pool really
+#           is LIGHT SWORD, and PHASER (8) and QUICK SWORD (9) are excluded. Armour 1..3 is
+#           CLOTH, LEATHER, CHAIN, so PLATE, REFLECT and POWER are never chest loot.
+#           Reachability, measured: 0x2c occurs at seven cells in the shipped maps (mapx31
+#           (4,23),(4,60),(4,61); mapx32 (26,43),(26,44); mapx41 (16,35),(25,41)) and 0x2a
+#           occurs in NO mapx file -- see original/updated/GCHANGES.TXT on the CD dump
+#           overwriting same-named Galactic-disk files.
 # notes: re-decoded with tools/decode_str.py (str_out-aware); gas re-encode diffs
 #        kept as .byte (disp8/disp16 and reg-op form choices)
 cmd_G:

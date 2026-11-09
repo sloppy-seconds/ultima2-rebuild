@@ -266,6 +266,14 @@
 #define U2_S_GET_A "A "
 /* exe@0x383E */
 #define U2_S_GET "GET"
+/* exe@0x3868 */
+#define U2_S_GET_WEAPON " WEAPON"
+/* exe@0x389E */
+#define U2_S_GET_ARMOUR " ARMOUR"
+/* exe@0x3890 */
+#define U2_S_GET_EMPTY " EMPTY"
+/* exe@0x385B */
+#define U2_S_GET_WHAT " WHAT?"
 /* exe@0x444D */
 #define U2_S_TRIBUTE_WELCOME "WELCOME MY CHILD "
 /* exe@0x4466 */

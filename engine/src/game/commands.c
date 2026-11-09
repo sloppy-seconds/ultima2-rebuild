@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "core/seam.h"
+#include "core/rng.h"
 #include "core/frame.h"
 #include "core/font.h"
 #include "game/status.h"
@@ -1302,12 +1303,28 @@ static void daa_bcd2(uint8_t v, char *out)
  * chest; print " CHEST!", clear the cell, and roll one random byte against 0x40
  * for gold or TRI-LITHIUM. That arm is u2_dungeon_get and it is byte-read.
  *
- * Outside a site the arm reads [DS:14] against 0x2a '*' for armour, 0x2c ',' for
- * a weapon and 0x40 '@' for a chest, and picks WHICH item with asm/361C plus a
- * roll. asm/361C is unnamed and its table has not been read, so the overworld arm
- * is NOT modelled: the command prints its word and completes without touching
- * anything. That is an honest gap rather than a stub that looks finished, and it
- * is recorded as G52 in docs/needs-gameplay.md. */
+ * Outside a site the arm reads the cell under the player against 0x2a for ARMOUR and 0x2c
+ * for WEAPON, clears the cell, and picks WHICH item with a masked roll: `and $0x3` for
+ * armour and `and $0x7` for weapons, with zero meaning EMPTY!. Both arrays are indexed the
+ * same way the shoppes index them -- DS:96+i armour, DS:76+i weapons -- so the roll IS the
+ * pool index.
+ *
+ * That makes the weapon pool reachable from a chest exactly DAGGER..LIGHT SWORD (indices
+ * 1..7), with PHASER (8) and QUICK SWORD (9) excluded, which is what the third-party guide
+ * claims independently: "some weapons can be found randomly in chests, up to the light
+ * sword (n.7)". Index 7 of our pool is literally LIGHT SWORD. Armour is indices 1..3 =
+ * CLOTH, LEATHER, CHAIN, so PLATE, REFLECT and POWER are never chest loot.
+ *
+ * Reachability, measured rather than assumed: 0x2c occurs in the shipped maps only at seven
+ * cells -- mapx31 (4,23), (4,60), (4,61); mapx32 (26,43), (26,44); mapx41 (16,35), (25,41)
+ * -- each an isolated point surrounded by land or water, which is what a deliberate marker
+ * looks like. **0x2a occurs in no mapx file at all**, so the armour arm is unreachable in
+ * this pack. original/updated/GCHANGES.TXT explains how that can happen: the Ultima I-VI CD
+ * dumped three disks into one directory and "cities, dungeons, and worlds on the Galactic
+ * disk with the same name as a location on Earth are not available", so a tile that only
+ * ever appeared on the Galactic disk is simply gone from what we hold. The arm is
+ * implemented because the bytes say it exists, and its unreachability is recorded here
+ * rather than quietly dropped. */
 static u2_cmd_result cmd_G(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
 {
     (void)letter;
@@ -1315,6 +1332,34 @@ static u2_cmd_result cmd_G(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
         return u2_dungeon_get(ctx, ow);
 
     seam_str_out(ctx, U2_S_GET);
+
+    const uint8_t under = u2_world_tile_at(&ow->world, ow->x, ow->y);
+    const int armour = (under == 0x2A);
+    const int weapon = (under == 0x2C);
+    if (!armour && !weapon) {
+        seam_str_out(ctx, U2_S_GET_WHAT);
+        cmd_done(ctx);
+        return U2_CMD_DONE;
+    }
+
+    seam_str_out(ctx, armour ? U2_S_GET_ARMOUR : U2_S_GET_WEAPON);
+
+    /* asm/361C runs BEFORE the roll, so the marker is consumed even when the roll comes
+     * back EMPTY -- an empty chest is still gone. The stamp is 0x08, the plain land tile,
+     * read via asm/3611's own header rather than re-derived here. */
+    u2_world_terrain_put(&ow->world, ow->x, ow->y, 0x08);
+
+    const unsigned mask = armour ? 0x3u : 0x7u;
+    const unsigned idx = (unsigned)(u2_rand_byte(ctx) & mask);
+    if (idx == 0) {
+        /* asm/388d: EMPTY! and nothing granted. Note the cell is already cleared above. */
+        seam_str_out(ctx, U2_S_GET_EMPTY);
+        cmd_done(ctx);
+        return U2_CMD_DONE;
+    }
+
+    uint8_t *pool = armour ? ctx->state.armour_owned : ctx->state.weapons_owned;
+    pool[idx] = u2_bcd_inc1(pool[idx]);
     cmd_done(ctx);
     return U2_CMD_DONE;
 }

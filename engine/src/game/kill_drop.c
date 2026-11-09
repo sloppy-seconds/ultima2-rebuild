@@ -19,25 +19,6 @@
 #define U2_AI_TYPE_THIEF 0xFC
 
 
-/* Packed-decimal add one, with the original's missing ceiling guard. asm/2D07 is
- * `clc; mov 0xd6(%di),%al; adc $1,%al; daa; mov %al,0xd6(%di)` and there is no compare
- * anywhere in it, so a count at 99 goes 99 -> 00 and keeps going. That is not a bug we are
- * reproducing out of laziness: asm/2D07's own header records "no clamp, so a slot wraps
- * 99 -> 00", and the same absence is what lets cmd_O push a stat past 99.
- *
- * Adding n by calling this n times is byte-equivalent to one DAA add of n, including across
- * the 99 boundary (0x99 +4 in one step is 0x03, and four steps are 0x00,0x01,0x02,0x03).
- * Verified, not assumed -- combat_check walks both forms. */
-static void bcd_inc1(uint8_t *p)
-{
-    unsigned v = (unsigned)*p + 1u;
-    if ((v & 0xFu) > 9u)
-        v += 6u;
-    if (v > 0x99u)
-        v += 0x60u;              /* and the carry falls off the end, by design */
-    *p = (uint8_t)(v & 0xFFu);
-}
-
 /* asm/0FCD's thief type. ai.c carries the same constant privately; it is repeated here
  * rather than hoisted because the two uses are different events (theirs is the contact-path
  * theft, ours is the drop on death) and the shared name would imply a shared decision that
@@ -48,11 +29,6 @@ static void bcd_inc1(uint8_t *p)
  * one `adc $2,%al ; daa`. Both forms are implemented independently here -- bcd_add2 does the
  * DAA in one step from the x86 rule, not by looping -- so the check compares two derivations
  * rather than restating one. */
-void u2_bcd_inc1_test(uint8_t *p)
-{
-    bcd_inc1(p);
-}
-
 uint8_t u2_bcd_add2_test(uint8_t v)
 {
     unsigned sum = (unsigned)v + 2u;
@@ -104,29 +80,29 @@ void u2_combat_kill_drop(u2_ctx *ctx, uint8_t dead_type)
          * where captures/spice86/castle-03-live was taken and where Townsfolk belong.
          * The type>>2 == art_index fold that would have been the lazy route is explicitly
          * retracted in asm/0ADB's header as "a hypothesis about the renderer". */
-        bcd_inc1(&ctx->state.keys);
-        bcd_inc1(&ctx->state.keys);
+        ctx->state.keys = u2_bcd_inc1(ctx->state.keys);
+        ctx->state.keys = u2_bcd_inc1(ctx->state.keys);
         return;
     }
     if (dead_type == U2_AI_TYPE_THIEF) {
         /* asm/2CE9/2CF2: one roll, `cmp $0x40,%al`, so 64/256 = 25%. asm/2CF6 then adds 1
          * to DS:66, which state.h names `tools` (asm/277B spends them in a dungeon). */
         if (u2_rand_byte(ctx) < 0x40u)
-            bcd_inc1(&ctx->state.tools);
+            ctx->state.tools = u2_bcd_inc1(ctx->state.tools);
         /* asm/2D00/2D03: a SECOND roll picks the slot. Two rolls, not one -- reading this
          * as a single draw gets the joint distribution wrong. */
         const unsigned idx = (unsigned)(u2_rand_byte(ctx) & 0x0Fu);
         if (idx != 0)
-            bcd_inc1(&ctx->state.items_held[idx]);
+            ctx->state.items_held[idx] = u2_bcd_inc1(ctx->state.items_held[idx]);
         return;
     }
     if (dead_type == 0xF0u) {
         /* asm/2D26..2D3A: 25% for a HELM (DS:DB = items_held[5]), then asm/2D3D..2D52 adds
          * (rand & 3) + 1 to DS:64, which is `torches`. */
         if (u2_rand_byte(ctx) < 0x40u)
-            bcd_inc1(&ctx->state.items_held[5]);
+            ctx->state.items_held[5] = u2_bcd_inc1(ctx->state.items_held[5]);
         for (unsigned n = 1u + (u2_rand_byte(ctx) & 3u); n; --n)
-            bcd_inc1(&ctx->state.torches);
+            ctx->state.torches = u2_bcd_inc1(ctx->state.torches);
         return;
     }
     if (dead_type == 0xF8u) {
@@ -135,7 +111,7 @@ void u2_combat_kill_drop(u2_ctx *ctx, uint8_t dead_type)
          * caster leaving behind a wand or a staff is the consistency check that this arm
          * is read correctly rather than merely plausibly. */
         const unsigned idx = 1u + (unsigned)(u2_rand_byte(ctx) & 1u);
-        bcd_inc1(&ctx->state.items_held[idx]);
+        ctx->state.items_held[idx] = u2_bcd_inc1(ctx->state.items_held[idx]);
     }
     /* Every other type: asm/2D8B is a bare nop and the tail jmp to the reward follows with
      * no grant at all. Silence here is the original's, and it is cited by the byte that
