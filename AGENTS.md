@@ -421,6 +421,40 @@ Verification, in two independent layers:
   name into an `asm/` filename, and keep `bestiary/cache/` away from anyone drawing
   substitute art; it holds the originals in more variants than `original/` does.
 
+* **Bytes decide identity; the wiki decides names.** Owner ruling, 2026-11-09, replacing the
+  older habit of leaving a sector unnamed because its name was not in the binary. Which sector a
+  place is, what tile it is made of, what a monster drops and where a time door lands come from
+  the executable and the content files, and nothing external overrides those. What a place is
+  *called* comes from the third-party tables, because the game frequently does not name its own
+  villages — its alphabet tiles spell shop signs instead, so `sector 21` has no byte-name at all
+  and is called *Le Jester* by the guide. A name read off the bytes still outranks a name read
+  off a wiki, and every row says which it got. **Keep the `name_source` and `grade` columns.**
+  "Definitive" does not mean "unattributed": that distinction is what caught the game spelling
+  `TOMMERSVILLE` and `PIRATES COVE` itself where the wiki says *Tommersville* and *Pirates
+  Harbour*. The primary third-party sources are the Ultima Codex and the Gamer Corner location
+  table, vendored at `disasm/source-gamercorner-locations.csv` with its URL and fetch date so a
+  later re-fetch diffs against what was joined.
+
+* **`disasm/census/` is the one-stop lookup, and it is generated.** `tools/census.py` joins the
+  place, planet, npc and tile indices, the two wiki crosswalks, the vendored guide table, the
+  bestiary and the exe's own gate table into eight tables: `world`, `sector`, `place`, `npc`,
+  `tile`, `creature`, `gate`, `vehicle`. Ask it before hand-joining anything:
+
+  ```bash
+  python3 tools/census.py --what sector --where world=pluto
+  python3 tools/census.py --what vehicle --where what=rocket
+  ```
+
+  It is the only writer of that directory, and it invents nothing — every row names its source.
+  Two gates cover it in `check_all.sh`: `--verify` asserts the data's invariants (every guide row
+  joins to a real sector, four rocket tiles and not some other number, no blank names where
+  `unnamed` belongs), and `--check-fresh` regenerates to a temp dir and diffs against the
+  committed tables. The second exists for a specific reason: `place_index.py --verify` re-derives
+  in memory and never compares to the committed file, so `place-index.tsv` sat stale with five
+  wiki names unjoined while its own gate reported green. **A generated artefact with no freshness
+  check will go stale and look healthy doing it** — which is now also true of `place-index.tsv`
+  itself, and should be fixed there the same way.
+
 * **The cleanroom wall separates the implementer from the originals, and an answer key is a
   breach just like a screenshot is.** `docs/tile-art-spec.md` is the only document someone
   drawing substitute art may read. It may carry **intent** (what a tile must communicate) but

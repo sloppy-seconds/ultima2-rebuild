@@ -1,0 +1,55 @@
+# Third-party source table, vendored verbatim. NOT generated -- this is an input.
+#
+#   source:  Gamer Corner, "Ultima II - Locations"
+#   url:     https://guides.gamercorner.net/ultimaii/locations/
+#   csv:     https://guides.gamercorner.net/ultimaii/tables/locations/csv
+#   fetched: 2026-11-09
+#   rows:    27 (the guide's own count: "Locations - 27 shown")
+#
+# Why this is committed as a raw source rather than folded into place-wiki-names.tsv:
+# the join is a derivation and belongs in the generator. Keeping the upstream table intact
+# means a later re-fetch can be diffed against what we joined, so a rename upstream is a
+# visible event rather than a silent one. tools/census.py reads this file; nothing else should.
+#
+# What this table is good for, and what it is not: it names places and says which world or
+# era and which site type each is on. It does NOT say which sector number. The sector is
+# derived from bytes (the tens digit is the era on Earth and the world off Earth, and the
+# ones digit is the site kind -- docs/planet-maps-galaxy-patch.md section 3a), and the guide's
+# (World, Type) pair is then matched onto that. Names are third-party; identity is not.
+#
+# Two rows are worth reading carefully before trusting them:
+#   * "Le Jester" (Village, B.C.) and "New Jester" (Village, Uranus) are DIFFERENT places in
+#     different worlds that happen to share a name. Sector 21 and sector 61.
+#   * "Greenland Dungeon" appears four times, once per Earth era, because the same dungeon is
+#     reachable in every age: sectors 15, 25, 35 and 45.
+#   * "Pirates Harbour" lists treasure "Frigate, plane, rocket". That independently corroborates
+#     the rocket tiles this project found by bytes at (33,3) (38,3) (43,3) in sector 41 -- see
+#     docs/spice86-live-findings.md, vehicle census. Third-party data used as a control.
+Name,Type,World,Treasure
+"Shadow Guard",Castle,Legends,
+"Baradins Town",Village,Pangea,
+"Greenland Dungeon",Dungeon,Pangea,"11 chests, 8 tri-lithiums"
+"Le Jester",Village,B.C.,
+"Towne Linda",Town,B.C.,
+"Castle of Lord British",Castle,B.C.,
+"South America Tower",Tower,B.C.,"46 chests, 104 tri-lithiums"
+"Greenland Dungeon",Dungeon,B.C.,"11 chests, 8 tri-lithiums"
+"Port Bonifice",Village,A.D.,Frigate
+"New San Antonio",Town,A.D.,"Horse, plane"
+"Castle of Lord British",Castle,A.D.,
+"Egypt Tower",Tower,A.D.,"54 chests, 31 tri-lithiums"
+"Greenland Dungeon",Dungeon,A.D.,"11 chests, 8 tri-lithiums"
+"Pirates Harbour",Village,Aftermath,"Frigate, plane, rocket"
+"Greenland Dungeon",Dungeon,Aftermath,"11 chests, 8 tri-lithiums"
+"Mercury Dungeon",Dungeon,Mercury,"8 chests, 94 tri-lithiums"
+"Towne Mary",Town,Mars,
+"Jupiter Village",Village,Jupiter,
+"Jupiter Tower",Tower,Jupiter,"110 chests, 124 tri-lithiums"
+"Jupiter Dungeon",Dungeon,Jupiter,"99 chests, 31 tri-lithiums"
+"New Jester",Village,Uranus,
+"Computer Camp",Village,Neptune,
+Tommersville,Village,Pluto,
+"Towne Makler",Town,Pluto,Horse
+"Pluto Dungeon",Dungeon,Pluto,"130 tri-lithiums"
+"Towne Basko",Town,X,"Horse, frigate"
+"Castle Barataria",Castle,X,

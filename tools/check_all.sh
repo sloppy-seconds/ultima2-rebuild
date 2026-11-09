@@ -203,6 +203,14 @@ opt_run "apple2_anchor_map" original/ultimaii.exe decompiled/apple2 -- python3 t
 # were exercised before this line was added, because the first version of the control passed
 # vacuously when Z was clipped from the mapping.
 opt_run "place_index" original/mapx22 -- python3 tools/place_index.py --verify
+# The census joins every generated table into one lookup. Two gates, because they catch
+# different failures: --verify asserts the invariants of the data, --check-fresh asserts that
+# the committed tables are what the generator produces. The second one exists because
+# place-index.tsv sat stale with five wiki names unjoined and --verify could not see it:
+# --verify re-derives in memory and never compares against the committed artefact, so it was
+# checking the generator and not the file everyone reads.
+run "census verify" disasm/place-index.tsv disasm/source-gamercorner-locations.csv original/ultimaii.exe -- python3 tools/census.py --verify
+run "census fresh" disasm/census/sector.tsv -- python3 tools/census.py --check-fresh
 opt_run "npc_index" original/tlkx32 -- python3 tools/npc_index.py --verify
 opt_run "planet_index" original/ultimaii.exe -- python3 tools/planet_index.py --verify
 opt_run "gate_graph" original/ultimaii.exe -- python3 tools/gate_graph.py --verify
