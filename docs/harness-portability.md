@@ -1785,3 +1785,26 @@ writes and from live memory, and treat a file listing only as a hint. Where a fa
 the lost files in a subdirectory, expect the two layers to disagree on filename casing as well,
 and compare case-folded or the count will be quietly wrong. This project misread its world/era
 model this way more than once, always from the same listing.
+
+**Do not validate the DOS MZ header checksum when deciding whether an image is loadable.** The
+header's checksum field is documented as "usually ignored and set to zero", with a rule that the
+16-bit words of the file should sum to zero when that field is excluded. Real shipped binaries
+frequently carry a non-zero checksum field and do **not** satisfy the sum rule — DOS itself never
+enforced it, so linkers had no reason to get it right. A harness that treats a checksum mismatch
+as grounds for refusing an image will reject valid executables, and will do so quietly, reporting
+the file as not-a-DOS-image rather than as a file whose checksum is simply wrong. The portable
+rule: sanity-check the fields that describe loading — header paragraph count, relocation offset
+and count, memory requirements within conventional memory — and treat the checksum as
+informational. Read it, record it, never gate on it. The same caution applies to any legacy
+container field that documentation describes with "usually" or "supposedly": those hedges are
+where ecosystem drift lives, and a generic harness inherits that drift whether or not its first
+target happens to comply.
+
+**Related, and cheaper than it looks: read the relocation count out of the header instead of
+reasoning about relocations in general.** A harness that diffs runtime-captured bytes against
+file bytes needs to know which differences are legitimate. The header states exactly how many
+relocation fixups exist, and the table gives their positions, so the set of expected differences
+is enumerable rather than inferable. Getting this wrong produces a caveat written in the plural
+and a habit of waving away byte mismatches near segment-initialising code, when in practice the
+legitimate set can be a single word — and once it is a single known word, every other mismatch
+becomes a real finding instead of noise. Enumerate the fixups; do not describe them.

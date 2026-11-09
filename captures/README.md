@@ -59,10 +59,29 @@ captured the runtime instruction, while the file holds the pre-relocation one.
 Two consequences worth remembering:
 
 - A byte-for-byte comparison of a runtime-captured instruction against the file will differ
-  wherever a relocation fixup applies. Expect it at the segment-initialising instructions near
-  the entry point, and do not treat those diffs as an error in either source.
+  wherever a relocation fixup applies, and do not treat those diffs as an error in either
+  source. **There is exactly one such place.** The MZ header's `e_crlc` (relocation count) is
+  `1`, and its single entry points at image offset `0x101` — file `0x301` — which is the
+  immediate operand of the `mov ax,0x0741` / `mov ds,ax` pair at image `0x100`:
+
+  ```
+  file 0x300:  b8 41 07 8e d8 05 10 03 8e
+               mov ax,0x0741  mov ds,ax  add ax,0x310  mov ss,...
+               ^^^^^^^^^^^^^
+               the one relocated word in the whole 37,344-byte image
+  ```
+
+  So the entire file-versus-runtime byte discrepancy is one instruction's immediate. Anything
+  else that differs between a capture and the file is a real finding, not relocation noise.
+  This paragraph previously said "the segment-initialising instructions", plural, which was a
+  guess about a count nobody had read out of the header.
+- The arithmetic ties out from two directions, which is what makes it a fact rather than a
+  story: `0x0741 + 0x17D = 0x08BE`, and `0x17D` is the segment every block in this very CFG is
+  tagged with. The load paragraph is therefore confirmed by the capture that produced the
+  fixed-up value and by the segment the same capture reports.
 - The runtime segment values are only knowable from a capture like this one. The file alone
-  does not tell you that `DS` will be `0x08BE`.
+  does not tell you that `DS` will be `0x08BE`. It does now tell you *where* it will be patched,
+  which is what the header's relocation table is for.
 
 ## Limits of this capture
 

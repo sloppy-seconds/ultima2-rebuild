@@ -2,6 +2,20 @@
 # func 8387..8CCF  len 0949 B  evidence: reko
 # confidence: low (bytes proven by check_func.py)
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
+# PROGRAM ENTRY POINT LIVES IN THIS RANGE, at L_008ac0. The MZ header's initial CS:IP is
+#           0x8ac:0x0000, which is image-relative, so the first instruction DOS transfers to is
+#           image 0x8ac0 = file 0x8cc0. The bytes there are the textbook MZ startup prologue:
+#             8c d8   mov ax,es
+#             8e c0   mov es,ax
+#             05 10 00 add ax,0x0010
+#             8e d0   mov ss,ax
+#             bc 00 00 mov sp,0x0000
+#           Recorded here rather than as a rename because this file's start (0x8387) is a
+#           discovered routine start and 0x8ac0 is not that routine's beginning; splitting the
+#           tree at 0x8ac0 is a structural change to the CP0 tiling and needs its own decision.
+#           Until then this header is the only place in the repo that names the program entry,
+#           which is worth knowing given the whole tree was seeded from the runtime CFG and the
+#           CFG records what ran, not what was configured to run first.
 sub_8387:
 L_008587:
         db 0xff,0x04  # split: branch target inside data

@@ -82,3 +82,40 @@ shops, death loop, frigate, Lord British, Port Bonifice, cumulative watch-* seri
 - Merged unique entries: **1113** (was 693). New seed union with jump table: **1125**
   (12 handlers still CFG-uncovered: C D G H J K L M O R T V W X).
 - Handler coverage from runtime evidence: 14/26 (was 7/26).
+
+## The program entry point is not in this list, and cannot be
+
+Everything above is a *routine* entry discovered from the runtime CFG — what executed during a
+playthrough. The **program** entry point is a different kind of fact: it is declared in the MZ
+header and needs no capture at all.
+
+| field | value | meaning |
+| --- | --- | --- |
+| `e_cs:e_ip` | `0x8ac:0x0000` | image-relative, so image `0x8ac0` = file `0x8cc0` |
+| `e_ss:e_sp` | `0x9fe:0x0064` | the stack DOS sets up before transferring control |
+| `e_cparhdr` | `0x20` | 512-byte header, so image offset + `0x200` = file offset |
+| `e_crlc` | `1` | one relocation entry — see `captures/README.md` |
+
+The bytes at file `0x8cc0` confirm it independently of the header claim:
+
+```
+8c d8      mov ax,es
+8e c0      mov es,ax
+05 10 00   add ax,0x0010
+8e d0      mov ss,ax
+bc 00 00   mov sp,0x0000
+```
+
+That is the textbook MASM-style startup prologue — adopt ES from the PSP, place SS just above
+the image, zero SP. Nothing else in the file looks like it.
+
+Two things worth being explicit about. First, **the CFG could never have told us this**: the
+entry is configured, not discovered, and a capture records what ran. Second, the entry sits at
+image `0x8ac0`, which is *inside* the range owned by `asm/8387_sub_8387.asm` (`8387..8CCF`) and
+is therefore currently an anonymous `L_008ac0` label. It is named in that file's header rather
+than split out, because splitting changes the CP0 tiling and that is a decision for the owner,
+not a documentation fix.
+
+Note also that the relocated DS-initialising instruction at image `0x100` is **not** the entry —
+it is a separate startup path at the very start of the machine code. Two different startup-ish
+addresses, and only one of them is what DOS jumps to.
