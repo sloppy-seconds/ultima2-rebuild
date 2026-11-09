@@ -132,6 +132,11 @@ def load_places(tsv):
             # parenthetical is the in-game string, useful in the index, noise in a dropdown.
             'era': r[idx['era']].split(' (ANOS')[0].strip(),
             'kind': r[idx['kind']].strip(),
+            # `candidate` is the name this tool read OFF THE BYTES -- the game spells its own
+            # place names as alphabet tiles. It is preferred over `wiki` for exactly that
+            # reason, and it is empty for most sectors because a village's tiles usually spell
+            # shop signs rather than the town's name.
+            'candidate': r[idx['candidate']].strip() if 'candidate' in idx else '',
             # The decoded place names live in the column the generator calls `rooms` -- the
             # text runs naming a room or area. `dialogue` is the count of tlkx lines, not
             # text, and reading it as names is a mistake worth naming because it was made:
@@ -204,6 +209,12 @@ def name_maps(maps, places):
         # name came from outside this binary rather than off its bytes.
         place, grade = (wiki.split(' [', 1) + [''])[:2] if wiki else ('', '')
         grade = grade.rstrip(']')
+        # A name read off the bytes outranks a name read off a wiki, and says so.
+        cand = (p or {}).get('candidate') or ''
+        if cand and ';' not in cand:
+            place, grade = cand, 'bytes'
+        elif cand:
+            place, grade = cand.split(';')[0].strip(), 'bytes'
         runs = '; '.join([n for n in names.split('; ') if n][:2])
         m['place'] = place
         m['grade'] = grade
