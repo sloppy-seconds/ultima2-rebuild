@@ -617,6 +617,43 @@ else
     else
         skip "CP6 stamp: load-moment latch needs the player's mapx20/mapx22 (synthetic data cannot show this defect)"
     fi
+
+    # --- GET's fixtures in the VAULT: asm/363B's ARMOUR and WEAPON arms -------------
+    # The grant is SILENT in the original -- asm/363B prints " WEAPON" and then only touches
+    # the owned array -- so a transcript grep proves the branch was taken and nothing about
+    # the payout. Each leg therefore asserts BOTH the message and the array, and the RNG is
+    # pinned so the roll cannot come up 0 (EMPTY!) and turn a passing leg into a coin flip.
+    #
+    # vault_plain is the load-bearing one: without it the arm could quietly become "grant on
+    # any tile" and both positive legs would still pass.
+    nonzero() { [ -n "$(printf '%s' "$1" | tr -d ' 0')" ]; }
+    rawfield() { sed -n 's/.*"'"$2"'":"\([^"]*\)".*/\1/p' "$1" | tail -1; }
+
+    RNGPIN="020201000000"
+    for c in vault_sword vault_shield vault_plain; do
+        run_case "$c" "vault_$c" 'G\n' "$WORK/out_$c" "$RNGPIN"
+    done
+
+    vs="$WORK/out_vault_sword"; vh="$WORK/out_vault_shield"; vp="$WORK/out_vault_plain"
+
+    if [ -s "$vs" ] && said "$vs" " WEAPON" && nonzero "$(rawfield "$vs" weapons)"; then
+        ok "CP6 GET: 0x58 (art 0x2c) in the VAULT grants a weapon  [$(rawfield "$vs" weapons)]"
+    else
+        bad "CP6 GET: standing on 0x58 did not grant a weapon (said=$(said "$vs" ' WEAPON' && echo y || echo n) weapons=$(rawfield "$vs" weapons))"
+    fi
+
+    if [ -s "$vh" ] && said "$vh" " ARMOUR" && nonzero "$(rawfield "$vh" armour)"; then
+        ok "CP6 GET: 0x54 (art 0x2a) in the VAULT grants armour  [$(rawfield "$vh" armour)]"
+    else
+        bad "CP6 GET: standing on 0x54 did not grant armour (said=$(said "$vh" ' ARMOUR' && echo y || echo n) armour=$(rawfield "$vh" armour))"
+    fi
+
+    if [ -s "$vp" ] && said "$vp" " WHAT?" && ! nonzero "$(rawfield "$vp" weapons)" \
+            && ! nonzero "$(rawfield "$vp" armour)"; then
+        ok "CP6 GET control: a plain floor tile refuses and grants nothing"
+    else
+        bad "CP6 GET control: a plain floor tile did not refuse cleanly (said=$(said "$vp" ' WHAT?' && echo y || echo n) weapons=$(rawfield "$vp" weapons) armour=$(rawfield "$vp" armour))"
+    fi
 fi
 
 printf '\n'

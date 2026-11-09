@@ -93,14 +93,19 @@ SITE_CASES = {
     "enter_tower":    ((2, 0), (5, 5), 0x1C, 0x00, None, None),
     "enter_dungeon":  ((2, 0), (5, 5), 0x24, 0x00, None, None),
     "enter_town":     ((2, 0), (5, 5), 0x18, 0x00, None, None),
-    # GET's town arm. asm/363B reads the cell under the player: 0x2c is a WEAPON chest and
-    # 0x2a an ARMOUR one, each granting pool index (rand & 7) and (rand & 3) with zero meaning
-    # EMPTY!. Sector 32 is a town kind, so u2_site_is_dungeon is false and the town arm runs.
-    # chest_plain is the control: a floor tile must print " WHAT?" and grant nothing, and
-    # without it the arm could quietly become "grant on anything" and stay green.
-    "chest_weapon":   ((3, 2), (5, 5), 0x2C, 0x00, None, None),
-    "chest_armour":   ((3, 2), (5, 5), 0x2A, 0x00, None, None),
-    "chest_plain":    ((3, 2), (5, 5), 0x70, 0x00, None, None),
+    # GET's fixture arm, in the place the shipped game actually puts the fixtures: the VAULT
+    # of Lord British's castle, sector 23. asm/363B compares the ART INDEX of the cell under
+    # the player, so the values here are real map bytes -- 0x54 (art 0x2a) is the drawn shield
+    # rack and 0x58 (art 0x2c) the drawn sword rack, each occurring exactly 8 times in
+    # mapx23 and mapx33 and nowhere else but six cells in sector 41.
+    # The first version of these cases used 0x2c and 0x2a as raw tiles. That was wrong, and
+    # the hand test passed anyway because the code under test made the same mistake -- a test
+    # that agrees with the assumption it was written from is not evidence.
+    # vault_plain is the control: a floor tile must refuse and grant nothing, or the arm could
+    # quietly become "grant on any tile" and both positive legs would still pass.
+    "vault_sword":    ((2, 3), (19, 13), 0x58, 0x00, None, None),
+    "vault_shield":   ((2, 3), (19, 13), 0x54, 0x00, None, None),
+    "vault_plain":    ((2, 3), (19, 13), 0x70, 0x00, None, None),
 }
 
 # Slots in the synthetic monx: the engine's loader reads x at 0..31, y at 32..63, hp at

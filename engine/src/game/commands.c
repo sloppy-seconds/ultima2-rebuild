@@ -1333,7 +1333,14 @@ static u2_cmd_result cmd_G(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
 
     seam_str_out(ctx, U2_S_GET);
 
-    const uint8_t under = u2_world_tile_at(&ow->world, ow->x, ow->y);
+    /* asm/363B compares 0x2a and 0x2c, and those are ART INDICES, not map bytes: the tiles
+     * that actually carry them in the shipped data are 0x54 and 0x58, and 0x54>>1 == 0x2A,
+     * 0x58>>1 == 0x2C. The engine's own convention elsewhere is to shift before comparing
+     * (see the mode_a read and the site_for_tile switch), and this is that same shift.
+     * Confirmed live 2026-11-09 in the VAULT of Lord British's castle, sector 23: standing
+     * on the drawn shields and pressing G gives GET ARMOUR, on the drawn swords GET WEAPON,
+     * each sometimes followed by EMPTY!, and a non-empty result lands in the inventory. */
+    const uint8_t under = (uint8_t)(u2_world_tile_at(&ow->world, ow->x, ow->y) >> 1);
     const int armour = (under == 0x2A);
     const int weapon = (under == 0x2C);
     if (!armour && !weapon) {

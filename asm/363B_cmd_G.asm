@@ -26,6 +26,17 @@
 #           overwriting same-named Galactic-disk files.
 # notes: re-decoded with tools/decode_str.py (str_out-aware); gas re-encode diffs
 #        kept as .byte (disp8/disp16 and reg-op form choices)
+# CORRECTED 2026-11-09, later in the same session: the "Reachability, measured" paragraph
+#           above censused RAW map bytes for 0x2c and 0x2a and concluded the armour arm was
+#           unreachable. That was the wrong quantity. 0x2a and 0x2c are ART INDICES -- the map
+#           byte is shifted right by one before the compare, exactly as for the alphabet tiles
+#           in tools/place_index.py. The tiles that carry them are 0x54 (art 0x2a) and 0x58
+#           (art 0x2c), each occurring EXACTLY 8 times in mapx23 and mapx33 -- the VAULT of
+#           Lord British's castle, drawn as a rack of shields and a rack of swords -- plus 6
+#           cells in sector 41. Confirmed live through the noVNC run: on the shields G prints
+#           GET ARMOUR, on the swords GET WEAPON, each sometimes followed by EMPTY!, and a
+#           non-empty result lands in the inventory. Both arms are reachable; both are gated
+#           in engine/tests/run_cp6.sh on the real tiles in the real sector.
 cmd_G:
 L_00383b:
         call L_0051df
