@@ -85,7 +85,8 @@ fi
 run_model() {
     local m="$1" want="$2"
     if ! cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/$m" \
-            tests/combat_check.c "tests/$m.c" src/core/rng.c src/core/state.c \
+            tests/combat_check.c "tests/$m.c" src/game/kill_drop.c \
+            src/core/rng.c src/core/state.c \
             2>"$WORK/$m.build"; then
         bad "CP5 control $m did not build:"
         sed 's/^/        /' "$WORK/$m.build"
@@ -191,7 +192,7 @@ fi
 # Direct test of combat.c, not part of combat_check.c: the attack is implemented,
 # so it is tested against the real thing rather than specified against fixtures.
 if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/attack_check" \
-        tests/attack_check.c src/game/combat.c src/game/monsters.c \
+        tests/attack_check.c src/game/combat.c src/game/kill_drop.c src/game/monsters.c \
         src/core/rng.c src/core/state.c 2>"$WORK/atk.build"; then
     if "$WORK/attack_check" > "$WORK/atk.out" 2>&1; then
         n=$(sed -n 's/^attack_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/atk.out")
@@ -323,7 +324,7 @@ if [ ! -f src/game/combat.c ]; then
 fi
 
 cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/combat_check" \
-   tests/combat_check.c src/game/combat.c src/core/rng.c src/core/state.c \
+   tests/combat_check.c src/game/combat.c src/game/kill_drop.c src/core/rng.c src/core/state.c \
    2>"$WORK/cc.err"
 if [ $? -ne 0 ]; then
     bad "CP5 combat harness did not build (combat.c present but does not link):"

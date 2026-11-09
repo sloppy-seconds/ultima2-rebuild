@@ -4,8 +4,17 @@
 #           mov %al,0xd6(%di)`. DS:D6+i is the held-item count array, 16 slots,
 #           per docs/save-format.md (proven); the slot index arrives in AL and is
 #           zero-extended into DI. Renamed from sub_2d07 on 2026-10-22 by
-#           tools/bcd_census.py. No `call L_002f07` exists in asm/, so entry is
-#           indirect and the game action is unproven; named for the arithmetic.
+#           tools/bcd_census.py.
+# SUPERSEDED 2026-11-09: the claim above that no call exists was right about the call and
+#           wrong about the conclusion. There is no call because the entry is a
+#           FALL-THROUGH from asm/2D03 (`and $0xf,%al ; je skip`), inside the thief branch
+#           of the kill-drop dispatch at asm/2CE5. Proven by execution: 0x2d07 is in
+#           ExecutedInstructions 8 times across baseline-fight, play-test-live and
+#           play-test. The game action is now proven -- it is the thief's random item
+#           drop -- and the index is rand & 15, so slot 0 (the RING, which asm/3C2E pays
+#           for gold instead) is excluded and every other slot is reachable. This is the
+#           only source in the binary for the ANKH at DS:DD, and therefore the only route
+#           to boarding the rocket for a character that did not start with one.
 # label: kept as `sub_2d07` on purpose. CP0 (engine/tests/run_cp0.sh) pins every
 #           non-comment line across a rename, so only the filename and the header
 #           may carry a discovered name. Do not "tidy" the label to match.

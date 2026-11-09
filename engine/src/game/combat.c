@@ -277,11 +277,23 @@ static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *
      */
     const int lethal = (ctx->fidelity == U2_FIDELITY_ENHANCED)
                      ? (dmg >= hp) : (dmg > hp);
+    const uint8_t dead_type = ctx->state.mon_type[slot];
     if (lethal) {
         /* Death clears hp, type and kind — and NOT x/y (file 0x30D2..0x30DC). */
         ctx->state.mon_hp[slot]   = 0;
         ctx->state.mon_type[slot] = 0;
         ctx->state.mon_kind[slot] = 0;
+
+        /* asm/2CE5..2D21 and asm/2D22..2D8B: the kill-drop dispatch, keyed on the TYPE of
+         * the creature that just died. asm/2CE5 is `cmp $0xfc,%al ; jne L_002f22`, so a
+         * THIEF takes the fall-through and every other type jumps to the type table. Both
+         * arms end in a tail `jmp L_002f8c` into combat_kill_reward, which is why the reward
+         * runs more often than the thief arm does (17 vs 8 in the captured flows).
+         *
+         * The thief arm is the only source in the binary for most of the item array, and
+         * the only one that can produce the ANKH. See u2_combat_kill_drop(). */
+        if (award)
+            u2_combat_kill_drop(ctx, dead_type);
 
         /* asm/2E3D file 0x3114 / 0x3141: gold += (rand & 0x17) | 1, exp += rand & 7.
          * Reproduces the live `KILLED--GOLD+1--EXP.+02` shape exactly. The cannon reaches

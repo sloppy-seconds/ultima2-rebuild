@@ -3,6 +3,17 @@
 # calls: L_002f8c, L_005417
 # confidence: low (bytes proven by check_func.py)
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
+# RESOLVED 2026-11-09: this is the NON-THIEF arm of the kill-drop dispatch, reached by
+#           `jne L_002f22` from asm/2CE5. Two type branches, and the function is complete
+#           at 0x6A bytes with both accounted for:
+#             0xF0 -> 25% HELM (DS:DB), then torches += (rand&3)+1   (asm/2D26..2D52)
+#             0xF8 -> WAND or STAFF, 50/50                         (asm/2D64..2D7C)
+#             else -> nothing; L_002f8b is a bare nop
+#           Consistency check that this is read correctly and not merely plausibly:
+#           asm/0AD3 makes 0xF8 the magic-missile caster, and a caster leaving a wand or
+#           a staff agrees. Both live observations we already had are predicted by these
+#           two branches -- the `HELM 1 -> 2` and `STAFF 1 -> 2` kills in the sector-00
+#           fight. Renamed from sub_2d22 on the strength of this.
 sub_2d22:
 L_002f22:
         cmp    $0xf0,%al

@@ -67,4 +67,10 @@ int u2_combat_attack(u2_ctx *ctx, int slot, u2_attack *out);
  */
 int u2_combat_cannon(u2_ctx *ctx, int cx, int cy, u2_attack *out);
 
+
+/* asm/2CE5..2D8B: which item a kill grants, keyed on the TYPE of the creature that died.
+ * Split out and public so the distribution is testable without driving a whole fight; the
+ * three arms are the only sources in the binary for most of the item array. */
+void u2_combat_kill_drop(u2_ctx *ctx, uint8_t dead_type);
+
 #endif /* U2_GAME_COMBAT_H */

@@ -41,6 +41,7 @@ void    u2_combat_set_counter(u2_ctx *ctx, uint16_t counter_ds, uint8_t value);
 void    u2_combat_set_item(u2_ctx *ctx, uint16_t item_ds, uint8_t count);
 uint8_t u2_combat_item(const u2_ctx *ctx, uint16_t item_ds);
 uint16_t u2_combat_thief_steal(u2_ctx *ctx);
+void    u2_combat_kill_drop(u2_ctx *ctx, uint8_t dead_type);
 /* C4: magic missile. Non-zero when damage applies. Must consume NO random
  * byte — there is no save to roll. spec: asm/0F12 */
 int     u2_combat_magic_missile(u2_ctx *ctx);
@@ -430,6 +431,90 @@ static void test_c5_bcd_not_binary(void)
           "C5: 0x99 - 0x10 must be 0x89 (packed decimal), got 0x%02X", ctx.state.hp);
 }
 
+
+/* asm/2CE5..2D8B: the kill-drop dispatch. Three types drop anything at all, and the thief
+ * arm is the only source in the binary for most of the item array -- including the ANKH,
+ * which no shoppe sells and no chest holds. */
+static void test_kill_drop(void)
+{
+    /* Every type except 0xFC, 0xF0 and 0xF8 must be silent. asm/2D8B is a bare nop and the
+     * tail jmp to the reward follows with no item write, so "most kills drop nothing" is
+     * the original's behaviour and not an omission. */
+    for (int t = 0; t < 256; ++t) {
+        if (t == 0xFC || t == 0xF0 || t == 0xF8)
+            continue;
+        u2_ctx ctx; fresh(&ctx, 1);
+        for (int i = 0; i < 200; ++i)
+            u2_combat_kill_drop(&ctx, (uint8_t)t);
+        int touched = 0;
+        for (int s = 0; s < 16; ++s)
+            if (ctx.state.items_held[s]) touched++;
+        if (ctx.state.tools || ctx.state.torches) touched++;
+        CHECK(touched == 0, "type %02x must drop nothing at all", t);
+    }
+
+    /* asm/2D03 is `and $0xf,%al ; je skip`: a uniform draw over slots 1..15 with slot 0
+     * excluded. Slot 0 is the RING, which asm/3C2E pays for gold instead. */
+    {
+        u2_ctx ctx; fresh(&ctx, 7);
+        int seen[16] = {0};
+        for (int i = 0; i < 40000; ++i) {
+            uint8_t b[16];
+            for (int s = 0; s < 16; ++s) b[s] = ctx.state.items_held[s];
+            u2_combat_kill_drop(&ctx, 0xFC);
+            for (int s = 0; s < 16; ++s)
+                if (ctx.state.items_held[s] != b[s]) seen[s]++;
+        }
+        CHECK(seen[0] == 0,
+              "the RING slot must never come out of a thief drop, got %d", seen[0]);
+        for (int s = 1; s < 16; ++s)
+            CHECK(seen[s] > 0, "thief drop must be able to produce slot %d", s);
+        /* The two the third-party guides name, called out because they are the whole
+         * reason this routine matters to the win condition. */
+        CHECK(seen[7] > 0 && seen[15] > 0,
+              "ANKH (7) and TRI-LITHIUM (15) must both be droppable, got %d and %d",
+              seen[7], seen[15]);
+        CHECK(ctx.state.tools > 0, "a thief kill must be able to grant tools (DS:66), got %u",
+              ctx.state.tools);
+    }
+
+    /* asm/2D64..2D7C: 0xF8 gives slot 1 or 2 and nothing else. */
+    {
+        u2_ctx ctx; fresh(&ctx, 3);
+        int seen[16] = {0};
+        for (int i = 0; i < 20000; ++i) {
+            uint8_t b[16];
+            for (int s = 0; s < 16; ++s) b[s] = ctx.state.items_held[s];
+            u2_combat_kill_drop(&ctx, 0xF8);
+            for (int s = 0; s < 16; ++s)
+                if (ctx.state.items_held[s] != b[s]) seen[s]++;
+        }
+        CHECK(seen[1] > 0 && seen[2] > 0, "0xF8 must drop WAND or STAFF, got %d/%d",
+              seen[1], seen[2]);
+        int other = 0;
+        for (int s = 0; s < 16; ++s) if (s != 1 && s != 2) other += seen[s];
+        CHECK(other == 0, "0xF8 must touch nothing but WAND and STAFF, got %d others", other);
+    }
+
+    /* asm/2D26..2D52: 0xF0 gives HELM at 25% and always adds torches. */
+    {
+        u2_ctx ctx; fresh(&ctx, 5);
+        int helm = 0;
+        for (int i = 0; i < 20000; ++i) {
+            uint8_t h = ctx.state.items_held[5];
+            u2_combat_kill_drop(&ctx, 0xF0);
+            if (ctx.state.items_held[5] != h) helm++;
+        }
+        CHECK(helm > 0, "0xF0 must be able to grant a HELM");
+        CHECK(ctx.state.torches > 0, "0xF0 must grant torches (DS:64), got %u",
+              ctx.state.torches);
+        int other = 0;
+        for (int s = 0; s < 16; ++s)
+            if (s != 5 && ctx.state.items_held[s]) other++;
+        CHECK(other == 0, "0xF0 must touch no item slot but HELM, got %d", other);
+    }
+}
+
 int main(void)
 {
     printf("combat_check — CP5 spec (C1, C2, C4, C5, C6)\n");
@@ -454,6 +539,7 @@ int main(void)
     test_c5_exactly_1000();
     test_c5_kills_below_1000();
     test_c5_bcd_not_binary();
+    test_kill_drop();
     }
     printf("combat_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
