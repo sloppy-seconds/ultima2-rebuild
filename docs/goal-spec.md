@@ -98,6 +98,53 @@ port-specific claims to keep out.
 
 ---
 
+## 1a. The victory chain, decoded statically on 2026-11-09
+
+CP8 was blocked on the belief that the endgame needed a capture, because `MINAX IS DEAD!!` has
+never appeared in an `ExecutedInstructions`. It does not. The whole chain is readable in `asm/`
+and is now named there. This matters for the goal spec more than for any other file, because it
+changes what W2 is even claiming.
+
+```
+asm/2CB5_combat_kill_minax_gate     mov 0x197(%di),%al ; cmp $0x40,%al ; jne <kill-drop>
+      |                                                               |
+      | type != 0x40 -------------------------------------------------+
+      | type == 0x40 (fall through, no call edge)
+      v
+asm/2CCD_victory_call               call L_0074a0 ; jmp L_000c33
+      v
+asm/72A0 (file 0x74A0)              the victory sequence
+```
+
+**The gate inspects the creature's type and nothing else.** No weapon check, no damage-source
+check, no quick-sword test, no HP threshold, no era test. That is the finding, and it lands on
+W2 directly:
+
+> **W2 ("quick sword readied") is not a precondition of the victory condition.** The path to
+> `MINAX IS DEAD!!` never reads `readied_weapon`. So either the quick sword is required
+> *upstream*, in the damage arithmetic that brings Minax's HP to zero, or the claim is
+> folklore. This is a much smaller question than "is W2 true", and it is now located: the
+> damage formula is `((8 * readied_weapon + strength) >> 2)` on raw packed decimal
+> (`combat.c:347`, from the asm), so the question becomes whether Minax's HP can be reached at
+> all without index 9 -- which is arithmetic, and answerable without a capture.
+
+W4 ("displayed HP >= 9900") also moved. Minax's attack is now measured: it subtracts one from
+the **hundreds** byte of the packed-decimal HP pair, so it is exactly 100 HP per strike and it
+kills by underflow, not by zeroing. At 9900 that is 99 strikes; the ceiling the instruction can
+address is 9999. So 9900 is no longer a bare recollection -- it is a number with a mechanism
+under it, and the mechanism is `asm/0F8E`.
+
+What the ending *does*, once fired: narrows the print margin to 40, prints
+`MINAX IS DEAD!! / ALL HER WORKS SHALL DIE!`, repaints a whole 4096-cell sector with `0x74`
+(art `0x1D`, solid black), names `MAPX30` inline, prints `YOU FEEL A STRANGE FORCE!` and then
+the completion text, sets `view_mode = 0xFF`, `player_stamp = 0x28` (the rocket stamp) and the
+player position to `(0, 0)`, and enters a looping animation that never returns.
+
+Two grades to keep apart. The loop bounds, the fill byte, the state writes and the embedded
+filename are **measured from the bytes**. The reading of `L_005417` and `L_0061a6` as
+cell-addressing and file I/O is **inferred**, and none of it has ever executed -- see
+`docs/needs-gameplay.md` G75 for the capture that would settle the difference.
+
 ## 2. The key-item dependency graph, as checkable predicates
 
 The valuable part of the walkthrough is not the route, it is this graph. Five of its edges
