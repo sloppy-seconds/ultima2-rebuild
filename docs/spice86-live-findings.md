@@ -778,15 +778,27 @@ sector is hardcoded to 40, which is era 4, and era 4's village 41 is where three
 waiting. Era 4 is both the arrival and the departure hub, so a bot that lands from space is
 already standing next to its next rocket rather than needing a time door to era 0.
 
-### Trap: two different "art index" scalings
+### Trap: two scalings of a map byte, and only one of them is the art index
 
-`DS:14` and the passability ladder use **`byte >> 1`**. The alphabet-tile decoder in
-`tools/place_index.py` uses **`byte >> 2`**. Both are called "the art index" in this repo, and
-using the wrong one silently produces confident nonsense: decoding `mapx41` with `>> 1` turns
-the 12 plane tiles into the letter `G`, the armour and weapon racks into `K` and `M`, and the
-terrain tile `0x70` into `Y`, which reads as a wall of filler rather than as a shift error.
-Under the correct `>> 2` those same bytes are not letters at all. When a decode returns
-uniform junk, check which shift the tool means before believing the junk.
+This repo already names these correctly, and the confusion was introduced by a draft of the
+note above, so the correction is worth keeping next to the data rather than deleting it.
+
+| scaling | name | what it is for |
+| --- | --- | --- |
+| `map_byte >> 1` | **gate value** | what `asm/2FAD` dispatches the vehicle modes on and what `DS:14` holds. It equals the mode constants `0x22` horse / `0x24` ship / `0x26` plane / `0x28` rocket for vehicle tiles, and `cmd_G`'s rack compares are `0x2a` / `0x2c` |
+| `map_byte >> 2` | **art index** | the 64-entry tile table. Closed as G1 on 2026-10-23 by `captures/spice86/art-index/` at 256/256 pixel match; `docs/art-index.md`; the atlas is `tile_00`..`tile_3F` |
+
+The failure mode is silent and it looks like data. Decoding `mapx41`'s alphabet tiles with
+`>> 1` instead of the decoder's `>> 2` turns the 12 plane tiles into the letter `G`, the
+armour and weapon racks into `K` and `M`, and the terrain tile `0x70` into `Y` — which reads as
+a wall of meaningless filler rather than as a shift error. Under the correct `>> 2` those same
+bytes are not letters at all, and the same map decodes cleanly as `CCCP DEFENCE DA KGB CCCP
+TEST LAUNCH EXIT HERE` at `y=0`, `PIRATES COVE` at `y=17`, `PIRATES HARBOUR` at `y=63`.
+
+**The tell is that the junk is uniform.** A wrong shift maps a handful of non-letter tiles onto
+a handful of letters repeatedly, so the output is repetitive in a way real signage never is.
+When a decode comes back looking like noise with a pattern, check which scaling the tool means
+before believing the noise — and check it against `docs/art-index.md`, which is the authority.
 
 **Still open:** the `[DS:14]` writer at file `0x6238` calls `0x6AC0`, whose index
 arithmetic came out as `y*16 + x` against a 64-wide grid. Unexplained.

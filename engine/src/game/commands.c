@@ -1333,11 +1333,14 @@ static u2_cmd_result cmd_G(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
 
     seam_str_out(ctx, U2_S_GET);
 
-    /* asm/363B compares 0x2a and 0x2c, and those are ART INDICES, not map bytes: the tiles
-     * that actually carry them in the shipped data are 0x54 and 0x58, and 0x54>>1 == 0x2A,
-     * 0x58>>1 == 0x2C. The engine's own convention elsewhere is to shift before comparing
-     * (see the mode_a read and the site_for_tile switch), and this is that same shift.
-     * Confirmed live 2026-11-09 in the VAULT of Lord British's castle, sector 23: standing
+    /* asm/363B compares 0x2a and 0x2c, and those are GATE VALUES (`map_byte >> 1`), not map
+     * bytes and not art indices: the tiles that actually carry them in the shipped data are
+     * 0x54 and 0x58, and 0x54>>1 == 0x2A, 0x58>>1 == 0x2C. Their ART indices are 0x15 and
+     * 0x16, because art is `>> 2`. The two scalings are different quantities with different
+     * names -- `>> 1` is the gate value asm/2FAD dispatches the vehicle modes on, `>> 2` is the
+     * art index into the 64-entry tile table (G1, docs/art-index.md) -- so do NOT read this as
+     * the same shift site_for_tile uses: that switch is `tile >> 2`. Confirmed live 2026-11-09
+     * in the VAULT of Lord British's castle, sector 23: standing
      * on the drawn shields and pressing G gives GET ARMOUR, on the drawn swords GET WEAPON,
      * each sometimes followed by EMPTY!, and a non-empty result lands in the inventory. */
     const uint8_t under = (uint8_t)(u2_world_tile_at(&ow->world, ow->x, ow->y) >> 1);

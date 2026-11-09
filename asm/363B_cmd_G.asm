@@ -28,15 +28,26 @@
 #        kept as .byte (disp8/disp16 and reg-op form choices)
 # CORRECTED 2026-11-09, later in the same session: the "Reachability, measured" paragraph
 #           above censused RAW map bytes for 0x2c and 0x2a and concluded the armour arm was
-#           unreachable. That was the wrong quantity. 0x2a and 0x2c are ART INDICES -- the map
-#           byte is shifted right by one before the compare, exactly as for the alphabet tiles
-#           in tools/place_index.py. The tiles that carry them are 0x54 (art 0x2a) and 0x58
-#           (art 0x2c), each occurring EXACTLY 8 times in mapx23 and mapx33 -- the VAULT of
+#           unreachable. That was the wrong quantity. 0x2a and 0x2c are GATE VALUES -- the map
+#           byte is shifted right by ONE before the compare, which is the quantity asm/2FAD
+#           dispatches the vehicle modes on and the quantity [DS:14] holds. They are NOT art
+#           indices: the art index is `map_byte >> 2`, and for these two tiles it is 0x15 and
+#           0x16. (An earlier draft of this line said "exactly as for the alphabet tiles in
+#           tools/place_index.py", which is wrong twice over -- that decoder shifts by two, not
+#           one, so it is a different quantity with a different range.) The tiles that carry
+#           them are 0x54 (gate 0x2a) and 0x58
+#           (gate 0x2c), each occurring EXACTLY 8 times in mapx23 and mapx33 -- the VAULT of
 #           Lord British's castle, drawn as a rack of shields and a rack of swords -- plus 6
 #           cells in sector 41. Confirmed live through the noVNC run: on the shields G prints
 #           GET ARMOUR, on the swords GET WEAPON, each sometimes followed by EMPTY!, and a
 #           non-empty result lands in the inventory. Both arms are reachable; both are gated
 #           in engine/tests/run_cp6.sh on the real tiles in the real sector.
+# NAMING, so this trap is not re-dug: this repo has exactly two scalings of a map byte and
+#           they have different names. `>> 1` is the GATE VALUE (it equals the vehicle mode
+#           constants 0x22/0x24/0x26/0x28 for vehicle tiles). `>> 2` is the ART INDEX into the
+#           64-entry tile table (G1, closed 2026-10-23 by captures/spice86/art-index/, 256/256
+#           pixel match; docs/art-index.md). cmd_G compares gate values. site_for_tile and
+#           place_index compare art indices. Do not call `>> 1` an art index.
 # PROVEN BY CAPTURE 2026-11-09 -- captures/spice86/vault-pickups (frames: 03-armoury.png
 #           before the pickups, 04-after-pickups.png after, both racks visibly emptied).
 #           ExecutedInstructions of that harvest records 0x363b, 0x3665 (weapon arm),
@@ -44,8 +55,8 @@
 #           and the consume-the-tile helper are observed, not inferred.
 #           And the harvest settled what [DS:14] is, which three live pokes could not: the
 #           frozen live-ds.bin reads pos=(23,14), DS:14=0x38, and mapx23 at that cell is
-#           0x70 -- 0x70 >> 1 == 0x38. **DS:14 is the ART INDEX of the cell under the
-#           player.** The live readings disagreed only because the character had already
+#           0x70 -- 0x70 >> 1 == 0x38. **DS:14 is the GATE VALUE (`map_byte >> 1`) of the cell
+#           under the player** -- not its art index, which would be `0x70 >> 2 == 0x1C`. The live readings disagreed only because the character had already
 #           moved between the peek and the screenshot; a frozen capture cannot race. This
 #           is why the engine shifts the tile before comparing.
 cmd_G:
