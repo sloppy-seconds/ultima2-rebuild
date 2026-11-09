@@ -210,7 +210,11 @@ opt_run "place_index" original/mapx22 -- python3 tools/place_index.py --verify
 # --verify re-derives in memory and never compares against the committed artefact, so it was
 # checking the generator and not the file everyone reads.
 run "census verify" disasm/place-index.tsv disasm/source-gamercorner-locations.csv original/ultimaii.exe -- python3 tools/census.py --verify
-run "census fresh" disasm/census/sector.tsv -- python3 tools/census.py --check-fresh
+# One gate covers every committed generated table, including the census: regenerate each to a
+# temp dir and byte-compare. This caught a second stale file the moment it was written --
+# planet-index.tsv joins settlement names out of place-index, so it went stale when the wiki
+# names landed there, and nothing noticed.
+run "generated fresh" tools/census.py tools/place_index.py -- bash tools/generated_fresh.sh
 opt_run "npc_index" original/tlkx32 -- python3 tools/npc_index.py --verify
 opt_run "planet_index" original/ultimaii.exe -- python3 tools/planet_index.py --verify
 opt_run "gate_graph" original/ultimaii.exe -- python3 tools/gate_graph.py --verify
