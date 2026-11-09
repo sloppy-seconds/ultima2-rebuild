@@ -143,18 +143,64 @@ Designed to four constraints, in priority order:
 | 1 | `#2a7fff` | azure | UI accent; water highlight family |
 | 2 | `#ff5f9e` | rose | UI accent; blood, danger, magic |
 | 3 | `#ffffff` | white | **text ink**; bone, steel, cloth, letters |
-| 4 | `#10305e` | deep | water `00` |
-| 5 | `#2f6fb5` | sea | shallow water `01` |
-| 6 | `#2f9e57` | grass | grass `02` — the calmest, most common tile |
-| 7 | `#14512b` | forest | forest `03` |
-| 8 | `#3a3340` | paving | marsh / town ground `1C` — **letters land here** |
-| 9 | `#5c5c6e` | stone | mountain `04`, pass `09`, masonry |
+| 4 | `#1668b8` | water | `00` — **blue, not the original's magenta** |
+| 5 | `#4f5d24` | swamp | `01` — sallow bog olive, **not a second blue** |
+| 6 | `#3f8f4a` | grass | `02` — the calmest, most common tile |
+| 7 | `#1d5c2c` | forest | `03` |
+| 8 | `#3a3340` | paving | `1C` — **letters land here** |
+| 9 | `#6b6b78` | stone | `04` mountain, `09` pass, masonry |
 | 10 | `#a8a8bc` | steel | structure light, armour, blades |
 | 11 | `#6b4a2a` | wood | ships, doors, handles |
 | 12 | `#d8c9a8` | bone | creature skin, cloth, pale highlights — **not ground** |
 | 13 | `#b03040` | crimson | blood, danger, hostile accents |
 | 14 | `#d88a2f` | amber | torchlight, fire, leather |
 | 15 | `#ffd84d` | gold | treasure, magic, the player marker |
+
+The owner's instruction was to stop treating the 1983 palette as a constraint, and the
+clear case for it: **the original's water is magenta and its vegetation is cyan.** That
+is a CGA palette artefact, not a design decision. Nothing in the engine cares — the
+palette is a file — so this set uses blue water and green land, and all seven ground
+tiles still pass white-ink contrast (worst is grass at 4.01:1, best is paving at
+12.16:1).
+
+## 4a. Naming: no, we do not have definitive names
+
+The census `grade` column reads `measured` for every terrain row, but **what is measured
+is the pixel description, not the name.** "Magenta dashes in loose diagonal rows on
+black" is measured. "Water" is an interpretation sitting on top of it. The older spec
+says so itself in several places — `1C` is "naming contested", and § 7a is a whole
+table of tiles that "are not what the old names said".
+
+The arbiter is **passability, not appearance** — `passability-findings.md` puts it as
+*"the passability table is the arbiter, not the label"*. `overworld.c:936` transcribes
+the ladder: gate values `0x00` and `0x08` reject, which is map bytes `0x00` and `0x10`.
+Everything else walks.
+
+| art | byte | spec name | on foot | verdict |
+| --- | --- | --- | --- | --- |
+| `00` | `0x00` | water | **reject** | water, confirmed |
+| `01` | `0x04` | shallow / rough water | **accept** | **cannot be water** |
+| `02` | `0x08` | grass | accept | consistent |
+| `03` | `0x0C` | forest | accept | consistent |
+| `04` | `0x10` | mountain | **reject** | mountain, confirmed |
+| `09` | `0x24` | mountain pass | accept | consistent |
+| `1C` | `0x70` | marsh / reeds / paving | accept | contested |
+
+**Art `01` is the live error, and our own two documents disagree about it.**
+`tile-art-spec.md` § 7 calls it "shallow / rough water". `passability-findings.md`
+calls map byte `0x04` **"scrub"** and accepts it. A tile the player walks on is not
+water, so the spec's name lost an argument it did not know it was having. Paul's
+instinct — swamp, not shallow water — fits the evidence better than the current name.
+
+**"Swamp" versus "scrub" is still open**, and it is the one naming question worth
+settling before the art is briefed, because it changes what the tile must communicate:
+swamp is wet and coastal, scrub is dry and scattered. Both are land, which is the part
+the palette already depends on. The cheap test is spatial, not visual: for every
+instance of art `01` across all 33 sectors, measure whether it sits on the **land**
+side or the **water** side of the water boundary, and whether it clusters in low-lying
+rings. That is a script over `mapx*`, agent-drivable, no capture needed.
+
+Until then this spec calls it **swamp** and says so, rather than silently renaming it.
 
 **Correction, and it matters.** The first version of this table had "leaf", "foam"
 and "sand" as the light step of three invented ramps. **Those tiles do not exist.**
