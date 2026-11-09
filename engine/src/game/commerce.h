@@ -173,4 +173,61 @@ u2_steal_result u2_commerce_steal(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
  */
 u2_steal_result u2_steal_loot_for(int x, int y, int site_kind);
 
+/*
+ * asm/3C2E — cmd_O, OFFER GOLD.
+ *
+ * The handler the third-party walkthrough calls Hotel California, and the only place in the
+ * game that grants the two endgame items. Its shape is not what the word "offer" suggests:
+ *
+ *   - It aims the SAME one-cell creature scan TRANSACT uses. asm/3C2E stores the found slot
+ *     into DS:1F and then tests it against zero, and slot 0 is never a possible result of
+ *     that scan — so "nothing there" and "slot 0" are the same value, which is the property
+ *     asm/23E6 already has.
+ *   - The amount is read AFTER the target is known, as ONE digit of hundreds (DS:27). One
+ *     digit is not a shortcut: both thresholds the bytes gate on are `cmp $0x5`, and the
+ *     walkthrough's two quoted figures were 500 and 900 — 9 being the largest single digit.
+ *     **No gold is ever deducted.** There is no write to the gold pair anywhere in asm/3C2E;
+ *     the amount is read, compared and used as an increment, and kept. An offer is free.
+ *   - Bit 7 of the target's role byte decides everything. Clear means a plain creature and
+ *     the answer is THANK YOU VERY MUCH! whatever was offered. Set means a quest role, and
+ *     then the WHOLE special path is gated on sector 32 — `[DS:4A]==2 && [DS:49]==3` — so
+ *     outside that one town none of the quest arms can fire at all.
+ *   - Inside sector 32 the role is compared one at a time: 0x81 gives the QUICK SWORD
+ *     (DS:7F=1) for >=500, 0x82 gives the RING (DS:D6=1) for >=500 **and only if DS:6C is
+ *     non-zero** (the Father Antos blessing flag; without it the line is EARN THE RING!),
+ *     0x83 gives one random weapon from DAGGER..PHASER, and anything else with bit 7 set
+ *     reaches the stat raise.
+ *   - The stat raise is one roll: `r = rng & 7`. It fires when `r < 6` — 6 of 8, so **75% up
+ *     and 25% THANK YOU** — and the same `r` indexes the stat, DS:4B+r, so all six stats are
+ *     equally likely conditional on firing. The gain is four BCD adds of the amount, so
+ *     **+4 per 100 gold**, written back with **no ceiling guard**, which is why a stat past
+ *     99 wraps and why "stop at 95" is arithmetic rather than superstition: 95+4 = 99.
+ *
+ * Results are an enum rather than text so a test can assert on the arm taken.
+ */
+typedef enum u2_offer_result {
+    U2_OFFER_NOBODY = 0,    /* OFFER TO WHOM? — the ray found no creature */
+    U2_OFFER_THANK_YOU,     /* plain recipient: bit 7 clear, or set but not sector 32 */
+    U2_OFFER_BELOW,         /* a quest role, but the amount was under 5 hundreds */
+    U2_OFFER_QUICKSWORD,    /* ENILNO IS YOURS! — DS:7F set */
+    U2_OFFER_EARN_RING,     /* EARN THE RING! — the blessing flag DS:6C is zero */
+    U2_OFFER_RING,          /* THE RING IS YOURS! — DS:D6 set */
+    U2_OFFER_WEAPON,        /* HERE TAKE THIS! — one weapon count goes up */
+    U2_OFFER_RAISE,         /* ALAKAZAM! — a stat went up by 4 x hundreds */
+    U2_OFFER_REFUSED        /* the 2 of 8 that prints THANK YOU instead of raising */
+} u2_offer_result;
+
+/* Runs the whole handler after the direction is known: the creature scan, the amount
+ * prompt (read here, because asm/3C2E asks for it only once a recipient exists), and the
+ * arm. The raise's roll comes from the engine's own generator, so a test pins it by seeding
+ * rather than by stubbing; the arithmetic underneath it is enumerable through the pure
+ * helper below. */
+u2_offer_result u2_commerce_offer(u2_ctx *ctx, u2_overworld *ow, int dx, int dy);
+
+/* The pure half of the raise, so the gate can enumerate all 256 rolls and all 256 amounts
+ * without touching the RNG or the state: which stat index the roll selects, whether it
+ * fires at all, and what the new packed-decimal value is. */
+int u2_offer_raise_for(uint8_t roll, uint8_t hundreds, uint8_t cur_bcd,
+                       int *stat_index, uint8_t *new_bcd);
+
 #endif /* U2_COMMERCE_H */

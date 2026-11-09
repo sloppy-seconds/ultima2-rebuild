@@ -319,7 +319,7 @@ typedef struct u2_state {
                                         * on a character that had never been in space. */
     /* 0x6A */ uint8_t rocket_parked_x;  /* the parked rocket's cell column */
     /* 0x6B */ uint8_t rocket_parked_y;  /* and row */
-    /* 0x6C */ uint8_t reserved_6C;      /* CORRECTED 2026-11-08: there IS a reader. asm/3C2E
+    /* 0x6C */ uint8_t blessing;         /* CORRECTED 2026-11-08: there IS a reader. asm/3C2E
                                        * cmd_O tests `mov 0x6c,%al; or %al,%al; jne` before
                                        * granting the force field ring, and prints "EARN THE
                                        * RING!" when it is zero -- so this is the flag the

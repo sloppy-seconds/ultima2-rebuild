@@ -326,6 +326,21 @@ static u2_cmd_result cmd_T(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
     return U2_CMD_AWAIT;
 }
 
+/* asm/3C2E cmd_O: OFFER GOLD. Same AWAIT shape as cmd_T and cmd_S — asm/3C2E calls the
+ * asm/2362 aim gate, so the letter alone is not a completed turn and the direction word
+ * lands on the OFFER GOLD DIRECT- line. What happens after the direction is known, including
+ * the amount prompt, lives in game/commerce.c because it is a subsystem: it is the only
+ * place the game grants the QUICK SWORD and the RING, and the only stat-raising path in the
+ * binary. Note that no gold is ever deducted — asm/3C2E contains no write to the gold pair —
+ * so an offer is free, and the grind is a loop rather than a purchase. */
+static u2_cmd_result cmd_O(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
+{
+    (void)letter;
+    seam_str_out(ctx, U2_S_OFFER_GOLD_DIRECT);
+    ow->pending_cmd = 'O';
+    return U2_CMD_AWAIT;
+}
+
 /* asm/3F25 cmd_S: STEAL. Same AWAIT shape as cmd_T for the same reason — the direction is
  * consumed inside the handler chain, by asm/2362, whose call sits at asm/3F36 as a bare
  * forced-keep `e8` byte and so never appeared in any `# calls:` list.
@@ -1518,10 +1533,6 @@ static u2_cmd_result cmd_D(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
  *   N  asm/3BCE prints NEGATE TIME and falls through into asm/3BDD (`mov 0xe3,%al`), which
  *      is not cmd_done. Where that fragment ends is not established; guessing a time effect
  *      from the word "NEGATE" is the invention this project's rules exist to stop.
- *   O  the offer flow (asm/3C2E: OFFER GOLD DIRECT- / OFFER TO WHOM? / HOW MUCH (*100))
- *      needs town NPCs, which is CP6. Owner pointer 2026-10-25, grade `recalled` and not
- *      yet tested: several NPCs accept an offer, Lord British is the easiest target, and his
- *      castle is on the same small island as the Port Boniface entrance.
  *   R  ready weapon.
  *   S  implemented 2026-10-29. asm/3F25 prints STEAL DIRECT- and falls into the aim gate at
  *      asm/3F36 (a forced-keep `e8`, so the call edge was never listed), then asm/3F37 and
@@ -1569,7 +1580,9 @@ static const cmd_fn cmd_table[CMD_COUNT] = {
     cmd_L, /* L  launch plane/rocket: asm/38B0, its own flight loops, gated on the item named */
     cmd_M, /* M  ready a spell by number: asm/3B92, echoes the spell NAME */
     cmd_N, /* N  negate time: asm/3BCE, spends a STRANGE COIN and freezes creature movement */
-    NULL,  /* O  see the note above */
+    cmd_O, /* O  offer gold: asm/3C2E, the ray, the amount, and the ONLY source of the
+            * QUICK SWORD and the RING. Grants nothing outside sector 32, and never
+            * deducts the gold it is given. */
     cmd_P, /* P  PASS: asm/3DBC. The space bar is a different site, in overworld.c */
     cmd_Q, /* Q  save: asm/3DE4 refuses indoors, asm/3DFA saves outdoors */
     cmd_R, /* R  ready weapon: asm/3E50, menu then NAME then ownership and the AGILITY gate */

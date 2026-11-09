@@ -259,6 +259,62 @@ int main(void)
     CHECK(u2_tribute_raise_for(0x98) == 1 && u2_tribute_raise_for(0x99) == 0,
           "0x99 is the overflow guard: above it a +100 would carry past a packed-decimal byte");
 
+    /* --- cmd_O: the Hotel California raise, enumerated rather than sampled ----------
+     * asm/3C2E L_003f7e is one draw that decides BOTH whether the raise fires and which
+     * stat it lands on: `r = rng & 7`, fires when `r < 6`. So the split is 6 of 8 and the
+     * third-party walkthrough's 75/25 is exactly right, and the claim that the chance
+     * depends on turn count is exactly wrong -- there is no turn term anywhere. */
+    {
+        int fired = 0, idx_seen[8] = {0};
+        for (int roll = 0; roll < 256; ++roll) {
+            int idx = -1; uint8_t out = 0;
+            if (u2_offer_raise_for((uint8_t)roll, 1, 0x00, &idx, &out)) {
+                fired++;
+                idx_seen[idx]++;
+            }
+        }
+        CHECK(fired == 192, "6 of 8 rolls raise, so 192 of 256, got %d", fired);
+        for (int i = 0; i < 6; ++i)
+            CHECK(idx_seen[i] == 32, "stat %d is hit by an equal share of rolls, got %d", i, idx_seen[i]);
+        CHECK(idx_seen[6] == 0 && idx_seen[7] == 0, "rolls 6 and 7 never raise");
+    }
+    /* The gain is four `adc 0x27,%al ; daa`, so +4 per 100 gold, in packed decimal. */
+    {
+        int idx = -1; uint8_t out = 0;
+        CHECK(u2_offer_raise_for(0, 1, 0x00, &idx, &out) && out == 0x04,
+              "100 gold buys +4, got %02x", out);
+        /* Packed decimal, so the results are BCD and not hex: +20 is 0x20 and +36 is 0x36.
+         * The first draft of these two lines said 0x14 and was wrong about its own base,
+         * which is the mistake this arithmetic exists to make visible. */
+        CHECK(u2_offer_raise_for(0, 5, 0x00, &idx, &out) && out == 0x20,
+              "500 gold buys +20 (four adds of 5), got %02x", out);
+        CHECK(u2_offer_raise_for(0, 9, 0x00, &idx, &out) && out == 0x36,
+              "900 gold, the largest single digit, buys +36, got %02x", out);
+    }
+    /* No ceiling guard exists on the store, which is the whole reason the walkthrough's
+     * "stop at 95" is arithmetic and not superstition: 95 + 4 = 99 is the last safe raise,
+     * and 96 wraps to 00. */
+    {
+        int idx = -1; uint8_t out = 0;
+        u2_offer_raise_for(0, 1, 0x95, &idx, &out);
+        CHECK(out == 0x99, "95 + 4 is 99, the last safe stop, got %02x", out);
+        u2_offer_raise_for(0, 1, 0x96, &idx, &out);
+        CHECK(out == 0x00, "96 + 4 wraps to 00, because nothing guards the store, got %02x", out);
+        /* 95 +2 +2 +2 +2: 97, 99, then the third add crosses the byte and the carry falls
+         * off the end (99 +2 -> DAA -> A1 -> +60 -> 101 -> 01), then +2 +carry -> 04. */
+        u2_offer_raise_for(0, 2, 0x95, &idx, &out);
+        CHECK(out == 0x04, "95 + 8 overshoots past 99 and wraps, got %02x", out);
+    }
+    /* The index the roll selects is the stat offset: DS:4B + r, and DS:4B..50 are
+     * str, agi, sta, cha, wis, int in that order. */
+    {
+        int idx = -1; uint8_t out = 0;
+        for (int r = 0; r < 6; ++r) {
+            u2_offer_raise_for((uint8_t)r, 1, 0x00, &idx, &out);
+            CHECK(idx == r, "roll %d selects stat index %d, got %d", r, r, idx);
+        }
+    }
+
     printf("commerce_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
 }

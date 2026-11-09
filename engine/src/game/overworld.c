@@ -2289,6 +2289,25 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             continue;
         }
 
+        /* A direction arriving while OFFER GOLD DIRECT- is on the line is the recipient, not
+         * a step. Same shape as TRANSACT and STEAL, and the same byte-level reason: asm/3C2E
+         * calls the asm/2362 aim gate inside the handler chain. The amount prompt follows
+         * inside u2_commerce_offer, because the original asks for it only once a recipient
+         * exists. */
+        if (ow->pending_cmd == 'O' && word != NULL) {
+            ow->pending_cmd = 0;
+            seam_str_out(ctx, word);              /* no CR: same line as OFFER GOLD DIRECT- */
+            u2_commerce_offer(ctx, ow, dx, dy);
+            /* Unlike STEAL, and like TRANSACT, this can move the ledger: a raise lands in a
+             * stat byte and the status band shows stats. Redraw for the same reason the
+             * TRANSACT arm does. */
+            u2_status_draw(ctx);
+            seam_char_print(ctx, '\r');
+            seam_str_out(ctx, U2_S_CMD_PROMPT);
+            creature_turn(ctx, ow);
+            continue;
+        }
+
         /* A direction arriving while FIRE DIRECT- is on the line is the cannon's bearing.
          * Same AWAIT plumbing as the TRANSACT and STEAL arms above, and the same reason: the
          * original consumes the direction inside asm/2362. asm/35ED plays the gun report and

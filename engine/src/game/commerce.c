@@ -781,3 +781,128 @@ u2_steal_result u2_commerce_steal(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
     }
     return steal_no_luck(ctx);
 }
+
+/* ---- cmd_O: OFFER GOLD -------------------------------------------------- */
+
+/* The pure half, so a gate can enumerate every roll and every amount instead of sampling a
+ * seeded RNG. Mirrors asm/3C2E L_003f7e..L_003fa8: ONE draw decides both whether the raise
+ * fires and which stat it lands on, and the increment is four `adc 0x27,%al ; daa` with the
+ * carry chained across all four. Returns 1 when it fires (`r < 6`, so 6 of 8 = 75%). */
+int u2_offer_raise_for(uint8_t roll, uint8_t hundreds, uint8_t cur_bcd,
+                       int *stat_index, uint8_t *new_bcd)
+{
+    const int r = roll & 7u;
+    if (r >= 6)
+        return 0;
+    int cf = 0;
+    uint8_t v = cur_bcd;
+    for (int i = 0; i < 4; ++i)
+        v = daa_add(v, hundreds, cf, &cf);
+    *stat_index = r;
+    *new_bcd = v;
+    return 1;
+}
+
+/* The six stat bytes are contiguous at DS:4B..DS:50 in this order, which is what lets the
+ * roll index them directly the way `mov 0x4b(%di),%al` does. */
+#define U2_OFFER_STAT_N 6
+
+u2_offer_result u2_commerce_offer(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
+{
+    u2_state *st = &ctx->state;
+    uint8_t *const stats[U2_OFFER_STAT_N] = {
+        &st->stat_str, &st->stat_agi, &st->stat_sta,
+        &st->stat_cha, &st->stat_wis, &st->stat_int
+    };
+
+    /* asm/25E6 leaves the aimed creature's slot in DI and cmd_O stores it to DS:1F, then
+     * tests it against zero. The engine's equivalent is the one-cell scan TRANSACT uses
+     * (slots 31 down to 1, slot 0 never examined), and the two agree on what zero means:
+     * because slot 0 is not a possible result, "nothing found" and "DS:1F == 0" are the same
+     * value. asm/25E6's own body has not been read, so the extent is inherited from the
+     * decoded scan rather than claimed for cmd_O's bytes. */
+    const int cx = (ow->x + dx) & (U2_SECTOR_EDGE - 1);
+    const int cy = (ow->y + dy) & (U2_SECTOR_EDGE - 1);
+    int slot = 0;
+    for (int i = U2_MON_SLOTS - 1; i >= 1; i--) {
+        if (st->mon_type[i] == 0)
+            continue;
+        if (st->mon_x[i] == (uint8_t)cx && st->mon_y[i] == (uint8_t)cy) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot == 0) {
+        seam_str_out(ctx, U2_S_OFFER_TO_WHOM);
+        return U2_OFFER_NOBODY;
+    }
+
+    /* asm/3C2E asks for the amount only AFTER it knows there is a recipient, so a miss never
+     * prompts for one. One digit of hundreds into DS:27, exactly as the shops read their
+     * menu digits. */
+    seam_str_out(ctx, U2_S_OFFER_HOW_MUCH);
+    const int d = read_digit(ctx);
+    if (d < 0)
+        return U2_OFFER_NOBODY;                 /* caller gone; nothing printed, nothing moved */
+    const uint8_t hundreds = (uint8_t)d;
+
+    /* Bit 7 of the role byte decides everything, and the whole special path is additionally
+     * gated on sector 32 -- `[DS:4A]==2 && [DS:49]==3`. Outside that one town a quest role
+     * prints the same THANK YOU a plain creature gets, which is a byte-level anchor for
+     * sector 32 being the Hotel California town. */
+    const uint8_t role = st->mon_role[slot];
+    if (!(role & 0x80u) || st->sector_second != 2 || st->sector_first != 3) {
+        seam_str_out(ctx, U2_S_OFFER_THANK_YOU);
+        return U2_OFFER_THANK_YOU;
+    }
+
+    switch (role) {
+    case 0x81:
+        /* ENILNO IS YOURS! DS:7F is weapons_owned[9], the QUICK SWORD -- the one weapon no
+         * shoppe sells and no steal can take, which is why this is the only source. */
+        if (hundreds < 5) {
+            seam_str_out(ctx, U2_S_OFFER_THANK_YOU);
+            return U2_OFFER_BELOW;
+        }
+        seam_str_out(ctx, U2_S_OFFER_ENILNO);
+        st->weapons_owned[9] = 1;
+        return U2_OFFER_QUICKSWORD;
+
+    case 0x82:
+        if (hundreds < 5) {
+            seam_str_out(ctx, U2_S_OFFER_THANK_YOU);
+            return U2_OFFER_BELOW;
+        }
+        if (st->blessing == 0) {                 /* DS:6C, set by Father Antos */
+            seam_str_out(ctx, U2_S_OFFER_EARN_RING);
+            return U2_OFFER_EARN_RING;
+        }
+        seam_str_out(ctx, U2_S_OFFER_RING_IS_YOURS);
+        st->items_held[0] = 1;                   /* DS:D6, the RING slot */
+        return U2_OFFER_RING;
+
+    case 0x83: {
+        seam_str_out(ctx, U2_S_OFFER_HERE_TAKE_THIS);
+        const int i = (u2_rand_byte(ctx) & 7u) + 1;   /* DAGGER..PHASER, never QUICK SWORD */
+        st->weapons_owned[i] = bcd_inc1(st->weapons_owned[i]);
+        return U2_OFFER_WEAPON;
+    }
+
+    default: {
+        /* The grind. One roll, one stat, four BCD adds, and deliberately no ceiling guard:
+         * that is why a stat past 99 wraps and why 95 is the last safe stop. */
+        const uint8_t roll = u2_rand_byte(ctx);
+        const int idx = roll & 7u;
+        if (idx >= 6) {                       /* the 2 of 8 that refuses */
+            seam_str_out(ctx, U2_S_OFFER_THANK_YOU);
+            return U2_OFFER_REFUSED;
+        }
+        int unused = 0;
+        uint8_t out = 0;
+        (void)u2_offer_raise_for(roll, hundreds, *stats[idx], &unused, &out);
+        *stats[idx] = out;
+        seam_str_out(ctx, U2_S_OFFER_ALAKAZAM);
+        return U2_OFFER_RAISE;
+    }
+    }
+}
