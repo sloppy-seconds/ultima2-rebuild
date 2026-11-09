@@ -143,21 +143,43 @@ Designed to four constraints, in priority order:
 | 1 | `#2a7fff` | azure | UI accent; water highlight family |
 | 2 | `#ff5f9e` | rose | UI accent; blood, danger, magic |
 | 3 | `#ffffff` | white | **text ink**; bone, steel, cloth, letters |
-| 4 | `#14512b` | forest | vegetation dark |
-| 5 | `#2f9e57` | grass | vegetation mid |
-| 6 | `#8fe0a0` | leaf | vegetation light |
-| 7 | `#10305e` | deep | water dark |
-| 8 | `#2f6fb5` | sea | water mid |
-| 9 | `#9fd8f0` | foam | water light |
-| 10 | `#4a3826` | soil | terrain dark |
-| 11 | `#8f6f45` | earth | terrain mid |
-| 12 | `#d8c9a8` | sand | terrain light — **fails V1, see § 5** |
-| 13 | `#5c5c6e` | iron | structure dark |
-| 14 | `#a8a8bc` | steel | structure mid |
-| 15 | `#ffd84d` | gold | treasure, magic, torchlight, the player marker |
+| 4 | `#10305e` | deep | water `00` |
+| 5 | `#2f6fb5` | sea | shallow water `01` |
+| 6 | `#2f9e57` | grass | grass `02` — the calmest, most common tile |
+| 7 | `#14512b` | forest | forest `03` |
+| 8 | `#3a3340` | paving | marsh / town ground `1C` — **letters land here** |
+| 9 | `#5c5c6e` | stone | mountain `04`, pass `09`, masonry |
+| 10 | `#a8a8bc` | steel | structure light, armour, blades |
+| 11 | `#6b4a2a` | wood | ships, doors, handles |
+| 12 | `#d8c9a8` | bone | creature skin, cloth, pale highlights — **not ground** |
+| 13 | `#b03040` | crimson | blood, danger, hostile accents |
+| 14 | `#d88a2f` | amber | torchlight, fire, leather |
+| 15 | `#ffd84d` | gold | treasure, magic, the player marker |
 
-Ramp logic: four three-step families (vegetation, water, terrain, structure) plus
-black, white, two UI accents and one highlight = 16, with no slot left idle.
+**Correction, and it matters.** The first version of this table had "leaf", "foam"
+and "sand" as the light step of three invented ramps. **Those tiles do not exist.**
+Paul's reaction — "I don't remember them in the game" — was correct, and checking was
+cheap. The real ground set is **seven tiles in four families**, per
+`tile-art-spec.md` § 7 and the census instance counts:
+
+| art | name | instances |
+| --- | --- | --- |
+| `00` | water | 57,449 |
+| `01` | shallow / rough water | 7,121 |
+| `02` | grass | 60,963 |
+| `03` | forest | 21,856 |
+| `04` | mountain | 12,420 |
+| `09` | mountain pass | 7 |
+| `1C` | marsh / reeds / town paving | 19,433 |
+
+There is no sand, no leaf, and no separate foam — "foam" appears in the older spec
+only as a description of what the shallow-water tile is made of. Inventing a tidy
+taxonomy instead of counting the tiles is the oldest failure mode in this project, and
+it nearly cost six palette slots.
+
+The corrected logic is therefore **not four three-step ramps**. Ground gets one colour
+per tile — seven colours, all dark enough for white letters — and the light end of the
+palette is spent on creatures, structures and effects, which never carry letters.
 
 **This table is a proposal for review, and § 5 shows it does not yet satisfy its own
 constraint.** The contrast figures below are computed (WCAG relative luminance,
@@ -196,24 +218,29 @@ the legibility line, so this is not a matter of nudging three hex values. Three 
 nine ground candidates fail, and they are the three that make the ramps read as three
 steps.
 
-Three ways out:
+**Resolved by the owner, 2026-11-09: keep white on black, no renderer change.** The
+reasoning is better than my framing: **letters only appear in towns**, so what they
+actually fight with is grass and paving, not the whole palette. Measured against the
+seven real ground tiles, white ink passes everywhere at a 3:1 floor:
 
-| option | what it means | cost |
+| art | colour | ratio |
 | --- | --- | --- |
-| **A. Cap ground lightness** | no ground tile lighter than index 11 | deletes the light step from three of four ramps — a third of the palette's shading, given up |
-| **B. Letters get an outline** | glyphs drawn in index 3 with a 1px index 0 surround | a renderer change, and letters stop being a pure palette-index lookup |
-| **C. Promote V1 to a gate** | compute every (letter, ground) pair and refuse the set if any fails | none on its own; it makes A or B *enforced* rather than hoped for |
+| `00` water | `#10305e` | 13.07:1 |
+| `01` shallow | `#2f6fb5` | 5.17:1 |
+| `02` grass | `#2f9e57` | 3.42:1 |
+| `03` forest | `#14512b` | 9.37:1 |
+| `04`/`09` mountain | `#5c5c6e` | 6.54:1 |
+| `1C` paving | `#3a3340` | 12.16:1 |
 
-**Recommendation, revised by the measurement: B + C.** My first draft said "A now, C
-as the gate". The numbers argue against that — A does not cost one tile, it costs the
-shading strategy that made the palette worth designing in the first place. Outlined
-glyphs are what every later game in the series did for exactly this reason, and the
-alternative is shipping a palette whose best colours cannot be used for ground.
+The tight one is grass at 3.42:1, worth watching but passing. And the light colours
+are not lost — bone, gold, amber and steel sit between 7.6:1 and 15.2:1 against black;
+they are simply **reserved for things that never carry letters**.
 
-B is a renderer change and should be argued on its own merits — but it should be
-argued now, because choosing A means quietly accepting a smaller palette than § 4
-claims. Either way **C is free and should happen regardless**: an unenforced V1 is
-prose, and prose is how a set passes review and then ships unreadable letters.
+That dissolves the A/B/C choice entirely. There was never a real conflict between a
+rich palette and legible letters; there was a conflict between a *made-up* palette and
+the tiles that exist. Option C — promoting V1 from prose to a machine check — still
+stands on its own merits and is carried into § 7, because an unenforced V1 is prose,
+and prose is how a set passes review and then ships unreadable letters.
 
 ---
 
@@ -313,5 +340,6 @@ must not be confused with — and not appearance.
 - **No 8bpp.** Deferred with a stated bar (§ 3a).
 - **No dungeon/tower scope.** Different medium (§ 3c).
 - **No edit to `tile-art-spec.md`.** It is pinned; the reversal is recorded here (§ 2).
-- **No answer to § 5.** The measurement says B+C, but B is a renderer change and that
-  is a separate decision with its own cost, not a palette footnote.
+- **No answer to § 5 needed** — the owner ruled it (keep white on black), and the
+  measurement against the real ground set supports it. What remains is writing the
+  V1 check, not deciding the palette's brightest entry.
