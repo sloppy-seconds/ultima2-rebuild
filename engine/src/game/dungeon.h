@@ -24,9 +24,29 @@
  *                          '@' (0x40) and prints " CHEST!" (asm/363B, runtime 0x36C4)
  *       0x20 down ladder — cmd_D's gate is [DS:14] & 0x20
  *       0x10 up ladder   — cmd_K's gate is [DS:14] & 0x10
+ *       0xC0 door        — NOT IMPLEMENTED. Named by ModdingWiki's dungeon tile table and
+ *                          present in every shipped dungeon and tower grid (48 to 262 cells
+ *                          per file). Bit 7 is set, so asm/6144's "corridor ends here" test
+ *                          fires on it, yet the ADVANCE gate at asm/277B rejects only
+ *                          `al == 0x80` exactly. Those two cannot both be the whole story;
+ *                          see docs/needs-gameplay.md G74 for the live check that settles it.
+ *       0xE0 secret door — NOT IMPLEMENTED, same open question, and 45 to 259 cells per file.
+ *                          Note 0x30 is not a separate code: it is 0x10|0x20, and the two
+ *                          ladder gates are bit tests, so an up/down cell satisfies both with
+ *                          no extra rule. ModdingWiki lists it as its own row and our bit
+ *                          masks already cover it.
  *   The shipped mapx35 uses exactly seven values, all multiples of 0x10, and only
  *   seven of the sixteen combinations a free nibble would allow. That is a small
  *   enum, not an art index, and it is why the tile renderer has never covered this.
+ *   The seven are 0x00, 0x10, 0x20, 0x40, 0x80, 0xC0, 0xE0 — the count has always
+ *   included the two door codes; only their names were missing from this list.
+ *
+ *   DOORS ARE TWO DISJOINT SYSTEMS, and conflating them is the trap here. The unlock rule
+ *   `u2_unlock_rule` tests the cell for 0xA0, which is a SITE door tile: 0xA0 occurs in 16
+ *   town and castle maps (1 to 29 cells) and in ZERO dungeon or tower files. The dungeon
+ *   doors are 0xC0 and 0xE0, which occur in quantity in dungeon files and almost not at all
+ *   in site maps. So the implemented 0xA0 path is correct for towns and castles and cannot
+ *   ever fire in a dungeon. Counts and the reasoning: docs/map-format.md § 3b.
  *
  *   The view is a wireframe. asm/6000 renders, and it renders nothing at all when
  *   the light counter [DS:26] is zero — that branch is the darkness, and it is a
@@ -74,6 +94,12 @@ typedef struct u2_overworld u2_overworld;
 #define U2_DG_UP     0x10u
 #define U2_DG_TERRAIN 0xf0u
 #define U2_DG_STAMP   0x0fu
+
+/* Dungeon door codes. Present in the shipped grids, named here so the gap is visible;
+ * nothing reads them yet. A site door is a different code (0xA0) on a different map layer
+ * and is handled by u2_unlock_rule -- do not reuse that constant down here. */
+#define U2_DG_DOOR     0xc0u
+#define U2_DG_SECRET   0xe0u
 
 /* asm/6078 samples eight depths; asm/6144 stops drawing at seven. */
 #define U2_DG_SAMPLE_DEPTH 8

@@ -143,6 +143,41 @@ player wades `0x04` and a land monster will not, which is what makes it shallows
 And every step above spent exactly 19 food including the two refused ones, which independently
 re-confirms the charge-before-verdict finding in `asm/2423_passability.asm`.
 
+## 3b. Doors are two disjoint systems, and the codes do not overlap (2026-11-09)
+
+ModdingWiki's dungeon page lists `0xC0` as Door and `0xE0` as Secret door. Our own unlock rule
+`u2_unlock_rule` tests the cell for `0xA0`. That looked like a contradiction until the counts
+were taken, and it is not one -- **the two sets live in different map layers and never meet**:
+
+| map byte | meaning | site maps (town/castle) | dungeon and tower maps |
+| --- | --- | --- | --- |
+| `0xA0` | site door, what UNLOCK paves | **1 to 29 cells in 16 files** | **0 in all 8 files** |
+| `0xC0` | dungeon door | 0 to 4 | 48 to 262 |
+| `0xE0` | dungeon secret door | 0 to 4 | 45 to 259 |
+
+Counts are `bytes.count()` over the first 4096 bytes of every `original/mapxNN`. The `0xA0`
+row is the load-bearing one: it **never occurs in a dungeon or tower file**, so the implemented
+unlock path is correct for the towns and castles it was derived from (the observed paving was
+in sector 31, a town) and can never fire underground. `mapx03` is the only site map with more
+than a handful of `0xC0`/`0xE0`, at four and one.
+
+Two consequences worth writing down before anyone rediscovers them:
+
+* **Do not "fix" `0xA0` into `0xC0`.** They are not two spellings of one thing. A dungeon door
+  needs its own rule, and what that rule is remains open -- see `docs/needs-gameplay.md` G74.
+* **`0x30` is not a third ladder.** ModdingWiki lists it as "Ladder up/down", and it needs no
+  new rule: our ladder gates are bit tests (`cmd_D` tests `[DS:14] & 0x20`, `cmd_K` tests
+  `[DS:14] & 0x10`), so a cell of `0x30` satisfies both on its own. Their tile table and our
+  bitmasks are the same fact from two directions, which is worth recording as corroboration.
+
+The dungeon grid uses exactly seven values in the shipped files -- `0x00 0x10 0x20 0x40 0x80
+0xC0 0xE0` -- and `mapx15` is the one file that breaks the pattern, carrying sector-map terrain
+bytes (`0x08 0x0c 0x60 0x70 0x78`) inside a dungeon grid. That is the corruption GCHANGES.TXT
+describes and the Galaxy patch fixes, seen from a third direction: ModdingWiki's page says
+"some map files are corrupted, look to the Upgrade patch for fixes", `install-design.md`
+measures 260 differing bytes from 3837, and the byte-value census above shows it as foreign
+codes.
+
 ## 4. The world wraps
 
 The viewport is toroidal, not clamped. With the player at `x=0`, the left edge
