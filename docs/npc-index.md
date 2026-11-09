@@ -127,7 +127,94 @@ Stoned Jester, and the rest. **The wiki has nothing to add to any of them.**
 Note the game's spelling is **SANTRE**; the wiki's link text renders it "Sentri". The bytes win,
 as usual, and the difference is recorded rather than tidied.
 
-## 5. Method
+## 5. The talk file format, checked against a third-party description (2026-11-09)
+
+ModdingWiki publishes an *Ultima II Talk Format* page with a reader. Every claim in it was
+tested against `original/tlkx*` and `original/updated/TLKX*` rather than accepted.
+
+| claim | result |
+| --- | --- |
+| every file is exactly 384 bytes | **confirmed**, all 24 files |
+| file begins with a `0x00` marker | **confirmed** |
+| four null-terminated dialogue strings | **confirmed, by two independent routes** -- see below |
+| rotate by 128, ROT13-like | **confirmed**: `byte ^ 0x80` decodes everything. Same fact as "the high bit is set" |
+| line endings are CR | **confirmed** |
+| three rows, thirty columns, CR implied at 30 | **confirmed**, with one string that only looks like a violation |
+| the tail is garbage from the memory buffer | **confirmed**, and it is more interesting than garbage |
+
+### The four-record limit, from two directions
+
+The wiki derives four from reading the file; this tool derives it from the **creature role
+byte**, which is a completely independent signal. They agree exactly:
+
+```
+files: 23   total records: 92
+records per (layer, sector): {4: 23}
+```
+
+92 = 23 x 4, four in every file, no exceptions. Role bytes `0x81`..`0x84` map to dialogue
+indices 1..4, which is the join `npc_index.py` already uses.
+
+**The trap here is real and was walked into while writing this.** Splitting the file on nulls and
+keeping segments that are mostly printable gives **5 to 10** "dialogues" per file, not four. The
+extra segments are not corrupt -- they are legible dialogue text, from the buffer that was still
+in memory when the file was written. `tlkx03`'s tail repeats its own MINAX line; `tlkx23`'s and
+`tlkx31`'s tails each carry a Wandering Bard line. Printability cannot distinguish authored text
+from residue because the residue *is* text. The correct discriminator is the role byte, or
+ equivalently the engine's own read limit -- which is why the wiki's reader stops at the fourth
+null instead of trusting what it can decode, and why this tool keys off the role byte rather than
+the nulls.
+
+### The thirty-column rule, and the one string that tests it
+
+Exactly one authored row exceeds 30 columns, in `tlkx32`:
+
+```
+SANTRE THE SWASHBUCKLER WARNS:BEWARE, I'VE A QUICK BLADE!
+   len=57  explicit CRs=0
+```
+
+That is not a violation. The rule is that a row ends with CR *unless it is 30 columns, where a
+CR is implied*, so this renders as 30 + 27 -- two rows of the three-row budget, with the author
+relying on the implied break. Worth noting it is **Santre**, the sector-32 NPC who is the only
+source of the QUICK SWORD: the one string that stress-tests the wrap rule sits on the win path.
+
+### The Galaxy patch recases dialogue, and that is a systematic layer difference
+
+The patch layer rewrites the same records in mixed case. Record 1 of each shared sector:
+
+| sector | root `tlkxNN` | patched `TLKXNN` |
+| --- | --- | --- |
+| 23 | `BISHOP BOB PREACHES: CONFESS TO BROTHER ANTOS!` | `Bishop Bob preaches: Confess to Brother Antos!` |
+| 33 | `SISTER SLEDGE SINGS: WE ARE FAMILY!` | `Sister Sledge sings: We are family!` |
+| 32 | `AN OLD MAN MUMBLES: I'M AN OLD MAN.` | `An old man mumbles: I'm an old man.` |
+| 41 | `CHUCKLES THE BUMBLE CRIES: CAN I LOOK YET...` | `Chuckles the Bumble cries: Can I look yet...` |
+
+The content is identical; only the casing differs. This matters for anything that compares the
+two layers or displays both: a case-sensitive diff reports every shared record as changed, which
+is the same class of error `docs/planet-maps-galaxy-patch.md` § 2a records for filenames. The
+speaker names in `disasm/npc-index.tsv` come from the **root** layer and are therefore uppercase.
+
+### A fossil of the game's own source code, and a line that exists nowhere else
+
+The wiki says *"There is even some source code to be found in some of the files!"* Confirmed --
+and it is in the **raw** bytes, not the rotated ones, which is why a first pass that decrypted
+everything found nothing:
+
+```
+tlkx11  tlkx21  tlkx22  tlkx32:
+        PRBYTE    PRINT    $0D,"HOW 'BOUT IT? ",$00
+```
+
+That is an assembler macro invocation from the game's own source, sitting in the buffer residue.
+And the string it prints -- `HOW 'BOUT IT?` -- **appears in no authored dialogue in any talk
+file**, on either layer. So it is a cut or unused line, preserved only because the assembler's
+text buffer was still in memory when someone saved a talk file over the top of it.
+
+Nothing in the engine should read past the fourth record. This section is documentation of what
+lives there, not a suggestion to use it.
+
+## 6. Method
 
 Two traps, both live in the tool's comments rather than only here:
 
