@@ -99,7 +99,7 @@ unmistakably. Graded `inferred` because the rule is "the text says so", not a na
 | 03 | Time of Legends | castle | `SHADOW GUARD`, `CHAMBER ONE`, `CHAMBER TWO`, `TIME ZONE MUSEUM`, `TORTURE CHAMBER`, `APOTHECARY`, `THIEVES MORGUE GUILD`, `DEVIL WORSHIP` |
 | 23 | 1423 B.C. | castle | `VAULT LORD BRITISH KITCHEN`, `MESS HALL`, `PRISON`, `THE CHAPEL` |
 | 33 | 1990 A.D. | castle | **identical to sector 23** — see § 3a |
-| 41 | 2112 A.D. Aftermath | village | `CCCP DEFENCE DA KGB`, `PIRATES COVE`, `CCCP TEST LAUNCH EXIT HERE`, `RED LOBSTER`, `PROPAGANDA` |
+| 41 | 2112 A.D. Aftermath | village | `CCCP DEFENCE DA KGB`, `PIRATES COVE`, `CCCP TEST LAUNCH EXIT HERE`, `RED LOBSTER`, `PROPAGANDA` — the row spelling `CCCP TEST LAUNCH EXIT HERE` is at `y=0` and the game's **only three rocket tiles** sit directly below it at `y=3`, cells `(33,3) (38,3) (43,3)`; see `docs/spice86-live-findings.md` vehicle census |
 | 81 | world 8 | village | `TOMMERSVILLE`, `SOFTALK`, `KURTS CLERGY` |
 | 71 | world 7 | village | `CABIN TWO`…`CABIN NINE`, `CAMP FIRE`, `POOR DEBBIES POOL` — a camp, not a town |
 | 61 | world 6 | village | `MONKEY ISLAND`, `VISIT FOOLS`, `SEARS`, `JACK BOX` |

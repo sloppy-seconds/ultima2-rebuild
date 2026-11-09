@@ -742,6 +742,52 @@ else gives `LAND--NOT HERE!!!!!` and inertial flight continues. Both branches ar
 the executed set of `captures/spice86/dungeon-35-live` - gate `cmp` at runtime
 `0x3B56`, accept at `0x3B5A`, refuse at `0x3B72`.
 
+### Every vehicle tile in the game, all four kinds
+
+The plane census above existed and the others did not, which is how "the rocket is in era 0"
+survived into a routing plan. Full sweep of the map byte at offset 0 over the first 4096 bytes
+of every `mapxNN` in `original/` and every `MAPGNN` in `original/updated/`:
+
+| sector | horse `0x44` | ship `0x48` | plane `0x4C` | **rocket `0x50`** | what the letter tiles say |
+| --- | --- | --- | --- | --- | --- |
+| `mapx03` | (36,24) | (37,24) | (38,24) | **(39,24)** | four vehicles side by side in a Legends-era castle — a depot, not a launch site |
+| `mapx31` | — | 5 cells | — | — | |
+| `mapx32` | 5 cells | — | (4,10) | — | `AIR PORT` |
+| **`mapx41`** | — | 3 cells | 12 cells | **(33,3) (38,3) (43,3)** | `CCCP DEFENCE DA KGB CCCP TEST LAUNCH EXIT HERE` at y=0 |
+| `mapx61` | — | 2 cells | — | — | |
+| `mapx80` | — | (15,47) | 3 cells | — | |
+| `mapx82` | 3 cells | — | — | — | |
+| `mapx92` | 3 cells | 2 cells | — | — | |
+| `MAPG41` | — | 3 cells | — | — | Jupiter's village; **no rocket** |
+| `MAPG61/80/82/92` | — | see root | — | — | byte-identical to the root `mapx` of the same number |
+
+**Four rockets exist, not one.** The three in `mapx41` sit at `y=3`, directly below the row
+`y=0` that spells `CCCP TEST LAUNCH EXIT HERE` — so they are the Soviet test-launch strip, and
+the sign is pointing at them. Sector 41 is the place the letter tiles call `PIRATES COVE` (y=17)
+and `PIRATES HARBOUR` (y=63), so the pirate town and the Soviet launch site are **the same
+sector**, which is why the owner's recollection of "rockets at both Pirates Cove and the USSR"
+reads as two places and is one. The `mapx03` rocket is the only other one, and it is in a
+castle in era 0 alongside the other three vehicle kinds, which makes it a depot rather than a
+launch site.
+
+**No planet has a rocket.** `MAPG41` — Jupiter's village, which is what sector 41 becomes under
+the Galaxy patch — has three ships and no rocket. Rockets are an Earth object.
+
+The consequence for routing is the opposite of what was assumed: Earth's rocket **landing**
+sector is hardcoded to 40, which is era 4, and era 4's village 41 is where three rockets are
+waiting. Era 4 is both the arrival and the departure hub, so a bot that lands from space is
+already standing next to its next rocket rather than needing a time door to era 0.
+
+### Trap: two different "art index" scalings
+
+`DS:14` and the passability ladder use **`byte >> 1`**. The alphabet-tile decoder in
+`tools/place_index.py` uses **`byte >> 2`**. Both are called "the art index" in this repo, and
+using the wrong one silently produces confident nonsense: decoding `mapx41` with `>> 1` turns
+the 12 plane tiles into the letter `G`, the armour and weapon racks into `K` and `M`, and the
+terrain tile `0x70` into `Y`, which reads as a wall of filler rather than as a shift error.
+Under the correct `>> 2` those same bytes are not letters at all. When a decode returns
+uniform junk, check which shift the tool means before believing the junk.
+
 **Still open:** the `[DS:14]` writer at file `0x6238` calls `0x6AC0`, whose index
 arithmetic came out as `y*16 + x` against a 64-wide grid. Unexplained.
 
