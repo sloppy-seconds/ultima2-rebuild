@@ -27,6 +27,38 @@ Sector maps are `original/mapxNN`, one per sector, 33 of them, all exactly
 | `0x1000` | 1 | always `0x1A` - a header marker, present in all 33 files |
 | `0x1001..0x107F` | 127 | mostly zero; 25 distinct variants across the 33 sectors, purpose unproven |
 
+### 2a. The grid is 64x64, and a third-party source says 64x66 (tested 2026-11-09)
+
+ModdingWiki's *Ultima II Map Format* page states "Cell dimensions: 64x66 (for planets and
+towns)" and its FreeBASIC sample viewer loops `For Y = 0 To 65` over all 4224 bytes. That is a
+reasonable misreading of exactly this file layout -- read the whole file as tiles and you get 66
+rows -- but it is wrong, and three things in our own content say so:
+
+* **Every map that has a byte at `0x1000` has `0x1A` there.** All 46 of them, without exception.
+  `0x1A` is the DOS end-of-file marker. A tile grid does not begin its 65th row with an EOF
+  character in every single file.
+* **Eight Galaxy-patch maps are exactly 4096 bytes with no tail at all**: `MAPG10`, `MAPG15`,
+  `MAPG20`, `MAPG30`, `MAPG32`, `MAPG40`, `MAPG41`, `MAPG45`. If the grid were 64x66 these would
+  be truncated files missing two rows. They are complete maps, and the game loads them. This is
+  the same fact `docs/phase4-implementation.md` records as "do not assert the 4224 size", seen
+  from the other side.
+* **The trailer is filled with the map's own ground byte, not with tiles.** `mapx20` is
+  predominantly `0x00` and its trailer is `0x00`; `mapx41` is predominantly `0x08` and its
+  trailer is `0x08`. That is padding that matches its neighbours, not two rows of terrain.
+
+So: 4096 grid, one `0x1A` marker, 127 bytes of filler. The engine's `GRID*GRID + TAIL` read and
+the viewer's `data[:4096]` are both correct, and the viewer should not grow two extra rows to
+match the wiki.
+
+The same page is right about the thing that matters more, and it is worth having it on record
+that an independent source derived it: **`tile id = map byte / 4`**, which is our `art = byte >> 2`
+under another name (G1, `docs/art-index.md`). Its tile table also names id 20 Rocket, 21 Shield
+and 22 Sword, which corroborate the rocket byte `0x50` and the two `cmd_G` racks at `0x54` and
+`0x58` -- see `disasm/tile-art.tsv`. Where it is vaguer than we are, that is said in the note
+rather than copied over: its id 5 is `?` where `site_for_tile` says village, and its claim that
+the game "saves the location of NPCs and monsters directly in the map files" does not match our
+separate `monxNN` records.
+
 ### Cross-checked against the Apple II build
 
 The Apple II reference disks hold the same sector maps as `M/AP.NN`, 4096 bytes each

@@ -54,9 +54,9 @@
 	11	11	creature	quadruped, head at left, four legs and a tail	)	horse candidate
 	12	12	object	Frigate — boat hull with mast and yard	<	frigate candidate
 	13	13	object	crossbar over a vertical post on a base	>	PLANE, map byte 0x4C. Proven 2026-10-21 by measurement, not by the drawing: BOARD dispatches on [DS:14] (asm/2FAD) against 0x22 horse / 0x24 ship / 0x26 plane / 0x28 rocket, and [DS:14] was measured live as map_byte >> 1 on 53 of 54 walk samples across three terrain bytes. That puts the plane at map byte 0x4C, i.e. art 0x13, and arts 0x11/0x12/0x14 are independently this file's own horse, frigate and rocket candidates. An earlier note here claimed 0x34 and was wrong: the render used %02d against hex-named PNGs, so art 0x13 was displayed under the label "13" and attached to the wrong byte. The 0x34 tiles are art 0x0D, a humanoid figure with arms raised.
-	14	14	object	white spire, pointed top, flared base	=	rocket candidate, NOT 0x08
-	15	15	object	white square frame enclosing an S curve	?	dungeon mouth candidate
-	16	16	object	diagonal stroke with a small cross at the foot	'	
+	14	14	object	white spire, pointed top, flared base	=	ROCKET, confirmed -- no longer a candidate. Map byte 0x50; asm/2FAD dispatches vehicle mode 0x28 on 0x50>>1. ModdingWiki's tile table independently names id 20 "Rocket", and its id is byte/4, which is the same quantity as art = byte>>2
+	15	15	object	white square frame enclosing an S curve	?	ARMOUR RACK -- not a dungeon mouth. Map byte 0x54; cmd_G's armour arm compares 0x54>>1 == 0x2a. ModdingWiki names id 21 "Shield", which is what the art is: the rack of shields in a castle VAULT, proven live in captures/spice86/vault-pickups
+	16	16	object	diagonal stroke with a small cross at the foot	'	WEAPON RACK. Map byte 0x58; cmd_G's weapon arm compares 0x58>>1 == 0x2c. ModdingWiki names id 22 "Sword" -- the rack of swords beside the shields
 	17	17	block	magenta, cyan and white checkerboard rows	"	
 	18	18	creature	Guard — white humanoid, arms out and down	;	
 	19	19	creature	Jester — white figure, arms raised in a V, legs crossed	`	
@@ -82,7 +82,7 @@
 	2D	2D	font	capital N	N	
 	2E	2E	font	capital O	O	
 	2F	2F	font	capital P	P	
-	30	30	object	vertical bars, no letter	Q slot holds bars, not Q
+	30	30	object	vertical bars, no letter	MOONGATE -- not a letter, and not a wall either. Map byte 0xC0 -> staging 0x60 -> art 0x30 (docs/moongates.md). ModdingWiki names id 48 "Moongate", agreeing with our byte evidence; the "wall tile" wording in tools/place_index.py predates that decode and has been corrected. What the gate actually enforces is that there is no Q glyph here
 	31	31	font	capital R	R	
 	32	32	font	capital S	S	
 	33	33	font	capital T	T	

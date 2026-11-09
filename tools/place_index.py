@@ -9,8 +9,10 @@ can be recovered without playing the game at all. This tool does that and nothin
 THE TILE->LETTER MAPPING, and where it comes from. A map byte is an art index shifted left
 by two (`docs/tile-art-spec.md` § 7 and `docs/tile-art-evidence.md` A1: `[DS:14] =
 map_byte >> 1`, and the art index itself is `>>2`). Arts `0x20..0x2F` are A..P and arts
-`0x31..0x39` are R..Z. **Art `0x30` is a wall tile, not Q: there is no Q glyph in the
-game.** That absence is load-bearing evidence rather than a gap — `mapx93` spells the
+`0x31..0x39` are R..Z. **Art `0x30` is the moongate tile, not Q: there is no Q glyph in the
+game.** (An earlier draft of this line called it a wall tile; `docs/moongates.md` settled byte
+`0xC0` -> staging `0x60` -> art `0x30` as the moongate, and ModdingWiki's independent tile table
+names id 48 "Moongate". The rule that matters is unchanged: it is not a letter.) That absence is load-bearing evidence rather than a gap — `mapx93` spells the
 queen's room `KUEEN`, which is what a data set with no Q has to do, and it is the reason
 this mapping is trusted rather than assumed.
 
@@ -416,7 +418,7 @@ def main():
                 print(f"VERIFY FAIL: byte {byte:#04x} decoded {got!r}, expected {want!r}")
                 return 1
         if art_to_letter(0xC0) is not None:
-            print("VERIFY FAIL: art 0x30 decoded as a letter, but it is the wall tile -- "
+            print("VERIFY FAIL: art 0x30 decoded as a letter, but it is the moongate tile -- "
                   "there is no Q glyph in the game")
             return 1
         total = sum(len(re.sub(r"[^A-Z]", "", r["candidate"] + r["rooms"])) for r in rows)
@@ -496,8 +498,8 @@ def main():
                 bad.append((s, at, have_at))
         # And the negative control: a name the game cannot spell, because there is no Q tile.
         if any("QUEEN" in r["rooms"] + r["candidate"] for r in rows):
-            print("VERIFY FAIL: a QUEEN was decoded, but art 0x30 is a wall tile and there is "
-                  "no Q glyph -- the letter mapping is wrong")
+            print("VERIFY FAIL: a QUEEN was decoded, but art 0x30 is the moongate tile and there "
+                  "is no Q glyph -- the letter mapping is wrong")
             bad.append(("Q", "no QUEEN", "found one"))
         if bad:
             return 1
