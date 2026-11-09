@@ -1,4 +1,46 @@
 # sub_72a0 — mechanical clean (bulk wave); behavior not yet reviewed
+#           ** THIS FILE BEGINS WITH THE VICTORY SEQUENCE. ** The routine at L_0074a0 is what
+#           asm/2CCD_victory_call invokes when a killed creature's type is 0x40. It is the
+#           endgame, and it is decoded below rather than renamed, because this file is a bulk-
+#           wave catch-all spanning 0x10E7 bytes and the victory block is only its first ~0x160.
+#           Splitting it out is the right change and it is a structural one (it retiles the CP0
+#           map), so it is left for the owner rather than done inside a decode commit.
+# victory sequence, decoded statically 2026-11-09 (file offsets; image = file - 0x200):
+#   74A1  movb $0x28,DS:31          ; right_margin = 40, so the text prints in a narrow column
+#   74A6  call str_out              ; "\r\r     MINAX IS DEAD!!\rALL HER WORKS SHALL DIE!\r"
+#   74DA  mov $0x40,%al ; DS:1f=al  ; OUTER loop, 64 iterations
+#   74DF  call L_0060d7
+#   74E2  mov $0x40,%al ; DS:20=al  ; INNER loop, 64 iterations  (64 x 64 = 4096 = one whole grid)
+#   74E7  call L_005417 ; and $0x3f ; DS:23 = al                 ; a cell x, wrapped to 0..63
+#   74EF  call L_005417 ; and $0x3f ; DS:24 = al                 ; a cell y, wrapped to 0..63
+#   74F7  call L_0052b3
+#   74FA  mov $0x74,%al ; bx=[DS:06] ; [bx]=al                   ; write 0x74 through the grid ptr
+#   7502  decb DS:20 ; jne 74E7
+#   7508  call L_005cb1 ; mov $0x0e,%bx ; call L_000911          ; delay
+#   7511  decb DS:1f ; jne 74DF
+#         The fill value 0x74 is art 0x74>>2 == 0x1D, which disasm/tile-art.tsv records as
+#         SOLID BLACK. So the ending repaints a whole 4096-cell sector black, and the filename
+#         a few instructions later says which one: "MAPX30  " -- sector 30, the 1990 A.D.
+#         wilderness. "ALL HER WORKS SHALL DIE!" is not flavour text, it is a description of
+#         the map write. Grade: the loop bounds and the fill byte are measured from the bytes;
+#         "which sector" is measured from the embedded filename; the reading of L_005417 and
+#         L_0061a6 as cell-addressing and file I/O is INFERRED and unexecuted.
+#   7517  call str_out              ; "\rYOU FEEL A STRANGE FORCE!"
+#   7535  call L_0061a6
+#   7538  mov $0x27,%ah ; mov $0x1000,%cx ; mov [0x0472],%dx ; call L_0054ca   ; delay
+#   7544  db "MAPX30  "             ; an FCB-style padded filename
+#   754C  call L_0061a6
+#   754F  call str_out              ; "\r\rYOU HAVE SAVED THE UNIVERSE,\rAND COMPLETED ULTIMA ][!"
+#                                   ; " SEEK\rNOW TO CONQUER WICKED EXODUS,\r"
+#   75AE  call str_out              ; "FOUND IN ULTIMA ]I[-D ]II[-P!"
+#   75CF  mov $0xff,%al ; DS:12=al  ; DS:12 = 0xFF (the site/mode byte; 0xFF is a sentinel)
+#   75D4  mov $0x28,%al ; DS:13=al  ; DS:13 = 0x28, which is the ROCKET vehicle code (asm/2FAD)
+#   75D9  mov $0x00,%al ; DS:00=al ; DS:01=al   ; player x = 0, y = 0
+#   75E1.. loop: al = (DS:01 + 1) & 0x3f -> DS:01, and likewise DS:00, guarded by jb, with a
+#           delay each step and `jmp -0x2a` back to 75E1. An ending animation, not a return.
+#         The `]` sequences are the string emitter's alternate-glyph escapes and are left
+#         verbatim here rather than guessed at; decode them with tools/decode_str.py before
+#         quoting the win text in prose.
 # func 72A0..8386  len 10E7 B  evidence: call+reko
 # calls: L_000911, L_0051df (str_out), L_0052b3, L_005417, L_0054ca, L_005cb1, L_0060d7, L_0061a6 (+1 more)
 # confidence: low (bytes proven by check_func.py)
