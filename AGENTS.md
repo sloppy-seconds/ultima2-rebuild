@@ -363,6 +363,16 @@ Verification, in two independent layers:
   renames the `asm/` file and writes the header.** Not a follow-up, not a
   backlog item. If no file covers the address yet, record it in the owning
   function's header and say so.
+* **Never infer the world model from a directory listing of `original/`.** The sector number is
+  `DS:49 * 10 + DS:4A`, and the tens byte carries two axes told apart by `DS:6D`: on Earth it is
+  the **era** (0..4), off Earth it is the **world**. The root `mapx` set is *damage, not design*
+  — MS-DOS had no directories, so `MAPG10` and `mapx10` were the same name and a 1990s folder
+  merge overwrote the planet maps with Earth's era maps. Earth and Planet X are `mapx`;
+  Mercury..Pluto are `MAPG` in `original/updated/`, restored by the Galaxy patch, and reaching
+  them requires the rocket, not a time door. "Every tens group has one wilderness `X0` plus its
+  sites, so tens must be a world" is the invalid inference that has reopened G45 here more than
+  once. Read `docs/planet-maps-galaxy-patch.md` § 3a/§ 3b before reasoning about sectors at all.
+
 * **A gate has to be able to fail in the place that enforces it, not just locally.**
   `engine/tests/asm_body_guard.py` compared the working tree to `HEAD`, and CI checks out a
   clean tree, so in CI it compared `HEAD` to itself and could only ever print `conserved`.

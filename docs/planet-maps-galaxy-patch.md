@@ -63,6 +63,47 @@ filename alone cannot tell them apart; the world byte `DS:6D` can. `0` means Ear
 binary reads `mapg` in space and `mapx` on Earth, and why `RENGAL.BAT` renames the surviving
 outer `mapx` files to `mapg` rather than deleting them.
 
+### 3a. The sector model, in one table
+
+`sector = DS:49 * 10 + DS:4A`. Two bytes, and the tens byte carries two different axes:
+
+| `DS:6D` (world) | `DS:49` (tens) means | maps | reached by |
+| --- | --- | --- | --- |
+| `0x00` Earth | era index, 0..4 | root `mapx00..45` | time doors |
+| `0x01..0x08` Mercury..Pluto | world index | `MAPG` in `updated/` | **rocket only** |
+| `0x09` Planet X | world index | root `mapx90/92/93` **survived** | rocket |
+| `0x0A` deep space | — | — | — |
+
+`DS:4A` is the ones digit and is the **site kind**: `0` is the wilderness map you walk on,
+`1..5` are sites. `cmd_G` branches on `cmpb $0x4,[DS:4A]` and `cmd_O` gates on
+`DS:4A==2 && DS:49==3`.
+
+**The collision only touched sectors 10-40.** Earth's eras occupy tens 0..4, so only
+Mercury, Venus, Mars and Jupiter (worlds 1..4) shared names with something. Saturn, Uranus,
+Neptune, Pluto and Planet X are tens 5..9, never collided, and their real maps are still the
+root `mapx50/60/61/70/71/80/81/82/85/90/92/93`. That is why Planet X survived and is `mapx`,
+not `mapg` — and it is the whole reason nobody noticed the loss before shipping: the planet
+you need to finish the game was never missing.
+
+### 3b. Anti-pattern: do not read the sector model off the root file list
+
+This project has drawn the wrong conclusion from the root `mapx` set more than once, and the
+reason is that the set is *evidence of the damage, not of the design*. The tempting argument
+is:
+
+> "every tens group has exactly one wilderness `X0` plus its own sites, and five time periods
+> do not explain ten groups, so the tens digit must be a world."
+
+It is invalid. Ten groups is exactly what **five Earth eras plus a name collision** looks like
+from the outside: the merge copied Earth's era maps into the planet filenames, so each
+affected group still presents one `X0` and its sites — they are just the wrong world's.
+
+The rule: **the sector model comes from the bytes and from live reads, never from a directory
+listing.** `DS:6D` versus `DS:49` across a time door and across a landing is what settled it
+(`docs/moongates.md` § 4, `captures/spice86/g39-rocket-flight`), and both `asm/3546` and
+`asm/7030` now carry that resolution in their headers. A listing cannot tell you which layer
+won a 1996 folder merge.
+
 ## 4. Engine behaviour (implemented)
 
 `engine/src/core/world.c` is now world-aware for all three per-sector families

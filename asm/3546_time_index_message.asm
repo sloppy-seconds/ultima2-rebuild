@@ -3,21 +3,27 @@
 # name-evidence: five inline strings, file 0x3752 "ANOS: 2112 A.D.", 0x3768
 #           "ANOS: LEGENDS!", 0x377D "ANOS: 9,000,000 B.C.", 0x3798
 #           "ANOS: 1423 B.C.", 0x37AE "ANOS: 1990 A.D."
-# TENSION WITH THE WORLD BYTE — unresolved, see docs/needs-gameplay.md G45: the index here is
-#           DS:49, the sector TENS digit. asm/7030_space_collision also writes DS:49, and it
-#           writes it from DS:6D — the world byte (0 Earth, 1..9 planets, 0x0A deep space),
-#           set beside 'YOU ARE ORBITING ' and 'YOU ARE IN DEEP SPACE.'. One byte, two
-#           documented meanings, and they cannot both be right as stated:
-#             * if tens is the era, then eras are 0..4 and the mapx set runs to tens 9, so
-#               5..9 are not eras — yet every tens group has exactly one wilderness sector X0
-#               plus its sites, which is what a WORLD looks like, not an era.
-#             * if tens is the world, then this routine's five arms label worlds as time
-#               periods, and 'YOU ARE ORBITING' would be a time-travel message.
-#           The Apple twin does not settle it either: it derives its index as (x >> 1) + 1,
-#           arithmetic that turns ten things into five, which fits eras-from-a-ten-valued
-#           thing and not a direct copy. What would settle it is named in G45: read DS:49 and
-#           the ANOS line across a time-travel event, and separately across a planet landing,
-#           and see which one moves the tens digit.
+# THE TENS DIGIT IS AN ERA INDEX ON EARTH -- G45 RESOLVED 2026-10-29, see docs/moongates.md § 4.
+#           The index here is DS:49, the sector TENS digit, and asm/7030_space_collision also
+#           writes DS:49 -- from DS:6D, the world byte (0 Earth, 1..9 planets, 0x0A deep
+#           space). That looked like one byte with two impossible meanings. It is one byte
+#           with two axes, told apart by DS:6D:
+#             * DS:6D == 0 (Earth): DS:49 is this routine's era index, 0..4. Settled by
+#               watching a time door move DS:49 02 -> 03 -> 02 while DS:6D stayed 00
+#               (captures/spice86/moongate-cycle).
+#             * DS:6D != 0 (a planet): DS:49 is the world index, written by asm/7030 on
+#               landing (captures/spice86/g39-rocket-flight: world 9 -> DS:49 = 0x09).
+#           Both of the experiments G45 asked for have now been run, and this routine's five
+#           arms are correct as stated: they label eras, and they are only reached on Earth.
+#           TRAP, walked into more than once in this project: the argument "eras are 0..4 but
+#           the mapx set runs to tens 9, and every tens group has one wilderness X0 plus its
+#           sites, so tens must be a world" is INVALID. The root mapx list is the damage, not
+#           the design. MS-DOS had no directories, so MAPG10 and mapx10 were the same name and
+#           the floppy-to-CD merge overwrote the planet maps with Earth's era maps. The real
+#           planet maps are MAPG/MONG/TLKG in original/updated/, shipped by the Galaxy patch
+#           and unapplied in our pack. Earth and Planet X are mapx; Mercury..Pluto are MAPG,
+#           and reaching them requires the rocket, not a time door.
+#           Full record: docs/planet-maps-galaxy-patch.md.
 # func 3546..3564  len 001F B  evidence: seed+reko
 # dispatch (observed: the dec/je chain and each call target):
 #   %di == 1 -> "ANOS: 9,000,000 B.C."  (call at file 0x377A)

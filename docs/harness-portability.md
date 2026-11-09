@@ -1773,3 +1773,15 @@ metadata assertions: a check that a name decodes passes whether or not the locat
 ever populated. When writing a control, ask which single-line change to the *guarded* code would
 make it fail, and then make that change and watch. Both holes here were found that way, and both
 were green before it.
+
+**A shipped directory listing is evidence of the distribution's damage, not of the game's
+design.** On a platform with no directories and short fixed-width filenames, two logically
+distinct content sets can share a name, and collapsing a multi-disk release into one folder
+silently overwrites one set with the other. A harness that then infers structure from the
+resulting listing will find that listing perfectly regular and conclude the wrong thing —
+uniform groupings that look like a deliberate schema are exactly what a name collision plus a
+merge produces. The general rule: derive the content model from the executable's own reads and
+writes and from live memory, and treat a file listing only as a hint. Where a fan patch ships
+the lost files in a subdirectory, expect the two layers to disagree on filename casing as well,
+and compare case-folded or the count will be quietly wrong. This project misread its world/era
+model this way more than once, always from the same listing.

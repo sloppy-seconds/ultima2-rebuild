@@ -12,18 +12,27 @@
 #             * `mov 0x6d,%al ; mov %al,0x49` copies it into DS:49, the sector TENS digit.
 #               The world you are on and the high digit of the sector number are the same
 #               value, which is how MAPXNN reaches a planet's sectors at all.
-#           TENSION, unresolved (docs/needs-gameplay.md G45): asm/3546 reads that same DS:49
-#           as the TIME-PERIOD index (0 LEGENDS, 1 9,000,000 B.C., 2 1423 B.C., 3 1990 A.D.,
-#           4+ 2112 A.D.). So DS:49 is documented as both a world and an era, and the mapx set
-#           (tens 0..9, each group with exactly one wilderness X0 plus its sites) fits the
-#           Neither had been observed moving until 2026-11-03. OBSERVED: a planet
-#           landing DOES move it. Landing on world 9 wrote DS:49 = 0x09 (sector 90);
-#           landing on Earth wrote DS:49 = 0x04 (sector 40). So on the landing path the
-#           tens digit is the world for worlds 1..9 and is hardcoded to 4 for Earth --
-#           which is why Earth's rocket landing zone is sector 40 and not 00, and why
-#           the two readings of DS:49 coexist: the byte is the world on arrival from
-#           space, and era-indexed by asm/3546 on Earth where the two agree at 4.
-#           Still open for G45: a time-door crossing has not been re-watched since.
+#           G45 RESOLVED (2026-10-29, confirmed from the landing side 2026-11-03). DS:49 is
+#           one byte carrying two axes that are distinguished by DS:6D, the world byte:
+#             * ON EARTH (DS:6D == 0) the tens digit is the ERA axis, 0..4.
+#               Observed: a time-door transit moved DS:49 02 -> 03 -> 02 while DS:6D stayed
+#               00 (captures/spice86/moongate-cycle). asm/3546 is the reader of that axis.
+#             * OFF EARTH the tens digit is the WORLD axis, copied from DS:6D here.
+#               Observed: landing on world 9 wrote DS:49 = 0x09 (sector 90); landing on
+#               Earth wrote DS:49 = 0x04 (sector 40) (captures/spice86/g39-rocket-flight).
+#           So the two readings are not competing meanings for one situation; they are the
+#           two situations, and reading this routine next to asm/3546 could never decide it
+#           because neither routine is wrong.
+#           TRAP, and this project has walked into it more than once: DO NOT infer the sector
+#           model from the root mapx file list. The root set is the DAMAGE, not the design.
+#           MS-DOS had no directories, so MAPG10 and mapx10 were the same name, and the
+#           floppy-to-CD folder merge kept Earth's era maps and overwrote the planet maps.
+#           The observation "every tens group has exactly one wilderness X0 plus its sites"
+#           therefore looks like ten worlds and proves nothing of the kind -- it is what five
+#           Earth eras plus a name collision looks like from the outside. Earth and Planet X
+#           are mapx; Mercury..Pluto are MAPG, shipped in original/updated/ by the Galaxy
+#           patch. Reaching Mercury requires space travel, not a time door.
+#           Full record: docs/planet-maps-galaxy-patch.md, docs/moongates.md § 4.
 # WORLD NAMES, from this routine's dispatch on DS:6D (cmp $0x0 .. cmp $0x8):
 #           0 EARTH   1 MERCURY  2 VENUS   3 MARS    4 JUPITER
 #           5 SATURN  6 URANUS   7 NEPTUNE 8 PLUTO   9 'X'

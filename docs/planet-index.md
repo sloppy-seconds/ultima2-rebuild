@@ -8,6 +8,17 @@
 > `ultimaii.exe`, and orbit is tested by **equality** with the triple, no tolerance. So the entire
 > inter-planet routing problem is solved by one table, and it needed no capture.
 
+> **Read this before using the sector column.** The `-> sector NN` column is the rocket's
+> *landing* sector, computed by `asm/7030`: Earth is hardcoded to 40 and every other world is
+> `world * 10`. It is **not** a statement that sectors 10-40 belong to Mercury..Jupiter. On
+> Earth the tens digit is the **era** axis, and the real maps for Mercury, Venus, Mars and
+> Jupiter are `MAPG` in `original/updated/`, restored by the Galaxy patch — the root `mapx10`
+> ..`mapx45` are Earth era maps that overwrote them in a 1990s folder merge, because MS-DOS
+> had no directories and `MAPG10` and `mapx10` were the same name. Reaching those four worlds
+> requires the rocket, and reaching them at all requires the patch layer to be resolved.
+> Saturn..Planet X (tens 5..9) never collided, so their root `mapx` files are genuine.
+> Full model and the anti-pattern: `docs/planet-maps-galaxy-patch.md` § 3a and § 3b.
+
 ## 1. The table, and the trap in reading it
 
 At file **`0x7212`**: ten X values, then ten Y values, then ten Z values, indexed by the world
