@@ -44,7 +44,34 @@ static void bcd_inc1(uint8_t *p)
  * the bytes do not show. Both cite asm/0ADB's spawn arms, which set type 0xFC with HP 0x20. */
 #define U2_AI_TYPE_THIEF 0xFC
 
-/* asm/2CE5..2D8B. Which item a kill grants, given the type of what died.
+/* Test surface for the equivalence the 0x60 arm depends on: two single increments must equal
+ * one `adc $2,%al ; daa`. Both forms are implemented independently here -- bcd_add2 does the
+ * DAA in one step from the x86 rule, not by looping -- so the check compares two derivations
+ * rather than restating one. */
+void u2_bcd_inc1_test(uint8_t *p)
+{
+    bcd_inc1(p);
+}
+
+uint8_t u2_bcd_add2_test(uint8_t v)
+{
+    unsigned sum = (unsigned)v + 2u;
+    /* AF is the half-carry out of bit 3: set when the low nibbles overflow. */
+    const int af = ((v & 0xFu) + 2u) > 0x0Fu;
+    if (af || (sum & 0xFu) > 9u)
+        sum += 6u;
+    if (sum > 0x99u)
+        sum += 0x60u;
+    return (uint8_t)(sum & 0xFFu);
+}
+
+/* asm/2CD3..2D8B. Which a kill grants, given the TYPE of what died -- four arms, tested in
+ * this order because that is the order the bytes test them:
+ *
+ *   2CD3  cmp $0x60,%al ; jne 2CE5     -> keys += 2
+ *   2CE5  cmp $0xfc,%al ; jne 2D22     -> tools (25%) + a random item
+ *   2D22  cmp $0xf0 -> HELM (25%) + torches ; cmp $0xf8 -> WAND or STAFF
+ *   2D8B  nop                          -> everything else grants nothing
  *
  * The thief arm (asm/2CE9..2D17) is a UNIFORM draw over the item array, and that is the
  * whole reason the ANKH is obtainable at all: no shoppe sells it, no chest holds it, and
@@ -60,6 +87,27 @@ static void bcd_inc1(uint8_t *p)
  * looked orphaned to every static pass over the tree. */
 void u2_combat_kill_drop(u2_ctx *ctx, uint8_t dead_type)
 {
+    if (dead_type == 0x60u) {
+        /* asm/2CD8 is `clc ; mov 0x65,%al ; adc $2,%al ; daa ; mov %al,0x65` -- keys += 2,
+         * packed decimal, no clamp, so 98 -> 00. Two bcd_inc1 calls are byte-equivalent to
+         * the single `adc $2 ; daa` including across the wrap and across a nibble carry
+         * (0x09 +2 = 0x11 either way; 0x99 +2 = 0x01 either way), which combat_check walks
+         * rather than assumes.
+         *
+         * The identity of type 0x60 is the GUARD, and it is documented and observed rather
+         * than guessed: state.h records the type byte as "0x60 Guard, 0x68 Merchant, 0xF0
+         * Fighter" and notes it is NOT the art index, and the bestiary's gamercorner row
+         * for GUARD carries the special "Drops 2 keys" -- which is exactly what asm/2CD8
+         * does. It is now also seen in play: 0x60 fills live mon_type slots in 105 of the
+         * 3055 captured DS dumps (210 slot-occurrences), every one of them in sector 03,
+         * alongside 0x68 Merchant at the same count. Sector 03 is the castle town, which is
+         * where captures/spice86/castle-03-live was taken and where Townsfolk belong.
+         * The type>>2 == art_index fold that would have been the lazy route is explicitly
+         * retracted in asm/0ADB's header as "a hypothesis about the renderer". */
+        bcd_inc1(&ctx->state.keys);
+        bcd_inc1(&ctx->state.keys);
+        return;
+    }
     if (dead_type == U2_AI_TYPE_THIEF) {
         /* asm/2CE9/2CF2: one roll, `cmp $0x40,%al`, so 64/256 = 25%. asm/2CF6 then adds 1
          * to DS:66, which state.h names `tools` (asm/277B spends them in a dungeon). */
@@ -90,6 +138,6 @@ void u2_combat_kill_drop(u2_ctx *ctx, uint8_t dead_type)
         bcd_inc1(&ctx->state.items_held[idx]);
     }
     /* Every other type: asm/2D8B is a bare nop and the tail jmp to the reward follows with
-     * no item at all. Silence here is the original's, and it is cited by the byte that
+     * no grant at all. Silence here is the original's, and it is cited by the byte that
      * proves it. */
 }

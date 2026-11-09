@@ -73,4 +73,10 @@ int u2_combat_cannon(u2_ctx *ctx, int cx, int cy, u2_attack *out);
  * three arms are the only sources in the binary for most of the item array. */
 void u2_combat_kill_drop(u2_ctx *ctx, uint8_t dead_type);
 
+
+/* Test surface for the packed-decimal equivalence the type-0x60 arm depends on: two
+ * single-step increments must equal one `adc $2,%al ; daa`. */
+void    u2_bcd_inc1_test(uint8_t *p);
+uint8_t u2_bcd_add2_test(uint8_t v);
+
 #endif /* U2_GAME_COMBAT_H */

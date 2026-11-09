@@ -42,6 +42,8 @@ void    u2_combat_set_item(u2_ctx *ctx, uint16_t item_ds, uint8_t count);
 uint8_t u2_combat_item(const u2_ctx *ctx, uint16_t item_ds);
 uint16_t u2_combat_thief_steal(u2_ctx *ctx);
 void    u2_combat_kill_drop(u2_ctx *ctx, uint8_t dead_type);
+void    u2_bcd_inc1_test(uint8_t *p);
+uint8_t u2_bcd_add2_test(uint8_t v);
 /* C4: magic missile. Non-zero when damage applies. Must consume NO random
  * byte — there is no save to roll. spec: asm/0F12 */
 int     u2_combat_magic_missile(u2_ctx *ctx);
@@ -437,11 +439,11 @@ static void test_c5_bcd_not_binary(void)
  * which no shoppe sells and no chest holds. */
 static void test_kill_drop(void)
 {
-    /* Every type except 0xFC, 0xF0 and 0xF8 must be silent. asm/2D8B is a bare nop and the
-     * tail jmp to the reward follows with no item write, so "most kills drop nothing" is
-     * the original's behaviour and not an omission. */
+    /* Every type except 0x60, 0xFC, 0xF0 and 0xF8 must be silent. asm/2D8B is a bare nop and
+     * the tail jmp to the reward follows with no grant, so "most kills drop nothing" is the
+     * original's behaviour and not an omission. */
     for (int t = 0; t < 256; ++t) {
-        if (t == 0xFC || t == 0xF0 || t == 0xF8)
+        if (t == 0x60 || t == 0xFC || t == 0xF0 || t == 0xF8)
             continue;
         u2_ctx ctx; fresh(&ctx, 1);
         for (int i = 0; i < 200; ++i)
@@ -449,8 +451,52 @@ static void test_kill_drop(void)
         int touched = 0;
         for (int s = 0; s < 16; ++s)
             if (ctx.state.items_held[s]) touched++;
-        if (ctx.state.tools || ctx.state.torches) touched++;
+        if (ctx.state.tools || ctx.state.torches || ctx.state.keys) touched++;
         CHECK(touched == 0, "type %02x must drop nothing at all", t);
+    }
+
+    /* asm/2CD8: type 0x60 grants exactly 2 keys and touches nothing else. The bestiary's
+     * gamercorner GUARD row says "Drops 2 keys", so the +2 is third-party-corroborated;
+     * the arm itself is byte-proven and the creature name is not, which is why the
+     * assertion is about the byte and not about a Guard. */
+    {
+        u2_ctx ctx; fresh(&ctx, 11);
+        CHECK(ctx.state.keys == 0, "fixture must start with no keys, got %02x", ctx.state.keys);
+        u2_combat_kill_drop(&ctx, 0x60);
+        CHECK(ctx.state.keys == 0x02,
+              "type 0x60 must add exactly 2 keys (asm/2CD8 adc $2), got %02x", ctx.state.keys);
+        u2_combat_kill_drop(&ctx, 0x60);
+        CHECK(ctx.state.keys == 0x04,
+              "two kills must add 4 keys, got %02x", ctx.state.keys);
+        /* And the no-clamp wrap, same as every other counter in this family. */
+        ctx.state.keys = 0x99;
+        u2_combat_kill_drop(&ctx, 0x60);
+        CHECK(ctx.state.keys == 0x01,
+              "99 +2 must wrap to 01 with no ceiling guard, got %02x", ctx.state.keys);
+        ctx.state.keys = 0x98;
+        u2_combat_kill_drop(&ctx, 0x60);
+        CHECK(ctx.state.keys == 0x00,
+              "98 +2 must wrap to 00, got %02x", ctx.state.keys);
+        int other = 0;
+        for (int s = 0; s < 16; ++s)
+            if (ctx.state.items_held[s]) other++;
+        CHECK(other == 0 && ctx.state.tools == 0 && ctx.state.torches == 0,
+              "type 0x60 must grant keys and nothing else (items %d, tools %02x, torches %02x)",
+              other, ctx.state.tools, ctx.state.torches);
+    }
+    /* Two bcd_inc1 calls must equal one `adc $2 ; daa`, including across the nibble carry
+     * and the 99 wrap. This is the equivalence the 0x60 arm relies on. */
+    {
+        static const uint8_t seeds[] = { 0x00, 0x07, 0x08, 0x09, 0x10, 0x97, 0x98, 0x99 };
+        for (unsigned i = 0; i < sizeof seeds; ++i) {
+            uint8_t two = seeds[i];
+            u2_bcd_inc1_test(&two);
+            u2_bcd_inc1_test(&two);
+            uint8_t one = seeds[i];
+            one = u2_bcd_add2_test(one);
+            CHECK(two == one, "0x%02x +2: two increments gave %02x, one adc gave %02x",
+                  seeds[i], two, one);
+        }
     }
 
     /* asm/2D03 is `and $0xf,%al ; je skip`: a uniform draw over slots 1..15 with slot 0

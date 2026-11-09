@@ -1,5 +1,9 @@
 # sub_2ce5 — mechanical clean (bulk wave); behavior not yet reviewed
-# func 2CE5..2CE8  len 0004 B  evidence: seed+reko
+# name-evidence: four type compares (0x60, 0xFC, 0xF0, 0xF8) each tail-jumping to
+#           combat_kill_reward at L_002f8c -- which is what makes them one routine
+#           rather than four helpers
+# func 2CD3..2D21  len 004F B  evidence: seed+reko+live (span is the merged dispatch, four arms;
+#           the Phase 2 map's own rows for the absorbed fragments are gone)
 # provenance: static:bytes (whole dispatch read from the listing) + live:baseline-fight, play-test-live, play-test -- 0x2d07 is in ExecutedInstructions of all three, reached by fall-through from 0x2d05.
 # confidence: low (bytes proven by check_func.py)
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
@@ -40,6 +44,43 @@
 # confidence: high. Bytes proven by check_func.py over the merged span; the dispatch, the
 #           two rolls, the slot mask and the tail jump are all read from the listing, and
 #           the whole path appears in ExecutedInstructions.
+# EXTENDED 2026-11-09: the merge now also covers asm/2CD3 and asm/2CD8, which are the FIRST
+#           arm of this chain and were still chopped off from it. The dispatch is four arms
+#           and starts at 2CD3, not 2CE5:
+#             2CD3  cmp $0x60,%al ; jne L_002ee5   -> keys += 2   (asm/2CD8)
+#             2CE5  cmp $0xfc,%al ; jne L_002f22   -> tools + a random item
+#             2D22  cmp $0xf0 -> HELM + torches ; cmp $0xf8 -> WAND or STAFF
+#             2D8B  nop                            -> everything else grants nothing
+#           Each arm tail-jumps to combat_kill_reward at L_002f8c, which is what makes them
+#           one routine rather than four helpers.
+#
+# Type 0x60 is the GUARD. state.h already records the type byte as "0x60 Guard, 0x68
+# Merchant, 0xF0 Fighter" and notes it is NOT the art index, and the bestiary's gamercorner
+# row for Guard carries the special "Drops 2 keys" -- which is exactly what asm/2CD8 does.
+# Now also OBSERVED: 0x60 fills live mon_type slots in 105 of the 3055 captured DS dumps,
+# 210 slot-occurrences, every one of them in sector 03 (DS:49=0, DS:4A=3) alongside 0x68 at
+# the same count -- the castle town, which is where captures/spice86/castle-03-live is from
+# and where Townsfolk belong.
+sub_2cd3:
+L_002ed3:
+        nop
+L_002ed4:
+        cmp    $0x60,%al
+L_002ed6:
+        jne L_002ee5
+sub_2cd8:
+L_002ed8:
+        clc
+L_002ed9:
+        mov    0x65,%al
+L_002edc:
+        adc    $0x2,%al
+L_002ede:
+        daa
+L_002edf:
+        mov    %al,0x65
+L_002ee2:
+        jmp L_002f8c
 sub_2ce5:
 L_002ee5:
         cmp    $0xfc,%al
