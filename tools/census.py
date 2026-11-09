@@ -273,14 +273,31 @@ def build():
         # a pixel DESCRIPTION and never claimed to name the tile; conflating the two is what
         # let a wrong name ride in wearing a `measured` badge.
         named = asm_names.get(mb)
+        fname = font_name(ai)
+        # The vehicle and rack bytes are already named by the dispatch that consumes them, so
+        # leaving those tiles `unnamed` would be a gap the census chose not to close.
+        vlabel = VEHICLES.get(mb) or RACKS.get(mb)
+        # Vehicles are named by the dispatch that boards them; racks by the cmd_G arm that
+        # empties them. Citing the wrong routine is a wrong citation, not a near miss.
+        vsrc = ('asm/2FAD_vehicle_board_dispatch.asm'
+                if mb in VEHICLES else 'asm/363B_cmd_G.asm')
+        eff = TILE_EFFECTS.get(mb)
         trows.append({'art': '0x%02x' % ai, 'map_byte': '0x%02x' % mb,
                       'kind': t.get('kind', ''), 'description': t.get('description', ''),
                       'instances': inst.get(ai, 0),
+                      'role': tile_role(ai, mb, t.get('kind', '')),
                       'gate_value': '0x%02x' % ((mb >> 1) & 0x7F),
                       'walkable': foot_ladder_walkable(mb),
-                      'name': named[0] if named else '',
-                      'name_source': ('asm/%s' % named[1]) if named else '',
-                      'name_grade': 'measured' if named else 'unnamed',
+                      # asm proof outranks the font mapping where both speak; neither is a guess.
+                      'name': (named[0] if named else (fname or (vlabel or ''))),
+                      'name_source': (('asm/%s' % named[1]) if named
+                                      else ('structural: art 0x20-0x39 is A-Z, 0x30 excluded'
+                                            if fname else
+                                            (vsrc if vlabel else ''))),
+                      'name_grade': 'measured' if (named or fname or vlabel) else 'unnamed',
+                      'entry_effect': eff[0] if eff else '',
+                      'entry_message': eff[1] if eff else '',
+                      'boardable_by': BOARDABLE.get(mb, ''),
                       'note': (t.get('note') or '')[:200],
                       'source': 'disasm/tile-art.tsv (tile_atlas.py); art = map_byte >> 2',
                       'grade': 'measured'})
@@ -309,6 +326,21 @@ def build():
                       'source': 'bestiary/bestiary.tsv (third-party art, joined by bitmap identity)',
                       'grade': 'inferred'})
 
+    # Join creature characteristics onto the tile rows. The bestiary names are third-party and
+    # joined by bitmap identity, so they carry `inferred` and a source even though they land in
+    # a tile row whose other columns are measured -- the grades must not flatten on the join.
+    by_art = {c['art']: c for c in crows if c['art']}
+    for r in trows:
+        c = by_art.get(r['art'])
+        if c:
+            r['creature_hp'] = c['hp']
+            r['creature_damage'] = c['damage']
+            r['creature_special'] = c['special']
+            if not r['name'] and c['name']:
+                r['name'] = c['name']
+                r['name_source'] = c['source']
+                r['name_grade'] = 'inferred (third-party)'
+
     return {'world': wrows, 'sector': srows, 'place': prows, 'vehicle': vrows,
             'tile': trows, 'npc': nrows, 'creature': crows,
             'gate': gate_rows(D('original', 'ultimaii.exe'))}
@@ -324,8 +356,10 @@ COLUMNS = {
               'resolved', 'grade', 'source', 'note'],
     'vehicle': ['layer', 'sector', 'x', 'y', 'byte', 'what', 'art', 'gate_value',
                 'source', 'grade'],
-    'tile': ['art', 'map_byte', 'kind', 'description', 'instances', 'gate_value', 'walkable',
-             'name', 'name_source', 'name_grade', 'note', 'source', 'grade'],
+    'tile': ['art', 'map_byte', 'kind', 'role', 'name', 'name_source', 'name_grade',
+             'gate_value', 'walkable', 'entry_effect', 'entry_message', 'boardable_by',
+             'creature_hp', 'creature_damage', 'creature_special',
+             'instances', 'description', 'note', 'source', 'grade'],
     'npc': ['layer', 'sector', 'world', 'era', 'kind', 'record_index', 'role',
             'game_speaker', 'name', 'name_source', 'line', 'quest', 'source'],
     'creature': ['art', 'name', 'hp', 'damage', 'special', 'verdict', 'source', 'grade'],
@@ -406,6 +440,70 @@ def asm_tile_names(asm_dir):
     return out
 
 
+# Tile characteristics that are proven but were sitting in a prose table in
+# docs/handoff-tile-effects.md instead of in the census -- the same failure as passability: a
+# curated, byte-cited table the join walked past. Keyed on MAP BYTE (not art, not mode), because
+# that is what the effects ladder tests. Each entry cites the routine that proves it.
+TILE_EFFECTS = {
+    0x00: ('reject: open sea',   '--INVALID MOVE!',              'asm/2423'),
+    0x04: ('-5 HP on entry',     'none (silent)',                'asm/2495_swamp_damage'),
+    0x08: ('none (grass)',       '',                             'asm/2423'),
+    0x0C: ('none',               '',                             'asm/2423'),
+    0x10: ('reject: mountain',   '--INVALID MOVE!',              'asm/2423'),
+    0x44: ('board horse',        '',                             'asm/2FAD'),
+    0x48: ('board ship',         '',                             'asm/2FAD'),
+    0x4C: ('board plane',        '',                             'asm/2FAD'),
+    0x50: ('board rocket',       '',                             'asm/2FAD'),
+    0x5C: ('-1000 HP unless ring protected',
+                               'FIELD CAUSES 1000 DAMAGE! / RING PROTECTS FROM FIELD!',
+                                'asm/24B1_force_field_gate'),
+    0x70: ('town paving',        '',                             'asm/2423'),
+}
+BOARDABLE = {0x44: 'horse', 0x48: 'ship', 0x4C: 'plane', 0x50: 'rocket'}
+
+
+def tile_role(art_index, map_byte, kind):
+    """What the tile IS, as distinct from what it looks like.
+
+    Derived, not transcribed: vehicles and racks come from the same byte tables the vehicle
+    scan uses, the letter range is structural, and the rest falls out of `kind`. A tile can
+    only have one role, so the order below is the precedence and it is deliberate -- a moongate
+    that happens to sit in the letter range is a moongate (art 0x30 is NOT the letter Q).
+    """
+    if map_byte in VEHICLES:
+        return 'vehicle'
+    if map_byte in RACKS:
+        return 'rack'
+    if art_index == 0x30:
+        return 'moongate'
+    if map_byte == 0xA0:
+        return 'site door'
+    if kind == 'font':
+        return 'letter'
+    if kind == 'creature':
+        return 'creature'
+    if kind == 'block':
+        return 'block'
+    if kind == 'terrain':
+        return 'terrain'
+    return 'object'
+
+
+def font_name(art_index):
+    """The 25 letter tiles are nameable without interpretation, so name them.
+
+    art 0x20-0x2F are A-P and 0x31-0x39 are R-Z. 0x30 is skipped: it is the moongate, and the
+    absent Q is the proof that the range is a font and not a coincidence -- see
+    docs/place-index.md. This is deterministic, so it is `measured`, not inferred: 25 of the 60
+    previously-unnamed tiles stop being guesses the moment the mapping is written down.
+    """
+    if 0x20 <= art_index <= 0x2F:
+        return chr(ord('A') + (art_index - 0x20))
+    if 0x31 <= art_index <= 0x39:
+        return chr(ord('R') + (art_index - 0x31))
+    return ''
+
+
 def verify(tables):
     """The invariants. Each one names what it caught, because a check without a story rots."""
     bad = []
@@ -452,11 +550,18 @@ def verify(tables):
         # A cited proof must still say what it is cited for, or the rename rotted silently.
         src = r.get('name_source', '')
         if src.startswith('asm/') and r.get('name'):
-            path = os.path.join(ROOT, src)
+            # citations may carry a trailing gloss: 'asm/2FAD_... (mode dispatch)'
+            stem = src.split()[0]
+            if not stem.endswith('.asm'):
+                stem += '.asm'
+            path = os.path.join(ROOT, stem)
             if not os.path.exists(path):
                 bad.append('tile %s cites %s for its name and that file is gone'
                            % (r['art'], src))
-            elif r['name'] not in open(path).read().lower():
+            elif r['name'].split()[0].lower() not in open(path).read().lower():
+                # the first word is the claim; multi-word labels like 'armour rack' are the
+                # census's own phrasing, so requiring the whole phrase would fail on a
+                # citation that is actually correct.
                 bad.append('tile %s cites %s for name %r and the file no longer contains it'
                            % (r['art'], src, r['name']))
     # The four common ground tiles must be named by proof, not left to interpretation.
@@ -465,6 +570,28 @@ def verify(tables):
         if row and row.get('name') and row['name'] != what:
             bad.append('tile %s is named %r but asm/248B proves %r'
                        % (row['art'], row['name'], what))
+    # ---- tile: role coverage and the naming gap must stay visible ---------------------------
+    t = tables['tile']
+    if any(not r.get('role') for r in t):
+        bad.append('a tile has no role: tile_role() is not covering the kind set')
+    letters = [r for r in t if r.get('role') == 'letter']
+    # 24, not 25: tile-art.tsv classifies art 0x30 as `font`, but it is the MOONGATE and the
+    # absent Q is the proof the range is a font. Role precedence gives it to moongate, so the
+    # letter role holds A-P plus R-Z. Asserting 25 here would be asserting the old misreading.
+    if len(letters) != 24:
+        bad.append('expected 24 letter tiles (A-P, R-Z; 0x30 is the moongate), found %d'
+                   % len(letters))
+    if any(not r.get('name') for r in letters):
+        bad.append('a letter tile is unnamed: the font mapping is not being applied')
+    # Every entry effect we claim must still cite a routine that exists.
+    for r in t:
+        if r.get('entry_effect'):
+            cite = TILE_EFFECTS.get(int(r['map_byte'], 16), (None, None, ''))[2]
+            # cites are stored as 'asm/2423'; the glob must not double the prefix
+            stem = cite.split('/', 1)[-1] if cite.startswith('asm/') else cite
+            if cite and not glob.glob(os.path.join(ROOT, 'asm', stem + '*.asm')):
+                bad.append('tile %s cites %s for its entry effect and no such asm file exists'
+                           % (r['art'], cite))
     return bad, named, len(unnamed)
 
 
