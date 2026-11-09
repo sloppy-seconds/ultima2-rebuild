@@ -9,7 +9,7 @@ it red — the budget check was disabled to prove AP3 can fail, and it failed).
 
 Wired into `make test` as `test-api`, plus `make api` for a one-command smoke.
 
-**Twelve deviations from this plan, each forced by a measurement or by a gap the plan did not
+**Thirteen deviations from this plan, each forced by a measurement or by a gap the plan did not
 name.** They are listed here rather than edited silently into § 3 and § 4.
 
 1. **`turn` became `rolls`.** There is no turn counter on the state block — `ow->turns`
@@ -162,6 +162,37 @@ of this kind drift and then lie.
 
 Adopted: `{"cmd":"create", name, sex, race, class, stats[6]}` builds a `form` and calls the
 existing `commit()` in `game/creation.c`, exposed as `u2_creation_apply()`. One source for
+
+### `{"cmd":"load"}` — the menu's P, declaratively (deviation 13)
+
+Adopted: `{"cmd":"load"}` runs `u2_save_load()` — the same routine `title.c` runs for the P
+key — and then sets `enter_world`, so the caller lands in the world without ever seeing a
+menu. `create` is "press C and fill the form" declaratively; this is "press P" declaratively.
+Both are menu *actions*, never menu *navigation*.
+
+**It is refused once a handoff has happened**, with `load_only_at_menu`. The original cannot
+load mid-session: loading means exiting to the menu and coming back. Guarding on
+`enter_world` rather than `world_started` is deliberate and was forced by a measurement —
+`world_started` is only set when the world loop actually runs a turn, so a caller that sends
+an invalid key never starts the loop and `world_started` stays 0 forever, which let
+`create` followed by `load` through. The menu offers C *or* P, so "a handoff already
+happened" is the real condition.
+
+Recovery for a bot is therefore: end the process, relaunch with `--api --save-dir X`, send
+`{"cmd":"load"}`. This is the sanctioned answer to "how does a bot reload a save", and it is
+deliberately not a mid-session load. A real load verb usable in-play waits on a multi-slot
+save/load system, which `docs/save-scoped-worlds.md` D5 defers: one slot exists today and
+`--save NAME` is not implemented.
+
+Errors: `load_no_character` (the slot exists but holds a blank record — the original's own
+`DS:36 == 0` test), `load_not_ready` (the path is unusable or absent, the insert-disk
+analogue), `load_failed` (I/O). They are named apart because a caller that cannot tell an
+empty slot from a broken one will retry forever.
+
+Gate: `run_api.sh` AP13 (save outdoors, relaunch, load, state matches), AP14 (an empty slot
+refuses rather than loading a blank character — the control that stops AP13 passing by
+loading nothing), AP15 (load after create is refused). Control exercised: making `do_load`
+skip `u2_save_load()` turns AP13 and AP14 red.
 the BCD bonuses, the `sub $0x31` conversions, the entry cell, the starting HP/food/gold. The
 API adds no rules and cannot contradict the form.
 

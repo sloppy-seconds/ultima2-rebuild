@@ -357,6 +357,50 @@ raise SystemExit(1)
   && ok "AP12: the observation carries a full gate block (cell, slot, countdown, era, world, destination)" \
   || bad "AP12: the gate block is missing or incomplete"
 
+# --- AP13: {"cmd":"load"} boots a saved character straight into the game ----------
+# The bot never sees the menu. `create` is "press C and fill the form" declaratively;
+# `load` is "press P" declaratively, running the same u2_save_load() the title flow uses.
+# Recovery for a bot is therefore: end the process, relaunch against the slot, load.
+if [ -z "$DATA" ]; then
+    skip "AP13: the round trip needs a content tree that can open a world"
+else
+    SLOT="$WORK/ap13.slot"
+    printf '{"cmd":"create","name":"BOT","race":1,"class":1,"stats":[10,10,10,10,10,40]}\n{"cmd":"key","key":"Down"}\n{"cmd":"key","key":"Q"}\n{"cmd":"quit"}\n' \
+      | "$U2" --headless --api --cleanroom $DATA --save-dir "$SLOT" --demo-dir "$WORK/ap13.demos" \
+             > "$WORK/ap13a.out" 2>/dev/null
+    printf '{"cmd":"load"}\n{"cmd":"state"}\n{"cmd":"quit"}\n' \
+      | "$U2" --headless --api --cleanroom $DATA --save-dir "$SLOT" --demo-dir "$WORK/ap13.demos" \
+             > "$WORK/ap13b.out" 2>/dev/null
+    if grep -q '"event":"loaded"' "$WORK/ap13b.out" \
+       && grep -q '"name":"BOT"' "$WORK/ap13b.out"; then
+        ok "AP13: a saved character reloads straight into the game with no menu in between"
+    else
+        bad "AP13: load did not restore the saved character (loaded=$(grep -c '"'"'"event":"loaded"'"'"' "$WORK/ap13b.out") named=$(grep -c '"'"'"name":"BOT"'"'"' "$WORK/ap13b.out"))"
+    fi
+
+    # --- AP14 (control): an empty slot must refuse, not silently hand back a blank ------
+    # Without this, AP13 could pass by loading nothing at all: a blank record and a loaded
+    # record both leave the caller "in the world", and only the error distinguishes them.
+    printf '{"cmd":"load"}\n{"cmd":"quit"}\n' \
+      | "$U2" --headless --api --cleanroom $DATA --save-dir "$WORK/ap14.empty" \
+             --demo-dir "$WORK/ap14.demos" > "$WORK/ap14.out" 2>/dev/null
+    if grep -q '"event":"error"' "$WORK/ap14.out" && ! grep -q '"event":"loaded"' "$WORK/ap14.out"; then
+        ok "AP14 control: an empty save slot refuses instead of loading a blank character"
+    else
+        bad "AP14 control: an empty slot did not refuse -- load can pass while loading nothing"
+    fi
+
+    # --- AP15: no mid-session load. The original cannot, so neither can we. -------------
+    printf '{"cmd":"create","name":"BOT","race":1,"class":1,"stats":[10,10,10,10,10,40]}\n{"cmd":"load"}\n{"cmd":"quit"}\n' \
+      | "$U2" --headless --api --cleanroom $DATA --save-dir "$WORK/ap15.slot" \
+             --demo-dir "$WORK/ap15.demos" > "$WORK/ap15.out" 2>/dev/null
+    if grep -q 'load_only_at_menu' "$WORK/ap15.out"; then
+        ok "AP15: load once in the world is refused -- the menu is the only load point"
+    else
+        bad "AP15: load was accepted mid-session, which the original cannot do"
+    fi
+fi
+
 echo
 [ "$fail" -ne 0 ] && { echo "API TEST: FAIL"; exit 1; }
 [ "$skips" -ne 0 ] && echo "API TEST: PASS ($skips leg(s) skipped)" || echo "API TEST: PASS"

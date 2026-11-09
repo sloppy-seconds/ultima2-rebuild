@@ -21,6 +21,7 @@
 #include "core/pool_names.h"
 #include "core/keys.h"
 #include "core/demo.h"
+#include "core/save.h"
 #include "debug/dump_state.h"
 #include "game/creation.h"
 #include "game/gates.h"
@@ -450,6 +451,57 @@ static int do_create(u2_ctx *ctx, const char *line)
     return 1;
 }
 
+/* {"cmd":"load"} -- the menu's own P, expressed declaratively.
+ *
+ * `create` is "press C and fill the form" without the form; this is "press P" without the
+ * menu. Both are menu ACTIONS, never menu navigation, and neither gives the caller a power
+ * the original lacks: u2_save_load() is the same routine title.c runs for the P key, and it
+ * is already cross-verified against the real game by tools/save_cross_load.py.
+ *
+ * The guard is the point. The original cannot load mid-session -- a load means exiting to the
+ * menu and coming back -- so `load` is refused once the world has started. That is what keeps
+ * this a menu verb rather than a new game capability, and it is the owner ruling of
+ * 2026-11-09: no mid-session load until a real multi-slot save/load system exists
+ * (docs/save-scoped-worlds.md D5, which defers slot selection). Recovery for a bot is
+ * therefore: end the process, relaunch with --api --save-dir X, send {"cmd":"load"}.
+ *
+ * world_started rather than enter_world is the test, because enter_world stays set for the
+ * whole session once a handoff has happened and so cannot tell "still at the menu" from
+ * "handed off long ago" -- the same distinction that made the create handoff work.
+ */
+static int do_load(u2_ctx *ctx)
+{
+    /* enter_world, not world_started. The menu offers C *or* P, so once any handoff has
+     * happened -- a create, or an earlier load -- this is no longer a menu action. Testing
+     * world_started instead let `create` then `load` through, because a caller that sends an
+     * invalid key never starts the world loop and world_started stays 0 forever. */
+    if (ctx->enter_world) {
+        u2_api_error(ctx, "load_only_at_menu",
+                     "the original can only load at the menu; end the process and relaunch "
+                     "with --save-dir to reload a save");
+        return 0;
+    }
+
+    const u2_save_result r = u2_save_load(ctx);
+    if (r != U2_SAVE_OK) {
+        /* BLANK is the original's own "no character yet" test -- a slot that exists but
+         * holds nothing. NOT_READY is the insert-disk analogue. Naming them apart matters:
+         * a caller that cannot tell an empty slot from a broken one will retry forever. */
+        if (r == U2_SAVE_BLANK)
+            u2_api_error(ctx, "load_no_character", "the save slot holds no character");
+        else if (r == U2_SAVE_NOT_READY)
+            u2_api_error(ctx, "load_not_ready", "the save path is unusable or absent");
+        else
+            u2_api_error(ctx, "load_failed", "could not read the save record");
+        return 0;
+    }
+
+    /* Same handoff as create: the flag is what makes the title flow unwind, and returning
+     * U2_API_NONE from the dispatch is what keeps the caller's next keys for the world. */
+    ctx->enter_world = 1;
+    return 1;
+}
+
 int u2_api_command(u2_ctx *ctx, u2_key *out)
 {
     struct u2_api *a = ctx->api;
@@ -509,6 +561,16 @@ int u2_api_command(u2_ctx *ctx, u2_key *out)
                     return U2_API_NONE;
             }
             continue;                       /* the loop re-emits await via the guard */
+        }
+        if (strcmp(cmd, "load") == 0) {
+            if (do_load(ctx))
+                u2_api_observe(ctx, "loaded", NULL);
+            /* Identical unwind to create. If the load set enter_world, the flow that is
+             * polling must see it on a no-key arm, so answer NONE and hand the session
+             * back rather than reading on and eating the caller's next key as a menu key. */
+            if (ctx->enter_world)
+                return U2_API_NONE;
+            continue;
         }
         if (strcmp(cmd, "key") == 0) {
             char tok[32] = "";
