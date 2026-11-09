@@ -50,9 +50,15 @@ import glob
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
+
+# The project root, derived rather than assumed: census.py lives in tools/, and the tool is run
+# from both the repo root and engine/, so a relative 'asm' would silently find nothing when
+# invoked from the wrong place -- the same class of failure as a gate with no files to read.
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 D = lambda *p: os.path.join(ROOT, *p)
@@ -253,6 +259,7 @@ def build():
         for v in data:
             inst[v >> 2] = inst.get(v >> 2, 0) + 1
     trows = []
+    asm_names = asm_tile_names(os.path.join(ROOT, 'asm'))
     for t in tiles:
         a = (t.get('id') or '').strip()
         if not a:
@@ -261,9 +268,19 @@ def build():
             ai = int(a, 16)
         except ValueError:
             continue
-        trows.append({'art': '0x%02x' % ai, 'map_byte': '0x%02x' % (ai << 2),
+        mb = ai << 2
+        # The name comes from the proof layer if the proof layer has one. tile-art.tsv carries
+        # a pixel DESCRIPTION and never claimed to name the tile; conflating the two is what
+        # let a wrong name ride in wearing a `measured` badge.
+        named = asm_names.get(mb)
+        trows.append({'art': '0x%02x' % ai, 'map_byte': '0x%02x' % mb,
                       'kind': t.get('kind', ''), 'description': t.get('description', ''),
                       'instances': inst.get(ai, 0),
+                      'gate_value': '0x%02x' % ((mb >> 1) & 0x7F),
+                      'walkable': foot_ladder_walkable(mb),
+                      'name': named[0] if named else '',
+                      'name_source': ('asm/%s' % named[1]) if named else '',
+                      'name_grade': 'measured' if named else 'unnamed',
                       'note': (t.get('note') or '')[:200],
                       'source': 'disasm/tile-art.tsv (tile_atlas.py); art = map_byte >> 2',
                       'grade': 'measured'})
@@ -307,7 +324,8 @@ COLUMNS = {
               'resolved', 'grade', 'source', 'note'],
     'vehicle': ['layer', 'sector', 'x', 'y', 'byte', 'what', 'art', 'gate_value',
                 'source', 'grade'],
-    'tile': ['art', 'map_byte', 'kind', 'description', 'instances', 'note', 'source', 'grade'],
+    'tile': ['art', 'map_byte', 'kind', 'description', 'instances', 'gate_value', 'walkable',
+             'name', 'name_source', 'name_grade', 'note', 'source', 'grade'],
     'npc': ['layer', 'sector', 'world', 'era', 'kind', 'record_index', 'role',
             'game_speaker', 'name', 'name_source', 'line', 'quest', 'source'],
     'creature': ['art', 'name', 'hp', 'damage', 'special', 'verdict', 'source', 'grade'],
@@ -326,6 +344,66 @@ def write_tables(tables, outdir):
             f.write('\t'.join(COLUMNS[name]) + '\n')
             for r in rows:
                 f.write('\t'.join(str(r.get(c, '')) for c in COLUMNS[name]) + '\n')
+
+
+def foot_ladder_walkable(map_byte):
+    """On-foot passability, transcribed from asm/2423 -- the same ladder the engine runs.
+
+    The gate variable is `map_byte >> 1` (the mode), NOT the art index. Getting that wrong is
+    the root of every passability regression this project has had, so it is stated here in the
+    same words `overworld.c` uses. Verbatim ladder: mode 0x00 and 0x08 reject; a short accept
+    list; then `>= 0x16` rejects; everything below that accepts.
+
+    This exists because passability is the ARBITER for land-vs-water naming, and the census
+    previously joined seven sources and none of them was this one. Art 0x01 was carried as
+    `grade=measured` while the spec called it "shallow / rough water" -- and it is walkable,
+    which is dispositive. See docs/passability-findings.md F14.
+    """
+    mode = (map_byte >> 1) & 0x7F
+    if mode in (0x00, 0x08):
+        return 'no'                      # water, mountain
+    if mode in (0x22, 0x24, 0x26, 0x28, 0x2A, 0x2C, 0x2E, 0x38):
+        return 'yes'                     # vehicles, racks, force field, town paving
+    if mode >= 0x16:
+        return 'no'
+    return 'yes'
+
+
+def asm_tile_names(asm_dir):
+    """Tile names read out of the proof layer, so the census cannot drift from it.
+
+    `asm/248B_swamp_damage_gate.asm` carries, in its header: "fires for map byte 0x04 and for
+    nothing else among the common tiles: 0x00->0x00 water, 0x04->0x02 SWAMP, 0x08->0x04 grass,
+    0x0C->0x06, 0x10->0x08 mountain". That is a byte-cited name table sitting in the
+    byte-exact reconstruction -- the most authoritative place a tile name can live, and the
+    one nobody grepped when the art-01 argument happened.
+
+    Returns {map_byte: (name, citing_file)}. A name is only kept if the citing file still
+    exists and still contains it, so a rename or a header edit cannot leave a stale name
+    behind; `verify` re-checks the citation.
+    """
+    out = {}
+    if not os.path.isdir(asm_dir):
+        return out
+    pat = re.compile(r'(0x[0-9A-Fa-f]{2})->(0x[0-9A-Fa-f]{2})\s+([A-Za-z]{3,20})')
+    for fn in sorted(os.listdir(asm_dir)):
+        if not fn.endswith('.asm'):
+            continue
+        try:
+            text = open(os.path.join(asm_dir, fn)).read()
+        except OSError:
+            continue
+        # Headers wrap, and the citation wraps mid-entry: asm/248B writes
+        # "... 0x10->0x08" and puts "mountain." on the next line. Matching line by line
+        # silently loses exactly the entry that matters most, so the header block is joined
+        # into one string first. Bodies are still excluded -- only comments are naming evidence.
+        header = ' '.join(l.lstrip('#').strip() for l in text.splitlines() if l.startswith('#'))
+        for mb, _mode, word in pat.findall(header):
+            word = word.strip().lower().rstrip('.,;').strip()
+            # the header writes SWAMP in caps when it is the point of the line
+            if word in ('water', 'swamp', 'grass', 'forest', 'mountain'):
+                out.setdefault(int(mb, 16), (word, fn))
+    return out
 
 
 def verify(tables):
@@ -356,6 +434,37 @@ def verify(tables):
     named = sum(1 for r in s if r['name'])
     if named < 30:
         bad.append('only %d sectors named; the wiki join has regressed' % named)
+
+    # ---- tile naming vs passability: the check that would have caught art 01 ----------------
+    # Water is impassable on foot. That is not a convention, it is asm/2423, and it makes
+    # "walkable" a disproof of any name containing "water". The census previously joined seven
+    # sources and none of them was passability, so a wrong name arrived already wearing a
+    # `measured` badge and nothing argued with it.
+    for r in tables['tile']:
+        nm = (r.get('name', '') + ' ' + r.get('description', '')).lower()
+        if 'water' in nm and r.get('walkable') == 'yes':
+            bad.append('tile %s is named/described as water but the foot ladder accepts it '
+                       '(a walkable "water" is a naming error, not a terrain type)'
+                       % r['art'])
+        if 'mountain' in nm and r.get('walkable') == 'yes':
+            bad.append('tile %s is named/described as mountain but the foot ladder accepts it'
+                       % r['art'])
+        # A cited proof must still say what it is cited for, or the rename rotted silently.
+        src = r.get('name_source', '')
+        if src.startswith('asm/') and r.get('name'):
+            path = os.path.join(ROOT, src)
+            if not os.path.exists(path):
+                bad.append('tile %s cites %s for its name and that file is gone'
+                           % (r['art'], src))
+            elif r['name'] not in open(path).read().lower():
+                bad.append('tile %s cites %s for name %r and the file no longer contains it'
+                           % (r['art'], src, r['name']))
+    # The four common ground tiles must be named by proof, not left to interpretation.
+    for mb, what in ((0x00, 'water'), (0x04, 'swamp'), (0x08, 'grass'), (0x10, 'mountain')):
+        row = next((r for r in tables['tile'] if r['map_byte'] == '0x%02x' % mb), None)
+        if row and row.get('name') and row['name'] != what:
+            bad.append('tile %s is named %r but asm/248B proves %r'
+                       % (row['art'], row['name'], what))
     return bad, named, len(unnamed)
 
 
