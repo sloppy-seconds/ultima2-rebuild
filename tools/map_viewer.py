@@ -306,7 +306,8 @@ small{color:#888}
 tail whose first byte is always 0x1A. Unproven; if these maps look shifted or wrong,
 that assumption is the first suspect.<br>
 Dungeons and towers (sector ending 4 or 5) are drawn as 16 pages of 16x16 instead, per
-asm/68C0. White = impassable rock, black = passable, castle = doorway, mountain = hidden
+asm/68C0, laid out 2 across x 8 down. White = impassable rock, black = passable, castle =
+doorway, mountain = hidden
 door (drawn solid but walkable), sword = chest, U/D = ladder, magenta = byte not in the
  dungeon alphabet (a reliable damage marker: only mapx15 has any). That is a <i>derived</i>
 top-down view: the game itself shows a first-person wireframe, so nothing here is a
@@ -360,8 +361,11 @@ function dunCell(b){
 }
 function dunGeom(){
   const z=Math.max(4,Math.min(32,+$('zoom').value||12));
-  const zd=Math.max(2,Math.min(10,(z>>1)||4));
-  return {zd:zd, PW:16*zd, LBL:13, cols:8, rows:2};
+  // 2 across x 8 down, not 8 x 2. Eight panels across forced cells down to ~6px and the maze
+  // became unreadable; two across frees the whole width, so a panel can use the zoom value
+  // directly and land at roughly twice the size for the same canvas width.
+  const zd=Math.max(4,Math.min(20,z));
+  return {zd:zd, PW:16*zd, LBL:Math.max(13,(zd*1.15|0)), cols:2, rows:8};
 }
 function paintDungeon(c,m,IMGS){
   const g=dunGeom(), {zd,PW,LBL,cols}=g;
@@ -388,9 +392,9 @@ function paintDungeon(c,m,IMGS){
       if(want>=0 && b===want){x.strokeStyle='#ff0';x.lineWidth=1;
         x.strokeRect(cx+.5,cy+.5,zd-1,zd-1);}
     }
-    x.fillStyle='#8fa'; x.font='10px monospace'; x.textAlign='left';
+    x.fillStyle='#8fa'; x.font=Math.max(10,(zd*0.8|0))+'px monospace'; x.textAlign='left';
     const dir=m.dun==='tower'?'floor 0 = bottom':'floor 0 = top';
-    x.fillText('floor '+f+(f===0?' ('+dir+')':''), px+2, py+PW+LBL-3);
+    x.fillText('floor '+f+(f===0?' ('+dir+')':''), px+2, py+PW+LBL-4);
     x.strokeStyle='#444'; x.lineWidth=1; x.strokeRect(px+.5,py+.5,PW-1,PW-1);
   }
 }
