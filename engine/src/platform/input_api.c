@@ -27,14 +27,20 @@ static int api_input_init(u2_ctx *ctx)
     return 0;
 }
 
+/* The three-state answer is passed through rather than collapsed. NONE has to reach the
+ * caller as 0, because seam_key_poll raises input_exhausted on anything negative, and a
+ * handoff is not the player walking away. Collapsing it to -1 here is what made a `create`
+ * look like the caller had left rather than like the flow needed to change. */
 static int api_input_poll(u2_ctx *ctx, u2_key *out)
 {
-    return u2_api_command(ctx, out) == U2_API_KEY ? 1 : -1;
+    const int r = u2_api_command(ctx, out);
+    return r > 0 ? 1 : (r == 0 ? 0 : -1);
 }
 
 static int api_input_wait(u2_ctx *ctx, u2_key *out)
 {
-    return u2_api_command(ctx, out) == U2_API_KEY ? 1 : -1;
+    const int r = u2_api_command(ctx, out);
+    return r > 0 ? 1 : (r == 0 ? 0 : -1);
 }
 
 static void api_input_shutdown(u2_ctx *ctx)

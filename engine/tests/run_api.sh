@@ -290,6 +290,73 @@ case "$WOK" in
   *) bad "AP11: a win-condition predicate is not readable: $WOK" ;;
 esac
 
+# --- AP12: the world actually turns, and the door is visible to the caller --------
+# This leg exists because the API used to accept every key, answer `await`, report
+# `mode: world`, and take no turn at all. A `create` is delivered from inside a poll some
+# title-flow screen was already sitting in, and the title flow's stop test lives in its
+# no-key arm, so the flow ate the caller's game keys as menu keys and the overworld loop
+# was entered with the input spent. Measured before the fix: forty direction keys, `rolls`
+# never left 0, and the overworld's own key poll was reached zero times.
+#
+# `rolls` is the discriminator that cannot be faked by a screen redraw: it is the engine's
+# RNG counter, and only a completed world turn advances it. The countdown is the second
+# half -- it proves the turn body reached the gate tick, and its value also pins the
+# cold-load wrap (256 turns to the first door, so five turns reads 251, not 3).
+printf '{"cmd":"create","name":"T","sex":"M","race":1,"class":1,"stats":[20,20,10,10,10,20]}\n' > "$WORK/ap12.keys"
+for i in $(seq 1 12); do printf '{"cmd":"key","key":"0xf1"}\n' >> "$WORK/ap12.keys"; done
+printf '{"cmd":"quit"}\n' >> "$WORK/ap12.keys"
+session ap12 < "$WORK/ap12.keys"
+T12=$(python3 -c '
+import json,sys
+rolls=cd=None
+for l in open(sys.argv[1]):
+    l=l.strip()
+    if not l: continue
+    try: o=json.loads(l)
+    except Exception: continue
+    obs=o.get("obs") or {}
+    g=obs.get("gate")
+    if g is not None: rolls, cd = obs.get("rolls"), g.get("countdown")
+print("rolls", rolls, "cd", cd)' "$WORK/ap12.out")
+case "$T12" in
+  "rolls "0*" cd 25"*) bad "AP12: the world took no turn ($T12) -- keys are being eaten before the overworld loop" ;;
+  "rolls "[1-9]*" cd 251") ok "AP12: keys reach the world -- rng advanced and the gate countdown ticked ($T12)" ;;
+  *) bad "AP12: unexpected world state: $T12" ;;
+esac
+# The control: with no keys at all nothing may have turned. Without this the rolls test
+# above would pass against any build that emitted a number.
+printf '{"cmd":"create","name":"T","sex":"M","race":1,"class":1,"stats":[20,20,10,10,10,20]}\n{"cmd":"quit"}\n' | session ap12b
+python3 -c '
+import json,sys
+for l in open(sys.argv[1]):
+    l=l.strip()
+    if not l: continue
+    try: o=json.loads(l)
+    except Exception: continue
+    g=(o.get("obs") or {}).get("gate")
+    if g is not None and (o["obs"].get("rolls") or 0) != 0: raise SystemExit(1)
+' "$WORK/ap12b.out" \
+  && ok "AP12 control: with no keys nothing turned, so the rolls test can go red" \
+  || bad "AP12 control: a keyless session advanced the rng"
+
+# And the door itself must be readable, not just implied. At load the original stamps
+# nothing, so `present` is false here and that is the correct answer, not a gap.
+printf '{"cmd":"create","name":"T","sex":"M","race":1,"class":1,"stats":[20,20,10,10,10,20]}\n{"cmd":"quit"}\n' | session ap12c
+python3 -c '
+import json,sys
+for l in open(sys.argv[1]):
+    l=l.strip()
+    if not l: continue
+    o=json.loads(l)
+    g=(o.get("obs") or {}).get("gate")
+    if g is None: continue
+    need={"present","x","y","slot","countdown","era","world","dest_era","dest_x","dest_y"}
+    raise SystemExit(0 if need <= set(g) else 1)
+raise SystemExit(1)
+' "$WORK/ap12c.out" \
+  && ok "AP12: the observation carries a full gate block (cell, slot, countdown, era, world, destination)" \
+  || bad "AP12: the gate block is missing or incomplete"
+
 echo
 [ "$fail" -ne 0 ] && { echo "API TEST: FAIL"; exit 1; }
 [ "$skips" -ne 0 ] && echo "API TEST: PASS ($skips leg(s) skipped)" || echo "API TEST: PASS"

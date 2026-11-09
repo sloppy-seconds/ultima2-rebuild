@@ -9,7 +9,7 @@ it red — the budget check was disabled to prove AP3 can fail, and it failed).
 
 Wired into `make test` as `test-api`, plus `make api` for a one-command smoke.
 
-**Eight deviations from this plan, each forced by a measurement or by a gap the plan did not
+**Twelve deviations from this plan, each forced by a measurement or by a gap the plan did not
 name.** They are listed here rather than edited silently into § 3 and § 4.
 
 1. **`turn` became `rolls`.** There is no turn counter on the state block — `ow->turns`
@@ -269,6 +269,56 @@ does not have to infer from a trailing `WHICH?` that a menu is open. It is deriv
 site that blocked, not guessed.
 
 ---
+
+11. **The API could not play the game, and every existing leg passed anyway.** Deviation 9
+    fixed `create` so it *requested* the world; it did not make the world run. A `create` is
+    delivered from inside `seam_key_poll`, while some title-flow screen is already sitting in
+    that poll, and the title flow's stop test lives in its **no-key** arm — so when the create
+    returned, the next key arrived on the key arm, was read as a menu key, and was lost. The
+    overworld loop was then entered with the caller's input already spent.
+
+    Measured, before the fix: **forty direction keys, `rolls` never left 0**, the overworld's
+    own key poll reached **zero** times, and `u2_gate_turn` never ran. The API answered
+    `await` to every command, reported `mode: "world"`, and did nothing. AP9 passed throughout
+    because it greps for `CMD:`, which the world loop emits once before it exits — the
+    assertion proved a prompt was printed, not that a world was running. It is the exact shape
+    AGENTS. § 3 calls a gate that cannot go red.
+
+    Found by instrumenting every poll site rather than reasoning about it: marking the seven
+    `seam_key_poll` calls in `title.c` showed the create landing in `hold_for_esc`'s headless
+    arm, twice. An earlier attempt to fix it there was reverted because it changed scripted
+    runs and broke CP2's committed replay evidence — the correct lesson being that the fix
+    belongs in one place, not in six poll sites.
+
+    The fix is that one place: **`u2_api_command` parks a key while a handoff is pending**
+    (`enter_world && !world_started`) and answers `U2_API_NONE`, which is the state `api.h`
+    had always declared and never returned. Every flow that consults `flow_stopped()` then
+    unwinds on its own, and the parked key is handed to the overworld loop when it asks.
+    `world_started` exists because `enter_world` stays set for the whole session and so cannot
+    distinguish "handoff pending" from "handoff long finished".
+
+    `AP12` is the leg that was missing. Its discriminator is `rolls`, which no screen redraw
+    can fake — only a completed world turn advances the RNG — paired with a keyless control
+    leg proving the test can go red. Reverting the parking fix reproduces the failure exactly:
+    `rolls 0 cd 0`.
+
+12. **The observation grew a `gate` block, because a bot cannot walk to a door it cannot see.**
+    `state` is the debug dump and it has never carried `DS:6E` or `DS:6F`, so until now there
+    was no way to ask where a time door was, when it would move, or where stepping on it would
+    lead. The block reports `present, x, y, slot, countdown, era, world, dest_era, dest_x,
+    dest_y`.
+
+    `present/x/y` are **published by the draw path** onto `ctx`, following the
+    `screen_player_col/row` precedent, rather than re-derived in `api.c`. Two reasons: a second
+    latch for "has it stamped yet" would drift from the one the renderer uses, and the caller
+    should be told about the door that was actually drawn. The rest is derived through the same
+    pure functions the engine uses, so there is one rule and not two. The block is omitted
+    outside the world — at the title the era and world bytes are both zero, and reporting
+    `era: 0` there would read as a real location.
+
+    Note what `present: false` means at load, because it is correct and not a gap: the original
+    stamps nothing until the countdown first expires, and `asm/2701` is `decb 0x6f ; je`, so a
+    countdown that starts at zero takes ~256 turns to get there. See `docs/moongates.md`.
 
 ## 5. What already exists — do not rebuild it
 

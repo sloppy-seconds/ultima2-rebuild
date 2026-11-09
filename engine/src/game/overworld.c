@@ -1730,7 +1730,14 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
      * the fill loop itself would produce for 0xC0, so the renderer's proven mapping does
      * the rest and the art comes from the player's own extracted tiles. */
     int gate_x = 0, gate_y = 0;
+    /* Published on ctx every draw, and cleared first, so a frame with no door cannot
+     * inherit the previous frame's. This is the only writer, and the API reads it. */
+    ctx->gate_present = 0;
+    ctx->gate_x = ctx->gate_y = 0;
     if (u2_gate_current_cell(ctx, ow, &gate_x, &gate_y)) {
+        ctx->gate_present = 1;
+        ctx->gate_x = gate_x;
+        ctx->gate_y = gate_y;
         const int col = gate_x - (ow->x - ow->view.player_col);
         const int row = gate_y - (ow->y - ow->view.player_row);
         if (col >= 0 && col < ow->view.cols && row >= 0 && row < ow->view.rows)
@@ -1988,6 +1995,10 @@ static void overworld_present_now(u2_ctx *ctx)
 
 int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
 {
+    /* The handoff is complete from here on: any key the play API parked while the title flow
+     * was still unwinding belongs to this loop, and api.c starts releasing them once this is
+     * set. See core/ctx.h. */
+    ctx->world_started = 1;
     ctx->frame = &ow->frame;
     s_present_ow = ow;
     ctx->present_now = overworld_present_now;

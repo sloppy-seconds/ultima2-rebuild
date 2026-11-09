@@ -98,6 +98,16 @@ typedef struct u2_ctx {
      * can say "flash the player" without threading the overworld struct through
      * every call. One source: set where the view shape is set. */
     int screen_player_col, screen_player_row;
+    /* The time door the renderer actually drew this frame: whether one exists at all, and
+     * its sector coordinates. Same reason as the two fields above — the play API and
+     * anything else far from the renderer needs to say "where is the door" without
+     * threading the overworld struct through, and a second latch for "has it stamped yet"
+     * would be a second source of truth that drifts from the one the draw path uses.
+     * So this is written where the door is stamped into the view, and it reports what was
+     * drawn rather than what the rotation table implies. `gate_present` is false at load,
+     * because the original stamps nothing until the countdown first expires — roughly 256
+     * turns from a cold start. See game/gates.h and docs/moongates.md. */
+    int gate_present, gate_x, gate_y;
     /* The active theme's own RGB table, when it ships one (a v2 PALETTE.RGB).
      * The renderer uses this instead of the built-in EGA table whenever
      * theme_palette_set is true, and re-reads it on each upload so a Ctrl-T cycle
@@ -289,6 +299,11 @@ typedef struct u2_ctx {
      * the player straight into the overworld instead of restarting. */
     int restart_requested;
     int enter_world;
+    /* Set by the overworld loop the first time it runs, so "a handoff is pending" can be
+     * told apart from "a handoff happened long ago". `enter_world` stays set for the whole
+     * session once the world has been entered, so it cannot be the test on its own. See
+     * core/api.h and the create arm of u2_api_command. */
+    int world_started;
     int input_exhausted;    /* the player is gone: the script ran out, stdin hit EOF,
                              * or a quit was requested (window closed, SIGINT). Set by
                              * seam_key_poll and seam_key_wait together, and every flow

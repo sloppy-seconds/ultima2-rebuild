@@ -23,6 +23,7 @@
 #include "core/demo.h"
 #include "debug/dump_state.h"
 #include "game/creation.h"
+#include "game/gates.h"
 
 #define LINE_MAX_LEN 4096
 #define SCR_MAX      4096
@@ -34,6 +35,14 @@ struct u2_api {
      * fresh observation on every poll, and a command that consumes two keys (ATTACK-- then a
      * direction) would look like two questions rather than one question and a follow-up. */
     int await_emitted;
+    /* One key held across a handoff. A `create` arrives on a line the reader has already
+     * consumed, and the key that follows it belongs to the world, not to the flow that was
+     * polling when the create landed. The line cannot be unread, so the key is parked here
+     * and handed out first once the world loop is running. One slot is enough because the
+     * flows stop on `enter_world` as soon as they see a no-key poll, so at most one key can
+     * be in flight. */
+    int pending_key;
+    u2_key pending;
 };
 
 int u2_api_active(const u2_ctx *ctx) { return ctx && ctx->api != NULL; }
@@ -208,6 +217,27 @@ static void emit_counts(const char *const *tbl, int n, const uint8_t *counts)
         printf("%s\"%s\":%u", i ? "," : "", tbl[i], (unsigned)counts[i]);
 }
 
+static void emit_gate(const u2_ctx *ctx)
+{
+    /* A bot cannot walk to a door it cannot see, and until now the observation carried no
+     * gate at all: `state` is the debug dump and it has never emitted DS:6E or DS:6F. The
+     * cell comes from ctx, which the draw path writes, so the API reports the door that was
+     * actually rendered rather than a second reading of the rotation table. The rest is
+     * derived from the state block by the same pure functions the engine uses, so there is
+     * one rule and not two. */
+    const int slot = u2_gate_slot(ctx->state.gate_index);
+    const int era = ctx->state.sector_first;
+    const int dest = u2_gate_partner_era(era, slot);
+    int dx = 0, dy = 0;
+    if (dest >= 0)
+        (void)u2_gate_cell(dest, slot, &dx, &dy);
+    printf("\"gate\":{\"present\":%s,\"x\":%d,\"y\":%d,\"slot\":%d,\"countdown\":%u,"
+           "\"era\":%u,\"world\":%u,\"dest_era\":%d,\"dest_x\":%d,\"dest_y\":%d}",
+           ctx->gate_present ? "true" : "false", ctx->gate_x, ctx->gate_y, slot,
+           (unsigned)ctx->state.gate_countdown, (unsigned)era, (unsigned)ctx->state.world,
+           dest, dx, dy);
+}
+
 static void emit_char(const u2_ctx *ctx)
 {
     static const char *names[6] = { "str", "agi", "sta", "cha", "wis", "int" };
@@ -303,6 +333,10 @@ static void emit_obs(u2_ctx *ctx)
     emit_screen(ctx);
     printf(",");
     emit_char(ctx);
+    /* Only once there is a world to have a door in. At the title or in creation the era and
+     * world bytes are both zero, and reporting era 0 there would read as a real location. */
+    if (ctx->enter_world)
+        printf(","), emit_gate(ctx);
     printf(",\"state\":%s}", jn > 0 ? js : "{}");
     fflush(stdout);
 
@@ -422,6 +456,14 @@ int u2_api_command(u2_ctx *ctx, u2_key *out)
     char line[LINE_MAX_LEN];
 
     for (;;) {
+        /* A key parked during a handoff goes out before anything is read or emitted, so the
+         * world loop receives the caller's keys in the order they were sent. */
+        if (a->pending_key) {
+            a->pending_key = 0;
+            if (out) *out = a->pending;
+            a->await_emitted = 0;
+            return U2_API_KEY;
+        }
         /* The engine speaks first (A2), and only once per question. */
         if (!a->await_emitted) u2_api_observe(ctx, "await", NULL);
 
@@ -446,7 +488,26 @@ int u2_api_command(u2_ctx *ctx, u2_key *out)
             continue;
         }
         if (strcmp(cmd, "create") == 0) {
-            if (do_create(ctx, line)) u2_api_observe(ctx, "created", NULL);
+            if (do_create(ctx, line)) {
+                u2_api_observe(ctx, "created", NULL);
+                /* Hand the session back instead of reading on. This is the whole fix for
+                 * "the API accepts every key, answers await, reports mode world, and does
+                 * nothing": `create` is delivered from INSIDE seam_key_poll, so the flow that
+                 * was polling keeps going after the flag is set, and the title flow's stop test
+                 * only runs on the no-key arm. Without this return the title flow ate the
+                 * caller's first game keys as menu keys, then swallowed the rest, and the
+                 * world loop was entered with stdin already spent. Measured before the fix:
+                 * 40 direction keys, `rolls` never left 0, and the overworld's key poll was
+                 * reached zero times.
+                 *
+                 * Returning NONE (not KEY, not END) is what makes the unwind honest: NONE is
+                 * "no key right now", so seam_key_poll leaves input_exhausted alone and the
+                 * title flow's own predicate sees enter_world and returns. The caller's keys
+                 * stay in stdin for the world, which is where they belong. U2_API_NONE existed
+                 * in api.h for exactly this and had never been returned. */
+                if (ctx->enter_world)
+                    return U2_API_NONE;
+            }
             continue;                       /* the loop re-emits await via the guard */
         }
         if (strcmp(cmd, "key") == 0) {
@@ -459,6 +520,19 @@ int u2_api_command(u2_ctx *ctx, u2_key *out)
             if (!u2_key_from_token(tok, &k)) {
                 u2_api_error(ctx, "unknown_key", tok);
                 continue;
+            }
+            /* Hold the key until the world has taken over. A `create` is delivered from
+             * inside a poll that some flow is already sitting in, and the title flow's stop
+             * test lives in its no-key arm — so a key released immediately is read by that
+             * flow as a menu key and lost. Parking it and answering NONE makes every flow
+             * that consults flow_stopped() unwind, and the key is handed to the world loop
+             * when it asks. Without this the API accepted every key, answered `await`,
+             * reported mode world and took no turn at all: measured as `rolls` stuck at 0
+             * across forty direction keys. */
+            if (ctx->enter_world && !ctx->world_started) {
+                a->pending_key = 1;
+                a->pending = k;
+                return U2_API_NONE;
             }
             if (out) *out = k;
             a->await_emitted = 0;
