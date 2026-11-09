@@ -213,6 +213,38 @@ describes and the Galaxy patch fixes, seen from a third direction: ModdingWiki's
 measures 260 differing bytes from 3837, and the byte-value census above shows it as foreign
 codes.
 
+### 3d. The viewer renders dungeon pages, not a 64x64 grid
+
+`tools/map_viewer.py` branches on the sector's **ones digit**: 4 or 5 means the 4096 bytes are
+read as 16 pages of 16x16 (`floor*256 + y*16 + x`, `asm/68C0`) and drawn as a 2x8 table of
+levels. Drawn as 64x64 the pages interleave four to a row -- 256 bytes is four rows of 64 --
+which is what made these sectors look like noise. The noise was four levels, not garbage.
+
+Two things worth having on record, both measured rather than assumed.
+
+**The ones-digit rule holds on both layers, and that is not obvious.** It came from Earth
+sectors, but the ones digit is the site kind on the Galaxy-patch planets too, so the flag picks
+up twelve sectors, not eight: `mapx 15 24 25 34 35 44 45 85` and `MAPG 15 44 45 85`. The
+census `kind` column agrees on all twelve independently, and the wiki names corroborate
+("Dungeon on Mercury", "Tower on Jupiter"). Third-party data used as a control, as always.
+
+**All 16 pages are authored in all twelve files**, at 82-194 non-zero cells per page in
+`mapx35`. They are not padding. And the **low nibble is zero throughout every dungeon file
+except `mapx15`**, which is the corruption showing up as 240 low-nibble bytes and 260
+off-alphabet ones -- so file bytes are pure terrain codes with no runtime stamps, and the
+viewer's magenta "not in the alphabet" cells are a reliable damage detector.
+
+The glyph mapping is the game's own art, and the passability rule is the engine's: a cell is
+impassable iff `(b & 0x0f) || b == 0x80` (`asm/277B` at runtime `0x286F`, restated at
+`engine/src/game/dungeon.c:84`). That is why the hidden door `0xE0` gets its own glyph instead
+of white: it renders solid and walks open, and calling it impassable would be the same error as
+calling it a wall. Verified by running the viewer's classifier over all 256 byte values against
+that rule -- zero disagreements -- with the control being `0xE0` forced impassable, which goes
+red at exactly `0xe0`.
+
+What the view is *not*: a top-down level map is a derived view. The game draws a first-person
+wireframe, so no panel here is a screenshot of anything. Ladder connectivity between pages is
+also still open -- page authoring is proven, reachability is not.
 ## 4. The world wraps
 
 The viewport is toroidal, not clamped. With the player at `x=0`, the left edge

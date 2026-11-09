@@ -40,6 +40,20 @@ import sys
 
 TILE_PX = 16          # art is 16x16; PNGs are upscaled, drawn with smoothing off
 GRID = 64
+
+
+def dun_kind(sector):
+    """'tower' / 'cave' / '' -- the ones digit decides, and it is the only thing that does.
+
+    A dungeon is not a separate file. It is an ordinary sector whose ones digit is 4 or 5
+    (docs/sector-rulesets.md section 1: 24/34/44 are towers, 15/25/35/45/85 are caves), and
+    entering one loads the same mapxNN into the same 4096-byte buffer the overworld uses. What
+    changes is the reading: asm/68C0 forms a cell address as map_base + floor*256 + y*16 + x,
+    so those 4096 bytes are 16 pages of 16x16, not one 64x64 grid. Rendered as 64x64 the
+    levels interleave four to a row, which is exactly what made these sectors look like noise.
+    """
+    return {'4': 'tower', '5': 'cave'}.get(sector[-1], '')
+
 TAIL = 128            # 4224 - 4096; byte 4096 is the 0x1A marker, not terrain
 
 
@@ -195,7 +209,7 @@ def load_maps(srcdir, updated=None):
         if len(data) != GRID * GRID + TAIL:
             print('  note: %s is %d bytes, expected %d' % (name, len(data), GRID * GRID + TAIL))
         maps.append({'name': name, 'layer': 'mapx', 'sector': name[4:],
-                     'bytes': list(data[:GRID * GRID])})
+                     'dun': dun_kind(name[4:]), 'bytes': list(data[:GRID * GRID])})
     nmapg = 0
     if updated and os.path.isdir(updated):
         for path in sorted(glob.glob(os.path.join(updated, 'MAPG*'))):
@@ -205,7 +219,7 @@ def load_maps(srcdir, updated=None):
                 print('  note: %s is %d bytes, shorter than a sector' % (name, len(data)))
                 continue
             maps.append({'name': name, 'layer': 'mapg', 'sector': name[4:],
-                         'bytes': list(data[:GRID * GRID])})
+                         'dun': dun_kind(name[4:]), 'bytes': list(data[:GRID * GRID])})
             nmapg += 1
     if not maps:
         sys.exit('no mapx* found in %s' % srcdir)
@@ -288,9 +302,15 @@ small{color:#888}
 <input id="maskv" value="80" style="width:60px"></div>
 <div id="info">hover a tile</div>
 <div id="legend"></div>
-<div class="hint">Layout assumption: bytes 0..4095 = 64x64 row-major, then a 128-byte
+<div class="hint">Overworld assumption: bytes 0..4095 = 64x64 row-major, then a 128-byte
 tail whose first byte is always 0x1A. Unproven; if these maps look shifted or wrong,
-that assumption is the first suspect.</div>
+that assumption is the first suspect.<br>
+Dungeons and towers (sector ending 4 or 5) are drawn as 16 pages of 16x16 instead, per
+asm/68C0. White = impassable rock, black = passable, castle = doorway, mountain = hidden
+door (drawn solid but walkable), sword = chest, U/D = ladder, magenta = byte not in the
+ dungeon alphabet (a reliable damage marker: only mapx15 has any). That is a <i>derived</i>
+top-down view: the game itself shows a first-person wireframe, so nothing here is a
+screenshot of anything.</div>
 </div>
 <div id="view">
 <div class="pane"><b id="lab1">cleanroom</b><canvas id="c" width="768" height="768"></canvas></div>
@@ -318,8 +338,65 @@ function glabel(g){const p=g.split('|');const ms=maps.filter(m=>m.layer===p[0]&&
 opts($('grp'),groups.map(g=>[g,glabel(g)]),groups[0]);
 function secs(){const p=$('grp').value.split('|');
   return maps.filter(m=>m.layer===p[0]&&m.sector[0]===p[1]).map(m=>[m.name,m.label||m.name])}
+// ---- dungeons and towers: 16 pages of 16x16, not 64x64 -------------------------------
+// The three glyphs are the game's own art, named in disasm/tile-art.tsv: 0x07 is the solid
+// white tower silhouette ("rook"), 0x04 the mountain crosshatch, 0x16 the weapon rack that
+// ModdingWiki calls "Sword". The two solids are CSS fills rather than art 0x1D/0x1E so the
+// cleanroom set cannot change what "solid black" means.
+const DUN_ART={door:0x07, hidden:0x04, chest:0x16};
+const DUN_NAME={rock:'rock (impassable)',floor:'floor (passable)',door:'doorway (passable)',
+  hidden:'hidden door (drawn solid, WALKABLE)',chest:'chest',ladder:'ladder',unknown:'not in the dungeon alphabet'};
+function dunCell(b){
+  if(b===0x80) return {t:'rock'};
+  if(b===0x00) return {t:'floor'};
+  if(b===0xC0) return {t:'door'};
+  if(b===0xE0) return {t:'hidden'};
+  if(b===0x40) return {t:'chest'};
+  // A low nibble is a runtime stamp, and it is zero in every shipped dungeon file except
+  // mapx15 -- the known-corrupt one that carries sector-map terrain. Flag rather than guess.
+  if(b&0x0f) return {t:'unknown'};
+  if(b&0x30) return {t:'ladder', up:!!(b&0x10), down:!!(b&0x20)};
+  return {t:'unknown'};
+}
+function dunGeom(){
+  const z=Math.max(4,Math.min(32,+$('zoom').value||12));
+  const zd=Math.max(2,Math.min(10,(z>>1)||4));
+  return {zd:zd, PW:16*zd, LBL:13, cols:8, rows:2};
+}
+function paintDungeon(c,m,IMGS){
+  const g=dunGeom(), {zd,PW,LBL,cols}=g;
+  c.width=cols*PW; c.height=g.rows*(PW+LBL);
+  const x=c.getContext('2d');
+  x.imageSmoothingEnabled=false; x.fillStyle='#000'; x.fillRect(0,0,c.width,c.height);
+  const want=$('mask').checked?(parseInt($('maskv').value,16)&0xFF):-1;
+  for(let f=0;f<16;f++){
+    const px=(f%cols)*PW, py=(f/cols|0)*(PW+LBL);
+    for(let r=0;r<16;r++)for(let col=0;col<16;col++){
+      const b=m.bytes[f*256+r*16+col], cx=px+col*zd, cy=py+r*zd, t=dunCell(b);
+      x.fillStyle='#000'; x.fillRect(cx,cy,zd,zd);
+      if(t.t==='rock'){x.fillStyle='#fff';x.fillRect(cx,cy,zd,zd);}
+      else if(t.t==='unknown'){x.fillStyle='#f0f';x.fillRect(cx,cy,zd,zd);}
+      else if(t.t==='ladder'){
+        x.fillStyle='#ffd479'; x.textAlign='center';
+        if(t.up&&t.down){x.font=(zd*0.45|0)+'px monospace';
+          x.fillText('U',cx+zd/2,cy+zd*0.45); x.fillText('D',cx+zd/2,cy+zd*0.95);}
+        else{x.font=(zd*0.85|0)+'px monospace';
+          x.fillText(t.up?'U':'D',cx+zd/2,cy+zd*0.8);}
+      }
+      else if(DUN_ART[t.t]!==undefined && IMGS[DUN_ART[t.t]].complete)
+        x.drawImage(IMGS[DUN_ART[t.t]],cx,cy,zd,zd);
+      if(want>=0 && b===want){x.strokeStyle='#ff0';x.lineWidth=1;
+        x.strokeRect(cx+.5,cy+.5,zd-1,zd-1);}
+    }
+    x.fillStyle='#8fa'; x.font='10px monospace'; x.textAlign='left';
+    const dir=m.dun==='tower'?'floor 0 = bottom':'floor 0 = top';
+    x.fillText('floor '+f+(f===0?' ('+dir+')':''), px+2, py+PW+LBL-3);
+    x.strokeStyle='#444'; x.lineWidth=1; x.strokeRect(px+.5,py+.5,PW-1,PW-1);
+  }
+}
 function paint(c, IMGS){
   const m=byName[$('sec').value], z=Math.max(4,Math.min(32,+$('zoom').value||12));
+  if(m.dun){paintDungeon(c,m,IMGS);return;}
   c.width=c.height=64*z; const x=c.getContext('2d');
   x.imageSmoothingEnabled=false; x.fillStyle='#000'; x.fillRect(0,0,c.width,c.height);
   const want=$('mask').checked?(parseInt($('maskv').value,16)&0xFF):-1;
@@ -349,6 +426,22 @@ function redraw(){
 }
 $('c').addEventListener('mousemove',e=>{
   const m=byName[$('sec').value], z=Math.max(4,Math.min(32,+$('zoom').value||12));
+  if(m.dun){
+    const g=dunGeom();
+    const f=(e.offsetX/g.PW|0) + (e.offsetY/(g.PW+g.LBL)|0)*g.cols;
+    if(f>15){$('info').textContent='outside';return}
+    const lx=e.offsetX%g.PW/g.zd|0, ly=e.offsetY%(g.PW+g.LBL)/g.zd|0;
+    if(lx>15||ly>15){$('info').textContent='between levels';return}
+    const b=m.bytes[f*256+ly*16+lx], t=dunCell(b);
+    const n=m.bytes.filter(v=>v===b).length;
+    $('info').innerHTML='<b>'+m.name+'</b> <span style="color:#fc6">'+m.dun+'</span>'+
+      ' &mdash; floor '+f+', x='+lx+' y='+ly+
+      '<br>byte 0x'+b.toString(16).padStart(2,'0')+' &rarr; '+DUN_NAME[t.t]+
+      (t.t==='ladder'?' ('+(t.up?'up ':'')+(t.down?'down':'')+')':'')+
+      '<br><small>'+n+' of 4096 cells in this file use this byte</small>'+
+      '<br><small>page address: floor*256 + y*16 + x = '+(f*256+ly*16+lx)+' (asm/68C0)</small>';
+    return;
+  }
   const r=e.offsetY/z|0, col=e.offsetX/z|0;
   if(r>63||col>63){$('info').textContent='outside';return}
   const b=m.bytes[r*64+col], a=b>>2, art=ART[a]||{};
