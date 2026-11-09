@@ -49,7 +49,7 @@ fi
 # Every shop literal here is a `run` locator (the menus are multi-segment db lines the asm
 # fallback cannot index), so with no copy of the game they come out empty and the prints are
 # empty too. Asserting on them then would be asserting on nothing.
-NEED="U2_S_ARMOUR_MENU U2_S_WEAPONS_MENU U2_S_TRANSPORT_MENU U2_S_FOOD_COSTS U2_S_SHOP_SOLD"
+NEED="U2_S_ARMOUR_MENU U2_S_WEAPONS_MENU U2_S_TRANSPORT_MENU U2_S_FOOD_COSTS U2_S_SHOP_SOLD U2_S_GET_WEAPON U2_S_GET_ARMOUR U2_S_GET_WHAT"
 EMPTY=""
 for sym in $NEED; do
     if grep -q "^#define ${sym} \"\"" content/gen_content.h 2>/dev/null; then

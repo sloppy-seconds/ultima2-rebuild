@@ -130,6 +130,11 @@ static int emit_raw(const u2_state *s, char *out, int outsz)
     struct { const char *name; const uint8_t *p; int n; } f[] = {
         { "pos", pos, 2 }, { "sector", sector, 2 }, { "hp", hp, 2 },        { "food", food, 3 }, { "exp", exp, 2 }, { "gold", gold, 2 },
         { "items", s->items_held, 16 },
+        /* The two owned-count pools. A chest grant is silent in the original -- asm/363B
+         * prints " WEAPON" and then only touches the array -- so a transcript grep cannot
+         * prove a grant happened. These two fields are what make that assertable. */
+        { "weapons", s->weapons_owned, 10 },
+        { "armour",  s->armour_owned,   6 },
         /* The travel mode, which is the same byte as the sprite stamped into the player's
          * cell (DS:13). A turn log that cannot say whether the player was aboard anything
          * cannot explain a step that cost 38 food or a step the rocket refused. */

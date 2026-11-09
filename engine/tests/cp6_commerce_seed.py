@@ -93,6 +93,14 @@ SITE_CASES = {
     "enter_tower":    ((2, 0), (5, 5), 0x1C, 0x00, None, None),
     "enter_dungeon":  ((2, 0), (5, 5), 0x24, 0x00, None, None),
     "enter_town":     ((2, 0), (5, 5), 0x18, 0x00, None, None),
+    # GET's town arm. asm/363B reads the cell under the player: 0x2c is a WEAPON chest and
+    # 0x2a an ARMOUR one, each granting pool index (rand & 7) and (rand & 3) with zero meaning
+    # EMPTY!. Sector 32 is a town kind, so u2_site_is_dungeon is false and the town arm runs.
+    # chest_plain is the control: a floor tile must print " WHAT?" and grant nothing, and
+    # without it the arm could quietly become "grant on anything" and stay green.
+    "chest_weapon":   ((3, 2), (5, 5), 0x2C, 0x00, None, None),
+    "chest_armour":   ((3, 2), (5, 5), 0x2A, 0x00, None, None),
+    "chest_plain":    ((3, 2), (5, 5), 0x70, 0x00, None, None),
 }
 
 # Slots in the synthetic monx: the engine's loader reads x at 0..31, y at 32..63, hp at
