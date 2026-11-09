@@ -16,6 +16,7 @@
 
 #include "game/combat.h"
 #include "game/monsters.h"   /* U2_MON_SLOTS: the attack takes a creature slot */
+#include "game/victory.h"    /* U2_MON_TYPE_MINAX, u2_victory: the CP8 endgame gate */
 #include "core/rng.h"
 #include "core/state.h"
 
@@ -292,8 +293,22 @@ static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *
          *
          * The thief arm is the only source in the binary for most of the item array, and
          * the only one that can produce the ANKH. See u2_combat_kill_drop(). */
-        if (award)
-            u2_combat_kill_drop(ctx, dead_type);
+        /* asm/2CB5_combat_kill_minax_gate: the kill path branches on the dead creature's TYPE
+         * and on nothing else. Minax falls through into asm/2CCD_victory_call and the ending;
+         * every other type jumps past it to asm/2CD3, the drop dispatch below. It is a
+         * fall-through rather than a call, which is the second time in twelve bytes that this
+         * address range hid a routine from every static pass (see asm/2D07).
+         *
+         * Gated on `award` for the same reason the drop is: the cannon's death branch reaches
+         * asm/2CA4 instead and skips this path entirely. Whether a cannon kill of Minax wins
+         * is not evidenced in either direction, so this mirrors the existing gate instead of
+         * inventing a second one, and G75 is the capture that would settle it. */
+        if (award) {
+            if (dead_type == U2_MON_TYPE_MINAX)
+                u2_victory(ctx);
+            else
+                u2_combat_kill_drop(ctx, dead_type);
+        }
 
         /* asm/2E3D file 0x3114 / 0x3141: gold += (rand & 0x17) | 1, exp += rand & 7.
          * Reproduces the live `KILLED--GOLD+1--EXP.+02` shape exactly. The cannon reaches

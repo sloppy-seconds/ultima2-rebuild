@@ -546,6 +546,14 @@
 #define U2_S_FIRE_DIRECT " DIRECT-"
 /* exe@0x37D3 */
 #define U2_S_FIRE_WHAT " WHAT?"
+/* exe@0x74A9 */
+#define U2_S_MINAX_DEAD "\215\215     MINAX IS DEAD!!\215ALL HER WORKS SHALL DIE!\215"
+/* exe@0x751A */
+#define U2_S_STRANGE_FORCE "\215YOU FEEL A STRANGE FORCE!"
+/* exe@0x7552 */
+#define U2_S_WIN_UNIVERSE "\215\215YOU HAVE SAVED THE UNIVERSE,\215AND COMPLETED ULTIMA ][! SEEK\215NOW TO CONQUER WICKED EXODUS,\215"
+/* exe@0x75B1 */
+#define U2_S_WIN_FOUND_IN "FOUND IN ULTIMA ]I[-D ]II[-P!"
 
 /* Indexed name pool, file 0x4F53.. — see the extractor's NAME_TABLES comment for
  * how the Z screen's group offsets pin each base. */

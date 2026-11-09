@@ -144,6 +144,11 @@ typedef struct u2_ctx {
     /* --api: serve the play API (core/api.h). Chosen at launch like every other
      * backend decision, and it replaces the input backend rather than adding one. */
     int api_mode;
+    /* CP8: set once the endgame fires (game/victory.h). Not a DS byte -- the original has no
+     * "you won" flag, it wins by never returning from asm/2CCD -- so this is the engine's own
+     * latch, and it exists so a gate, the play API or a bot can see that the run ended rather
+     * than inferring it from a log line. Zero until victory runs. */
+    int victory;
     /* --dump-frame FILE: write the last composed framebuffer to FILE as a PPM when the
      * overworld loop ends. --dump-map renders the OPENING frame and returns; this is the
      * one that can show what a scripted run ended looking at, which is what CP7's

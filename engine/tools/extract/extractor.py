@@ -576,6 +576,17 @@ MANIFEST = [
     ("U2_S_FIRE",                  "35C1_cmd_F.asm",             0),
     ("U2_S_FIRE_DIRECT",           "35DE_sub_35de.asm",          0),
     ("U2_S_FIRE_WHAT",             "35D0_sub_35d0.asm",          0),
+
+    # CP8: the victory sequence, at the head of asm/72A0. These four need the "run" locator
+    # because Phase 3 renders the whole 72A0 region as `db` hex -- the block sits past the
+    # highest offset any capture ever executed, so the disassembler never saw it as code and
+    # the ordinary db-index locator cannot see inside it. Same reason cmd_I, cmd_D and cmd_K
+    # needed it. Offsets are file offsets, each string beginning immediately after its own
+    # `call str_out`, and 0x8d is the emitter's CR.
+    ("U2_S_MINAX_DEAD",            "72A0_sub_72a0.asm", ("run", 0x74A9, 48)),
+    ("U2_S_STRANGE_FORCE",         "72A0_sub_72a0.asm", ("run", 0x751A, 26)),
+    ("U2_S_WIN_UNIVERSE",          "72A0_sub_72a0.asm", ("run", 0x7552, 91)),
+    ("U2_S_WIN_FOUND_IN",          "72A0_sub_72a0.asm", ("run", 0x75B1, 29)),
 ]
 
 # The terminator is matched as `0x00` OR `0` because the asm tree is not uniform:

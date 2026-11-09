@@ -24,6 +24,14 @@
 #include "game/monsters.h"
 
 static int fails, checks;
+
+/* CP8: the kill gate hands off to game/victory.c, which prints through the platform seam and
+ * so cannot be linked into this minimal harness. It is stubbed here instead -- and the stub IS
+ * the test. What this harness can prove is WHICH kills hand off, and that is the new logic;
+ * the sequence itself is the engine's business. */
+static int victory_calls;
+void u2_victory(u2_ctx *ctx) { (void)ctx; victory_calls++; }
+
 #define CHECK(cond, ...) do { checks++; if (!(cond)) { fails++; \
     printf("  FAIL  " __VA_ARGS__); printf("\n"); } } while (0)
 
@@ -248,6 +256,39 @@ int main(void)
           "the kill clears type and kind");
     CHECK(a.gold == 0 && a.exp == 0 && c.state.gold_lo == gold_was && c.state.exp_lo == exp_was,
           "a cannon kill awards no gold and no exp — asm/2CA4, not asm/2E3D");
+
+    /* --- CP8: the victory gate, asm/2CB5_combat_kill_minax_gate ------------------------
+       `mov 0x197(%di),%al ; cmp $0x40,%al ; jne <kill-drop>`. The kill path branches on the
+       dying creature's TYPE and on nothing else -- no weapon test, no damage-source test, no
+       HP threshold. That is why W2 in docs/goal-spec.md is no longer a win precondition. */
+    arm(&c, 0x5A, 0x40, 0x40, 1);
+    c.state.mon_type[4] = 0x40;                    /* Minax */
+    c.state.mon_hp[4]   = 0x01;                    /* one blow from dead */
+    victory_calls = 0;
+    r = u2_combat_attack(&c, 4, &a);
+    CHECK(r == 2, "the Minax blow is lethal (got %d; 2 = killed)", r);
+    CHECK(victory_calls == 1,
+          "killing a type-0x40 creature hands off to the victory sequence (asm/2CB5)");
+    CHECK(c.state.mon_type[4] == 0, "and the kill still clears the slot on the way out");
+
+    /* CONTROL: the same kill with any other type must NOT end the game. Without this the
+     * first check would pass even if the gate fired on every kill. */
+    arm(&c, 0x5A, 0x40, 0x40, 1);
+    c.state.mon_type[4] = 0xF0;                    /* a Fighter: the ordinary drop path */
+    c.state.mon_hp[4]   = 0x01;
+    victory_calls = 0;
+    r = u2_combat_attack(&c, 4, &a);
+    CHECK(r == 2, "the control blow is lethal (got %d)", r);
+    CHECK(victory_calls == 0, "CONTROL: a non-Minak kill does not reach the ending");
+
+    /* CONTROL 2: a Minax that survives the blow must not end it either, or the gate would be
+     * reading the slot rather than the kill. */
+    arm(&c, 0x5A, 0x40, 0x40, 1);
+    c.state.mon_type[4] = 0x40;
+    c.state.mon_hp[4]   = 0x99;                    /* far above any single blow */
+    victory_calls = 0;
+    u2_combat_attack(&c, 4, &a);
+    CHECK(victory_calls == 0, "CONTROL: a Minax still standing does not end the game");
 
     printf("attack_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;

@@ -33,6 +33,13 @@
 #include "core/rng.h"
 #include "core/state.h"
 
+/* CP8: src/game/combat.c hands off to game/victory.c when a killed creature's type is 0x40.
+ * That file prints through the platform seam (seam_str_out) and so cannot be linked into this
+ * minimal harness; it is stubbed here. The gate itself is tested where it can be observed --
+ * attack_check.c stubs it the same way and asserts on the call count in both directions. */
+void u2_victory(u2_ctx *ctx);
+void u2_victory(u2_ctx *ctx) { (void)ctx; }
+
 /* ---- the contract CP5 must provide (see the header comment) -------------- *
  * DS offsets are uint16_t: the counters live at DS:26B..26D, above 0xFF. */
 int     u2_combat_special(u2_ctx *ctx, uint16_t counter_ds);
