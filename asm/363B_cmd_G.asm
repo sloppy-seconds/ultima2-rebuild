@@ -37,6 +37,17 @@
 #           GET ARMOUR, on the swords GET WEAPON, each sometimes followed by EMPTY!, and a
 #           non-empty result lands in the inventory. Both arms are reachable; both are gated
 #           in engine/tests/run_cp6.sh on the real tiles in the real sector.
+# PROVEN BY CAPTURE 2026-11-09 -- captures/spice86/vault-pickups (frames: 03-armoury.png
+#           before the pickups, 04-after-pickups.png after, both racks visibly emptied).
+#           ExecutedInstructions of that harvest records 0x363b, 0x3665 (weapon arm),
+#           0x369b (armour arm) and 0x361c (cell clear) each executing once, so both arms
+#           and the consume-the-tile helper are observed, not inferred.
+#           And the harvest settled what [DS:14] is, which three live pokes could not: the
+#           frozen live-ds.bin reads pos=(23,14), DS:14=0x38, and mapx23 at that cell is
+#           0x70 -- 0x70 >> 1 == 0x38. **DS:14 is the ART INDEX of the cell under the
+#           player.** The live readings disagreed only because the character had already
+#           moved between the peek and the screenshot; a frozen capture cannot race. This
+#           is why the engine shifts the tile before comparing.
 cmd_G:
 L_00383b:
         call L_0051df
