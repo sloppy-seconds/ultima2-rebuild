@@ -535,6 +535,20 @@ MANIFEST = [
     ("U2_S_FOOD_YES_A",            "17F5_sub_17f5.asm",        ("run", 0x19F5,  4)),
     ("U2_S_FOOD_YES_B",            "17F5_sub_17f5.asm",        ("run", 0x19FA, 27)),
     ("U2_S_THANK_YOU_AGAIN",       "181A_tavern_thanks.asm",     0),
+    # cmd_O (OFFER GOLD), asm/3C2E. Nine strings, in the order they appear in the file,
+    # which is also the order of the handler's arms: the aim prompt, the two refusals, the
+    # amount question, then the four special-recipient lines and the stat-raise line. The
+    # whole special path is gated on sector 32 (see asm/3C2E_cmd_O.asm's header), so these
+    # are the lines the Hotel California grind and the ring/quicksword chain print.
+    ("U2_S_OFFER_GOLD_DIRECT",     "3C2E_cmd_O.asm", 0),
+    ("U2_S_OFFER_TO_WHOM",         "3C2E_cmd_O.asm", 1),
+    ("U2_S_OFFER_HOW_MUCH",        "3C2E_cmd_O.asm", 2),
+    ("U2_S_OFFER_THANK_YOU",       "3C2E_cmd_O.asm", 3),
+    ("U2_S_OFFER_ENILNO",          "3C2E_cmd_O.asm", 4),
+    ("U2_S_OFFER_EARN_RING",       "3C2E_cmd_O.asm", 5),
+    ("U2_S_OFFER_RING_IS_YOURS",   "3C2E_cmd_O.asm", 6),
+    ("U2_S_OFFER_HERE_TAKE_THIS",  "3C2E_cmd_O.asm", 7),
+    ("U2_S_OFFER_ALAKAZAM",        "3C2E_cmd_O.asm", 8),
     # cmd_R (READY WEAPON) and cmd_N (NEGATE TIME). Both were first observed executing on
     # 2026-10-29 in captures/spice86/cmd-nr-live, which is also where every branch below was
     # seen on a frame rather than only in the listing.
