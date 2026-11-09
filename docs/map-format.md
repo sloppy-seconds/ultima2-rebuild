@@ -163,12 +163,47 @@ than a handful of `0xC0`/`0xE0`, at four and one.
 
 Two consequences worth writing down before anyone rediscovers them:
 
-* **Do not "fix" `0xA0` into `0xC0`.** They are not two spellings of one thing. A dungeon door
-  needs its own rule, and what that rule is remains open -- see `docs/needs-gameplay.md` G74.
+* **Do not "fix" `0xA0` into `0xC0`.** They are not two spellings of one thing, and neither is
+  broken. `0xA0` is a site door that UNLOCK paves with the player's own ground, at the cost of a
+  key. Dungeon doors need no rule of their own, because the two rules the dungeon already has
+  cover them -- see § 3c.
 * **`0x30` is not a third ladder.** ModdingWiki lists it as "Ladder up/down", and it needs no
   new rule: our ladder gates are bit tests (`cmd_D` tests `[DS:14] & 0x20`, `cmd_K` tests
   `[DS:14] & 0x10`), so a cell of `0x30` satisfies both on its own. Their tile table and our
   bitmasks are the same fact from two directions, which is worth recording as corroboration.
+
+## 3c. Dungeon doors are the walk gate and the render rule, not a third system (2026-11-09)
+
+`0xC0` and `0xE0` looked unimplemented until the two halves were put together. They are not:
+
+| code | bit 7 | `& 0x40` | `& 0x20` | render stop rule | walk gate (`== 0x80`) | behaviour |
+| --- | --- | --- | --- | --- | --- | --- |
+| `0x80` | set | clear | — | corridor **ends** | **blocks** | solid rock |
+| `0xC0` | set | set | clear | corridor **continues** | passes | an open doorway, free passage |
+| `0xE0` | set | set | set | corridor **ends** | passes | **a fake wall** |
+
+The render column comes from `asm/6144`'s own header: *"So `0x80` alone is a dead end, `0xC0`
+continues, and `0xE0` stops."* The walk column comes from `asm/277B` at runtime `0x286F`, which
+rejects a stamp (`& 0x0f`) and exact rock (`== 0x80`) and nothing else. **The asymmetry is the
+mechanism, not an oversight**: what is drawn as solid and what blocks movement are decided by
+different routines, and a cell can be one without the other. A fake wall is precisely a cell that
+looks solid and is not.
+
+Both halves are already transcribed in `engine/src/game/dungeon.c` -- the stop rule as
+`if ((c & U2_DG_CHEST) == 0) return; if (c & U2_DG_DOWN) return;` and the walk gate as
+`c == U2_DG_ROCK`. What was missing was the names, which is why this reads as a gap in the
+commit that added them and was not one.
+
+Two corroborations, one from the owner and one from the bytes:
+
+* The owner had seen dungeon doors that are "always open" and had heard the term *fake walls*.
+  Both map onto the table above without adjustment, and the second is what `0xE0` is.
+* Structurally, `0xE0` behaves like a hidden route: in `mapx25` and `mapx35`, 87 of 109 `0xE0`
+  cells (79%) sit inside a wall line with open passage on the far side, against 33% for `0xC0`.
+
+One live subtlety worth knowing and not smoothing over: RETREAT tests `& 0x8f`, which is wider
+than ADVANCE's `== 0x80`. So backing into a fake wall refuses while walking into it passes. That
+is what the bytes say and it is transcribed as written.
 
 The dungeon grid uses exactly seven values in the shipped files -- `0x00 0x10 0x20 0x40 0x80
 0xC0 0xE0` -- and `mapx15` is the one file that breaks the pattern, carrying sector-map terrain

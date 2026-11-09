@@ -24,17 +24,29 @@
  *                          '@' (0x40) and prints " CHEST!" (asm/363B, runtime 0x36C4)
  *       0x20 down ladder — cmd_D's gate is [DS:14] & 0x20
  *       0x10 up ladder   — cmd_K's gate is [DS:14] & 0x10
- *       0xC0 door        — NOT IMPLEMENTED. Named by ModdingWiki's dungeon tile table and
- *                          present in every shipped dungeon and tower grid (48 to 262 cells
- *                          per file). Bit 7 is set, so asm/6144's "corridor ends here" test
- *                          fires on it, yet the ADVANCE gate at asm/277B rejects only
- *                          `al == 0x80` exactly. Those two cannot both be the whole story;
- *                          see docs/needs-gameplay.md G74 for the live check that settles it.
- *       0xE0 secret door — NOT IMPLEMENTED, same open question, and 45 to 259 cells per file.
+ *       0xC0 door        — an OPEN doorway, not a locked one. Bit 7 is set so asm/6144's
+ *                          rock-ahead path fires, but the stop rule then tests `& 0x40` and
+ *                          `& 0x20`, and 0xC0 passes both, so the corridor is drawn THROUGH it
+ *                          and the ADVANCE gate (`c == 0x80`) lets the player walk. Renders as
+ *                          an opening and behaves as an opening: shape, not obstacle. Owner
+ *                          observation 2026-11-09, confirmed against asm/6144's own header
+ *                          ("0x80 alone is a dead end, 0xC0 continues, and 0xE0 stops").
+ *       0xE0 secret door — a FAKE WALL. Bit 7 set and `& 0x20` set, so the render stop rule
+ *                          ends the corridor and it draws as solid rock -- but the walk gate
+ *                          compares `== 0x80` exactly, so it is WALKABLE. A wall you can walk
+ *                          into is exactly what a secret door is, and it needs no key and no
+ *                          OPEN: it is found by walking into it. 45 to 259 cells per dungeon
+ *                          file, and in mapx25/35 fully 79% of them sit inside a wall line
+ *                          with passage beyond, which is the signature of a hidden route.
  *                          Note 0x30 is not a separate code: it is 0x10|0x20, and the two
  *                          ladder gates are bit tests, so an up/down cell satisfies both with
  *                          no extra rule. ModdingWiki lists it as its own row and our bit
  *                          masks already cover it.
+ *   THE TWO HALVES ARE ONE MECHANISM, and reading only one of them looks like a contradiction.
+ *   The walk gate blocks only true rock; the render stop rule decides what is *drawn* as solid.
+ *   That asymmetry is the whole door system. It has one live consequence worth knowing: RETREAT
+ *   tests `& 0x8f`, which is wider than ADVANCE's `== 0x80`, so backing into a fake wall
+ *   refuses while walking into it passes. Transcribed as the bytes have it, not unified.
  *   The shipped mapx35 uses exactly seven values, all multiples of 0x10, and only
  *   seven of the sixteen combinations a free nibble would allow. That is a small
  *   enum, not an art index, and it is why the tile renderer has never covered this.
@@ -45,8 +57,9 @@
  *   `u2_unlock_rule` tests the cell for 0xA0, which is a SITE door tile: 0xA0 occurs in 16
  *   town and castle maps (1 to 29 cells) and in ZERO dungeon or tower files. The dungeon
  *   doors are 0xC0 and 0xE0, which occur in quantity in dungeon files and almost not at all
- *   in site maps. So the implemented 0xA0 path is correct for towns and castles and cannot
- *   ever fire in a dungeon. Counts and the reasoning: docs/map-format.md § 3b.
+ *   in site maps. So UNLOCK is a town-and-castle mechanic and correctly never fires underground
+ *   -- dungeon doors are free passage and fake walls are found by walking, so there is nothing
+ *   for a key to do there. Counts and the reasoning: docs/map-format.md § 3b.
  *
  *   The view is a wireframe. asm/6000 renders, and it renders nothing at all when
  *   the light counter [DS:26] is zero — that branch is the darkness, and it is a
@@ -95,11 +108,13 @@ typedef struct u2_overworld u2_overworld;
 #define U2_DG_TERRAIN 0xf0u
 #define U2_DG_STAMP   0x0fu
 
-/* Dungeon door codes. Present in the shipped grids, named here so the gap is visible;
- * nothing reads them yet. A site door is a different code (0xA0) on a different map layer
- * and is handled by u2_unlock_rule -- do not reuse that constant down here. */
-#define U2_DG_DOOR     0xc0u
-#define U2_DG_SECRET   0xe0u
+/* Dungeon door codes. Both are already handled -- by the render stop rule and the walk gate
+ * together, not by any code that names them. 0xC0 draws as an opening and is walkable; 0xE0
+ * draws as solid rock and is ALSO walkable, which is what makes it a fake wall. A site door is
+ * a different code (0xA0) on a different map layer and is handled by u2_unlock_rule; do not
+ * reuse that constant down here, and do not add an unlock test for these two. */
+#define U2_DG_DOOR     0xc0u   /* corridor continues; free passage */
+#define U2_DG_SECRET   0xe0u   /* corridor stops, but the walk gate passes: a fake wall */
 
 /* asm/6078 samples eight depths; asm/6144 stops drawing at seven. */
 #define U2_DG_SAMPLE_DEPTH 8
