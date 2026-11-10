@@ -1,7 +1,20 @@
 # Handoff — the space view (fixes 2 and 3)
 
-**Status: not started.** Fix 1 shipped in `aec9d6c`. This is the remaining work, written down
-because it is one job and not two.
+**Status: fix 1 and fix 2 shipped; fix 3 shipped in part.** Fix 1 = `aec9d6c` (boarding draws
+the vehicle). Fixes 2 and 3 = `8b57ba5` (`space_loop` presents instead of spinning; the orbit /
+deep-space screen is drawn: star field, ship cross, readout values).
+
+**What is still open, and what it needs:**
+
+| item | state | needs |
+| --- | --- | --- |
+| hyperwarp **radiating** star field (`21-space.png`) | not implemented | the original's warp animation is not decoded; the engine currently repaints the same static field. Enhancement-vs-fidelity call, same as the static field |
+| readout **position** | drawn as text lines, not the original's fixed right-hand cells | `asm/6999` draws the digits graphically at fixed cells; those cells are not decoded. The values are right, the layout is approximate |
+| arrow step size | `U2_SPACE_SHIP_STEP 4`, **UNMEASURED** | one live peek: `8be:47b` before and after one `Right` |
+| § 5 leg 3 gate | not written | needs a scripted run that can *reach* space; the suite has no route to a rocket today |
+| star field positions | generated, labelled enhancement | the drawing routine is unidentified |
+
+Everything below is the original scoping, kept as written.
 
 ## 0. Why 2 and 3 are the same job
 
@@ -110,15 +123,18 @@ Do not present a generated field as the original's.
 
 A gate must be able to fail where it enforces.
 
-1. **No hot spin**: assert `space_loop` contains a present call and no bare `continue` on the
-   empty-key path. Control: remove the present, watch it go red.
-2. **Readout**: drive a launch in a scripted run and assert the frame's right column reads
-   `FUEL=` and the world's triple — `6/6/6` for Earth orbit, `9/9/9` for X. Compare against the
-   capture PNGs, not against your own expectation.
-3. **Orbit vs deep space**: `9/9/9` → `YOU ARE ORBITING X.`; an off-course roll → `YOU ARE IN DEEP
-   SPACE.` with coords in 0..7. `space.h` already takes the RNG as an argument precisely so this
-   can be forced.
-4. **The landing sector rule**: dive from world N lands in sector N0, ones digit 0.
+1. **No hot spin** — DONE in `8b57ba5`, `tests/space_view_gate.py` leg 1, wired into CP4, control
+   seen to fail. Asserts a present call, no bare empty-poll `continue`, a paint call, and one
+   prompt per command.
+2. **Ship sprite geometry** — DONE, same gate leg 2: the sweep counts are read out of
+   `asm/6CC4_space_ship_erase`'s own header rather than restated, so it checks the evidence and
+   not the fix.
+3. **Readout values** — PARTIAL. The values are derived correctly from `st->world` and `DS:E5`,
+   and `space_readout()` prints them, but no gate drives a run far enough to assert it. Blocked on
+   the same thing as leg 4 below.
+4. **Orbit vs deep space / dive sector, end to end** — the pure rules are covered by
+   `space_check.c` (37 checks), but nothing in the suite can reach space in a live run. Building
+   that route is the next useful piece of work here.
 
 ## 6. Also still open from the same playtest
 

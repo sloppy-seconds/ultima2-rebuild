@@ -23,10 +23,10 @@ exact byte-for-byte fidelity.
 > passability), W3 (per-mode food) and W4/W5 (`cmd_L`) are implemented and W1/W2/W3 are gated as
 > CP5 P1 and V1. The one genuinely open question there (the plane's airborne flag, W6) is marked as
 > needing a capture and not a guess, and is now `docs/needs-gameplay.md` G43.** **Scoped handoffs are
-> the entry point for their own topic, not history:** `docs/handoff-space-view.md` (**not started**
-— the space screen is not drawn at all, which is why launching looked like a crash; `space_loop`
-hot-spins with no present call, while the model underneath it in `space.h` is already complete and
-byte-cited, so what is missing is presentation only. Its § 1 names the four capture frames that
+> the entry point for their own topic, not history:** `docs/handoff-space-view.md` (**fixes 1 and 2 shipped, 3 shipped in part**
+— `space_loop` no longer hot-spins and the orbit / deep-space screen is drawn; the remaining gaps
+are listed in its status table, and the two honest ones are the radiating hyperwarp animation and
+the readout's fixed cell positions, neither of which has a decoded routine behind it. Its § 1 names the four capture frames that
 define the screen; **the orbit/landed discriminator is closed** by `captures/spice86/w6-orbit-dive/`
 — there is no in-space boolean, launch changes only the coordinate triple and the fuel, and the
 recommendation in § 3a is to keep the loop-scoped structure rather than test the staging tables.
