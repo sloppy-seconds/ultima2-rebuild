@@ -609,6 +609,40 @@ void u2_death(u2_ctx *ctx)
     /* asm/0C8C: " IS DEAD!" then the game's newline (the 0x8d in its db). */
     seam_str_out(ctx, U2_S_IS_DEAD);
     seam_char_print(ctx, '\r');
+
+    /* Everything after the announcement is the owner's ruling, not the bytes: see
+     * ctx.h's death_pending note. The loops unwind on the flag and the handoff below
+     * does the press-any-key and the trip back to the menu. */
+    ctx->death_pending = 1;
+}
+
+/* What the engine does once the death announcement is on screen. Owner ruling
+ * 2026-11-11: print (PRESS ANY KEY), wait for a key, and go back to the menu.
+ *
+ * The literal is the game's own "(PRESS ANY KEY)" (asm/38B0 file 0x3b81, where it
+ * introduces the descent), reused rather than invented because the engine already owns
+ * that string and it says the same thing here.
+ *
+ * It polls rather than blocks for the same reason the title flow's disk-swap spin does:
+ * a headless or scripted run has no key to wait for, and seam_key_poll's exhausted
+ * signal is the only thing that distinguishes "not yet" from "never". The present inside
+ * the loop is what makes the message appear before the wait, which is the whole defect
+ * this replaces -- the game used to end with the announcement still in a frame nobody
+ * had shown. */
+void u2_death_handoff(u2_ctx *ctx)
+{
+    seam_str_out(ctx, U2_S_PRESS_ANY_KEY);
+    seam_present(ctx);
+
+    u2_key k;
+    for (;;) {
+        if (seam_key_poll(ctx, &k))
+            break;
+        if (ctx->exit_code || ctx->input_exhausted)
+            break;
+        seam_present(ctx);
+        seam_wait_ms(ctx, 16);
+    }
 }
 
 /*
@@ -1618,6 +1652,11 @@ int u2_overworld_init_state(u2_ctx *ctx, u2_overworld *ow)
 {
     if (!ctx || !ow) return -1;
     memset(ow, 0, sizeof *ow);
+    /* A fresh session clears the record of how the last one ended. The handoff leaves
+     * death_pending set on purpose -- it is how the callers know to go back to the menu --
+     * so it has to be dropped here rather than at the wait, or the new session would
+     * unwind on its first empty poll. */
+    ctx->death_pending = 0;
     ow->x = ctx->state.entry_x;
     ow->y = ctx->state.entry_y;
     ow->sector_hi = ctx->state.sector_first;
@@ -2064,6 +2103,12 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
 
         u2_overworld_draw(ctx, ow);
         if (seam_present_frame(ctx)) break;      /* window closed */
+
+        /* Death unwinds the session instead of ending the process. Checked after the
+         * draw and the present so the announcement and the zeroed band are actually on
+         * screen before the handoff asks for a key -- the defect Paul reported was the
+         * game vanishing with that message still in an unshown frame. */
+        if (ctx->death_pending) break;
 
         u2_key k;
         const int r = seam_key_poll(ctx, &k);
@@ -2606,6 +2651,17 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
     }
     ctx->frame = NULL;
     u2_frame_free(&ow->frame);
+
+    /* Death asks for a key here, not in the callers. There are three ways into this loop
+     * -- the menu's 'P' (title.c), the driver's enhanced-mode handoff (game.c) and the
+     * --play-map development entry (main.c) -- and a wait placed in any one of them is a
+     * wait the other two do not do. That is not theoretical: the first version of this
+     * put the handoff in title.c and game.c, and the scripted run that found it missing
+     * was the --play-map one. The flag stays set as the record of how the session ended;
+     * the next entry clears it, and the callers read it to decide menu-versus-exit. */
+    if (ctx->death_pending)
+        u2_death_handoff(ctx);
+
     return 0;
 }
 

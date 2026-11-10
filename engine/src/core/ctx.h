@@ -360,6 +360,17 @@ typedef struct u2_ctx {
                               * (see the underlay note in game/overworld.c). Every
                               * consumer must announce the substitution. */
     int exit_code;          /* set by game code / backends to force termination */
+    /* Death handoff. Owner ruling 2026-11-11: "on death the game just ends, lets have
+     * it print 'press any key' and take them back to the menu". This is a ruling and not
+     * a decode: asm/0C62_death prints the announcement and falls through into a creature
+     * scan that has never been observed to return in any capture, so what the original
+     * does next is not recoverable from the bytes -- and death is memory-only anyway
+     * (asm/0C62 never calls the save body), so the record on disk is still whole.
+     *   death_pending   set by u2_death; every input loop unwinds on it
+     *   title_skip_intro the handoff re-enters the MENU, not the splash-and-poem intro
+     */
+    int death_pending;
+    int title_skip_intro;
 
     /* Per-backend private state, one slot each so backends stay independent
      * and a context can be torn down without backend-specific knowledge. */

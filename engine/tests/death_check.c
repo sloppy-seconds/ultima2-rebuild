@@ -25,6 +25,7 @@
 #include "core/seam.h"
 #include "core/state.h"
 #include "core/vram.h"
+#include "platform/platform.h"
 #include "game/overworld.h"
 #include "game/status.h"
 #include "gen_content.h"
@@ -32,6 +33,27 @@
 static int fails, checks;
 #define CHECK(cond, ...) do { checks++; if (!(cond)) { fails++; \
     printf("  FAIL  " __VA_ARGS__); printf("\n"); } } while (0)
+
+/* A hand-built input backend, because this test links the game core and not the
+ * platform layer: the handoff waits on seam_key_poll, and with no input wired that
+ * poll dereferences a NULL pointer. keys_left is the whole script: one key, then
+ * finished for good, which is the scripted stand-in for a player who walked away. */
+static int keys_left = 1;
+
+static int handoff_poll(u2_ctx *ctx, u2_key *out)
+{
+    (void)ctx;
+    if (keys_left <= 0) return -1;
+    keys_left--;
+    memset(out, 0, sizeof *out);
+    out->ch = 'x';
+    return 1;
+}
+
+static const u2_input handoff_input = {
+    .name = "death-check-script",
+    .poll = handoff_poll,
+};
 
 static const char *row_text(u2_ctx *ctx, int row, char *buf, int c0, int c1)
 {
@@ -133,6 +155,45 @@ int main(void)
     CHECK(u2_overworld_spend_food(&ctx, 999999) == 1, "control: an underflowing spend returns 1");
     CHECK(strcmp(msg_text(&ctx, 22, buf), "G23MAX IS DEAD!") == 0,
           "the food borrow-out reaches the same tail, not just the zeroing");
+
+    /* --- the death handoff: press any key, back to the menu -----------------
+     * Owner ruling 2026-11-11, because the original's tail falls through into a loop
+     * that has never been seen to return and the engine was simply ending. These assert
+     * the ruling, not a decode, and they are here rather than only in a scripted run
+     * because the scripted run cannot reach the --play-map entry that was the one
+     * missing the wait. */
+    arm(&ctx);
+    keys_left = 1;
+    ctx.input = &handoff_input;
+    u2_death(&ctx);
+    CHECK(ctx.death_pending == 1,
+          "death records that the session ended dead, so the loops unwind instead of ending");
+    CHECK(msg_text(&ctx, 23, buf)[0] == '\0',
+          "death alone does not print the press-any-key line");
+
+    u2_death_handoff(&ctx);
+    CHECK(strcmp(msg_text(&ctx, 23, buf), U2_S_PRESS_ANY_KEY) == 0,
+          "the handoff prints (PRESS ANY KEY) on the row below the announcement");
+    CHECK(ctx.death_pending == 1,
+          "the handoff leaves the flag set: it is how the caller knows to go to the menu");
+    CHECK(keys_left == 0,
+          "the handoff waited for a key rather than falling straight through");
+
+    /* Control: a spent script must not hang the harness. seam_key_poll returns -1 and
+       the handoff has to come back anyway. */
+    arm(&ctx);
+    keys_left = 0;
+    ctx.input = &handoff_input;
+    u2_death(&ctx);
+    u2_death_handoff(&ctx);
+    /* Reaching this line at all is the assertion: with no key coming, a wait written as
+     * `while (!seam_key_poll(...))` would spin here forever, because seam_key_poll
+     * returns 0 for "no key right now" and the exhausted signal is a separate flag. */
+    CHECK(ctx.death_pending == 1,
+          "control: an exhausted script ends the wait without clearing the record or "
+          "hanging the harness");
+    CHECK(strcmp(msg_text(&ctx, 23, buf), U2_S_PRESS_ANY_KEY) == 0,
+          "the prompt is printed before the wait, so it is on screen even if no key comes");
 
     printf("death_check: %d checks, %d failures\n", checks, fails);
     return fails != 0;

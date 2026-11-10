@@ -141,23 +141,40 @@ void u2_game_run(u2_ctx *ctx)
     for (;;) {
         ctx->restart_requested = 0;
         u2_title_flow(ctx);
-        if (!ctx->restart_requested || ctx->exit_code) break;
-    }
 
-    /* Enhanced mode's creation tail sets this instead of restarting: straight
-     * into the world, no disk-swap theatre.
-     *
-     * It must spawn from the player record, exactly as the 'P' path does, because
-     * that is the same record creation just wrote. u2_overworld_run makes that
-     * choice itself now (see overworld_enter) rather than leaving it to each call
-     * site; it used to call u2_overworld_init, the probe entry, which put every
-     * enhanced-mode start in sector 30 near Lord British's castle instead of
-     * sector 20 at 20,20, the pair creation writes at asm/5BDC..5BE8. Original
-     * mode never showed the defect only because its tail restarts and the player
-     * comes back in through 'P'. */
-    if (ctx->enter_world && !ctx->exit_code) {
-        u2_overworld ow;
-        (void)u2_overworld_run(ctx, &ow);
+        /* Enhanced mode's creation tail sets this instead of restarting: straight
+         * into the world, no disk-swap theatre.
+         *
+         * It must spawn from the player record, exactly as the 'P' path does, because
+         * that is the same record creation just wrote. u2_overworld_run makes that
+         * choice itself now (see overworld_enter) rather than leaving it to each call
+         * site; it used to call u2_overworld_init, the probe entry, which put every
+         * enhanced-mode start in sector 30 near Lord British's castle instead of
+         * sector 20 at 20,20, the pair creation writes at asm/5BDC..5BE8. Original
+         * mode never showed the defect only because its tail restarts and the player
+         * comes back in through 'P'. */
+        if (ctx->enter_world && !ctx->exit_code) {
+            u2_overworld ow;
+            (void)u2_overworld_run(ctx, &ow);
+
+            /* Death returns to the menu rather than ending the program (owner ruling
+             * 2026-11-11). The 'P' path inside the title flow handles its own death
+             * without leaving the loop; this is the enhanced-mode path, which enters the
+             * world from here, so the handoff and the trip back have to happen here too.
+             * title_skip_intro is what makes "back to the menu" a menu and not the
+             * splash again, and enter_world is cleared because the dead character is not
+             * a character to drop back into. */
+            if (ctx->death_pending) {
+                /* The key-press wait already happened inside the loop; this is the
+                 * destination. enter_world goes because a dead character is not one to
+                 * drop straight back into, and the menu is the honest place to land. */
+                ctx->title_skip_intro = 1;
+                ctx->enter_world = 0;
+                continue;
+            }
+        }
+
+        if (!ctx->restart_requested || ctx->exit_code) break;
     }
 }
 

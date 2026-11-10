@@ -1256,6 +1256,10 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
         if (r) {
             if (!u2_space_dive_survives(u2_world_tile_at(&ow->world, ow->x, ow->y))) {
                 u2_death(ctx);
+                /* Do not fall through to the parked-rocket bookkeeping: a dead character
+                 * leaves no rocket behind, and the handoff that asks for a key belongs to
+                 * the top-level flow, not to this loop. */
+                return;
             } else if (st->world == 0) {
                 st->rocket_parked = 0;
             } else {
@@ -1337,6 +1341,7 @@ static void space_loop(u2_ctx *ctx, u2_overworld *ow)
         int r;
         while ((r = seam_key_poll(ctx, &k)) == 0) {
             if (ctx->exit_code || ctx->input_exhausted) return;
+            if (ctx->death_pending) return;    /* the dive killed you; unwind to the handoff */
             if (seam_present_frame(ctx)) return;      /* window closed */
         }
         if (r < 0) return;                            /* input exhausted: original blocks */

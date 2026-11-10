@@ -382,6 +382,14 @@ static void run_play(u2_ctx *ctx)
                 u2_overworld ow;
                 if (u2_overworld_init_state(ctx, &ow) == 0) {
                     u2_overworld_loop(ctx, &ow);
+                    /* Death does not end the program. The loop already asked for the key
+                     * (u2_death_handoff, at the end of u2_overworld_loop); what is left
+                     * here is the destination: back to the menu, and skip the splash on
+                     * the way, because a player who just died wants the load key and not
+                     * the intro. The save on disk is untouched -- asm/0C62 zeroes memory
+                     * only -- so loading again is a whole character. */
+                    if (ctx->death_pending)
+                        ctx->title_skip_intro = 1;
                     return;
                 }
                 /* The record loaded but the world did not (no --data-dir, no
@@ -430,9 +438,16 @@ int u2_title_flow(u2_ctx *ctx)
     ctx->state.story_flag = 0;                  /* asm/0133_sub_0133.asm */
 
     /* Opening presentation, then the title (asm/0237 branches to the title
-     * while the story flag is still clear). */
-    if (!present_intro(ctx) && ctx->state.story_flag != 0 && !flow_stopped(ctx))
+     * while the story flag is still clear).
+     *
+     * title_skip_intro is the engine's own flag, set by the death handoff: a player who
+     * just died is going back to the MENU, and replaying the splash and the poem to get
+     * there is a wall between them and the load key. The original never needs it because
+     * its death path does not return at all (see ctx.h's death_pending note). */
+    if (!ctx->title_skip_intro && !present_intro(ctx)
+        && ctx->state.story_flag != 0 && !flow_stopped(ctx))
         present_poem(ctx);
+    ctx->title_skip_intro = 0;
 
     for (;;) {
         draw_title(ctx);

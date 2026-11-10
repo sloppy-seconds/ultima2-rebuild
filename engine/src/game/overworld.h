@@ -335,6 +335,12 @@ void u2_overworld_site_leave(u2_ctx *ctx, u2_overworld *ow);
  */
 void u2_death(u2_ctx *ctx);
 
+/* The death handoff: `(PRESS ANY KEY)`, wait for one key, then back to the menu.
+ * Owner ruling 2026-11-11, because the original's death tail never returns and the
+ * engine was simply ending. game.c calls this when a session unwinds with
+ * ctx->death_pending set; every input loop breaks on that flag instead. */
+void u2_death_handoff(u2_ctx *ctx);
+
 /* Bitmask over tile ids 0..63 that the engine stepped onto without a measured
  * passability verdict. Zero means every tile the player entered had evidence
  * behind it; non-zero names exactly which ids still need a live sample.
