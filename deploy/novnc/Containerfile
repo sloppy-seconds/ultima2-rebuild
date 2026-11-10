@@ -29,7 +29,13 @@ RUN dnf -y install \
 
 COPY u2-sdl /usr/local/bin/u2-sdl
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/u2-sdl
+# u2-shot: a stdlib-only VNC client, so a running session can be asked what it is drawing.
+# It is here because nothing else in this image can say: there is no xwd, no ImageMagick and
+# no ffmpeg, the play API returns the TEXT grid, and --dump-screen writes only the first
+# presented frame. Standard library only, so it costs the image no new package.
+# See the docstring in vnc_shot.py for why pixels matter more than the grid here.
+COPY vnc_shot.py /usr/local/bin/u2-shot
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/u2-sdl /usr/local/bin/u2-shot
 
 # Overridable so one host can run several. 6080/5900 are taken by the Spice86
 # watching container on ai, so the defaults avoid them.

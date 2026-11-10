@@ -8,6 +8,9 @@
 #   ./up.sh --port N        # host port (default 6082; 6081 is taken by another container)
 #   ./up.sh --down          # stop and remove the container
 #   ./up.sh --status        # report what the running container is actually drawing
+#   ./up.sh --shot [FILE]   # save the frame the running session is drawing right now
+#                           # (default /var/tmp/u2-shot.png). Pixels, not the text grid:
+#                           # see deploy/novnc/vnc_shot.py for why that distinction matters.
 #   ./up.sh --name LABEL    # container name (default u2-novnc)
 #   ./up.sh --no-verify     # skip the smoke test (NOT recommended; see below)
 #
@@ -46,6 +49,7 @@ STAGED="$HERE/u2-sdl"
 CLEANROOM=0
 LOADSAVE=0
 DOWN=0
+SHOT=""
 STATUS=0
 VERIFY=1
 
@@ -55,6 +59,11 @@ while [ $# -gt 0 ]; do
         --load-save) LOADSAVE=1; shift ;;
         --down)      DOWN=1; shift ;;
         --status)    STATUS=1; shift ;;
+        --shot)      if [ $# -gt 1 ] && [ "${2:0:1}" != "-" ]; then
+                         SHOT=$2; shift 2
+                     else
+                         SHOT=/var/tmp/u2-shot.png; shift
+                     fi ;;
         --no-verify) VERIFY=0; shift ;;
         --port)      HOST_PORT=$2; shift 2 ;;
         --name)      CONTAINER=$2; shift 2 ;;
@@ -102,6 +111,18 @@ if [ "$STATUS" = 1 ]; then
     podman logs "$CONTAINER" 2>&1 \
         | grep -iE "cleanroom|tiles extracted|tiles from cache" | tail -3 \
         || say "no art-mode line in the log yet"
+    exit 0
+fi
+
+if [ -n "$SHOT" ]; then
+    # Grab the frame inside the container (x11vnc listens on loopback only) and copy it out.
+    # The engine is still drawing while this happens, so this is a snapshot of a live session,
+    # not a posed one -- which is the point.
+    podman exec "$CONTAINER" u2-shot --out /tmp/u2-shot.png \
+        || die "u2-shot failed; is a container named $CONTAINER running? (up.sh --status)"
+    podman cp "$CONTAINER:/tmp/u2-shot.png" "$SHOT" || die "could not copy the frame out"
+    podman exec "$CONTAINER" rm -f /tmp/u2-shot.png >/dev/null 2>&1
+    say "shot: $SHOT"
     exit 0
 fi
 
