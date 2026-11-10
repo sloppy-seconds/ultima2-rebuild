@@ -3293,3 +3293,62 @@ Neither is gated today, and the space-view lesson applies directly: a gate that 
 function was called proves nothing about what the player sees. Any check written for these should
 assert the visible outcome — a refusal line, or a creature's HP dropping — not that a handler ran.
 
+## Audit: every input-poll loop that never presents (owner-commissioned, 2026-11-10)
+
+Prompted by the owner finding two more instances of a bug this session had already fixed once and
+not hunted for in the sibling functions. The instruction was to grep the engine for the shape and
+**fix or list** them.
+
+The shape: a loop that calls `seam_key_poll` and, on "no key yet", loops without ever calling
+`seam_present_frame`. `seam_key_poll` does not present internally (`core/seam.c:198` — it calls
+`ctx->input->poll` and folds the result), so anything that wants the screen to change while waiting
+must present itself.
+
+**13 real call sites** (14 matches; `core/seam.c:198` is the definition, not a call). Counting
+"functions that never present" gives 11, and reporting that as *11 bugs* would be wrong: nine of
+them present once and then legitimately wait.
+
+### A. Visible defects — the screen goes stale while waiting for input that should change it (3)
+
+| site | symptom |
+| --- | --- |
+| `game/commands.c:1052` `space_hyperwarp` | the `HYPERWARP TO:` / `XENO=` / `YAKO=` / `ZABO=` prompts are written to the vram and never presented, so the player types the destination blind. Owner-reported 2026-11-10: "i hit H and it doesn't show the command, nor does it show asking X Y Z, but it accepts 9 9 9 anyway". The prompts also carry no CR between them |
+| `game/commands.c:1088` `rocket_descent` | calls `u2_overworld_draw` every step and never presents, so the southward descent is invisible and the space screen stays up. The owner's own diagnosis was correct: "maybe it just needs to clear the space screen back out to show the overworld" |
+| `game/commands.c:924` `launch_plane` | same shape — `flight_line` prints the heading words and the loop never presents, so plane flight text is invisible for the same reason the descent is. **Not owner-reported; found by this audit** |
+
+All three are one fix each: present inside the wait loop, as `space_loop` now does.
+
+### B. Present-then-spin — screen is correct, CPU is not (9)
+
+`game/title.c` at lines 147, 157 (`hold_for_esc`), 303 (`wait_choice`), 351, 354 (`run_demo`),
+417 (`run_play`), 491 (`u2_title_flow`), and `game/game.c:94` (`run_selftest`).
+
+The title flow presents once through its draw helper (`title.c:204`,
+`const int quit = seam_present_frame(ctx);`) and then waits for a single key. The screen is
+therefore **correct**; what these burn is CPU while a human reads a menu. `wait_choice` also
+already carries the hard-won exit conditions (`exit_code || input_exhausted || enter_world`, the
+T6 lesson), so they are not naive loops — they are correct loops that spin.
+
+**Listed, not fixed.** They are a different defect from class A, they are not what the owner
+reported, and touching seven sites in the title flow to reduce idle CPU would be a change nobody
+asked for, with real regression risk on the demo recorder, which drives that flow. If it is worth
+doing, it is worth doing as its own piece with a measurement of the burn — not as a drive-by.
+
+### C. Correct already (2)
+
+`game/commands.c:1164` `space_loop` and `game/overworld.c:2063` `u2_overworld_loop` — both present
+in their wait path. `space_loop` is the one fixed earlier today (`8b57ba5`).
+
+### The process finding, which is the point of the audit
+
+**A fix shipped without checking whether the same mistake existed one function over.** `space_loop`
+was corrected, and `space_hyperwarp` and `rocket_descent` — same file, same wait — were left
+untouched. That is the second time in this session; the first was the blank text pane, where the
+gate asserted calls and geometry and passed while the screen was visibly wrong.
+
+The generalisable rule: **when a defect is a shape rather than a line, grep for the shape before
+declaring it fixed.** A follow-up worth having is a gate that fails on the shape itself — a
+`seam_key_poll` inside a loop with no `seam_present_frame` between the poll and the loop edge, in a
+function that also draws. Class A is exactly three sites, so such a gate could be written as an
+allow-list and would have caught all three.
+
