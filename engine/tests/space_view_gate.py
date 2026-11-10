@@ -175,6 +175,100 @@ if dm_loop:
     check(-1 < i_present < i_wait < i_poll,
           "the wait sits after the present and before the key poll, as in the original's loop")
 
+# ---- leg 6: the space text pane -----------------------------------------------------
+# Owner playtest 2026-11-10, two symptoms: the hyperwarp target prompt never appeared, and
+# letters were missing from the HP/FOOD display. Both were the readout colliding with the CMD
+# pane, and the bytes name the three things that keep them apart (see space_values' note in
+# commands.c): the labels draw at column 30 under a wide margin, the values draw at column 37
+# as two BCD digits, and asm/6FA3 then narrows the scroll margin to 0x1f and parks the cursor
+# at column 0 of the bottom row. The gate checks the bytes are still modelled, and then -- the
+# part that matters -- checks the RENDERED GRID, because every one of these failures left the
+# code shape intact and the screen wrong.
+check("seam_clear_screen" in src and "space_screen_enter" in src,
+      "entering space clears the pane (asm/6999 L_006b9a sets graphics mode 4, which clears)")
+for name, want in (("U2_SPACE_VALUE_COL", "37"), ("U2_SPACE_MARGIN_CMD", "0x1f")):
+    got = re.search(r"#define\s+%s\s+(\S+)" % name, src)
+    check(got is not None and got.group(1).rstrip() == want,
+          f"{name} is {want}, matching asm/6FA3 (got {got.group(1) if got else 'missing'})")
+vm = re.search(r"static void space_values\(.*?\n\}\n", src, re.S)
+check(vm is not None and vm.group(0).count('%02u') == 4,
+      "the four readout values print as two BCD digits (FUEL=08, not FUEL=8)")
+check(vm and re.search(r"seam_goto\(ctx, 0, U2_SPACE_CMD_ROW\)", vm.group(0)),
+      "the status pass parks the cursor at column 0 of the bottom row (asm/6FA3 L_007202)")
+check(re.search(r"seam_char_print\(ctx, k\.ch\)", src) is not None,
+      "the typed hyperwarp digit is echoed (asm/6DFD L_006f7f calls char_print_wrap on it)")
+
+# The rendered-grid half. Skips, loudly, when there is no build or no copy of the game.
+U2_BIN = os.path.join(ROOT, "engine", "u2")
+PLAYER = os.path.join(ROOT, "original", "player")
+if not os.path.exists(U2_BIN) or not os.path.exists(PLAYER):
+    print("  SKIP  grid check: needs engine/u2 and original/player (gitignored) — "
+          "this leg cannot go red here, so run it locally after a build")
+else:
+    import shutil
+    import subprocess
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix="u2spacegate-") as work:
+        save = os.path.join(work, "save", "PLAYER")
+        os.makedirs(save)
+        rec = os.path.join(save, "PLAYER")
+        shutil.copyfile(PLAYER, rec)
+        for step in (["maxout", rec], ["set", rec, "name", "SPACEGATE"], ["set", rec, "sector", "41"],
+                     ["setpos", rec, "38", "3"], ["set", rec, "item", "TRI-LITHIUM", "9"]):
+            subprocess.run([sys.executable, os.path.join(ROOT, "tools", "u2_edit.py")] + step,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+        keys = os.path.join(work, "k.keys")
+
+        def space_grid(script):
+            """Run the scripted rocket and hand back the last grid the engine printed.
+            --dump-each prints one grid per present but only the last one survives to stdout,
+            so a frame you want to assert on has to be the frame the run ENDS on: pass the
+            script that stops there."""
+            with open(keys, "w") as fh:
+                fh.write(script)
+            r = subprocess.run([U2_BIN, "--headless", "--play-map",
+                                "--data-dir", os.path.join(ROOT, "original"),
+                                "--save-dir", os.path.join(work, "save"),
+                                "--script", keys, "--dump-each"],
+                               capture_output=True, text=True, timeout=120)
+            rows = [l for l in r.stdout.splitlines() if l.startswith("|")]
+            return r.stdout, "\n".join(rows[-5:])
+
+        grid, pane = space_grid("B\nL\nH\n9\n9\n9\n")
+        if "YOU ARE ORBITING" not in grid:
+            # A seed that will not load must not be able to pass by producing an empty screen.
+            # The blank-name refusal is the live trap: `NO CHARACTER ON DISK` leaves the
+            # overworld status block on screen and every assertion below would read as a
+            # different bug. Name the real cause instead.
+            check(False, "the scripted rocket reached orbit -- the seed did not load "
+                         "(a maxout record needs a name as well as stats)")
+        check("FUEL=0" in pane and "XENO=0" in pane,
+              "the readout reaches the screen whole (FUEL=/XENO= present in the final grid)")
+        check("UEL=" in pane and "ENO=" not in pane.replace("XENO=", ""),
+              "no readout label is clipped by the CMD scroll (a shaved `FUEL=` reads `UEL=`)")
+        check("H.P." not in pane and "FOOD" not in pane,
+              "the overworld's H.P./FOOD block is gone in space (the mode-4 clear)")
+        # The clear's real discriminator, and it needed one: with the readout now covering
+        # columns 30..38, deleting the clear left the H.P./FOOD check green anyway -- the
+        # readout simply paints over the stale block. What the clear demonstrably removes is
+        # the launch chatter above it, so assert that, on a run that STOPS at orbit (a later
+        # scroll would hide the line for the wrong reason). Without the clear the orbit frame
+        # reads `CMD: LAUNCH--ROCKET / HYPERWARP ENGAGED!! / CMD: / CMD:`; with it, the frame
+        # starts at HYPERWARP ENGAGED! exactly as 22-right.png does.
+        _, orbit_pane = space_grid("B\nL\n")
+        check("LAUNCH--ROCKET" not in orbit_pane,
+              "entering space wipes the launch chatter (asm/6999 L_006b9a sets mode 4, which "
+              "clears; 22-right.png has HYPERWARP ENGAGED! at the top of the pane, not the "
+              "launch line)")
+        check("HYPERWARP ENGAGED!" in orbit_pane,
+              "and what the space screen prints after the clear is on screen")
+        # The prompt frame: stop the script at H so the prompt is the last thing presented.
+        _, prompt_pane = space_grid("B\nL\nH\n")
+        check("HYPERWARP TO:" in prompt_pane and "XENO=" in prompt_pane,
+              "the hyperwarp target prompt is on screen while it waits (owner symptom 1)")
+        check("FUEL=0" in prompt_pane,
+              "the readout is still whole on the prompt frame, not just the last one")
+
 if fails:
     print(f"\nSPACE VIEW GATE: FAIL ({len(fails)})")
     sys.exit(1)
