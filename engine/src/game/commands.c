@@ -965,45 +965,110 @@ static u2_cmd_result launch_plane(u2_ctx *ctx, u2_overworld *ow)
     return U2_CMD_DONE;
 }
 
-/* asm/6999's readout, printed once on entering orbit. The original writes the four
- * labels via str_out and draws the digit values graphically at fixed cells; the
- * engine is a text renderer, so it appends the decimal value after each label.
- * FUEL is the TRI-LITHIUM count (packed BCD, DS:E5) AFTER the launch spend; the
- * XENO/YAKO/ZABO triple is a property of the world byte, read from the tables at
- * file 0x7212 -- an arrow key moves the ship sprite and leaves all three alone
- * (measured, asm/6999 header), so the readout does not change on an arrow. */
-/* The readout is NOT a text stream in the original -- asm/6999 draws those four values
- * at fixed cells down the right-hand side, which is why the engine's four back-to-back
- * seam_str_out calls collapsed them onto one line. Owner-reported 2026-11-10: "its not
- * rendering carriage returns so the cmd view gets messy".
+/* asm/6999's readout, in two passes, because the original draws it in two passes and the
+ * split is what makes the space text pane work. Owner report 2026-11-10: the hyperwarp
+ * prompt never appeared and letters were missing from the HP and FOOD display. Both were
+ * the readout colliding with the CMD pane, and the bytes say exactly where:
  *
- * The column is MEASURED, not eyeballed: in both 22-right.png and 21-space.png the
- * widest empty column run in the text rows ends at x=255 and the readout glyphs start
- * at x=256 and run to x=309 -- seven 8-pixel cells. At 8 px per cell that is column 32,
- * and the four rows are the first four text rows of the pane (U2_MSG_TOP..+3). */
-#define U2_SPACE_READOUT_COL 32
-#define U2_SPACE_READOUT_ROW U2_MSG_TOP
+ *   LABELS -- asm/6999's head, once on entering orbit (L_006bd9..L_006c46):
+ *     L_006bd9  `mov $0x28,%al ; mov %al,0x31` -- right_margin := 0x28 (40) first. The
+ *               overworld leaves the margin at 0x1d (29) after its GOLD= tail, and at that
+ *               margin a string starting at column 30 wraps on its FIRST character and
+ *               resumes at the left margin of the next row. That is how `  XENO=9` landed
+ *               over the CMD lines and ate characters out of H.P./FOOD/EXP/GOLD.
+ *     L_006be0  `mov $0x1e,%bl` -- the cursor goes to column 30, not 32. The literals are
+ *               "  FUEL=" with two leading spaces, so the visible text starts at column 32,
+ *               which is the x=256 the frames measure (22-right.png, 21-space.png: the empty
+ *               run ends at x=255 and the glyphs run x=256..309). Byte and frame agree once
+ *               the padding is counted; passing 32 with a padded literal did not.
+ *
+ *   VALUES -- asm/6FA3 (L_0071a3), called at the head of EVERY CMD-loop pass and again by
+ *             the hyperwarp flow, which is the repair the frames show and the mechanism this
+ *             file previously had to guess at:
+ *     L_0071ab  the four values print at column 37, rows 20..23, as two BCD digits each --
+ *               so `FUEL=08`, not `FUEL=8`. The engine was printing one unpadded digit.
+ *     L_0071fd  `mov $0x1f,%al ; mov %al,0x31` -- right_margin := 0x1f (31). This is the
+ *               load-bearing byte: the row scroll runs from column 0 to the margin inclusive
+ *               (asm/5025: `CL=0 DL=DS:0x31`), so at 31 the scroll window stops one column
+ *               short of the readout's first visible glyph at 32. The CMD pane can scroll
+ *               freely and cannot touch the readout. At the overworld's 0x1d, or at the 0x20
+ *               asm/6999 sets between the two passes, it can and does.
+ *     L_007202  `di = 0 ; si = 0x17` then the cursor setter -- the text cursor is parked at
+ *               column 0, row 23 before returning, which is where "CMD: " prints from. Every
+ *               CMD echo therefore starts at the left of the bottom row. Leaving the cursor
+ *               wherever a positioned print put it (column 39) made the next "CMD: " land
+ *               past the margin, wrap, and scroll the pane once per prompt.
+ *
+ * Neither pass restores the previous margin; the overworld's own status draw re-establishes
+ * 0x1d when the rocket lands. */
+#define U2_SPACE_LABEL_COL    30      /* asm/6999 L_006be0: mov $0x1e,%bl */
+#define U2_SPACE_VALUE_COL    37      /* asm/6FA3  L_0071ab: mov $0x25,%bl */
+#define U2_SPACE_READOUT_ROW  U2_MSG_TOP
+#define U2_SPACE_MARGIN_DRAW  0x28    /* asm/6999 L_006bd9, asm/6FA3 L_0071a4 */
+#define U2_SPACE_MARGIN_CMD   0x1f    /* asm/6FA3  L_0071fd: the scroll stops short of 32 */
+#define U2_SPACE_CMD_ROW      U2_MSG_BOTTOM   /* asm/6FA3 L_00720a: si = 0x17 */
 
-static void space_readout(u2_ctx *ctx)
+/* The four labels, drawn once when the space screen comes up (asm/6999's head). */
+static void space_labels(u2_ctx *ctx)
+{
+    ctx->state.right_margin = U2_SPACE_MARGIN_DRAW;
+    seam_str_out_at(ctx, U2_SPACE_LABEL_COL, U2_SPACE_READOUT_ROW + 0, U2_S_SPACE_FUEL);
+    seam_str_out_at(ctx, U2_SPACE_LABEL_COL, U2_SPACE_READOUT_ROW + 1, U2_S_SPACE_XENO);
+    seam_str_out_at(ctx, U2_SPACE_LABEL_COL, U2_SPACE_READOUT_ROW + 2, U2_S_SPACE_YAKO);
+    seam_str_out_at(ctx, U2_SPACE_LABEL_COL, U2_SPACE_READOUT_ROW + 3, U2_S_SPACE_ZABO);
+    /* asm/6999 L_006c46 sets 0x20 here and asm/6FA3 immediately narrows it to 0x1f; the
+     * value pass below is what leaves the margin where the CMD loop needs it. */
+    ctx->state.right_margin = 0x20;
+}
+
+/* asm/6FA3: the four values, redrawn on every status pass, then the margin and the cursor
+ * positioned for the CMD prompt. FUEL is the TRI-LITHIUM BCD byte (DS:E5) after the launch
+ * spend; the triple is DS:4CA/4CB/4CC, a property of the world byte -- an arrow moves the
+ * ship sprite and leaves all three alone (measured, asm/6999 header). */
+static void space_values(u2_ctx *ctx)
 {
     u2_state *st = &ctx->state;
     const u2_space_world *w = st->world < U2_WORLD_COUNT
                             ? &u2_space_worlds[st->world]
                             : &u2_space_worlds[U2_WORLD_EARTH];
-    char buf[48];
+    char buf[8];
 
-    /* Positioned writes, one per row, so the readout holds its four cells while the
-     * CMD: lines scroll underneath on the left -- the layout the frames show. */
-    snprintf(buf, sizeof buf, "%s%u", U2_S_SPACE_FUEL,
+    ctx->state.right_margin = U2_SPACE_MARGIN_DRAW;
+
+    snprintf(buf, sizeof buf, "%02u",
              (unsigned)u2_bcd_dec1(st->items_held[U2_ITEM_TRI_LITHIUM]));
-    seam_str_out_at(ctx, U2_SPACE_READOUT_COL, U2_SPACE_READOUT_ROW + 0, buf);
-    snprintf(buf, sizeof buf, "%s%u", U2_S_SPACE_XENO, w->xeno);
-    seam_str_out_at(ctx, U2_SPACE_READOUT_COL, U2_SPACE_READOUT_ROW + 1, buf);
-    snprintf(buf, sizeof buf, "%s%u", U2_S_SPACE_YAKO, w->yako);
-    seam_str_out_at(ctx, U2_SPACE_READOUT_COL, U2_SPACE_READOUT_ROW + 2, buf);
-    snprintf(buf, sizeof buf, "%s%u", U2_S_SPACE_ZABO, w->zabo);
-    seam_str_out_at(ctx, U2_SPACE_READOUT_COL, U2_SPACE_READOUT_ROW + 3, buf);
+    seam_str_out_at(ctx, U2_SPACE_VALUE_COL, U2_SPACE_READOUT_ROW + 0, buf);
+    snprintf(buf, sizeof buf, "%02u", (unsigned)w->xeno);
+    seam_str_out_at(ctx, U2_SPACE_VALUE_COL, U2_SPACE_READOUT_ROW + 1, buf);
+    snprintf(buf, sizeof buf, "%02u", (unsigned)w->yako);
+    seam_str_out_at(ctx, U2_SPACE_VALUE_COL, U2_SPACE_READOUT_ROW + 2, buf);
+    snprintf(buf, sizeof buf, "%02u", (unsigned)w->zabo);
+    seam_str_out_at(ctx, U2_SPACE_VALUE_COL, U2_SPACE_READOUT_ROW + 3, buf);
+
+    ctx->state.right_margin = U2_SPACE_MARGIN_CMD;
+    seam_goto(ctx, 0, U2_SPACE_CMD_ROW);
 }
+
+/* asm/6999's entry (L_006b99), before anything is printed in space. The first instruction
+ * that does anything is `call L_004c3e` -- INT 10h AH=00 AL=04, set 320x200 graphics mode 4
+ * -- and a mode set on real CGA clears the display. The game draws its text as glyphs in
+ * that same buffer, so this is the space screen's clear, and it is load-bearing twice:
+ * the overworld's H.P./FOOD/EXP/GOLD block is gone in every space frame, and so is
+ * "PREPARE FOR LAUNCH!", which frame 22-right.png confirms (its pane is HYPERWARP
+ * ENGAGED! / YOU ARE ORBITING EARTH. / CMD: RIGHT / CMD: and nothing above them).
+ * Without this the engine re-composites the stale status block on every space frame. */
+static void space_screen_enter(u2_ctx *ctx)
+{
+    seam_clear_screen(ctx);
+    space_labels(ctx);
+    space_values(ctx);
+}
+
+/* asm/6999's status pass, called at the head of every CMD-loop pass (L_006c7a) and by the
+ * hyperwarp flow. It redraws the four values, narrows the scroll margin to 0x1f so the CMD
+ * pane cannot reach the readout, and parks the cursor at column 0 of the bottom row -- which
+ * is where "CMD: " prints from, so every echo starts at the left edge as the frames show. */
+
 
 /* asm/7030's orbit determination (entry L_007230), reached from the hyperwarp arm.
  * It is the only writer of the world byte. 4/4/4 prints the sun message and then
@@ -1019,6 +1084,9 @@ static void space_orbit_determine(u2_ctx *ctx, const uint8_t dest[3])
     st->world = world;
     if (world == U2_WORLD_DEEP_SPACE) {
         seam_str_out(ctx, U2_S_ORBIT_DEEP_SPACE);
+        seam_char_print(ctx, '\r');   /* trailing 0x8d in asm/7030 file 0x73a6, as with the
+                                         orbiting line: the next "CMD: " parks at column 0 of
+                                         the bottom row and would overwrite this one. */
         return;
     }
     seam_str_out(ctx, U2_S_ORBIT_ORBITING);
@@ -1031,6 +1099,12 @@ static void space_orbit_determine(u2_ctx *ctx, const uint8_t dest[3])
         U2_S_WORLD_PLUTO, "X."
     };
     seam_str_out(ctx, names[world]);
+    /* Every one of those literals carries a trailing 0x8d in the binary -- asm/7030 file
+     * 0x73c2 is `db "EARTH.",0x8d,0x00` -- and the extractor splits there, so the newline
+     * belongs to the caller. Without it the next "CMD: " prompt, which asm/6FA3 parks at
+     * column 0 of the bottom row, prints over the first five characters of the orbiting
+     * line instead of landing on a fresh row. */
+    seam_char_print(ctx, '\r');
 }
 
 /* asm/6DFD's 'H' arm (L_0070c5). Spend one TRI-LITHIUM, read a typed XENO/YAKO/ZABO
@@ -1051,6 +1125,14 @@ static int space_hyperwarp(u2_ctx *ctx)
     st->items_held[U2_ITEM_TRI_LITHIUM] = u2_bcd_dec1(st->items_held[U2_ITEM_TRI_LITHIUM]);
 
     seam_str_out(ctx, U2_S_HYPERWARP_TO);
+    /* The original's literal is one string, `HYPERWARP TO:` 0x8d `XENO=` 0x00 (asm/6DFD
+     * file 0x7100), and 0x8d is the game's newline glyph. The extractor splits it at that
+     * byte into two names, so the newline has to be emitted here or the target entry starts
+     * on the same row as the prompt. The three prompts then run together on that row --
+     * `XENO=9 YAKO=9 ZABO=9` on ONE line, which is what g39 frame 23-hyperspace.png shows
+     * and why no CR goes between them -- and the next literal is 0x8d `PREPARE FOR
+     * HYPERWARP!` 0x8d, so the prepare line is bracketed by newlines too. */
+    seam_char_print(ctx, '\r');
     static const char *const prompts[3] = {
         U2_S_HYPERWARP_XENO, U2_S_HYPERWARP_YAKO, U2_S_HYPERWARP_ZABO
     };
@@ -1073,11 +1155,29 @@ static int space_hyperwarp(u2_ctx *ctx)
                 if (seam_present_frame(ctx)) return 0;
                 continue;
             }
-            if (k.ch >= '0' && k.ch <= '9') { dest[i] = (uint8_t)(k.ch - '0'); break; }
+            if (k.ch >= '0' && k.ch <= '9') {
+                /* The typed digit is echoed. asm/6DFD's reader (L_006f7f) is: repaint the
+                 * field, poll, reject anything outside '0'..'9', and on a digit
+                 * `push ax ; call L_0055f4 ; pop ax` -- char_print_wrap on the character
+                 * itself -- before converting it with `sbb $0x30`. That echo is what makes
+                 * g39 frame 23-hyperspace.png read `XENO=9 YAKO=9 ZABO=9` on one line;
+                 * without it the player types into a prompt that never shows the answer.
+                 * Push/pop means the echo cannot disturb the digit, and it cannot scroll
+                 * the pane differently either, so it goes through the same seam the game
+                 * uses for every other character. */
+                seam_char_print(ctx, k.ch);
+                dest[i] = (uint8_t)(k.ch - '0');
+                break;
+            }
         }
     }
+    seam_char_print(ctx, '\r');
     seam_str_out(ctx, U2_S_HYPERWARP_PREPARE);
+    seam_char_print(ctx, '\r');
     seam_str_out(ctx, U2_S_HYPERWARP_ENGAGED);
+    seam_char_print(ctx, '\r');   /* the literal is "HYPERWARP ENGAGED!" 0x8d (asm/6DFD file
+                                     0x6ffa), so the next line starts fresh. Without it the
+                                     orbiting line runs on after the exclamation mark. */
 
     const uint8_t rng[3] = { seam_rand_byte(ctx), seam_rand_byte(ctx), seam_rand_byte(ctx) };
     /* u2_space_hyperwarp tests the POST-decrement count, so it is handed the PRE value
@@ -1183,6 +1283,9 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
 
 static void space_paint(u2_ctx *ctx, u2_overworld *ow)
 {
+    /* The readout survives the scrolling CMD pane because space_values runs before every
+     * prompt and asm/6FA3 L_0071fd narrows the scroll margin to 0x1f, one column short of
+     * the readout's first visible glyph at 32. See that function's note. */
     u2_space_scene sc;
     u2_space_scene_from(ctx, &sc);
     u2_space_scene_draw(&ow->frame, &sc);
@@ -1212,6 +1315,11 @@ static void space_loop(u2_ctx *ctx, u2_overworld *ow)
     space_paint(ctx, ow);
 
     for (;;) {
+        /* asm/6999's loop head is `call L_0071a3` and THEN the "CMD: " print: the status
+         * pass redraws the values, sets the scroll margin to 0x1f and parks the cursor at
+         * (0, 23) before the prompt is printed. Doing it in that order is what keeps the
+         * readout whole while the pane scrolls under it. */
+        space_values(ctx);
         seam_str_out(ctx, U2_S_CMD_PROMPT);
 
         /* Wait for a key WITHOUT burning the CPU and WITHOUT re-printing the prompt.
@@ -1252,7 +1360,7 @@ static void space_loop(u2_ctx *ctx, u2_overworld *ow)
              * way the old stream version was not, because the old version simply never
              * refreshed either and just scrolled away. asm/6999 redraws it each status
              * pass, which is what this stands in for. */
-            space_readout(ctx);
+            space_values(ctx);
             break;
         case 'L': case 'l': {
             /* asm/7030's dive arm (L_007385): "LANDING REQUESTED!", refused only from
@@ -1375,8 +1483,9 @@ static u2_cmd_result launch_rocket(u2_ctx *ctx, u2_overworld *ow)
      * is where asm/38B0 sets them -- after the space loop returns on the dive. */
     ctx->state.items_held[U2_ITEM_TRI_LITHIUM] =
         u2_bcd_dec1(ctx->state.items_held[U2_ITEM_TRI_LITHIUM]);
-    space_readout(ctx);
+    space_screen_enter(ctx);
     seam_str_out(ctx, U2_S_HYPERWARP_ENGAGED);
+    seam_char_print(ctx, '\r');   /* trailing 0x8d in the original's literal, as above */
 
     /* The sprite starts where the capture found it: DS:47B/47C read 0x80/0x40 in
      * orbit and did not move on the dive (captures/spice86/w6-orbit-dive). */
