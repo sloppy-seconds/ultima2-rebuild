@@ -23,7 +23,12 @@ exact byte-for-byte fidelity.
 > passability), W3 (per-mode food) and W4/W5 (`cmd_L`) are implemented and W1/W2/W3 are gated as
 > CP5 P1 and V1. The one genuinely open question there (the plane's airborne flag, W6) is marked as
 > needing a capture and not a guess, and is now `docs/needs-gameplay.md` G43.** **Scoped handoffs are
-> the entry point for their own topic, not history:** `docs/handoff-commerce-transact.md` (**executed
+> the entry point for their own topic, not history:** `docs/handoff-space-view.md` (**not started**
+— the space screen is not drawn at all, which is why launching looked like a crash; `space_loop`
+hot-spins with no present call, while the model underneath it in `space.h` is already complete and
+byte-cited, so what is missing is presentation only. Its § 1 names the four capture frames that
+define the screen and § 3 flags the one discriminator nobody has evidence for), and
+`docs/handoff-commerce-transact.md` (**executed
 > 2026-10-29, the day it was written — read its § 0 status block first**; `cmd_T` is now implemented
 > in `engine/src/game/commerce.c` and gated by `make test-cp6`, and the headline is that three of its
 > four "not evidenced" items closed statically: the grocery quote was `0020` and not `0200`, the axe
