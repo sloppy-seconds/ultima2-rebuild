@@ -612,12 +612,13 @@ void u2_death(u2_ctx *ctx)
 
     /* Everything after the announcement is the owner's ruling, not the bytes: see
      * ctx.h's death_pending note. The loops unwind on the flag and the handoff below
-     * does the press-any-key and the trip back to the menu. */
+     * does the press-any-key; the callers reload the last save. */
     ctx->death_pending = 1;
 }
 
 /* What the engine does once the death announcement is on screen. Owner ruling
- * 2026-11-11: print (PRESS ANY KEY), wait for a key, and go back to the menu.
+ * 2026-11-11: print (PRESS ANY KEY), wait for a key, and let the caller reload the
+ * last save and drop back in.
  *
  * The literal is the game's own "(PRESS ANY KEY)" (asm/38B0 file 0x3b81, where it
  * introduces the descent), reused rather than invented because the engine already owns
@@ -643,6 +644,13 @@ void u2_death_handoff(u2_ctx *ctx)
         seam_present(ctx);
         seam_wait_ms(ctx, 16);
     }
+
+    /* No clear here, deliberately. The frame the death produced is the evidence the
+     * scripted gates read out of a run's final state -- CP4 G2's four arms and
+     * tests/swamp_damage.py's death case all grep for IS DEAD! -- and blanking it here
+     * erased that from every entry, including the ones that redraw nothing. The clear
+     * belongs to whoever is about to draw a new world over this one, and that lives in
+     * the callers (title.c's 'P' loop, game.c's enhanced-mode entry). */
 }
 
 /*
@@ -1653,9 +1661,9 @@ int u2_overworld_init_state(u2_ctx *ctx, u2_overworld *ow)
     if (!ctx || !ow) return -1;
     memset(ow, 0, sizeof *ow);
     /* A fresh session clears the record of how the last one ended. The handoff leaves
-     * death_pending set on purpose -- it is how the callers know to go back to the menu --
-     * so it has to be dropped here rather than at the wait, or the new session would
-     * unwind on its first empty poll. */
+     * death_pending set on purpose -- it is how the caller knows to reload the last
+     * save -- so it has to be dropped here rather than at the wait, or the new session
+     * would unwind on its first empty poll. */
     ctx->death_pending = 0;
     ow->x = ctx->state.entry_x;
     ow->y = ctx->state.entry_y;
@@ -2658,7 +2666,7 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
      * wait the other two do not do. That is not theoretical: the first version of this
      * put the handoff in title.c and game.c, and the scripted run that found it missing
      * was the --play-map one. The flag stays set as the record of how the session ended;
-     * the next entry clears it, and the callers read it to decide menu-versus-exit. */
+     * the next entry clears it, and the callers read it to reload the last save. */
     if (ctx->death_pending)
         u2_death_handoff(ctx);
 

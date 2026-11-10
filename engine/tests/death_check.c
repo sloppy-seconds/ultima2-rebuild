@@ -23,6 +23,7 @@
 #include "core/ctx.h"
 #include "core/font.h"
 #include "core/seam.h"
+#include "core/save.h"
 #include "core/state.h"
 #include "core/vram.h"
 #include "platform/platform.h"
@@ -39,11 +40,28 @@ static int fails, checks;
  * poll dereferences a NULL pointer. keys_left is the whole script: one key, then
  * finished for good, which is the scripted stand-in for a player who walked away. */
 static int keys_left = 1;
+static char prompt_at_wait[U2_COLS + 1];
 
 static int handoff_poll(u2_ctx *ctx, u2_key *out)
 {
     (void)ctx;
     if (keys_left <= 0) return -1;
+    /* Snapshot the screen at the instant the wait polls. "The prompt is on screen"
+     * cannot be asserted after the handoff returns -- it clears the screen on the way
+     * out -- and asserting it before the call would only prove u2_death printed. This
+     * is the moment the old defect was about: a message written into a frame nobody
+     * had shown. */
+    if (prompt_at_wait[0] == '\0') {
+        int n = 0;
+        /* Columns 0..29: the message area. Row 23 also carries the status band, and a
+         * snapshot of the whole row reads "(PRESS ANY KEY)    GOLD=0000". */
+        for (int c = 0; c < 30; c++) prompt_at_wait[n++] = (char)ctx->vram.cell[23][c].ch;
+        while (n > 0 && prompt_at_wait[n - 1] == ' ') n--;
+        prompt_at_wait[n] = '\0';
+        char *p = prompt_at_wait;
+        while (*p == ' ') p++;
+        if (p != prompt_at_wait) memmove(prompt_at_wait, p, strlen(p) + 1);
+    }
     keys_left--;
     memset(out, 0, sizeof *out);
     out->ch = 'x';
@@ -99,7 +117,7 @@ static void arm(u2_ctx *ctx)
     seam_str_out(ctx, U2_S_CMD_PROMPT);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     u2_ctx ctx;
     char buf[64];
@@ -156,7 +174,7 @@ int main(void)
     CHECK(strcmp(msg_text(&ctx, 22, buf), "G23MAX IS DEAD!") == 0,
           "the food borrow-out reaches the same tail, not just the zeroing");
 
-    /* --- the death handoff: press any key, back to the menu -----------------
+    /* --- the death handoff: press any key, reload the last save -------------
      * Owner ruling 2026-11-11, because the original's tail falls through into a loop
      * that has never been seen to return and the engine was simply ending. These assert
      * the ruling, not a decode, and they are here rather than only in a scripted run
@@ -164,6 +182,7 @@ int main(void)
      * missing the wait. */
     arm(&ctx);
     keys_left = 1;
+    prompt_at_wait[0] = '\0';
     ctx.input = &handoff_input;
     u2_death(&ctx);
     CHECK(ctx.death_pending == 1,
@@ -172,28 +191,75 @@ int main(void)
           "death alone does not print the press-any-key line");
 
     u2_death_handoff(&ctx);
-    CHECK(strcmp(msg_text(&ctx, 23, buf), U2_S_PRESS_ANY_KEY) == 0,
-          "the handoff prints (PRESS ANY KEY) on the row below the announcement");
+    CHECK(strcmp(prompt_at_wait, U2_S_PRESS_ANY_KEY) == 0,
+          "the prompt is on screen while the wait polls -- the defect being replaced was "
+          "the game ending with this message still in an unshown frame");
     CHECK(ctx.death_pending == 1,
-          "the handoff leaves the flag set: it is how the caller knows to go to the menu");
+          "the handoff leaves the flag set: it is how the caller knows to reload the save");
     CHECK(keys_left == 0,
           "the handoff waited for a key rather than falling straight through");
+    CHECK(msg_text(&ctx, 22, buf)[0] != '\0'
+          && strcmp(msg_text(&ctx, 23, buf), U2_S_PRESS_ANY_KEY) == 0,
+          "the handoff leaves the whole death frame intact -- announcement and prompt "
+          "both still on screen -- because the clear belongs to whoever redraws");
 
     /* Control: a spent script must not hang the harness. seam_key_poll returns -1 and
        the handoff has to come back anyway. */
     arm(&ctx);
     keys_left = 0;
+    prompt_at_wait[0] = '\0';
     ctx.input = &handoff_input;
     u2_death(&ctx);
     u2_death_handoff(&ctx);
     /* Reaching this line at all is the assertion: with no key coming, a wait written as
      * `while (!seam_key_poll(...))` would spin here forever, because seam_key_poll
-     * returns 0 for "no key right now" and the exhausted signal is a separate flag. */
+     * returns 0 for "no key right now" and the exhausted signal is a separate flag.
+     * The clear is unconditional, so the screen is blank here too. */
     CHECK(ctx.death_pending == 1,
           "control: an exhausted script ends the wait without clearing the record or "
           "hanging the harness");
-    CHECK(strcmp(msg_text(&ctx, 23, buf), U2_S_PRESS_ANY_KEY) == 0,
-          "the prompt is printed before the wait, so it is on screen even if no key comes");
+    CHECK(strcmp(prompt_at_wait, U2_S_PRESS_ANY_KEY) != 0,
+          "control: with no key the wait never shows the prompt, so nothing is printed "
+          "that the player cannot have pressed through");
+
+    /* --- the two facts the reload depends on ---------------------------------
+     * The shipped entries rescue a dead player by re-reading the record from disk.
+     * That is only a rescue if death never wrote the record, and if reading it back
+     * puts back what death zeroed. Both are asserted here rather than by driving the
+     * menu, because no scripted entry reaches the menu's world path: --headless has no
+     * pixel renderer so 'P' takes the cell-only branch, and --play-map deliberately
+     * does not reload (main.c names the gates that depend on that). argv[1] is the
+     * save directory the runner passes; a missing one is a failure, not a skip, so the
+     * wiring cannot be dropped quietly. */
+    if (argc < 2) {
+        CHECK(0, "death_check needs a save directory as argv[1] -- the runner must pass "
+                 "one, or the reload's two facts go unproven");
+    } else {
+        arm(&ctx);
+        ctx.save_dir = argv[1];
+        ctx.state.hp = 0x99;
+        ctx.state.unk_52 = 0x97;              /* the pair the band reads as H.P.=9997 */
+        CHECK(u2_save_store(&ctx) == U2_SAVE_OK, "the harness wrote a record to %s", argv[1]);
+
+        u2_death(&ctx);
+        CHECK(ctx.state.hp == 0 && ctx.state.unk_52 == 0,
+              "death zeroed the pair in memory (the precondition for restoring it)");
+
+        char rec[512];
+        u2_save_path(&ctx, rec, sizeof rec);
+        FILE *rf = fopen(rec, "rb");
+        unsigned char disk[384] = {0};
+        size_t got = rf ? fread(disk, 1, sizeof disk, rf) : 0;
+        if (rf) fclose(rf);
+        CHECK(got >= 0x1D, "the record on disk is readable at %s", rec);
+        CHECK(disk[0x1B] == 0x99 && disk[0x1C] == 0x97,
+              "death left the record alone: DS:51/52 on disk are still 99 97, so the "
+              "reload has a live character to read (asm/0C62 never calls the save body)");
+
+        CHECK(u2_save_load(&ctx) == U2_SAVE_OK, "the record reads back as a character");
+        CHECK(ctx.state.hp == 0x99 && ctx.state.unk_52 == 0x97,
+              "the reload restores exactly what death zeroed -- this is the whole rescue");
+    }
 
     printf("death_check: %d checks, %d failures\n", checks, fails);
     return fails != 0;

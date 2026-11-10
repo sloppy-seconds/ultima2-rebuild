@@ -335,10 +335,11 @@ void u2_overworld_site_leave(u2_ctx *ctx, u2_overworld *ow);
  */
 void u2_death(u2_ctx *ctx);
 
-/* The death handoff: `(PRESS ANY KEY)`, wait for one key, then back to the menu.
- * Owner ruling 2026-11-11, because the original's death tail never returns and the
- * engine was simply ending. game.c calls this when a session unwinds with
- * ctx->death_pending set; every input loop breaks on that flag instead. */
+/* The death handoff: `(PRESS ANY KEY)`, wait for one key. Owner ruling 2026-11-11,
+ * because the original's death tail never returns and the engine was simply ending.
+ * It lives at the end of u2_overworld_loop so every entry path gets it; the flag stays
+ * set afterwards as the record of how the session ended, and the callers reload the
+ * last save on it (title.c's 'P' loop, game.c's enhanced-mode entry). */
 void u2_death_handoff(u2_ctx *ctx);
 
 /* Bitmask over tile ids 0..63 that the engine stepped onto without a measured

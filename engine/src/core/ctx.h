@@ -367,7 +367,8 @@ typedef struct u2_ctx {
      * does next is not recoverable from the bytes -- and death is memory-only anyway
      * (asm/0C62 never calls the save body), so the record on disk is still whole.
      *   death_pending   set by u2_death; every input loop unwinds on it
-     *   title_skip_intro the handoff re-enters the MENU, not the splash-and-poem intro
+     *   title_skip_intro set when the death reload could not happen and the only place
+     *                    to go is the menu, so that trip does not replay the splash
      */
     int death_pending;
     int title_skip_intro;

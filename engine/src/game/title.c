@@ -382,14 +382,31 @@ static void run_play(u2_ctx *ctx)
                 u2_overworld ow;
                 if (u2_overworld_init_state(ctx, &ow) == 0) {
                     u2_overworld_loop(ctx, &ow);
-                    /* Death does not end the program. The loop already asked for the key
-                     * (u2_death_handoff, at the end of u2_overworld_loop); what is left
-                     * here is the destination: back to the menu, and skip the splash on
-                     * the way, because a player who just died wants the load key and not
-                     * the intro. The save on disk is untouched -- asm/0C62 zeroes memory
-                     * only -- so loading again is a whole character. */
-                    if (ctx->death_pending)
+                    /* Death reloads the last save and drops straight back in (owner
+                     * ruling 2026-11-11, revised the same day: the first version went
+                     * back to the menu, and "back to the menu" from a dead character is
+                     * indistinguishable from the game having ended). The `for (;;)` at
+                     * the top of this function is the whole mechanism: it re-reads the
+                     * record from disk, and death never writes one -- asm/0C62 zeroes
+                     * memory only -- so what comes back is the character as of the last
+                     * autosave rather than the corpse that was in RAM.
+                     *
+                     * The loop cannot spin on its own: reaching this branch means a
+                     * record loaded and a world ran, and the wait for the key already
+                     * happened inside u2_overworld_loop. A save that has become
+                     * unreadable falls to the top of the loop, which prints the
+                     * original's own "(INSERT PLAYER DISK)" and waits for ESC. */
+                    if (ctx->death_pending) {
+                        /* The world loop does not clear on entry -- it assumes the path
+                         * that entered it did, which is what asm/0764's 'P' branch does
+                         * before it reads the disk. So the reload clears here, or the
+                         * new world inherits the corpse: the first measured frame after
+                         * a reload read `CMD: S ANY KEY)`, the new prompt landing five
+                         * characters into "(PRESS ANY KEY)". */
+                        seam_clear_screen(ctx);
                         ctx->title_skip_intro = 1;
+                        continue;
+                    }
                     return;
                 }
                 /* The record loaded but the world did not (no --data-dir, no

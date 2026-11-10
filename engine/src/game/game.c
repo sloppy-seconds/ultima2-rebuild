@@ -20,6 +20,7 @@
 #include "game/game.h"
 #include "game/title.h"
 #include "game/overworld.h"
+#include "core/save.h"
 #include "core/seam.h"
 #include "core/demo.h"
 #include "debug/trace.h"
@@ -165,9 +166,17 @@ void u2_game_run(u2_ctx *ctx)
              * splash again, and enter_world is cleared because the dead character is not
              * a character to drop back into. */
             if (ctx->death_pending) {
-                /* The key-press wait already happened inside the loop; this is the
-                 * destination. enter_world goes because a dead character is not one to
-                 * drop straight back into, and the menu is the honest place to land. */
+                /* Same ruling as the 'P' path: reload the record and drop back in.
+                 * It has to be an explicit u2_save_load here, not just another trip
+                 * through overworld_enter, because init_state spawns from ctx->state --
+                 * the copy in memory, which is the thing death just zeroed. The 'P' path
+                 * gets this for free because its loop re-reads the disk at the top.
+                 * With nothing readable to come back to, the menu is the fallback, and
+                 * title_skip_intro keeps that trip from replaying the splash. */
+                if (u2_save_load(ctx) == U2_SAVE_OK) {
+                    seam_clear_screen(ctx);   /* see title.c: the world loop does not clear */
+                    continue;
+                }
                 ctx->title_skip_intro = 1;
                 ctx->enter_world = 0;
                 continue;
