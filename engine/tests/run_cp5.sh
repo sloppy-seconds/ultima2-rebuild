@@ -765,6 +765,22 @@ else
     bad "CP5 V5: DS:13 at world open disagrees with asm/080D for some class"
 fi
 
+# --- V5b: the drawn player art follows DS:13, so boarding shows the vehicle ----------
+#
+# The staging buffer holds DS:13 at the player's cell and staging halves to art, so the
+# sprite at the player's position is stamp>>1. The engine passed the literal 60 instead,
+# which is exactly what 0x78>>1 gives for a Fighter on foot -- every capture and every
+# seeded character this project has used -- and so it was invisible until the owner
+# boarded a rocket on 2026-11-10 and still saw a person.
+# Control, run 2026-11-10: with the constant put back at one of the two map draws, the
+# gate reports that draw FAIL and exits 1; restored, it passes.
+if python3 tests/board_stamp.py > "$WORK/v5b.log" 2>&1; then
+    ok "CP5 V5b: the map draws take their art from player_stamp, so a boarded vehicle is drawn"
+else
+    sed 's/^/        /' "$WORK/v5b.log" | tail -8
+    bad "CP5 V5b: the player art is hardcoded again, so boarding draws a person"
+fi
+
 # --- C5: the force field is traversable and costs 1000 HP; a ring stops it -----------
 #
 # asm/24B5_force_field_event, reached from inside the passability routine asm/2423. Tile 0x5C is

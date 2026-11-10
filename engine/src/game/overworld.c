@@ -1745,16 +1745,26 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
     }
 
     u2_frame_clear(&ow->frame, U2_CGA_BLACK);
-    /* The player is not terrain: the game's own staging buffer holds 0x78 at the
-     * player's cell, which halves to art 60, a humanoid figure. That is evidence
-     * from the captured DS rather than a guess, so the real sprite is drawn. */
+    /* The player is not terrain: the game's own staging buffer holds DS:13 at the
+     * player's cell, and staging halves to art. On foot DS:13 is 0x78, which is art
+     * 60, a humanoid figure -- that is the evidence U2_OVERWORLD_PLAYER_ART was
+     * written from. But DS:13 is a MODE, not a constant, and boarding changes it,
+     * so the cell must follow it or a boarded vehicle draws a person standing in
+     * the field. Owner-reported 2026-11-10: BOARD ROCKET printed and the figure
+     * stayed. The mapping is proven four ways by the mode constants' own tile
+     * comments -- HORSE 0x22/tile 0x44, SHIP 0x24/0x48, PLANE 0x26/0x4C,
+     * ROCKET 0x28/0x50, each of which halves to exactly stamp>>1 -- and the foot
+     * case reproduces the old constant, so this is a widening and not a change.
+     * The status PANEL icon is deliberately left on the constant: it is a different
+     * routine, and nothing here has evidence for what it draws while mounted. */
+    const int player_art = ctx->state.player_stamp >> 1;
     if (ow->use_ega)
         u2_frame_draw_view_ega(&ow->frame, &ow->view, &ow->tiles_ega,
-                               U2_OVERWORLD_PLAYER_ART,
+                               player_art,
                                ow->view.player_col, ow->view.player_row);
     else
         u2_frame_draw_view(&ow->frame, &ow->view, &ow->tiles,
-                           U2_OVERWORLD_PLAYER_ART,
+                           player_art,
                            ow->view.player_col, ow->view.player_row);
 
     /* One framebuffer, per the CP4b decision: the map window owns pixel rows
