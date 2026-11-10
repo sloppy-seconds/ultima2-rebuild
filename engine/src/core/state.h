@@ -319,12 +319,17 @@ typedef struct u2_state {
                                         * on a character that had never been in space. */
     /* 0x6A */ uint8_t rocket_parked_x;  /* the parked rocket's cell column */
     /* 0x6B */ uint8_t rocket_parked_y;  /* and row */
-    /* 0x6C */ uint8_t blessing;         /* CORRECTED 2026-11-08: there IS a reader. asm/3C2E
-                                       * cmd_O tests `mov 0x6c,%al; or %al,%al; jne` before
-                                       * granting the force field ring, and prints "EARN THE
-                                       * RING!" when it is zero -- so this is the flag the
-                                       * Father Antos blessing has to set. Still no writer
-                                       * traced, which is exactly what G61 is waiting on. */
+    /* 0x6C */ uint8_t blessing;         /* CORRECTED 2026-11-11: there IS a writer, and
+                                       * the engine now has one. asm/4209:422B stores 1 when
+                                       * [DS:6D]==9 (Planet X) and [DS:4A]==3 (castle) and
+                                       * the slot's role byte is 0x81 -- record 1 of tlkx93,
+                                       * Father Antos. The reader is asm/3C2E cmd_O, which
+                                       * grants the force field ring in sector 32 only when
+                                       * this is non-zero and prints "EARN THE RING!"
+                                       * otherwise. The earlier note here said "still no
+                                       * writer traced": the writer had been documented in
+                                       * asm/4209's own header since 2026-11-08, and nobody
+                                       * went and read the header the comment pointed at. */
     /* 0x6D */ uint8_t world;          /* WHICH WORLD the player is on. 0 = Earth,
                                         * 1..9 = the planets, 0x0A = deep space. Written by
                                         * asm/7030 (`mov $0xa,%al` beside 'YOU ARE IN DEEP

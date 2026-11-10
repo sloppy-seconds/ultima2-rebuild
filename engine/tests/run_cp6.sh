@@ -725,6 +725,61 @@ printf '\n'
         skip "CP6 talk: needs the player's tlkx22/monx22 (synthetic seed ships no dialogue)"
     fi
 
+    # The quest the owner asked about on 2026-11-11: speak to Father Antos, then offer gold
+    # and get a ring. The bytes split that across two places and the engine had neither half
+    # wired end to end -- the blessing byte DS:6C had no writer at all, so the ring arm in
+    # asm/3C2E could never fire. These run the real sector files rather than a fixture, so
+    # the role bytes, the dialogue records and the geometry are the shipped ones:
+    # monx93 slot 12 is role 0x81 at (1,48) and tlkx93 record 1 is Antos; monx32 slot 26 is
+    # role 0x82 at (25,2), and sector 32 is Earth 1990, the only place the offer does more
+    # than print THANK YOU VERY MUCH!.
+    if [ -r ../original/tlkx93 ] && [ -r ../original/monx93 ] \
+       && [ -r ../original/monx32 ] && [ -r ../original/mapx32 ]; then
+        rm -rf "$WORK/ring"; mkdir -p "$WORK/ring/save/PLAYER"
+        python3 ../tools/u2_edit.py set ../original/player sector 93 -o "$WORK/ring/save/PLAYER/PLAYER" >/dev/null 2>&1
+        python3 ../tools/u2_edit.py set "$WORK/ring/save/PLAYER/PLAYER" world 9 >/dev/null 2>&1
+        python3 ../tools/u2_edit.py setpos "$WORK/ring/save/PLAYER/PLAYER" 1 49 >/dev/null 2>&1
+        printf 'T\n\360\n' > "$WORK/ring/antos.keys"      # 0xF0 = up, at Antos in (1,48)
+        antos=$(./u2 --headless --play-map --data-dir ../original \
+                     --save-dir "$WORK/ring/save" --script "$WORK/ring/antos.keys" \
+                     --dump-state 2>&1)
+        # Not "FATHER ANTOS CHANTS": the record carries two embedded CRs, so the opening
+        # line has scrolled off the top of the log by the time the state is dumped. What
+        # is on screen is the tail of the same record, and that is the observable.
+        echo "$antos" | grep -qa "claim the Ring" \
+            && ok "CP6 ring: role 0x81 in sector 93 speaks tlkx93 record 1 (the blessing's trigger)" \
+            || bad "CP6 ring: Antos said nothing -- the blessing cannot be earned"
+
+        # The ring man, unblessed: asm/3C2E prints EARN THE RING! and hands nothing over.
+        python3 ../tools/u2_edit.py set ../original/player sector 32 -o "$WORK/ring/save/PLAYER/PLAYER" >/dev/null 2>&1
+        python3 ../tools/u2_edit.py setpos "$WORK/ring/save/PLAYER/PLAYER" 25 3 >/dev/null 2>&1
+        printf 'O\n\360\n5\n' > "$WORK/ring/offer.keys"   # OFFER, up at (25,2), 5 hundreds
+        unblessed=$(./u2 --headless --play-map --data-dir ../original \
+                         --save-dir "$WORK/ring/save" --script "$WORK/ring/offer.keys" \
+                         --dump-state 2>&1)
+        echo "$unblessed" | grep -qa "EARN THE RING" \
+            && ok "CP6 ring: 500 gold to the sector-32 role-0x82 man without the blessing is EARN THE RING!" \
+            || bad "CP6 ring: the unblessed offer did not refuse -- the DS:6C gate is not being read"
+        echo "$unblessed" | grep -qa '"items":"00 ' \
+            && ok "CP6 ring: and the RING slot is still empty, so the refusal is real and not cosmetic" \
+            || bad "CP6 ring: the unblessed offer put a ring in DS:D6 anyway"
+
+        # And blessed: the same run, the same creature, the same amount, with the flag set.
+        # The assertion is the inventory, not the line: "THE RING IS YOURS!" scrolls off the
+        # log before the dump, and the slot is the thing the player keeps.
+        python3 ../tools/u2_edit.py set "$WORK/ring/save/PLAYER/PLAYER" blessing 1 >/dev/null 2>&1
+        blessed=$(./u2 --headless --play-map --data-dir ../original \
+                        --save-dir "$WORK/ring/save" --script "$WORK/ring/offer.keys" \
+                        --dump-state 2>&1)
+        echo "$blessed" | grep -qa '"items":"01 ' \
+            && ok "CP6 ring: with the blessing the same offer puts the ring in DS:D6" \
+            || bad "CP6 ring: the blessed offer did not give the ring"
+        echo "$blessed" | grep -qa "EARN THE RING" \
+            && bad "CP6 ring: the blessed offer still refused -- the seed did not reach the run" || true
+    else
+        skip "CP6 ring: needs the player's tlkx93/monx93/monx32/mapx32"
+    fi
+
 if [ "$fail" -eq 0 ]; then
     printf 'CP6 SPEC: PASS\n'
 else

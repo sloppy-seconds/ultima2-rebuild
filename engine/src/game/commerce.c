@@ -562,6 +562,23 @@ u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, i
             const int n = u2_world_tlkx_record(&ow->world,
                                                (int)st->mon_role[slot] - 0x80,
                                                line, sizeof line);
+
+            /* asm/4209:422B -- the blessing, and the writer that state.h spent months
+             * calling untraced. Three conditions read straight off the bytes: the world
+             * byte is 9 (Planet X), the sector's ones digit is 3 (a castle), and the
+             * slot's role is 0x81, which is record 1 of tlkx93 -- FATHER ANTOS CHANTS:
+             * YOU HAVE EARNED MY BLESSING. RETURN AND CLAIM THE RING!. The reader is
+             * asm/3C2E cmd_O's ring arm, which lives in sector 32 -- Earth, 1990, town --
+             * so the quest is two trips and not one conversation: earn the flag on Planet
+             * X, then go back through time and pay the man in town. That half is the
+             * owner's recollection, confirmed by the two gates; the store itself is bytes.
+             *
+             * Placed before the n > 0 test on purpose: in asm/4209 the store follows the
+             * print with no branch on whether a record came out, so a sector with no tlkx
+             * file still blesses you. The engine's "no dialogue for that role" line is an
+             * engine affordance and is not in the original at all. */
+            if (st->world == 9 && st->sector_second == 3 && st->mon_role[slot] == 0x81u)
+                st->blessing = 1;
             if (n > 0) {
                 seam_str_out(ctx, line);
                 /* asm/4209 then holds the line on screen for a beat (di = 4 around a call to

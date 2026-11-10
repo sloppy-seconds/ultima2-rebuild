@@ -24,9 +24,87 @@
 
 #include "core/ctx.h"
 #include "core/state.h"
+#include "core/vram.h"
 #include "game/commerce.h"
+#include "game/monsters.h"
+#include "game/overworld.h"
+#include "platform/platform.h"
+#include "gen_content.h"
 
 static int checks, fails;
+
+/* read_digit goes through seam_key_poll, so an offer test needs an input backend. One
+ * digit of hundreds is the whole script: the amount is one key, and the second poll
+ * reports the input finished so nothing downstream can block on a human. */
+static int offer_digit_left = 1;
+
+static int offer_poll(u2_ctx *ctx, u2_key *out)
+{
+    (void)ctx;
+    if (offer_digit_left <= 0) return -1;
+    offer_digit_left = 0;
+    memset(out, 0, sizeof *out);
+    out->ch = '5';
+    return 1;
+}
+
+/* wait is not optional. seam_key_wait calls input->wait, and the read_digit path behind
+ * an offer goes through it, so a backend that only fills .poll is a call through a NULL
+ * pointer -- which is exactly how this test first failed, at address 0x0. The scripted
+ * answer is the same either way: the key is already in the queue. */
+static int offer_wait(u2_ctx *ctx, u2_key *out) { return offer_poll(ctx, out); }
+
+static const u2_input offer_input = {
+    .name = "commerce-check-script", .poll = offer_poll, .wait = offer_wait,
+};
+
+/* The amount prompt waits on the screen between polls, and the wait goes through the
+ * clock seam. The test links the game core and not the platform layer, so it brings its
+ * own clock that does nothing: the digit is already in the queue, so a real delay would
+ * only slow the run down. */
+static uint64_t offer_tick(u2_ctx *ctx) { (void)ctx; return 0; }
+static void offer_sleep(u2_ctx *ctx, uint32_t ms) { (void)ctx; (void)ms; }
+static const u2_clock offer_clock = {
+    .name = "commerce-check-null", .tick = offer_tick, .sleep_ms = offer_sleep,
+};
+
+/* Does the needle appear anywhere on the grid? Row and column are not asserted because
+ * the placement of a transact line is one of the things asm/4209 grades as low
+ * confidence -- the bytes prove the printer runs, not where the text lands. */
+static int grid_has(u2_ctx *ctx, const char *needle)
+{
+    char row[U2_COLS + 1];
+    for (int r = 0; r < U2_ROWS; r++) {
+        for (int c = 0; c < U2_COLS; c++) row[c] = (char)ctx->vram.cell[r][c].ch;
+        row[U2_COLS] = '\0';
+        if (strstr(row, needle)) return 1;
+    }
+    return 0;
+}
+
+/* A site with one creature standing one step east of the player, so both rays in
+ * u2_commerce_transact and u2_commerce_offer land on it. */
+static void arm_offer(u2_ctx *ctx, u2_overworld *ow, uint8_t role, uint8_t blessing,
+                      int first, int second)
+{
+    memset(ctx, 0, sizeof *ctx);
+    memset(ow, 0, sizeof *ow);
+    u2_vram_init(&ctx->vram);
+    u2_state_init(&ctx->state);
+    ctx->input = &offer_input;
+    ctx->clock = &offer_clock;
+    offer_digit_left = 1;
+    ctx->state.sector_first = (uint8_t)first;
+    ctx->state.sector_second = (uint8_t)second;
+    ctx->state.blessing = blessing;
+    ow->x = 10;
+    ow->y = 10;
+    ow->world.map_loaded = 1;
+    ctx->state.mon_type[5] = 0x60;
+    ctx->state.mon_x[5] = 11;
+    ctx->state.mon_y[5] = 10;
+    ctx->state.mon_role[5] = role;
+}
 
 #define CHECK(cond, ...) do {                                  \
         ++checks;                                              \
@@ -313,6 +391,109 @@ int main(void)
             u2_offer_raise_for((uint8_t)r, 1, 0x00, &idx, &out);
             CHECK(idx == r, "roll %d selects stat index %d, got %d", r, r, idx);
         }
+    }
+
+    /* --- the ring: asm/4209's blessing writer and asm/3C2E's reader -----------
+     * Owner report 2026-11-11: he spoke to Father Antos, was given the blessing, offered
+     * 500 gold to Antos and got THANK YOU VERY MUCH!, and could not tell whether a ring
+     * had come of it. All of that is correct behaviour -- Antos is not the ring's source,
+     * and the engine had never written DS:6C at all, so the ring arm was unreachable and
+     * nothing had tested it. These are the tests that were missing.
+     *
+     * The Antos line is record 1 of tlkx93, copied from tools/tlkx_decode.py's output for
+     * that file (the embedded CRs are 0x0d in the original; a plain space keeps the
+     * record one record, which is all this test reads from it). */
+    {
+        u2_ctx ctx; u2_overworld ow;
+
+        /* The writer: Planet X (world 9), a castle sector (ones digit 3), role 0x81.
+         * The buffer is laid out the way the real files are: tlkx93 begins with a NUL,
+         * so record 1 -- the one a role byte of 0x81 selects -- starts at offset 1. A
+         * fixture that put the text at offset 0 reads back empty, which is how this test
+         * first failed. */
+        arm_offer(&ctx, &ow, 0x81, 0, 9, 3);
+        ctx.state.world = 9;
+        ow.world.tlkx[0] = 0;
+        memcpy(ow.world.tlkx + 1,
+               "FATHER ANTOS CHANTS: YOU HAVE EARNED MY BLESSING. RETURN AND CLAIM THE RING!",
+               sizeof "FATHER ANTOS CHANTS: YOU HAVE EARNED MY BLESSING. RETURN AND CLAIM THE RING!");
+        ow.world.tlkx_loaded = 1;
+        CHECK(u2_commerce_transact(&ctx, &ow, 1, 0) == U2_TRANSACT_TREATED,
+              "a role-0x81 slot on Planet X takes the scripted talk arm");
+        CHECK(grid_has(&ctx, "FATHER ANTOS CHANTS"),
+              "Antos speaks his tlkx93 record before anything else happens");
+        CHECK(ctx.state.blessing == 1,
+              "asm/4209:422B -- the blessing byte DS:6C is the writer's store, not a guess");
+
+        /* Controls: each of the three conditions alone is not enough. */
+        arm_offer(&ctx, &ow, 0x81, 0, 9, 3);
+        ctx.state.world = 0;                       /* same castle, wrong world */
+        ow.world.tlkx[0] = 0;
+        memcpy(ow.world.tlkx + 1, "FATHER ANTOS CHANTS: BLESSING",
+               sizeof "FATHER ANTOS CHANTS: BLESSING");
+        ow.world.tlkx_loaded = 1;
+        (void)u2_commerce_transact(&ctx, &ow, 1, 0);
+        CHECK(ctx.state.blessing == 0,
+              "control: the same words from the same role on Earth do not bless you");
+
+        arm_offer(&ctx, &ow, 0x81, 0, 9, 2);       /* Planet X, but a town not a castle */
+        ctx.state.world = 9;
+        ow.world.tlkx[0] = 0;
+        memcpy(ow.world.tlkx + 1, "FATHER ANTOS CHANTS: BLESSING",
+               sizeof "FATHER ANTOS CHANTS: BLESSING");
+        ow.world.tlkx_loaded = 1;
+        (void)u2_commerce_transact(&ctx, &ow, 1, 0);
+        CHECK(ctx.state.blessing == 0,
+              "control: role 0x81 in a Planet X town does not bless you either");
+
+        arm_offer(&ctx, &ow, 0x82, 0, 9, 3);       /* the castle, but a different role */
+        ctx.state.world = 9;
+        ow.world.tlkx[0] = 0;
+        memcpy(ow.world.tlkx + 1, "SING LEE THE COOK YELLS: KICHEN CLOST",
+               sizeof "SING LEE THE COOK YELLS: KICHEN CLOST");
+        ow.world.tlkx_loaded = 1;
+        (void)u2_commerce_transact(&ctx, &ow, 1, 0);
+        CHECK(ctx.state.blessing == 0,
+              "control: the cook in the same castle does not bless you");
+
+        /* The reader, unblessed: the line is EARN THE RING! and the slot stays empty. */
+        arm_offer(&ctx, &ow, 0x82, 0, 3, 2);
+        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_EARN_RING,
+              "500 gold to the sector-32 role-0x82 man without the blessing");
+        CHECK(grid_has(&ctx, U2_S_OFFER_EARN_RING), "EARN THE RING! is what he says");
+        CHECK(ctx.state.items_held[0] == 0, "and no ring changes hands");
+
+        /* The reader, blessed: THE RING IS YOURS! and DS:D6 goes to 1. */
+        arm_offer(&ctx, &ow, 0x82, 1, 3, 2);
+        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_RING,
+              "the same offer after the blessing");
+        CHECK(grid_has(&ctx, U2_S_OFFER_RING_IS_YOURS), "THE RING IS YOURS! is what he says");
+        CHECK(ctx.state.items_held[0] == 1, "DS:D6, the RING slot, is set to 1");
+
+        /* Controls on the reader: the sector gate and the amount gate. */
+        arm_offer(&ctx, &ow, 0x82, 1, 3, 1);       /* sector 31: blessed, wrong town */
+        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_THANK_YOU,
+              "control: the whole quest arm is gated on sector 32, not on the blessing");
+        CHECK(ctx.state.items_held[0] == 0, "control: no ring outside sector 32");
+
+        /* The chain as the owner walked it: bless on Planet X, go back to 1990, pay the
+         * man. One run, both halves, and the ring only exists because of the first. */
+        arm_offer(&ctx, &ow, 0x81, 0, 9, 3);
+        ctx.state.world = 9;
+        ow.world.tlkx[0] = 0;
+        memcpy(ow.world.tlkx + 1, "FATHER ANTOS CHANTS: YOU HAVE EARNED MY BLESSING",
+               sizeof "FATHER ANTOS CHANTS: YOU HAVE EARNED MY BLESSING");
+        ow.world.tlkx_loaded = 1;
+        (void)u2_commerce_transact(&ctx, &ow, 1, 0);
+        CHECK(ctx.state.blessing == 1, "chain: the blessing is earned");
+        ctx.state.sector_first = 3;                /* the trip back through time */
+        ctx.state.sector_second = 2;
+        ctx.state.world = 0;
+        ctx.state.mon_role[5] = 0x82;              /* and the man in town */
+        offer_digit_left = 1;
+        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_RING,
+              "chain: Antos's blessing is what makes the ring obtainable");
+        CHECK(ctx.state.items_held[0] == 1, "chain: the ring is in the inventory at the end");
     }
 
     printf("commerce_check: %d checks, %d failures\n", checks, fails);

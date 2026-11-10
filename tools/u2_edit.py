@@ -136,6 +136,11 @@ FIELDS = {
     'keys':   (0x65, 1, 99, 'bcd'),
     'tools':  (0x66, 1, 99, 'bcd'),
     'world':  (0x6D, 1, 10, 'int'),      # 0 Earth, 1..9 planets, 0x0A deep space
+    # The Father Antos blessing flag. Written in the original by asm/4209:422B (world 9,
+    # castle sector, role 0x81) and read by asm/3C2E cmd_O, which grants the force field
+    # ring in sector 32 only when it is non-zero. Seeding it is how a gate tests the ring
+    # arm without flying to Planet X first.
+    'blessing': (0x6C, 1, 1, 'int'),
 }
 
 WEAPONS = ['HANDS', 'DAGGER', 'MACE', 'AXE', 'BOW', 'SWORD',
