@@ -923,6 +923,16 @@ static u2_cmd_result launch_plane(u2_ctx *ctx, u2_overworld *ow)
         u2_key k;
         const int r = seam_key_poll(ctx, &k);
         if (r < 0) break;                       /* input exhausted: no original counterpart */
+        if (r == 0) {
+            /* Audit class A (docs/phase4-state.md, 2026-11-10): this loop printed the
+             * heading words via flight_line and never presented, so plane flight text was
+             * invisible -- the same shape the owner found in space_loop and
+             * rocket_descent, found here by grepping the shape rather than waiting for a
+             * report. Presenting on the empty poll is what makes the text reach the
+             * screen, and it also paces the loop instead of spinning it. */
+            if (ctx->exit_code || ctx->input_exhausted) break;
+            if (seam_present_frame(ctx)) break;
+        }
 
         if (r) {
             switch (k.ch) {
@@ -1051,7 +1061,19 @@ static int space_hyperwarp(u2_ctx *ctx)
             u2_key k;
             const int r = seam_key_poll(ctx, &k);
             if (r < 0) return 0;                       /* input exhausted: original blocks */
-            if (r && k.ch >= '0' && k.ch <= '9') { dest[i] = (uint8_t)(k.ch - '0'); break; }
+            if (r == 0) {
+                /* Audit class A. Owner report 2026-11-10: "i hit H and it doesn't show
+                 * the command, nor does it show asking X Y Z, but it accepts 9 9 9
+                 * anyway". The prompts went into the vram and nothing presented, so the
+                 * player typed the destination blind while the input path worked fine.
+                 * No CRs are added between the three prompts on purpose: g39 frame
+                 * 23-hyperspace.png shows `XENO=9 YAKO=9 ZABO=9` on ONE line, so the
+                 * run-together form is the original's, not a defect. */
+                if (ctx->exit_code || ctx->input_exhausted) return 0;
+                if (seam_present_frame(ctx)) return 0;
+                continue;
+            }
+            if (k.ch >= '0' && k.ch <= '9') { dest[i] = (uint8_t)(k.ch - '0'); break; }
         }
     }
     seam_str_out(ctx, U2_S_HYPERWARP_PREPARE);
@@ -1084,9 +1106,17 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
     for (;;) {
         u2_space_descent_step((uint8_t *)&ow->x, (uint8_t *)&ow->y);
         u2_overworld_draw(ctx, ow);
+        /* Audit class A. The draw was happening and being thrown away: nothing presented,
+         * so the screen kept the space frame and the southward descent was invisible.
+         * Owner's own diagnosis on 2026-11-10 was correct -- "maybe it just needs to
+         * clear the space screen back out to show the overworld". u2_overworld_draw
+         * repaints the whole frame including the text pane, so presenting it here is
+         * exactly that clear-and-replace. */
+        if (seam_present_frame(ctx)) return;
         u2_key k;
         const int r = seam_key_poll(ctx, &k);
         if (r < 0) return;                             /* input exhausted: original blocks */
+        if (r == 0 && (ctx->exit_code || ctx->input_exhausted)) return;
         if (r) {
             if (!u2_space_dive_survives(u2_world_tile_at(&ow->world, ow->x, ow->y))) {
                 u2_death(ctx);
