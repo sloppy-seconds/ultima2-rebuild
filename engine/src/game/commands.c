@@ -1231,6 +1231,34 @@ static void space_loop(u2_ctx *ctx, u2_overworld *ow)
             const int sector = u2_space_dive_sector(st->world);
             st->sector_first  = (uint8_t)(sector / 10);
             st->sector_second = (uint8_t)(sector % 10);
+
+            /* Reload the sector before descending. Owner report 2026-11-10: after a
+             * hyperwarp to planet X, `L` landed on Earth. Setting the state digits was
+             * never enough -- ow->world still held the LAUNCH sector, so the descent drew
+             * the wrong map AND u2_space_dive_survives tested a tile from the wrong world,
+             * which can kill the player on terrain that is not there or spare them on
+             * terrain that is. Correctness, not presentation.
+             *
+             * site_reload is reused rather than a hand-rolled pair of u2_world_load calls
+             * because it is the only path that does the whole job in order: map layer,
+             * demo delta, creature layer, spawn, spawn-cell clear, tlkx clear-then-load,
+             * restamp, and the DS:12 derivation from the ones digit. Every one of those
+             * closes a documented failure; skipping them would trade this bug for a quieter
+             * one. The dive sector's ones digit is always 0 (u2_space_dive_sector forces
+             * N0), so site_reload derives view_mode = 0xFF, which is the world map --
+             * matching what rocket_descent sets, not fighting it. */
+            ow->sector_hi = st->sector_first;
+            ow->sector_lo = st->sector_second;
+            if (site_reload(ctx, ow) != 0) {
+                /* Same treatment the site paths give a failed reload: latch it rather than
+                 * pressing on with a half-loaded world. Diving into an unloadable sector is
+                 * a content problem, not something to paper over by landing anyway. */
+                ow->reload_failed = 1;
+                seam_str_out(ctx, ow->note);
+                seam_char_print(ctx, '\r');
+                return;     /* space_loop returns void; leaving the loop is the exit */
+            }
+
             rocket_descent(ctx, ow);
             return;
         }

@@ -265,7 +265,13 @@ static void monsters_clear(u2_ctx *ctx)
  * routines: asm/2290 for the map, asm/22D5 for the monsters, then DS:12 = 4.
  * Returns -1 and leaves the note filled when the map file is not there.
  */
-static int site_reload(u2_ctx *ctx, u2_overworld *ow)
+/* No longer static (2026-11-10): the rocket dive is a third caller. This was never a
+ * site-specific routine -- it makes whatever sector ow->sector_hi/lo names resident,
+ * derives DS:12 from that sector's ones digit, and takes the dungeon branch only when the
+ * sector IS one. The name now reads narrower than what it does; renaming it to
+ * sector_reload would be honest, but it is cited by name in comments that record history
+ * (G67 among them), so that is a separate change from fixing the dive. */
+int site_reload(u2_ctx *ctx, u2_overworld *ow)
 {
     u2_sector_id id = { (uint8_t)ow->sector_hi, (uint8_t)ow->sector_lo };
 

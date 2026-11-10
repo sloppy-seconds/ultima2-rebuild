@@ -379,4 +379,15 @@ uint8_t u2_dismount_tile(uint8_t stamp);
  * asm/080D; see asm/44D4_cmd_X.asm and docs/needs-gameplay.md G41. */
 uint8_t u2_foot_stamp(uint8_t pclass);
 
+/* Make the sector named by ow->sector_hi / ow->sector_lo resident: map layer, creature
+ * layer, spawn and restamp, tlkx, the DS:12 view-mode derivation from the sector's ones
+ * digit, and the demo delta. Returns -1 with ow->note naming what failed.
+ *
+ * Public because the rocket dive is a third caller (commands.c, the asm/7030 dive arm):
+ * changing the sector digits without reloading leaves ow->world holding the LAUNCH
+ * sector, so the descent draws the wrong map and u2_space_dive_survives tests a tile
+ * from the wrong world. Defined in overworld.c beside its two existing callers, which
+ * are the site entry and exit paths. */
+int site_reload(u2_ctx *ctx, u2_overworld *ow);
+
 #endif /* U2_OVERWORLD_H */
