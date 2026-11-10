@@ -1114,7 +1114,9 @@ static void space_orbit_determine(u2_ctx *ctx, const uint8_t dest[3])
  * one containing a 9, is unreachable by misfortune. Returns 0 only if input ran out
  * mid-entry (the original blocks); 1 means the warp resolved and the loop should
  * continue. */
-static int space_hyperwarp(u2_ctx *ctx)
+static void space_paint(u2_ctx *ctx, u2_overworld *ow);   /* defined below, with the loop */
+
+static int space_hyperwarp(u2_ctx *ctx, u2_overworld *ow)
 {
     u2_state *st = &ctx->state;
     const uint8_t pre = u2_bcd_dec1(st->items_held[U2_ITEM_TRI_LITHIUM]);
@@ -1144,15 +1146,22 @@ static int space_hyperwarp(u2_ctx *ctx)
             const int r = seam_key_poll(ctx, &k);
             if (r < 0) return 0;                       /* input exhausted: original blocks */
             if (r == 0) {
-                /* Audit class A. Owner report 2026-11-10: "i hit H and it doesn't show
-                 * the command, nor does it show asking X Y Z, but it accepts 9 9 9
-                 * anyway". The prompts went into the vram and nothing presented, so the
-                 * player typed the destination blind while the input path worked fine.
+                /* Audit class A, second occurrence. Owner report 2026-11-10: "i hit H and
+                 * it doesn't show the command, nor does it show asking X Y Z, but it
+                 * accepts 9 9 9 anyway". The remedy that went in then presented the frame
+                 * on the empty poll -- but nothing repainted it, so it presented the frame
+                 * as of before these prompts, which is the same invisible text with a
+                 * present() in it, and it passed every text assertion in the tree because
+                 * the grid really did hold the words. Owner report 2026-11-11 is the same
+                 * sentence: "i'm in space and hit H but its not showing the hyperjump
+                 * dialog". Paint, then present, then pace.
                  * No CRs are added between the three prompts on purpose: g39 frame
                  * 23-hyperspace.png shows `XENO=9 YAKO=9 ZABO=9` on ONE line, so the
                  * run-together form is the original's, not a defect. */
                 if (ctx->exit_code || ctx->input_exhausted) return 0;
-                if (seam_present_frame(ctx)) return 0;
+                space_paint(ctx, ow);
+                seam_present_frame(ctx);
+                seam_wait_ms(ctx, 16);
                 continue;
             }
             if (k.ch >= '0' && k.ch <= '9') {
@@ -1326,23 +1335,30 @@ static void space_loop(u2_ctx *ctx, u2_overworld *ow)
         space_values(ctx);
         seam_str_out(ctx, U2_S_CMD_PROMPT);
 
-        /* Wait for a key WITHOUT burning the CPU and WITHOUT re-printing the prompt.
-         * The old shape was `if (!r) continue;` back to the prompt print, which both
-         * spun at 100% and flooded the text pane with `CMD: ` -- owner-reported
-         * 2026-11-10 as "I hit L to launch and it seems to have crashed". The engine
-         * was alive and looping; nothing was ever presented, so the screen sat on the
-         * overworld frame it launched from.
-         *
-         * Presenting each empty poll is what paces this: the SDL backend renders and
-         * the window keeps servicing events, and a closed window or an exhausted
-         * script exits the same way the overworld loop's flow_stopped() test does
-         * (overworld.c, seam_key_poll collapses both to 0). */
+        /* Composite the prompt into the frame and show it BEFORE waiting. This ordering is
+         * the whole defect: space_paint is what copies the text grid into ow->frame
+         * (u2_font_draw_vram_rows at the end of it), and it used to run only at the top of
+         * the pass, so the frame that got presented carried the text as of before this
+         * prompt. Every string the loop wrote -- the CMD: prompt, and everything a command
+         * printed while it waited -- reached the vram and never the window, while the same
+         * unchanged frame was re-uploaded as fast as software GL could carry it. Measured
+         * on 2026-11-11 at 550% CPU with the main thread parked in sdl_upload, which is
+         * what the owner saw as a crash: "i'm in space and hit H but its not showing the
+         * hyperjump dialog". */
+        space_paint(ctx, ow);
+        seam_present_frame(ctx);
+
+        /* Wait for a key WITHOUT burning the CPU. The old shape was `if (!r) continue;`
+         * back to the prompt print, which both spun at 100% and flooded the text pane with
+         * `CMD: ` -- owner-reported 2026-11-10 as "I hit L to launch and it seems to have
+         * crashed". A closed window still exits here: the SDL backend answers a quit with
+         * -1 and seam_key_poll collapses that to input_exhausted. */
         u2_key k;
         int r;
         while ((r = seam_key_poll(ctx, &k)) == 0) {
             if (ctx->exit_code || ctx->input_exhausted) return;
             if (ctx->death_pending) return;    /* the dive killed you; unwind to the handoff */
-            if (seam_present_frame(ctx)) return;      /* window closed */
+            seam_wait_ms(ctx, 16);             /* ~60 fps, the overworld loop's cadence */
         }
         if (r < 0) return;                            /* input exhausted: original blocks */
 
@@ -1359,7 +1375,7 @@ static void space_loop(u2_ctx *ctx, u2_overworld *ow)
         case U2_KEY_DOWN:  seam_str_out(ctx, U2_S_SPACE_DIVE);  seam_char_print(ctx, '\r');
             st->space_ship_y = (uint8_t)(st->space_ship_y + U2_SPACE_SHIP_STEP); break;
         case 'H': case 'h':
-            if (!space_hyperwarp(ctx)) return;
+            if (!space_hyperwarp(ctx, ow)) return;
             /* Repaint the fixed cells. The readout is positioned now, not streamed, so
              * it would otherwise keep showing the world you warped FROM -- stale in a
              * way the old stream version was not, because the old version simply never

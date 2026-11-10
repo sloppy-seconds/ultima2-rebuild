@@ -1848,3 +1848,17 @@ refusal exists to prevent a silent no-op, fix the no-op rather than keeping the 
 re-test old refusals whenever a feature turns out to be unreachable by any scripted route —
 "no gate can reach that path" is evidence about the harness far more often than about the
 feature. → Tier 2, harness contract.
+
+**2026-11-11 — a screenshot taken from inside the input seam is one frame stale, and a gate
+built on it can pass while measuring nothing.** The harness grew a way to capture the frame the
+renderer actually uploaded, triggered by a control character that the key seam swallows. The
+trap: the capture happens *during* the poll, so it shows the frame as of before whatever the
+program printed on the way into that poll. A gate comparing "screen before the prompt" against
+"screen after the prompt" therefore needs the script to force an idle poll between the two --
+one empty-poll token is enough — otherwise both captures are the same image and the only reason
+the gate still looks alive is that some unrelated ink differs. Two controls caught it: driving
+the same script through the title flow instead of straight into the world captured two splash
+screens, and rebuilding from a reverted source produced two byte-identical frames. General
+form: when a gate's observable is a capture taken by the program under test, verify the capture
+moves when the feature moves and does not move when it does not. A pixel assertion that has
+never been shown to go red is a text assertion with extra steps. → Tier 2, harness contract.

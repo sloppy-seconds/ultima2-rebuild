@@ -48,6 +48,16 @@ the `seam_wait_ms(ctx, U2_DIVE_STEP_MS);` line from the copy, and run
 which must report the two pacing checks and the ordering check as FAIL. The copy is what makes
 this a control instead of a comment: the gate is shown going red on the real file shape, from the
 same directory and the same ref position CI will use.
+
+Leg 7 (the presented frame), added 2026-11-11 after the owner's second report of the same
+symptom -- "i'm in space and hit H but its not showing the hyperjump dialog". Legs 1 and 6
+read the text grid, and the grid was correct: the loop printed the prompt into the vram and
+presented a frame that had been composited before the prompt existed, so the window never
+changed while every text assertion stayed green. This leg runs the SDL renderer headlessly,
+captures the frame the engine actually uploaded with its own Ctrl-S, and requires that the
+hyperwarp prompt adds ink over the orbit frame. It is the only leg in the file that looks at
+pixels, which is the point: a gate that reads the same structure the code writes cannot catch
+a failure between the write and the screen.
 """
 import os
 import re
@@ -88,6 +98,20 @@ body_code = re.sub(r"//[^\n]*", "", body_code)
 
 check("seam_present_frame" in body_code,
       "space_loop presents a frame while it waits for a key (no invisible 100% spin)")
+# ...and WHERE it presents. Presenting is not enough: the frame is a composite, and the
+# paint that copies the text grid into it used to run before the prompt was printed, so
+# the window showed the screen as of one prompt ago. Every grid-level assertion in the
+# suite stayed green while the owner saw nothing at all (2026-11-11, second report).
+_body_prompt = body_code.find("seam_str_out(ctx, U2_S_CMD_PROMPT)")
+_body_poll = body_code.find("seam_key_poll(ctx, &k)", _body_prompt)
+_body_paint = body_code.find("space_paint(ctx, ow);", _body_prompt)
+check(_body_prompt >= 0 and _body_poll > _body_prompt
+      and _body_paint > _body_prompt and _body_paint < _body_poll,
+      "the frame is repainted between the prompt print and the key poll (paint-first is what "
+      "made the prompt invisible to the window while the grid looked correct; a later paint "
+      "does not count, because the poll has already presented)")
+check("seam_wait_ms" in body_code,
+      "the empty poll is paced, not a free-running upload loop")
 check(not re.search(r"if\s*\(\s*!r\s*\)\s*continue\s*;", body_code),
       "no bare empty-poll `continue` back to the prompt print")
 check("space_paint" in body_code,
@@ -268,6 +292,77 @@ else:
               "the hyperwarp target prompt is on screen while it waits (owner symptom 1)")
         check("FUEL=0" in prompt_pane,
               "the readout is still whole on the prompt frame, not just the last one")
+
+        # ---- leg 7: the PRESENTED frame, not the grid ------------------------------
+        # Every check above reads the text grid, and the grid is exactly where the defect
+        # hid. space_loop painted the frame and THEN printed the prompt, so the frame that
+        # reached the window always carried the text as of before the prompt. Owner report
+        # 2026-11-11, the second time in two days: "i'm in space and hit H but its not
+        # showing the hyperjump dialog". The grid said HYPERWARP TO:, the window said
+        # nothing, and the process sat at 550% CPU re-uploading one unchanged frame.
+        #
+        # Only a pixel assertion can see that, so this leg drives the SDL renderer
+        # headlessly (SDL_VIDEODRIVER=dummy, the route CP4 already uses) and takes the
+        # presented frame with the engine's own Ctrl-S, which is swallowed at the key seam
+        # and writes the frame that was actually uploaded. Byte-identical frames are the
+        # failure mode; more ink in the prompt frame is the fix.
+        SDL_BIN = next((p for p in (os.path.join(ROOT, "engine", "u2-sdl-static"),
+                                    os.path.join(ROOT, "engine", "u2-sdl"))
+                        if os.path.exists(p)), None)
+        if SDL_BIN is None:
+            print("  SKIP  presented-frame check: no SDL build (make sdl-static) — this is "
+                  "the only leg that can see a prompt that never reached the window")
+        else:
+            import glob
+
+            def presented(script, tag):
+                d = os.path.join(work, tag)
+                os.makedirs(d, exist_ok=True)
+                keys = os.path.join(work, tag + ".keys")
+                with open(keys, "w") as fh:
+                    fh.write(script)
+                subprocess.run([SDL_BIN, "--renderer=sdl", "--play-map",
+                                "--data-dir", os.path.join(ROOT, "original"),
+                                "--save-dir", os.path.join(work, "save"),
+                                "--script", keys],
+                               cwd=d, env=dict(os.environ, SDL_VIDEODRIVER="dummy"),
+                               timeout=180, stdout=subprocess.DEVNULL,
+                               stderr=subprocess.DEVNULL, check=False)
+                shots = sorted(glob.glob(os.path.join(d, "screenshots", "*.bmp")))
+                return shots[-1] if shots else None
+
+            def ink(path):
+                """Non-black pixels of a 24-bit BMP, with no image library: the header
+                gives the pixel offset and the rest is BGR triples."""
+                with open(path, "rb") as fh:
+                    b = fh.read()
+                off = int.from_bytes(b[10:14], "little")
+                px = b[off:]
+                return sum(1 for i in range(0, len(px) - 2, 3)
+                           if px[i] + px[i + 1] + px[i + 2] > 60)
+
+            # --play-map because the SDL route has no title to click through, and the two
+            # WAITs because Ctrl-S is swallowed inside seam_key_poll -- the screenshot is
+            # taken before the poll that consumed it can paint, so a script that goes
+            # straight from H to Ctrl-S captures the frame as of before the prompt. The
+            # WAIT is what forces the empty poll that paints and presents. Both frames are
+            # also required to differ: identical bytes are exactly the defect, and the
+            # first draft of this leg passed while measuring two title screens, because
+            # without --play-map the menu ate every key and the screenshot was of the
+            # splash. The control caught that; a leg that cannot go red is not a leg.
+            orbit = presented("B\nL\nWAIT\nWAIT\n\x13\n", "orbit-shot")
+            prompt = presented("B\nL\nH\nWAIT\nWAIT\n\x13\n", "prompt-shot")
+            if orbit is None or prompt is None:
+                check(False, "the SDL run wrote a Ctrl-S screenshot of the presented frame "
+                             f"(got {orbit!r} and {prompt!r})")
+            else:
+                i_orbit, i_prompt = ink(orbit), ink(prompt)
+                check(i_prompt > i_orbit,
+                      f"the hyperwarp prompt reaches the PRESENTED frame, not only the grid "
+                      f"(ink {i_orbit} at orbit vs {i_prompt} at the prompt)")
+                check(open(orbit, "rb").read() != open(prompt, "rb").read(),
+                      "the orbit and prompt frames are not byte-identical — identical is the "
+                      "defect, a window that never changed while the game printed into it")
 
 if fails:
     print(f"\nSPACE VIEW GATE: FAIL ({len(fails)})")

@@ -3331,6 +3331,24 @@ them present once and then legitimately wait.
 
 All three are one fix each: present inside the wait loop, as `space_loop` now does.
 
+**Corrected 2026-11-11: "present inside the wait loop" was the wrong remedy, and the owner
+reported the same symptom the next day** -- "i'm in space and hit H but its not showing the
+hyperjump dialog". Presenting is not the fix when what gets presented is a composite that has
+not been repainted. `space_loop` and `space_hyperwarp` build their screen with `space_paint`,
+which is what copies the text grid into `ow->frame`, and the paint ran *before* the prompt was
+printed -- so the wait loop faithfully uploaded the frame as of one prompt ago. The grid was
+correct, every text assertion in the suite was correct, and the window showed nothing, while
+the process sat at 550% CPU with the main thread parked in `sdl_upload` re-uploading one
+unchanged frame. The fix is ordering, not presence: paint, present, then pace the poll with a
+wait. What proves it now is `engine/tests/space_view_gate.py` leg 7, which drives the SDL
+renderer headlessly and compares the frame the engine actually uploaded (Ctrl-S, swallowed at
+the key seam) between the orbit screen and the hyperwarp prompt; with the ordering reverted
+the two captures are byte-identical at 1295 ink pixels. It needed `--play-map` and two `WAIT`
+tokens before it could see anything: without the first the menu ate every key and both
+screenshots were of the splash -- which is how the first draft of that leg passed while
+measuring nothing -- and without the second the screenshot is taken inside the poll that
+consumed Ctrl-S, before that poll has painted.
+
 ### B. Present-then-spin — screen is correct, CPU is not (9)
 
 `game/title.c` at lines 147, 157 (`hold_for_esc`), 303 (`wait_choice`), 351, 354 (`run_demo`),
