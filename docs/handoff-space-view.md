@@ -8,11 +8,12 @@ deep-space screen is drawn: star field, ship cross, readout values).
 
 | item | state | needs |
 | --- | --- | --- |
-| hyperwarp **radiating** star field (`21-space.png`) | not implemented | the original's warp animation is not decoded; the engine currently repaints the same static field. Enhancement-vs-fidelity call, same as the static field |
+| hyperwarp **radiating** star field | **partly decoded and drawn** (`141d610`) | the view rectangle, the (16,16) origin, white-only, and the view-centre radial origin are all measured and gated. What is missing is the per-star algorithm, the warp star count and the animation rate — see `captures/spice86/g39-rocket-flight/README.md`, which names the exact capture that would settle them (a ~10 Hz screenshot + `DS:479/47A` poll across the warp window; the 4–5 s frames loop cannot, and no re-reading of it will) |
+| warp field **trigger and duration** | undecoded | `scene_from()` sets `warping = 0` and says so. The radial branch is drawn from the measured centre but nothing currently selects it, because inventing a timing would be claiming a mechanism |
 | readout **position** | drawn as text lines, not the original's fixed right-hand cells | `asm/6999` draws the digits graphically at fixed cells; those cells are not decoded. The values are right, the layout is approximate |
 | arrow step size | `U2_SPACE_SHIP_STEP 4`, **UNMEASURED** | one live peek: `8be:47b` before and after one `Right` |
 | § 5 leg 3 gate | not written | needs a scripted run that can *reach* space; the suite has no route to a rocket today |
-| star field positions | generated, labelled enhancement | the drawing routine is unidentified |
+| star field positions | generated inside the **measured** rectangle; the rectangle is fidelity, the points are not | the drawing routine is unidentified — see the g39 README re-read |
 
 Everything below is the original scoping, kept as written.
 
