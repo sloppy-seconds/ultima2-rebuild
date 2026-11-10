@@ -1048,7 +1048,9 @@ it or kill it.
 
 Chasing the return address meant stopping inside the spawner, and the epilogue every arm ends
 in is `call L_005cb1` — so the same run that produced the null result also walked into the
-callee. It is `asm/5AB1_view_origin_by_mode`, and it is not spawn machinery at all:
+callee. It is `asm/5AB1_map_render` (named `view_origin_by_mode` until 2026-11-10, when a live
+rocket dive showed the routine continues past the fragment boundary into the whole sector render),
+and it is not spawn machinery at all:
 
 ```
 5AB1: cmpb $0xff,0x12 ; jne 5ABB        ; DS:12 == 0xFF -> world map

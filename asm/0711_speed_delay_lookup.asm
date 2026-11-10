@@ -1,4 +1,19 @@
 # speed_delay_lookup — read one of the 20 machine-scaled delay slots into %bx
+# CORRECTION 2026-11-10, measured: the value is DISCARDED at every call site that can be read.
+#           The header below claims the slots are key-wait timeouts. That was inference from the
+#           shape of the sites, and three of them have now been read end to end:
+#             asm/38B0_cmd_L runtime 39B1 — `mov $0x1c,%bx ; call L_000911` then `call L_00514d`.
+#                   key_poll (asm/4F4D) pushes %bx at entry and pops it at runtime 4FDD and never
+#                   reads it; its only internal %bx is `mov $0x6,%bx` for the arrow table.
+#             asm/2557_mode_arm_horse — the lookup sits inside a fixed nested busy loop (di from
+#                   0xFF, inner si from 0x20) and the next instruction is `dec %di`.
+#             asm/421A — `mov $0x4,%bx ; call L_000911` after a di/si busy delay, and the flush at
+#                   asm/4AAD_flush_staged_cells.asm also saves and restores %bx without reading it.
+#           So: the rescale machinery, DS:74, the F7/F8 adjustment and the 20 slots are all real and
+#           measured, and nothing in this binary has yet been shown to consume a slot. Do not wire a
+#           slot to a timeout, an animation rate, or anything else, on the strength of this header's
+#           original claim. The descent animation's rate is the render's cost, not a slot — see
+#           captures/spice86/dive-sweep-rate/README.md.
 # name-evidence: `mov 0x580(%bx),%bx` — %bx goes in as a byte offset into the word table at
 #           DS:580 and comes out as the value stored there. The table is written by the rescale
 #           routine at asm/06ED..0710 (`mov %ax,0x580(%bx)`), which fills offsets 0x00..0x26 in

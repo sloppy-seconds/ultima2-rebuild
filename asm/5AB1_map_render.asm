@@ -1,4 +1,24 @@
-# 5AB1_view_origin_by_mode — the routine the spawn arms call, and it is a viewport origin
+# map_render — the whole sector render: viewport origin, stage the visible 20x10 window, flush to CGA
+# RENAMED 2026-11-10 from view_origin_by_mode, because the old name is this project's recurring
+#           fragment-boundary error: the routine does not stop where Phase 3 cut it. It is the map
+#           renderer. Proof is a live dive, with every stage in ExecutedInstructions -- see
+#           captures/spice86/dive-sweep-rate/README.md section 3. Read in address order:
+#             5AB1  this entry: `cmpb $0xff,0x12`; the world map goes to asm/5B98_sub_5b98.asm, an
+#                   interior to asm/5ABB_sub_5abb.asm
+#             5B98  world-map arm: DS:03 = [DS:01]-6 & 63 and DS:02 = [DS:00]-10 & 63, then it
+#                   FALLS THROUGH into the staging loop rather than returning
+#             5AE1  asm/5AE1_stage_visible_cells.asm -- 20 columns (DS:04 to 0x14) x 10 rows
+#                   (DS:05 to 0x0a) = 200 staged cells at DS:272
+#             4AAD  asm/4AAD_flush_staged_cells.asm -- walks those 200 cells, skips any with bit 7
+#                   set, takes the art descriptor from the table at DS:5B0 and calls
+#                   asm/4A74_tile_blit_cga.asm per cell
+#             5C6D  asm/5C6D_underlay_copy.asm -- DS:272 -> DS:372 masked with 0x7f, i.e. record
+#                   what is now on screen, which is what the next stage compares against
+#           WHY IT MATTERS: asm/38B0_cmd_L's rocket-descent loop calls this entry once per march
+#           step and calls nothing else, so this routine IS the descent animation and its cost IS
+#           the frame rate: 492,074 emulated cycles per call measured, about 10 steps/s at 4.77
+#           MHz. A reading that stops at "viewport origin" concludes the dive draws nothing and is
+#           invisible. It is not, and the owner caught that from live play on 2026-11-10.
 # name-evidence: entry L_005cb1 is `call`ed from asm/0BAF_monster_hp_epilogue and five
 #           others (0864, 08E6, 268C, 26CC, 38B0_cmd_L, 72A0). § 15 of
 #           docs/monster-spawn.md listed this entry point as unknown behaviour; this is it.

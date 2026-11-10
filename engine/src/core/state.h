@@ -71,7 +71,7 @@ typedef struct u2_state {
                                         * 0xFF on the world map, 4 in an interior sector --
                                         * written by asm/0C1F/asm/0C2B on the DS:4A branch
                                         * (DS:4A is the sector's low decimal digit), and its
-                                        * only readers are asm/5AB1_view_origin_by_mode and
+                                        * only readers are asm/5AB1_map_render and
                                         * asm/5AF9. 5AB1 is the routine the monster spawn
                                         * arms call, and DS:12 == 0xFF is how it decides
                                         * whether the viewport origin wraps (`and $0x3f`).

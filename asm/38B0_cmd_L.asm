@@ -44,6 +44,22 @@
 #   stopped on decides everything — tile 0x08 grass and it lives, anything else jumps to
 #   runtime 0x0E62, which is the death tail. So a rocket is aimed by timing, not steering.
 #
+#   THE FLIGHT IS ANIMATED, and the animation is this routine's render, not a separate one.
+#   Per iteration the loop is: march, `call L_005cb1`, `mov $0x1c,%bx ; call L_000911`,
+#   `call L_00514d` (key_poll), `cmp $0xff,%ah ; jne` back to the march. L_005cb1 is
+#   asm/5AB1_map_render — the whole sector render: viewport origin, stage the visible 20x10
+#   window from mapx, flush it to the CGA planes, copy the underlay. So one march step is one
+#   frame, the ship the player watches is the stamp that render draws, and the frame rate is
+#   the render's cost: 492,074 emulated cycles per step measured, about 103 ms and 9.7 steps/s
+#   at 4.77 MHz, so a full north-to-south sweep (32 steps, x advancing 8) takes about 3.3 s.
+#   Evidence and the observed position sequence:
+#   captures/spice86/dive-sweep-rate/README.md (21-dive-a.png and 22-dive-b.png are the same
+#   dive 0.4 s apart; 23-land-death.png is the fatal landing). The speed-delay lookup in the
+#   middle of the loop is NOT a timeout — key_poll and the flush both save and restore %bx and
+#   neither reads it, so the value is loaded and discarded. See asm/0711_speed_delay_lookup.
+#   The 0xFF fill of DS:272/DS:372 described above is the underlay clear that makes the first
+#   staged pass draw all 200 cells; it is not a blank screen.
+#
 # THE PARKED-ROCKET TRIPLE, DS:69 / DS:6A / DS:6B. Decoded 2026-11-03 by sweeping every
 #   reader and writer in the tree; these three bytes are inside the save record (DS:36..135)
 #   and that is the whole point of them.

@@ -2897,7 +2897,7 @@ no site-kind test, and advances the countdown wherever the player is. The origin
 
 **Defect 2 — the south edge draws the north edge.** `engine/src/core/view.c` masks both axes with
 `& 63` unconditionally, and its comment justifies that with a single capture taken in sector 20, a
-world-map sector. The tree already names the correct rule: `asm/5AB1_view_origin_by_mode` branches on
+world-map sector. The tree already names the correct rule: `asm/5AB1_map_render` branches on
 `DS:12`, and only the world-map arm (`asm/5B98_sub_5b98`) applies `and $0x3f`; the interior arm
 (`asm/5ABB_sub_5abb`) computes the same origin deliberately unwrapped. Measured in the town, the rows
 past the last grid row are **one constant filler tile** — identical colour census across four rows and

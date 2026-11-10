@@ -1,4 +1,9 @@
 # 5B98_view_origin_wrapped — viewport origin for the WORLD MAP: origin, then `and $0x3f`
+# NOT THE END OF THE ROUTINE 2026-11-10: this arm does not return. It computes DS:02/DS:03 and
+#           FALLS THROUGH into the staging loop at asm/5AE1_stage_visible_cells.asm, whose tail
+#           (asm/5C6D_underlay_copy.asm) calls the flush and then returns. Together with the entry
+#           at asm/5AB1_map_render.asm this is the whole sector render, and it is what the rocket
+#           descent calls once per march step -- see captures/spice86/dive-sweep-rate.
 # name-evidence: reached only from asm/5AB1_view_origin_by_mode when DS:12 == 0xFF, i.e.
 #           on the world map. `stc ; mov 0x1,%al ; cmc ; sbb $0x5,%al ; cmc ; and $0x3f,%al`
 #           puts DS:03 at [DS:01] - 6 wrapped into 0..63, and the same shape with $0x9 puts

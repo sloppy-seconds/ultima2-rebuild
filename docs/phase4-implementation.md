@@ -1499,7 +1499,7 @@ while still being marked as upgrade-sourced content, never committed.
 
 **First, a convention trap I walked into and must not walk into again.** The `asm/`
 filenames are **runtime** offsets; the bytes live at **file = runtime + 0x200**. The
-`L_004c74`-style labels inside `asm/4A74_sub_4a74.asm` are the *file* offsets, which is
+`L_004c74`-style labels inside `asm/4A74_tile_blit_cga.asm` (named `sub_4a74` until 2026-11-10) are the *file* offsets, which is
 what made the two look interchangeable. I passed `--range 4860:4960` to `redecode.py`
 meaning runtime `0x4A64` and got the **status bar** code instead (repeated
 `call $0x53eb` string draws plus `mov al,[0x4b]; call $0x55b5`, the BCD printer, for

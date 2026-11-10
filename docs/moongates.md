@@ -431,5 +431,5 @@ its own world-map control so neither refusal can be passing for the wrong reason
 This is the same mistake as the viewport one measured in the same capture: the world map wraps both
 axes and a site sector does not, and `engine/src/core/view.c` applied the world-map rule to both, so
 Port Boniface's north sign band was drawn along the bottom of the screen as the water the owner
-reported. See `asm/5AB1_view_origin_by_mode`, `asm/5B98_sub_5b98` and `asm/5ABB_sub_5abb`, and the
+reported. See `asm/5AB1_map_render`, `asm/5B98_sub_5b98` and `asm/5ABB_sub_5abb`, and the
 fix and its gate in `docs/phase4-state.md`.
