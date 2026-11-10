@@ -3243,3 +3243,53 @@ stop mechanism is found, the renderer's remaining difference cannot be attribute
 change is justified by it. Fixing `bp_read.py` against this Spice86 is the next step, and it is a
 tool fix, not a renderer fix.
 
+## The frigate: ATTACK is allowed aboard it, and FIRE never hits (owner-found, 2026-11-10)
+
+**Recorded as a defect to solve later, not investigated and not fixed.** Owner found both while
+re-flying the rocket playtest on 2026-11-10, aboard the frigate:
+
+1. **`A` ATTACK is accepted from the frigate. It should not be.** On the water the crew row the
+   guns; a sword swing from a ship is not a thing the original offers.
+2. **`F` FIRE never seems to hit anything.** It takes the aim direction and prints, but no
+   casualty follows.
+
+Both are graded **owner observation** — reported from play, not yet reproduced against bytes or a
+capture. That is the correct starting grade and it outranks any inference here, per the standing
+rule; it also means neither has a named root cause yet.
+
+### Where to look, so the next person does not start from zero
+
+The on-foot gate already exists and is one condition:
+
+```c
+/* engine/src/game/overworld.c:723 */
+if (!pol->allow_in_vehicle && ctx->state.player_stamp < 0x78) {
+```
+
+`allow_in_vehicle` (`overworld.h:125`, "skip the on-foot gate (DS:13)") is the field that decides
+which commands survive aboard a vehicle. So defect 1 is most likely a policy-table entry, not a
+missing mechanism — check what `cmd_A`'s policy sets before writing anything.
+
+For defect 2, the ship arm is already decoded and cited: `asm/35C9` gates FIRE on
+`[DS:13] == 0x24` (the ship stamp from `asm/2FAD`'s BOARD dispatch), off the ship the whole
+command is `FIRE WHAT?`, and on the ship it prints ` DIRECT-` and goes through the aim gate.
+`asm/35C1_cmd_F.asm` holds it. The engine reproduces the gate and the prompt — what has **not**
+been checked is what happens after the direction arrives. The likely gap is the resolution step:
+whether the cannon ray reaches the creature sweep at all, or prints and discards.
+
+### What would settle each
+
+- **Defect 1**: one live sample. Board the frigate in the original, press `A`, record what the
+  screen says. If the original refuses, the refusal string is the spec and `cmd_A`'s policy entry
+  is the fix. If the original *allows* it, this is a false report and the note closes with the
+  frame as evidence — say which, do not assume.
+- **Defect 2**: a capture of a successful `F` hit in the original, with a creature adjacent in the
+  aimed direction, then diff `mon_hp`/`mon_type` across it. That names the damage path by
+  observation instead of by reading. Note this is a **needs-gameplay** item and, per the standing
+  rule, say who can do it: an agent can drive it headless with a seeded world and a poked
+  creature, so it is not owner-blocked.
+
+Neither is gated today, and the space-view lesson applies directly: a gate that asserts a
+function was called proves nothing about what the player sees. Any check written for these should
+assert the visible outcome — a refusal line, or a creature's HP dropping — not that a handler ran.
+
