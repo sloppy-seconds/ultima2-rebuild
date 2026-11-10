@@ -138,3 +138,25 @@ in rather than compiled in the image so that what runs is what the host's
 - Nothing here is wired into `make test`, and nothing in `make test` may come to
   depend on it: the CP4 dummy-driver assertion already covers the SDL pixel path for
   CI, and this container exists for a human with a browser.
+
+## Asking a running session what it shows
+
+`u2-shot` is in the image and speaks VNC to the local `x11vnc`, so it needs no display,
+no xwd and no ImageMagick:
+
+```bash
+./up.sh --shot /var/tmp/u2/frame.png          # what is on screen right now
+podman exec u2-novnc u2-shot --press "P,Left" --gap 0.6 --out /tmp/f.png
+```
+
+`--press` injects key events (letters, or `Up/Down/Left/Right/Return/Esc/Space/Tab/
+BackSpace`, case-insensitive) and then writes the frame, so a whole interaction can be
+driven and observed from one command. It connects `shared=1`, so it never evicts the
+browser tab a person is playing in — but it does put keys into that same game, so do not
+press anything while the owner is holding the keyboard.
+
+The reason both exist is that nothing else in the tree can answer "what is on the screen
+right now": the play API returns the 40x25 text grid, and `--dump-screen` writes only
+the first presented frame. For a scripted run through the shipped menu path prefer
+`SDL_VIDEODRIVER=dummy ./u2-sdl-static --renderer=sdl --script FILE` (CP5's menu-reload
+case) over injecting into a live display; this is for the live one.

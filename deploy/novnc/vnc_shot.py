@@ -24,6 +24,12 @@ bitten by.
 
 Run it inside the container (`podman exec u2-novnc u2-shot --out /tmp/shot.png`), or
 locally against any VNC server that offers security type None.
+
+`--press K1,K2,...` injects X key events before the shot, which is what makes a live
+session drivable as well as observable: letters by themselves, named keys
+(`Up/Down/Left/Right/Return/Esc/Space/Tab/BackSpace`, case-insensitive), `--gap` seconds
+between them. It is the only way to drive the container's game from a script, because
+`--script` needs a script input backend and a live window has an SDL one.
 """
 import argparse
 import socket
@@ -72,7 +78,7 @@ def ppm_write(path, width, height, rgb):
         fh.write(bytes(rgb))
 
 
-def grab(host, port, timeout):
+def handshake(host, port, timeout):
     # A container that has just come up refuses the connection for a second or two before
     # x11vnc has its display, so a refused connect is retried for the same reason the
     # greeting is: `up.sh --shot` immediately after `up.sh` is the normal sequence, and
@@ -128,7 +134,11 @@ def grab(host, port, timeout):
         sys.exit("u2-shot: pixel format bpp=%d depth=%d truecolour=%d is not the 32-bit "
                  "true-colour this client decodes; refusing rather than guessing"
                  % (bpp, depth, truecolour))
+    return s, width, height, name
 
+
+def grab(host, port, timeout):
+    s, width, height, name = handshake(host, port, timeout)
     # SetEncoding: type 2, 1 pad byte, n-rectangles (u16), then n encoding-type ints.
     s.sendall(struct.pack("!BBH", 2, 0, 1) + struct.pack("!i", 0))
     # FramebufferUpdateRequest: type 3, incremental (u8), x,y,w,h (u16 each). Getting this
@@ -166,6 +176,7 @@ def grab(host, port, timeout):
                  % (x, y, w, h, width, height))
 
     raw = rd(s, w * h * 4, "framebuffer")
+    s.close()
     # A 32-bit true-colour X display reaches x11vnc as B,G,R,x on the wire; swap to RGB.
     rgb = bytearray(w * h * 3)
     j = 0
@@ -177,6 +188,47 @@ def grab(host, port, timeout):
     return width, height, rgb, name.decode("utf-8", "replace")
 
 
+# X keysyms. ASCII characters use their code point (the X keysym for a printable
+# character IS its Unicode value), so only the named keys need a table. The engine reads
+# keys through SDL, which maps these onto its scancode enum; an arrow arriving as a
+# letter would be an ILLEGAL COMMAND! in the game and a silently wrong test here.
+KEYSYMS = {
+    "Up": 0xFF52, "Down": 0xFF54, "Right": 0xFF53, "Left": 0xFF51,
+    "Return": 0xFF0D, "Enter": 0xFF0D, "Esc": 0xFF1B, "Escape": 0xFF1B,
+    "Space": 0xFF20, "Tab": 0xFF09, "BackSpace": 0xFF08,
+}
+
+
+def keysym(tok):
+    # Tolerate "left"/"Left"/"LEFT": the tool gets driven from shell one-liners where
+    # the case of a token is the last thing anyone thinks about.
+    for k in (tok, tok.capitalize(), tok.upper()):
+        if k in KEYSYMS:
+            return KEYSYMS[k]
+    if len(tok) == 1:
+        return ord(tok)
+    sys.exit("u2-shot: unknown key %r; name it or pass a single character "
+             "(known: %s)" % (tok, ", ".join(sorted(KEYSYMS))))
+
+
+def send_keys(host, port, tokens, gap, timeout):
+    """Press and release each token, in order, over its own RFB connection.
+
+    This is how a scripted run reaches the shipped input path. The engine refuses
+    --script without --headless (main.c: no interactive backend reads a key script), and
+    --headless has no pixel renderer, so the menu's 'P' branch -- the one a player uses,
+    and the one that carries the death reload -- is unreachable from any text-mode gate.
+    Injecting at the display is the only way to drive it and still see the result."""
+    s, _w, _h, _name = handshake(host, port, timeout)
+    for tok in tokens:
+        sym = keysym(tok)
+        s.sendall(struct.pack("!BBHI", 4, 1, 0, sym))      # KeyEvent: down
+        s.sendall(struct.pack("!BBHI", 4, 0, 0, sym))      # then up
+        time.sleep(gap)
+    s.close()
+    return len(tokens)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--host", default="127.0.0.1")
@@ -185,12 +237,22 @@ def main():
     ap.add_argument("--out", default="/tmp/u2-shot.png")
     ap.add_argument("--ppm", action="store_true", help="write PPM instead of PNG")
     ap.add_argument("--timeout", default=20.0, type=float)
+    ap.add_argument("--press", default="",
+                    help="comma-separated keys to inject before the shot "
+                         "(letters, or Up/Down/Left/Right/Return/Esc/Space/Tab/BackSpace)")
+    ap.add_argument("--gap", default=0.35, type=float,
+                    help="seconds between injected keys (default 0.35)")
     a = ap.parse_args()
 
     port = a.port
     if port == 5901:
         import os
         port = int(os.environ.get("VNC_PORT", "5901"))
+
+    if a.press:
+        tokens = [t for t in a.press.split(",") if t != ""]
+        n = send_keys(a.host, port, tokens, a.gap, a.timeout)
+        print("u2-shot: pressed %d key(s): %s" % (n, ",".join(tokens)))
 
     width, height, rgb, name = grab(a.host, port, a.timeout)
     if a.ppm:
