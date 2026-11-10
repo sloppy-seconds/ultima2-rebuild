@@ -380,6 +380,59 @@ must not be confused with — and not appearance.
 
 ---
 
+## 9a. The test set was run — measured findings
+
+Four shots from `docs/concept-prompts.md` were generated on 2026-11-10 (outputs and a
+`prompt_sha256` + seed manifest under `~/Projects/agents/ultima2-art/`). Results, with the
+measurement rather than the impression:
+
+**T3 passed only after the owner rewrote it, and the failure was a vocabulary error in this
+spec's own prompt.** The first prompt asked for "a free-standing arch of light" while forbidding
+masonry. The output was a **stone masonry arch** — exactly the forbidden thing. A concrete noun
+beats an adjective that negates it: the model resolves toward the noun. The rewrite removed the
+noun ("an upright pane of light, like a tall mirror stood on its edge, no frame, no stand, no
+handle") and produced a luminous pane with a different-hour landscape visible inside it. Record
+this as the rule for every prompt in this thread: **do not name the thing being forbidden.**
+
+**T2 fails the acceptance test this spec set for it.** Shrunk to 32px, all five figures are dark
+lumps; the only discriminator that survives is a bright raised sword. Each figure still carries
+**221-273 distinct colours at 32px**, which is photographic blur rather than a pixel-art
+reduction. The model also substituted a barbarian-with-axe for the specified staff-caster. This
+is the downscale warning of `concept-shot-list.md` § 5 demonstrated on real output instead of
+argued: painterly concept art does not survive to tile size at any colour depth.
+
+**T4 should be cut from the concept list.** "A horizontal row of adjacent square game tiles" is
+not something an image model produces; four seeds returned four *illustrations of shopfront
+signs*, none square-tile-based, all with vertical dividers — the exact thing the owner's edit
+forbade. Signage construction is a sprite-sheet-stage job. Kept in the shot list as a sprite-stage
+note, removed from the concept stage.
+
+**The palette question now has a number.** Perceptual colour buckets at >= 0.5% coverage: T1 = 39,
+T2 = 13, T3 = 19, T4 = 40. The look the owner wants genuinely needs **20-40 colours**, so 16 is a
+real reduction and not a free one. § 3a's bar is now measured rather than assumed.
+
+**The engine blocker is not `bpp`.** The colour-depth refusal at `core/tiles_ega.c:228` is the
+smallest of three ceilings, because `tbytes = tw*th*bpp/8` already generalises. The binding one is
+`core/view.h:60`: the staging grid holds **one art per cell**, so a creature *replaces* the ground
+tile rather than being drawn over it. Painterly figures have soft edges and a drop shadow, which
+need the ground visible behind them; in a one-art-per-cell model they arrive with a hard
+rectangular patch of their own background pasted around them. Lifting the palette without adding a
+layer would fix the colour count and still produce a cardboard cutout.
+
+The three ceilings, in cost order: one-art-per-cell (`view.h:60`), the 16-entry palette
+(`platform/renderer_sdl.c:211`, and `ctx->theme_palette` sized the same), then the byte format
+(`tiles_ega.c:228` plus `U2_TILE_EGA_MAX_TILE`, which caps a 32x32 8bpp tile). The pixel path is
+already `SDL_PIXELFORMAT_RGBA8888` (`renderer_sdl.c:191`) with the indexing done in a CPU blit, so
+an alpha-blended sprite layer is a local change and not a GPU rearchitecture.
+
+The framing worth keeping: **16 colours was a framebuffer constraint, never a sprite constraint.**
+The proposed shape is terrain unchanged at 4bpp indexed, plus a second asset class of RGBA sprites
+with alpha drawn over the ground, added alongside the existing representations exactly as
+`tiles_ega.h` keeps the CGA blit byte-for-byte untouched. **This is parked, not decided** — the
+rest of the game and the win condition come first.
+
+---
+
 ## 9. Deliberately not done here
 
 - **No art.** This is a proposal. Commissioning is a separate decision.

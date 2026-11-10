@@ -40,10 +40,13 @@ motion carrying a curved blade. Each must be identifiable by outline alone at ve
 
 ```text
 front-facing game sprite on a plain dark background, hand-drawn early-90s pixel art, limited
-palette, no anti-aliasing — a free-standing arch of light or energy, nothing around it, no wall,
-no building, no frame of masonry. It is a portal that appears in open ground, transports the
-traveller somewhere else, and then vanishes. It should look temporary and unearthly rather than
-built: luminous edges, an interior that is clearly an opening, and no door, gate or leaf.
+palette, no anti-aliasing — an upright pane of light standing alone in open ground, like a tall
+mirror stood on its edge but with no frame, no stand and no handle. The pane is a window into
+another time: inside it a lit landscape at a different hour is clearly visible, still and
+inviting. A luminous rim of energy holds the pane open; nothing built surrounds it, no wall,
+no masonry, no arch, no door, gate or leaf. It should read as magical and full of promise,
+adventure just beneath the surface, and unmistakably temporary: it stands in open field and
+will vanish.
 ```
 
 ### T4 — A sign board assembled from pieces  *(construction rules)*
@@ -52,10 +55,11 @@ built: luminous edges, an interior that is clearly an opening, and no door, gate
 a horizontal row of adjacent square game tiles that together form one painted wooden sign board
 hanging over a shopfront, hand-drawn early-90s pixel art, limited palette, flat even lighting, no
 anti-aliasing — from left to right: a left end cap, three panels each bearing one bold capital
-letter, one blank panel with no letter, and a right end cap. Every panel carries a full-width rule
-along its top edge and another along its bottom edge; those rules are the frame of the board and
-are required, not decorative. The panels must join edge-to-edge with no visible seam so the board
-reads as one object assembled from tiles.
+letter, one blank panel with no letter, and a right end cap. The board is framed by two
+continuous horizontal rails, one running the full width along the top edge and one along the
+bottom edge; the only vertical bars are the two end caps. The interior panels butt together edge
+to edge with no vertical divider, no post and no gap between them, so the board reads as one
+plank carrying the letters. No seam between panels, no per-panel border, no letterboxing.
 ```
 
 ---
