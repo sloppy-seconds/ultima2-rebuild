@@ -515,7 +515,21 @@ typedef struct u2_state {
                                        * gate items_held[GREEN IDOL] at DS:E4). */
     /* 0x26E */ uint8_t reserved_26E[0x204];  /* 0x26E..0x471 */
     /* 0x472 */ uint16_t map_base;    /* map table base offset, asm/50B3_map_tile_ptr.asm */
-    /* 0x474 */ uint8_t reserved_474[0x0DB];
+    /* 0x474 */ uint8_t reserved_474[0x007];  /* 0x474..0x47A */
+    /* 0x47B */ uint8_t space_ship_x;   /* the in-space ship sprite's screen x.
+                                         * Named by asm/6CC4_space_ship_erase, whose two
+                                         * erase sweeps are centred on DS:47B/DS:47C, and
+                                         * measured at 0x80 in orbit by
+                                         * captures/spice86/w6-orbit-dive. Live scratch,
+                                         * outside the save record, never persisted. */
+    /* 0x47C */ uint8_t space_ship_y;   /* screen y of the same sprite; 0x40 measured. */
+    /* 0x47D */ uint8_t reserved_47D[0x04D];  /* 0x47D..0x4C9 */
+    /* 0x4CA */ uint8_t reserved_4CA[0x085];  /* 0x4CA..0x54E. The first three bytes are
+                                         * the XENO/YAKO/ZABO readout that asm/6999 writes
+                                         * from the world table; the engine derives them
+                                         * from st->world instead of mirroring them, so
+                                         * they stay reserved rather than getting names
+                                         * nothing reads. */
     /* 0x54F */ uint8_t left_margin;  /* column a CR returns to; 0 or 1 at the sites
                                          asm/456B_sub_456b.asm, asm/48A7_sub_48a7.asm;
                                          read by asm/500D_sub_500d.asm */

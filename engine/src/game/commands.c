@@ -22,6 +22,7 @@
 #include "game/overworld.h"
 #include "game/dungeon.h"
 #include "game/space.h"
+#include "game/space_view.h"
 
 /* Generated at build time from the user's copy (engine/tools/extract/extractor.py). */
 #include "gen_content.h"
@@ -1089,20 +1090,60 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
  * out, which in the original is an infinite block). Arrows move the ship sprite on
  * screen only and change no coordinate, so the engine prints the direction word and
  * loops; that is the whole observable effect of an arrow. */
+
+/* How far an arrow moves the sprite. UNMEASURED -- the captures prove the sprite moves
+ * and that no coordinate changes, but never read DS:47B across an arrow to get the
+ * step. Named rather than inlined so it is a visible gap with a route to closing it:
+ * peek 8be:47b before and after one Right in a live run. */
+#define U2_SPACE_SHIP_STEP 4
+
+static void space_paint(u2_ctx *ctx, u2_overworld *ow)
+{
+    u2_space_scene sc;
+    u2_space_scene_from(ctx, &sc);
+    u2_space_scene_draw(&ow->frame, &sc);
+}
+
 static void space_loop(u2_ctx *ctx, u2_overworld *ow)
 {
     u2_state *st = &ctx->state;
+
+    /* The frame is drawn once here and again after every handled command, not on
+     * every poll: the original repaints the starfield when the ship moves, not when
+     * nothing happens. */
+    space_paint(ctx, ow);
+
     for (;;) {
         seam_str_out(ctx, U2_S_CMD_PROMPT);
+
+        /* Wait for a key WITHOUT burning the CPU and WITHOUT re-printing the prompt.
+         * The old shape was `if (!r) continue;` back to the prompt print, which both
+         * spun at 100% and flooded the text pane with `CMD: ` -- owner-reported
+         * 2026-11-10 as "I hit L to launch and it seems to have crashed". The engine
+         * was alive and looping; nothing was ever presented, so the screen sat on the
+         * overworld frame it launched from.
+         *
+         * Presenting each empty poll is what paces this: the SDL backend renders and
+         * the window keeps servicing events, and a closed window or an exhausted
+         * script exits the same way the overworld loop's flow_stopped() test does
+         * (overworld.c, seam_key_poll collapses both to 0). */
         u2_key k;
-        const int r = seam_key_poll(ctx, &k);
-        if (r < 0) return;                             /* input exhausted: original blocks */
-        if (!r) continue;
+        int r;
+        while ((r = seam_key_poll(ctx, &k)) == 0) {
+            if (ctx->exit_code || ctx->input_exhausted) return;
+            if (seam_present_frame(ctx)) return;      /* window closed */
+        }
+        if (r < 0) return;                            /* input exhausted: original blocks */
+
         switch (k.ch) {
-        case U2_KEY_LEFT:  seam_str_out(ctx, U2_S_SPACE_LEFT);  break;
-        case U2_KEY_RIGHT: seam_str_out(ctx, U2_S_SPACE_RIGHT); break;
-        case U2_KEY_UP:    seam_str_out(ctx, U2_S_SPACE_CLIMB); break;
-        case U2_KEY_DOWN:  seam_str_out(ctx, U2_S_SPACE_DIVE);  break;
+        case U2_KEY_LEFT:  seam_str_out(ctx, U2_S_SPACE_LEFT);
+            st->space_ship_x = (uint8_t)(st->space_ship_x - U2_SPACE_SHIP_STEP); break;
+        case U2_KEY_RIGHT: seam_str_out(ctx, U2_S_SPACE_RIGHT);
+            st->space_ship_x = (uint8_t)(st->space_ship_x + U2_SPACE_SHIP_STEP); break;
+        case U2_KEY_UP:    seam_str_out(ctx, U2_S_SPACE_CLIMB);
+            st->space_ship_y = (uint8_t)(st->space_ship_y - U2_SPACE_SHIP_STEP); break;
+        case U2_KEY_DOWN:  seam_str_out(ctx, U2_S_SPACE_DIVE);
+            st->space_ship_y = (uint8_t)(st->space_ship_y + U2_SPACE_SHIP_STEP); break;
         case 'H': case 'h':
             if (!space_hyperwarp(ctx)) return;
             break;
@@ -1125,6 +1166,10 @@ static void space_loop(u2_ctx *ctx, u2_overworld *ow)
         default:
             break;                                      /* asm/6999: no match, re-poll */
         }
+
+        /* Arrows move the sprite and nothing else, so the redraw is what makes an
+         * arrow observable at all. */
+        space_paint(ctx, ow);
     }
 }
 
@@ -1197,6 +1242,11 @@ static u2_cmd_result launch_rocket(u2_ctx *ctx, u2_overworld *ow)
         u2_bcd_dec1(ctx->state.items_held[U2_ITEM_TRI_LITHIUM]);
     space_readout(ctx);
     seam_str_out(ctx, U2_S_HYPERWARP_ENGAGED);
+
+    /* The sprite starts where the capture found it: DS:47B/47C read 0x80/0x40 in
+     * orbit and did not move on the dive (captures/spice86/w6-orbit-dive). */
+    ctx->state.space_ship_x = U2_SPACE_SHIP_X0;
+    ctx->state.space_ship_y = U2_SPACE_SHIP_Y0;
 
     space_loop(ctx, ow);
 

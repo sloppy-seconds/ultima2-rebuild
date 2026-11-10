@@ -186,6 +186,20 @@ else
     fi
 fi
 
+# --- the in-space SCREEN ---------------------------------------------------
+# The model above was always fine; what was missing was that nothing ever drew it.
+# Owner playtest 2026-11-10: launching looked like a crash because space_loop spun at
+# 100% CPU re-printing `CMD: ` and never presented a frame, so the screen sat on the
+# overworld image the rocket launched from.
+# Control, run 2026-11-10: with the old spin put back (present removed, bare `continue`
+# restored) the gate reports both of those FAIL and exits 1; restored, it passes.
+if python3 tests/space_view_gate.py > "$WORK/spaceview.log" 2>&1; then
+    ok "space view: the loop presents and paints, and the ship sprite matches asm/6CC4's sweeps"
+else
+    sed 's/^/        /' "$WORK/spaceview.log" | tail -8
+    bad "space view gate failed -- the in-space screen is broken again"
+fi
+
 # --- the framebuffer ------------------------------------------------------
 # Every display backend sits behind this, so a mistake here reaches all of them.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/frame_check" \
@@ -244,7 +258,7 @@ fi
 # P lands where the player stood. Plus the outdoors guard and the CP11
 # save-anywhere policy hook.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/save_q_check" \
-   tests/save_q_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/flash.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c \
+   tests/save_q_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/game/space_view.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/flash.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c \
    src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c src/core/demo.c \
    src/core/vram.c src/core/state.c src/core/font.c src/core/frame.c \
    src/core/view.c src/core/rng.c src/core/timer.c src/core/replay.c \
@@ -264,7 +278,7 @@ fi
 # file 0x0B0D spends 10 food per PASS and file 0x0B2E sends a borrow to the
 # death handler at runtime 0x0E62 (asm/0C62), which zeroes DS:51..59.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/food_check" \
-   tests/food_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/flash.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c \
+   tests/food_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/game/space_view.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/flash.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c \
    src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c src/core/demo.c \
    src/core/vram.c src/core/state.c src/core/font.c src/core/frame.c \
    src/core/view.c src/core/rng.c src/core/timer.c src/core/replay.c \
