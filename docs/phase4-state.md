@@ -3352,3 +3352,39 @@ declaring it fixed.** A follow-up worth having is a gate that fails on the shape
 function that also draws. Class A is exactly three sites, so such a gate could be written as an
 allow-list and would have caught all three.
 
+## Still open: the dive does not reload the sector (fix 1 of the proposed order)
+
+Class A is fixed (`f33bd70`). The **world-reload bug is not**, and it is the most serious of the
+four the owner reported: after a hyperwarp to planet X, `L` still lands you on Earth.
+
+The dive arm sets the sector digits and then descends:
+
+```c
+const int sector = u2_space_dive_sector(st->world);   /* Earth -> 40, world N -> N0 */
+st->sector_first  = (uint8_t)(sector / 10);
+st->sector_second = (uint8_t)(sector % 10);
+rocket_descent(ctx, ow);     /* <-- ow->world is STILL the launch sector */
+```
+
+So the map drawn during the descent is the launch sector's, and
+`u2_space_dive_survives(u2_world_tile_at(&ow->world, ...))` tests a tile from the wrong world —
+which can kill the player on terrain that is not really there, or let them survive on terrain that
+is. Not presentation; correctness.
+
+**The fix is to reuse `site_reload`, not to hand-roll a load.** It is `static` in
+`game/overworld.c:268`, and it is the only place that does the whole job in the right order: map
+layer, demo delta, `monsters_clear`, creature layer + delta, `u2_monsters_spawn`,
+`clear_spawn_cells`, tlkx clear-then-load, restamp, `diag_unstamped_at_load`, `demo_note_world`,
+and the `DS:12` view-mode derivation from the sector's ones digit. Calling `u2_world_load` twice
+by hand from `commands.c` would skip most of that and reintroduce a subtler bug than the one being
+fixed — every one of those steps carries a comment naming a real failure it closes.
+
+So: expose it (the two existing callers, `overworld.c:434` and `:506`, are both "a sector becomes
+resident" paths and the dive is a third), sync `ow->sector_hi/sector_lo` from the state digits
+before calling it, and decide whether the dive wants `site_reload`'s site-flavoured side effects
+or whether the function should be renamed to something neutral first.
+
+**Why it was left undone:** context ran out mid-investigation. This is a correctness change to the
+world-loading path, and committing a half-understood version of it is precisely how a plausible fix
+ends up moving a bug somewhere quieter. Tree is green at `f33bd70`.
+
