@@ -27,7 +27,10 @@ exact byte-for-byte fidelity.
 — the space screen is not drawn at all, which is why launching looked like a crash; `space_loop`
 hot-spins with no present call, while the model underneath it in `space.h` is already complete and
 byte-cited, so what is missing is presentation only. Its § 1 names the four capture frames that
-define the screen and § 3 flags the one discriminator nobody has evidence for), and
+define the screen; **the orbit/landed discriminator is closed** by `captures/spice86/w6-orbit-dive/`
+— there is no in-space boolean, launch changes only the coordinate triple and the fuel, and the
+recommendation in § 3a is to keep the loop-scoped structure rather than test the staging tables.
+§ 3a also warns not to call this W6, which is the plane's airborne flag and still open), and
 `docs/handoff-commerce-transact.md` (**executed
 > 2026-10-29, the day it was written — read its § 0 status block first**; `cmd_T` is now implemented
 > in `engine/src/game/commerce.c` and gated by `make test-cp6`, and the headline is that three of its

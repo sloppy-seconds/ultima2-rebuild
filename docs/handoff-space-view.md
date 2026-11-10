@@ -51,7 +51,6 @@ readout, and the normal text pane below. The radiating field is the warp transit
 the save record, never persisted. Do not add them to `state.h` as saved fields.
 
 ## 3. State the loop must render
-
 From `captures/spice86/g62-orbit-state/README.md`, observed in order:
 
 | state | `DS:13` | `DS:6D` | sector | pos | xyz | fuel |
@@ -62,15 +61,38 @@ From `captures/spice86/g62-orbit-state/README.md`, observed in order:
 | **landed**, sector 40 | `0x28` | `00` | 40 | (1,10) | 6/6/6 | 08 |
 | after `L` while landed | `0x28` | `0a` | 40 | (1,10) | 7/1/1 | 07 |
 
-Two things this settles and one it does not:
+Two things this settles:
 
 - **launch goes to orbit; a second `L` dives.** Sector and position do not change on launch.
 - `DS:6D` is the world byte and it **does** move (`00` Earth, `0A` deep space, `09` X).
-- **Not settled: what distinguishes orbit from landed.** Both read `DS:13 = 0x28`, `DS:6D = 00`,
-  xyz `6/6/6`. The handoff on the vehicle state machine lists this as **W6** and says it needs a
-  capture, not a guess. Check `g62`'s three PNGs and `flight-launched-live` before inventing a
-  flag — a plausible boolean standing in for an unproven one is the failure this project has
-  named repeatedly.
+
+## 3a. The orbit/landed discriminator IS CLOSED — 2026-11-10, `captures/spice86/w6-orbit-dive/`
+
+**Do not call this W6.** The task that commissioned the capture used that label, but W6 already
+means *the plane's airborne flag* in `docs/handoff-vehicle-state-machine.md` § 3, which is a
+different question and is still open. The capture directory keeps the `w6-` prefix; prose does not.
+
+Read that README; it carries the three-state table and the byte evidence. Summary:
+
+**The owner's model is confirmed.** Launch changes only the coordinate triple (`DS:4CA/4CB/4CC`
+`0/0/0 -> 6/6/6`) and the fuel byte (`DS:E5` `09 -> 08`). Position, sector, `DS:13`, `DS:14` and
+`DS:12` are byte-identical between the pad and orbit. A second `L`, pressed while genuinely in
+orbit, runs the dive: sector `41 -> 40`, position moves, `DS:12` `04 -> ff`.
+
+**There is no in-space boolean, and that is the finding.** The only observable that separates
+orbit from both neighbours is that **`DS:272..DS:371` and `DS:372..DS:471` are uniformly `0xFF`
+while in space** -- all 512 bytes. On the pad they hold the village's staged map; after landing
+they hold sector 40's. It is a consequence of having no map to stage, not a designed flag.
+
+**So do not test the tables. Keep the loop.** `cmd_L` is only reachable from the overworld loop;
+while in space a different loop owns the keyboard and `L` means dive there. "In space" is a
+property of which loop is reading the keyboard. The engine already has this shape --
+`launch_rocket` calls `space_loop` at `commands.c:1201` -- so the fix is to make `space_loop`
+run and draw, not to invent a flag. Testing the staging tables would be reconstructing a control
+-flow fact out of a rendering side effect, which is how plausible booleans get into this codebase.
+
+Still unexplained and now measurably not the answer: `DS:21`/`DS:22` (`02->24`, `e2->e5` on launch,
+**unchanged by the dive**, still `reserved_21[2]` in `state.h`).
 
 ## 4. Drawing primitives that already exist
 
@@ -100,7 +122,10 @@ A gate must be able to fail where it enforces.
 
 ## 6. Also still open from the same playtest
 
-- **W6** (above) — the orbit/landed discriminator.
+- **The orbit/landed discriminator** — closed 2026-11-10 by `captures/spice86/w6-orbit-dive/`;
+  see § 3a. Nothing distinguishes orbit from landed except the staging tables being uniformly
+  `0xFF`, and the recommendation is to keep the loop-scoped structure rather than test them.
+  **The plane's airborne flag (the real W6) is still open.**
 - The **status panel icon** still uses the hardcoded `U2_OVERWORLD_PLAYER_ART`. Deliberate, and
   `board_stamp.py` asserts the constant stays referenced so the question remains visible. Nobody
   has evidence for what the panel draws while mounted.
