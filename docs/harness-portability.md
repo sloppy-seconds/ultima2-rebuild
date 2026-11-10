@@ -189,6 +189,34 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-10 — A loop that looks unpaced may be paced by the cost of a callee whose identity a
+  fragment boundary hid, and "this animation does not exist" is the wrong conclusion to reach from
+  bytes alone.** A tight input-poll loop with no delay call and no draw resolved, read through the
+  fragment map, to a routine whose mapped piece computed two viewport coordinates and nothing else.
+  The static reading therefore said the screen was static during that loop and the visible motion
+  was the port's invention. It was not: an owner playing the original saw the animation, and the
+  routine continued past the fragment boundary into a full frame-buffer render. One iteration was
+  one frame, and the frame rate was the renderer's cost — no timer, no timeout, nothing in a delay
+  table to find. Three transferable rules. **(1)** Before concluding a loop draws nothing, follow
+  every call in it to the end of the *routine*, not the end of the fragment that names it. A
+  routine whose whole body is "compute an origin and return" is itself the red flag, because
+  computing an origin nobody draws with is pointless; assume the drawing is on the other side of the
+  boundary and go look. **(2)** An owner-reported observation outranks a clean static reading —
+  "I watch it move" is data — and the cheapest experiment is to run the original and screenshot it
+  twice a few hundred milliseconds apart. Two frames that differ settle it in seconds; the static
+  reading took a day and was wrong. **(3)** When the port's step is cheap and the original's step
+  was expensive, the rate has to be stated and cited, not inherited. Measure it in **emulated CPU
+  cycles per step** rather than wall-clock milliseconds — cycles are portable across emulator speed
+  settings and can be restated at the target's real clock — then make the reimplementation sleep for
+  that figure. A port that leaves the wait out does not run "faster on a modern machine", it runs at
+  memcpy speed and every timed interaction silently becomes unaimable.
+
+  Separately, and it is a naming trap: **a looked-up value that a callee saves and restores without
+  ever reading is not a mechanism.** A delay table read into a register immediately before a call
+  whose prologue pushes that register and whose epilogue pops it, with no read in between, is dead
+  at that site — and a table whose every readable consumer discards it should not be described in
+  the documentation as driving anything. Prove a consumer before naming a table after its supposed
+  use; the plausible name is what makes the error survive review.
 * **2026-11-08 — A derived value has to be re-derived everywhere the state it derives from
   changes, not latched where the first caller needed it.** A mirror byte was defined by the
   original as a pure function of one other byte, recomputed every tick. The port wrote it in two

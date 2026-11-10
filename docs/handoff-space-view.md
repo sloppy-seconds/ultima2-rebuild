@@ -13,6 +13,7 @@ deep-space screen is drawn: star field, ship cross, readout values).
 | warp field **trigger and duration** | undecoded | `scene_from()` sets `warping = 0` and says so. The radial branch is drawn from the measured centre but nothing currently selects it, because inventing a timing would be claiming a mechanism |
 | readout **position** | drawn as text lines, not the original's fixed right-hand cells | `asm/6999` draws the digits graphically at fixed cells; those cells are not decoded. The values are right, the layout is approximate |
 | arrow step size | `U2_SPACE_SHIP_STEP 4`, **UNMEASURED** | one live peek: `8be:47b` before and after one `Right` |
+| **the dive sweep** | **decoded, animated, and paced** (2026-11-10, `captures/spice86/dive-sweep-rate`) | the march is the sweep and `asm/5AB1_map_render` — not a viewport calculation, it is the whole sector render — runs once per step, so the frame rate is the render's cost: 492,074 cycles/step, 103 ms and ~9.7 steps/s at 4.77 MHz. `rocket_descent` now waits that period per step and `space_view_gate.py` leg 5 holds it, with two demonstrated controls. What is left is the same blocker as leg 3: no scripted route to a rocket, so the pacing is gated by source shape and not by a rendered frame |
 | § 5 leg 3 gate | not written | needs a scripted run that can *reach* space; the suite has no route to a rocket today |
 | star field positions | generated inside the **measured** rectangle; the rectangle is fidelity, the points are not | the drawing routine is unidentified — see the g39 README re-read |
 
