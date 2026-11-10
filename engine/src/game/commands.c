@@ -962,6 +962,18 @@ static u2_cmd_result launch_plane(u2_ctx *ctx, u2_overworld *ow)
  * XENO/YAKO/ZABO triple is a property of the world byte, read from the tables at
  * file 0x7212 -- an arrow key moves the ship sprite and leaves all three alone
  * (measured, asm/6999 header), so the readout does not change on an arrow. */
+/* The readout is NOT a text stream in the original -- asm/6999 draws those four values
+ * at fixed cells down the right-hand side, which is why the engine's four back-to-back
+ * seam_str_out calls collapsed them onto one line. Owner-reported 2026-11-10: "its not
+ * rendering carriage returns so the cmd view gets messy".
+ *
+ * The column is MEASURED, not eyeballed: in both 22-right.png and 21-space.png the
+ * widest empty column run in the text rows ends at x=255 and the readout glyphs start
+ * at x=256 and run to x=309 -- seven 8-pixel cells. At 8 px per cell that is column 32,
+ * and the four rows are the first four text rows of the pane (U2_MSG_TOP..+3). */
+#define U2_SPACE_READOUT_COL 32
+#define U2_SPACE_READOUT_ROW U2_MSG_TOP
+
 static void space_readout(u2_ctx *ctx)
 {
     u2_state *st = &ctx->state;
@@ -969,12 +981,18 @@ static void space_readout(u2_ctx *ctx)
                             ? &u2_space_worlds[st->world]
                             : &u2_space_worlds[U2_WORLD_EARTH];
     char buf[48];
+
+    /* Positioned writes, one per row, so the readout holds its four cells while the
+     * CMD: lines scroll underneath on the left -- the layout the frames show. */
     snprintf(buf, sizeof buf, "%s%u", U2_S_SPACE_FUEL,
              (unsigned)u2_bcd_dec1(st->items_held[U2_ITEM_TRI_LITHIUM]));
-    seam_str_out(ctx, buf);
-    snprintf(buf, sizeof buf, "%s%u", U2_S_SPACE_XENO, w->xeno); seam_str_out(ctx, buf);
-    snprintf(buf, sizeof buf, "%s%u", U2_S_SPACE_YAKO, w->yako); seam_str_out(ctx, buf);
-    snprintf(buf, sizeof buf, "%s%u", U2_S_SPACE_ZABO, w->zabo); seam_str_out(ctx, buf);
+    seam_str_out_at(ctx, U2_SPACE_READOUT_COL, U2_SPACE_READOUT_ROW + 0, buf);
+    snprintf(buf, sizeof buf, "%s%u", U2_S_SPACE_XENO, w->xeno);
+    seam_str_out_at(ctx, U2_SPACE_READOUT_COL, U2_SPACE_READOUT_ROW + 1, buf);
+    snprintf(buf, sizeof buf, "%s%u", U2_S_SPACE_YAKO, w->yako);
+    seam_str_out_at(ctx, U2_SPACE_READOUT_COL, U2_SPACE_READOUT_ROW + 2, buf);
+    snprintf(buf, sizeof buf, "%s%u", U2_S_SPACE_ZABO, w->zabo);
+    seam_str_out_at(ctx, U2_SPACE_READOUT_COL, U2_SPACE_READOUT_ROW + 3, buf);
 }
 
 /* asm/7030's orbit determination (entry L_007230), reached from the hyperwarp arm.
@@ -1150,16 +1168,25 @@ static void space_loop(u2_ctx *ctx, u2_overworld *ow)
         if (r < 0) return;                            /* input exhausted: original blocks */
 
         switch (k.ch) {
-        case U2_KEY_LEFT:  seam_str_out(ctx, U2_S_SPACE_LEFT);
+        /* Each arrow ends its line. The original shows `CMD: RIGHT` on its own row and
+         * then a fresh `CMD:` below it (g39 frame 22-right.png); without the CR the
+         * echoes ran together as `CMD: RIGHTCMD: LEFT`. */
+        case U2_KEY_LEFT:  seam_str_out(ctx, U2_S_SPACE_LEFT);  seam_char_print(ctx, '\r');
             st->space_ship_x = (uint8_t)(st->space_ship_x - U2_SPACE_SHIP_STEP); break;
-        case U2_KEY_RIGHT: seam_str_out(ctx, U2_S_SPACE_RIGHT);
+        case U2_KEY_RIGHT: seam_str_out(ctx, U2_S_SPACE_RIGHT); seam_char_print(ctx, '\r');
             st->space_ship_x = (uint8_t)(st->space_ship_x + U2_SPACE_SHIP_STEP); break;
-        case U2_KEY_UP:    seam_str_out(ctx, U2_S_SPACE_CLIMB);
+        case U2_KEY_UP:    seam_str_out(ctx, U2_S_SPACE_CLIMB); seam_char_print(ctx, '\r');
             st->space_ship_y = (uint8_t)(st->space_ship_y - U2_SPACE_SHIP_STEP); break;
-        case U2_KEY_DOWN:  seam_str_out(ctx, U2_S_SPACE_DIVE);
+        case U2_KEY_DOWN:  seam_str_out(ctx, U2_S_SPACE_DIVE);  seam_char_print(ctx, '\r');
             st->space_ship_y = (uint8_t)(st->space_ship_y + U2_SPACE_SHIP_STEP); break;
         case 'H': case 'h':
             if (!space_hyperwarp(ctx)) return;
+            /* Repaint the fixed cells. The readout is positioned now, not streamed, so
+             * it would otherwise keep showing the world you warped FROM -- stale in a
+             * way the old stream version was not, because the old version simply never
+             * refreshed either and just scrolled away. asm/6999 redraws it each status
+             * pass, which is what this stands in for. */
+            space_readout(ctx);
             break;
         case 'L': case 'l': {
             /* asm/7030's dive arm (L_007385): "LANDING REQUESTED!", refused only from
