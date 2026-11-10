@@ -4,17 +4,27 @@
 # are mounted at runtime (--data-dir read-only, --save-dir read-write). The image
 # carries the engine binary and the display plumbing and nothing else.
 #
-# The binary is built on the host and copied in rather than compiled here, because
-# the CI proof and the acceptance suite both run against the host toolchain, and an
-# image that recompiles produces a binary nobody tested. Base on Fedora to match the
+# The binary is built elsewhere and copied in, never compiled here: an image that
+# recompiles produces a binary nobody tested. It now comes from
+# deploy/linuxbuild/build.sh, which links pinned STATIC SDL3, because the host
+# cannot build this any more -- `sdl2-config` on Bazzite resolves to sdl2-compat and
+# the build probe rightly refuses that. Static SDL3 means the image no longer needs
+# an SDL package, but it does need the X11 client libraries SDL dlopens at runtime;
+# they used to arrive here incidentally, pulled in by x11vnc. Install them by name
+# instead of inheriting them, or an x11-capable binary lands in an image with no x11
+# to talk to and every byte-level check still passes. Base on Fedora to match the
 # host glibc (Bazzite); a much older base would fail to load the binary at runtime
 # with an error that looks like a broken build.
 FROM fedora:42
 
-# SDL2 runtime for the engine; Xvfb for the display; x11vnc to export it;
-# novnc + websockify to reach it from a browser. The engine draws its own glyphs
-# from an embedded 8x8 font, so no fonts package is needed.
-RUN dnf -y install SDL2 x11vnc xorg-x11-server-Xvfb novnc python3-websockify \
+# Xvfb for the display; x11vnc to export it; novnc + websockify to reach it from a
+# browser. The X11 client set is what static SDL3's x11 video driver loads. The
+# engine draws its own glyphs from an embedded 8x8 font, so no fonts package is
+# needed, and it blits 2D textures, so no GL package is needed either.
+RUN dnf -y install \
+        x11vnc xorg-x11-server-Xvfb novnc python3-websockify \
+        libX11 libX11-xcb libXext libXrandr libXcursor libXfixes libXi \
+        libXinerama libxkbcommon \
     && dnf clean all
 
 COPY u2-sdl /usr/local/bin/u2-sdl

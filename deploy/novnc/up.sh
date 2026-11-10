@@ -2,7 +2,7 @@
 # Build, verify and start the ENGINE over noVNC on ai: our reimplementation, watched
 # from a browser. This is the entry point AGENTS.md claims exists.
 #
-#   ./up.sh                 # rebuild engine, verify the binary, start at the splash/title
+#   ./up.sh                 # rebuild the static engine, verify it, start at the splash/title
 #   ./up.sh --load-save     # skip the intro and boot the saved character into the world
 #   ./up.sh --cleanroom     # deliberately ship the substitute art instead
 #   ./up.sh --port N        # host port (default 6082; 6081 is taken by another container)
@@ -119,11 +119,21 @@ cd "$ROOT"
 # whose output was thrown away.
 # The art choice is a runtime flag, not a compile-time one, so the build is identical
 # either way. What differs is what the container is told to run with, below.
-say "building the SDL engine (output visible)"
-make -C engine sdl
+say "building the static SDL3 engine in the linuxbuild container (output visible)"
+# The host no longer builds this binary, and that is deliberate rather than
+# convenience. `make sdl` used to ask `sdl2-config`, which on Bazzite resolves to
+# sdl2-compat: the SDL2 API implemented over SDL3. That build compiled, ran, and
+# looked like success while linking something the release does not ship, so
+# tools/sdl_probe.sh was made to refuse it. Refusing was correct; it also removed
+# the only build path this script had, and nothing here was repointed, so the
+# deploy path sat broken from 2026-11-03 with a stale staged binary still in the
+# image and no signal at all. A gate that rejects the working path must name the
+# replacement, and the replacement is this container: same source, pinned static
+# SDL3, and its own artifact gate on the video drivers.
+bash deploy/linuxbuild/build.sh
 
-BIN=engine/u2-sdl
-[ -x "$BIN" ] || die "make reported success but $BIN is not executable"
+BIN=engine/u2-sdl-static
+[ -x "$BIN" ] || die "build.sh reported success but $BIN is not executable"
 
 # ---------------------------------------------------------------- 2. freshness
 # If make decided nothing had changed while a source file is newer than the binary, the
@@ -133,7 +143,7 @@ if ! make -C engine fresh >/dev/null 2>&1; then
     say "binary is stale -- forcing a clean rebuild:"
     make -C engine fresh 2>&1 | sed -n '2,7p' | sed 's/^/up.sh:   /'
     make -C engine clean
-    make -C engine sdl
+    bash deploy/linuxbuild/build.sh
     make -C engine fresh >/dev/null 2>&1 || die "still stale after a clean rebuild"
 fi
 say "binary is newer than every source it is built from"
@@ -149,7 +159,6 @@ if [ "$VERIFY" = 1 ]; then
     # /var/tmp, never /tmp: /tmp is tmpfs here and a frame dump takes RAM from the model.
     trap 'rm -rf "$TMP"' EXIT
     mkdir -p "$TMP/save" "$TMP/dbg"
-    printf 'N\n' > "$TMP/k.keys"
 
     SAVE_SRC="$SAVES_HOST/PLAYER"
     [ -r "$SAVE_SRC" ] || SAVE_SRC="original/player"
@@ -166,8 +175,13 @@ if [ "$VERIFY" = 1 ]; then
         die "no saved character to boot into the world, so the smoke test cannot run. Point one at $SAVES_HOST/PLAYER rather than passing --no-verify."
     fi
 
+    # No --script here on purpose: the engine refuses --script outside --headless, because
+    # no interactive backend reads a key script, so passing it to an --sdl run is a
+    # refusal rather than a no-op. --play-map reaches the overworld and announces its art
+    # before it ever waits for input, which is all this check needs; the process is killed
+    # a few seconds later regardless.
     ARGS=(--sdl --play-map --data-dir original --save-dir "$TMP/save"
-          --script "$TMP/k.keys" --debug-path "$TMP/dbg")
+          --debug-path "$TMP/dbg")
     [ "$CLEANROOM" = 1 ] && ARGS+=(--cleanroom)
 
     say "smoke-testing the built binary (art mode must match: $(art_expect))"

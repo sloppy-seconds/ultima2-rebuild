@@ -371,7 +371,7 @@ clean:
 # deploy, and it names the offenders instead of silently relinking.
 fresh:
 	@bad=0; \
-	for bin in $(BIN) $(SDL_BIN); do \
+	for bin in $(BIN) $(SDL_BIN) $(STAT_BIN); do \
 		[ -e "$$bin" ] || continue; \
 		newer=$$(find src ../asm $(GEN) -newer "$$bin" -type f 2>/dev/null | head -5); \
 		if [ -n "$$newer" ]; then \
