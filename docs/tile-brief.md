@@ -10,6 +10,66 @@ the pinned one, § 8 lists it.
 
 ---
 
+## 0. What we are making
+
+**The game.** *Ultima II* is a **top-down, tile-based 2D role-playing game** (1983). The world
+view is a grid seen from directly above; the player walks one cell at a time, and the camera is
+locked to the grid — there is no rotation, no perspective, no depth. Everything in this brief is
+drawn for that view: a tile is always seen flat-on, from directly above, at a fixed size, next to
+other tiles of the same size.
+
+Two exceptions, both out of scope here: towns and castles are also top-down but denser, and
+dungeons and towers are a **first-person wireframe** with completely different byte semantics.
+This brief covers the overworld and town tiles only.
+
+**What the tiles have to survive.** A tile is never seen alone. It is seen in a field of hundreds
+of copies of itself, beside other terrains, with creatures stamped on top of it and white text
+placed over it. Judge every design decision against that, not against a single tile on a blank
+background. This is the single most important thing in this document:
+
+> **A tile is a unit of a surface, not an illustration.**
+
+**The format.** 32×32 pixels, one image per art index, 64 indices. Tiles are laid edge-to-edge
+with no gaps and no overlap, so any internal border, frame or shading gradient that does not meet
+its own edge cleanly will show as a grid across the whole map.
+
+**The palette — and this is the part to read carefully.**
+
+The original ran on **CGA: four usable colours** — black, cyan, magenta, white. That is why its
+water is magenta and its grass is cyan. It was not a design choice, it was a hardware limit, and
+nothing about it is worth preserving.
+
+**We are not bound by it.** But there is a real constraint in its place, and it is ours rather
+than the 1983 machine's:
+
+| option | colours | cost | status |
+| --- | --- | --- | --- |
+| **A** | **16**, chosen freely | none — the engine loads this today | **default** |
+| **B** | **256** | a new unpack path, a palette format change (48 → 768 bytes), and rewriting a deliberate refusal gate that currently asserts 4bpp is the only packing | needs a decision + work |
+
+`engine/src/core/tiles_ega.c` parses `bpp` and refuses anything but 4, with a named control
+asserting that refusal. So **B is not a config change.** It is a loader feature.
+
+**The argument for A being enough:** 16 freely-chosen colours is four times what the original had,
+and it is what the entire EGA era of games shipped on. What makes a set feel alive is not colour
+*count* but whether the colours are **related** — a shaded ramp per material family gives
+volume, and volume is what reads as "alive". The palette in `docs/theme-art-spec.md` § 4 is built
+that way: four three-step ramps (water, vegetation, terrain, structure) plus black, white, two UI
+accents and a gold highlight. Blue water, green land, warm timber, cold iron, a gold for magic.
+
+**The argument for B:** 32×32 is four times the area of 16×16, and at that size a 16-colour
+budget shows banding on gradients — sky, water and cloth especially. If the goal is genuinely
+"stunning" rather than "good EGA", 16 colours may be the ceiling that matters.
+
+**Decision needed from the owner.** A is free and today; B is a feature. The rest of this brief is
+written to work either way — nothing in it depends on the colour count.
+
+**What the palette does not change:** legibility. White text sits on ground tiles, so ground must
+stay dark enough to hold it (see `theme-art-spec.md` § 5). Richer colour does not license a pale
+floor.
+
+---
+
 ## 1. How to use this
 
 Every tile gets: **what it is** → **what it must communicate** → **what it must not be confused
