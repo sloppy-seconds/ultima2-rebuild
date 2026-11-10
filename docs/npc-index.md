@@ -115,7 +115,10 @@ layer+sector+record for that reason.
   and the bytes support the join independently: `cmd_O`'s generic arm handles exactly the roles
   its special list omits, and this is the record that reaches the grind.
 * role `0x82` → **Old man**. The game gives a description. The join is by function — role
-  `0x82` in sector 32 is the only ring grant in the binary.
+  `0x82` in sector 32 is the only ring grant in the binary. He stands at (25,2) in
+  `monx32`, slot 26; Father Antos is slot 12 at (1,48) in `monx93`. Those two cells are the
+  whole quest: the blessing is earned in the castle on Planet X and paid for in 1990, and
+  `asm/3C2E` will not hand the ring over in any other sector.
 
 Everything else is the game's own: Santre, Father Antos, Queen Susan, King Ozy, Brother Antos,
 Bishop Bob, Andre the French Chef, Commander Decker, Ugly Irving, Kieth Zabalaoui, Big Bob Jaws,
