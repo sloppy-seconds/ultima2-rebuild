@@ -217,7 +217,7 @@ fi
 # band, and a stub of either would let the test pass on a half-implemented death.
 if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/death_check" \
         tests/death_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/death.build"; then
-    if "$WORK/death_check" > "$WORK/death.out" 2>&1; then
+    if "$WORK/death_check" "$WORK/death-save" > "$WORK/death.out" 2>&1; then
         n=$(sed -n 's/^death_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/death.out")
         if [ "${n:-0}" -eq 0 ]; then
             bad "CP5 death run executed 0 checks — the test is not running"
@@ -231,6 +231,104 @@ if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/death_check" \
 else
     bad "CP5 death harness did not build:"
     sed 's/^/        /' "$WORK/death.build"
+fi
+
+# --- 1h. the shipped menu path reloads the last save on death -----------------
+# "press any key on death exits the game, i want it to load the last save game". The
+# entry a player actually uses is the menu's 'P', and that branch only runs when the
+# renderer can present pixels -- so until --script was allowed on the SDL renderer there
+# was no scripted route to it at all and this ruling shipped with nothing behind it but
+# a unit test of the wait. SDL_VIDEODRIVER=dummy makes it a real, headless,
+# reproducible run: the frame composes and uploads and the keys come from a file.
+#
+# Four leading keys because the opening presentation eats one per screen (four for the
+# seed's story_flag: splash, the best-seller card, the title card, the poem) and the
+# count is not the interesting part; if it is wrong the world never runs and the death
+# count below goes red, which is the point of asserting a count rather than a line. It
+# has to be the cleanroom art because the seed writes no executable, and the engine
+# refuses to enter a world it cannot draw -- which is the right refusal, and was the
+# first thing this gate went red for.
+SDL_BIN=""
+if   [ -x ./u2-sdl-static ]; then SDL_BIN=./u2-sdl-static
+elif [ -x ./u2-sdl ];        then SDL_BIN=./u2-sdl
+fi
+if [ -z "$SDL_BIN" ]; then
+    printf '  SKIP  no SDL build present, so the menu path has no scripted route (build with make sdl-static)\n'
+elif ! python3 tests/cp5_fight_seed.py "$WORK/deathsdl" 2>"$WORK/deathsdl.seed.err"; then
+    bad "CP5 menu-reload gate: the synthetic content did not build:"
+    sed 's/^/        /' "$WORK/deathsdl.seed.err"
+else
+    python3 ../tools/u2_edit.py set "$WORK/deathsdl/save/PLAYER/PLAYER" food 0 \
+        2>"$WORK/deathsdl.food.err" \
+    || bad "CP5 menu-reload gate: could not zero the seed's food:"
+    printf 'x\nx\nx\nx\nP\n0xf0\nq\n0xf0\nq\n' > "$WORK/deathsdl.keys"
+    SDL_VIDEODRIVER=dummy timeout -s KILL 60 "$SDL_BIN" --renderer=sdl --cleanroom \
+         --data-dir "$WORK/deathsdl/content" --save-dir "$WORK/deathsdl/save" \
+         --script "$WORK/deathsdl.keys" --trace="$WORK/deathsdl.trace" \
+         --dump-each > "$WORK/deathsdl.out" 2>&1
+    nd=$(grep -c 'IS DEAD' "$WORK/deathsdl.trace")
+    np=$(grep -c 'PRESS ANY KEY' "$WORK/deathsdl.trace")
+    if [ "$nd" -ne 2 ] || [ "$np" -ne 2 ]; then
+        bad "CP5 menu-reload gate: expected 2 deaths and 2 prompts (the world must run, die, reload, run and die again), got $nd and $np"
+        tail -14 "$WORK/deathsdl.out" | sed 's/^/        /'
+    else
+        ok "CP5 menu reload: died, reloaded and died again in one session ($nd deaths, $np prompts)"
+    fi
+    # The restore, not just the death: the band has to read the record's HP again AFTER
+    # the announcement. A reload that printed the prompt and stayed dead would pass the
+    # counts above.
+    first_dead=$(grep -n 'IS DEAD' "$WORK/deathsdl.trace" | head -1 | cut -d: -f1)
+    if [ -n "$first_dead" ] && tail -n "+$first_dead" "$WORK/deathsdl.trace" \
+         | grep -q 'text=H.P.=9997'; then
+        ok "CP5 menu reload: H.P.=9997 is repainted after the death, so the record came back off the disk"
+    else
+        bad "CP5 menu reload: the band never came back to the record's HP after the death"
+    fi
+    case "$(cat "$WORK/deathsdl.out")" in
+      *"CMD: S ANY KEY)"*)
+          bad "CP5 menu reload: the reloaded world drew its prompt on top of (PRESS ANY KEY)" ;;
+      *)
+          ok "CP5 menu reload: no corpse text survives into the new world" ;;
+    esac
+fi
+
+# --- 1i. the development entry stays observable after death -------------------
+# The shipped entries reload the last save when a death unwinds the loop (title.c's 'P'
+# loop, game.c's enhanced-mode handoff). --play-map must NOT, and this is the gate that
+# keeps it that way: CP4 G2's four arms and tests/swamp_damage.py's death case assert
+# on the state a run leaves behind, so a reload on this entry would replace a corpse
+# with a live character and turn three gates green while they proved nothing.
+#
+# The seed's character carries food 999999; zeroing it makes the FIRST step underflow,
+# which is the cheapest death a scripted run can produce.
+if ! python3 tests/cp5_fight_seed.py "$WORK/death" 2>"$WORK/death.seed.err"; then
+    bad "CP5 dev-entry death gate: the synthetic content did not build:"
+    sed 's/^/        /' "$WORK/death.seed.err"
+else
+    REC="$WORK/death/save/PLAYER/PLAYER"
+    if ! python3 ../tools/u2_edit.py set "$REC" food 0 2>"$WORK/death.food.err"; then
+        bad "CP5 dev-entry death gate: could not zero the seed's food:"
+        sed 's/^/        /' "$WORK/death.food.err"
+    else
+        printf '0xf0\nq\n' > "$WORK/death.keys"
+        ./u2 --headless --play-map --cleanroom \
+             --data-dir "$WORK/death/content" --save-dir "$WORK/death/save" \
+             --script "$WORK/death.keys" --dump-state > "$WORK/death.reload.out" 2>&1
+        case "$(cat "$WORK/death.reload.out")" in
+          *"IS DEAD!"*)
+              ok "CP5 dev entry: the death is still what the run leaves behind (no reload on --play-map)" ;;
+          *)
+              bad "CP5 dev entry: the run did not end dead — a reload here would blind CP4 G2 and swamp_damage.py"
+              tail -12 "$WORK/death.reload.out" | sed 's/^/        /' ;;
+        esac
+        case "$(cat "$WORK/death.reload.out")" in
+          *"H.P.=0000"*)
+              ok "CP5 dev entry: the band still reads H.P.=0000 at exit, so the state is the corpse's" ;;
+          *)
+              bad "CP5 dev entry: the final state is not the dead one:"
+              tail -12 "$WORK/death.reload.out" | sed 's/^/        /' ;;
+        esac
+    fi
 fi
 
 # --- 1g. the creature turn (CP5 W6/W6b) -------------------------------------

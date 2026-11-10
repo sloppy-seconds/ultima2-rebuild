@@ -1836,3 +1836,15 @@ is enumerable rather than inferable. Getting this wrong produces a caveat writte
 and a habit of waving away byte mismatches near segment-initialising code, when in practice the
 legitimate set can be a single word — and once it is a single known word, every other mismatch
 becomes a real finding instead of noise. Enumerate the fixups; do not describe them.
+
+**2026-11-11 — a refusal that outlived its reason quietly deletes a whole class of test.**
+The harness refused to combine its scripted input with its pixel renderer, and the stated
+reason was that the flag would be dropped in silence. That reason was true of the
+implementation and false of the combination, and it stood for weeks as the accepted
+explanation for why a whole category of behaviour could not be gated at all. It was two
+lines to wire the script backend under the pixel renderer instead, and the first thing that
+class then contained was a defect in a feature shipped the same day. Two lessons: when a
+refusal exists to prevent a silent no-op, fix the no-op rather than keeping the refusal, and
+re-test old refusals whenever a feature turns out to be unreachable by any scripted route —
+"no gate can reach that path" is evidence about the harness far more often than about the
+feature. → Tier 2, harness contract.

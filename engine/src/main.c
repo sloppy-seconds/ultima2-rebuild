@@ -273,7 +273,15 @@ static int wire_backends(u2_ctx *ctx)
         ctx->renderer = &u2_renderer_sdl;
         ctx->audio    = &u2_audio_sdl;
         ctx->clock    = &U2_CLOCK_HOST;
-        ctx->input    = &u2_input_sdl;
+        /* A key script stays a headless affordance UNLESS the SDL renderer was chosen.
+         * The reason is that the shipped menu path only enters the world when the
+         * renderer can present pixels (title.c's 'P' branch checks present_frame), so
+         * with no scripted input for that renderer there is no scripted route to the
+         * menu at all -- which is how the death reload shipped for a day with no gate
+         * able to reach it. With SDL_VIDEODRIVER=dummy the combination is still
+         * headless and still reproducible: the frame composes and uploads, the keys
+         * come from a file. CP4's SDL gate already proves the dummy driver presents. */
+        ctx->input    = ctx->script_path ? &u2_input_script : &u2_input_sdl;
 #endif
     } else {
         ctx->renderer = &u2_renderer_term;
@@ -757,14 +765,19 @@ int main(int argc, char **argv)
         return 2;
     }
 #endif
-    /* A key script is read by the script input backend, which is wired only in
-     * headless mode. docs/phase4-state.md recorded this as "--sdl cannot take
-     * --script" and blamed argument order; the real cause is that no interactive
-     * backend reads script_path at all, so the flag was quietly dropped. Silently
-     * ignoring a script is how a scripted run ends up waiting for a human. */
-    if (ctx.script_path && ctx.mode != U2_MODE_HEADLESS) {
-        fprintf(stderr, "u2: --script needs --headless; no interactive backend reads a"
-                        " key script, so it would be ignored.\n");
+    /* A key script is read by the script input backend. It is wired in headless mode,
+     * and -- since the change above -- on the SDL renderer, because that is the only
+     * route by which a scripted run can reach the menu's world path. Anywhere else the
+     * flag would be quietly dropped: docs/phase4-state.md recorded this as "--sdl cannot
+     * take --script" and blamed argument order, and silently ignoring a script is how a
+     * scripted run ends up waiting for a human. */
+    if (ctx.script_path && ctx.mode != U2_MODE_HEADLESS
+#ifdef U2_HAVE_SDL
+        && ctx.renderer_choice != U2_RENDERER_SDL
+#endif
+       ) {
+        fprintf(stderr, "u2: --script needs --headless (or --renderer=sdl); no other"
+                        " backend reads a key script, so it would be ignored.\n");
         return 2;
     }
 
@@ -1122,6 +1135,12 @@ int main(int argc, char **argv)
         fprintf(stderr, "overworld: %s\n", ow.note);
         if (rc == 0)
             u2_overworld_loop(&ctx, &ow);
+        /* No death reload here, deliberately, even though the shipped entries do it
+         * (title.c's 'P' loop, game.c's enhanced-mode handoff). This is the development
+         * entry the scripted gates drive, and those gates assert on the state the run
+         * leaves behind: CP4 G2's four arms and tests/swamp_damage.py's death case all
+         * read "IS DEAD!" out of the final dump. A reload would put a live character in
+         * their place and every one of them would go green while proving nothing. */
     } else {
         u2_game_run(&ctx);
     }

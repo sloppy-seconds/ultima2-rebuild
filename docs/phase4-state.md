@@ -1253,6 +1253,19 @@ and should not be re-introduced blind. The cheap half is now gated anyway: CP4
 proves the flagless SDL build presents a real frame under `SDL_VIDEODRIVER=dummy`,
 which is the regression guard for "the default silently stopped being the window".
 
+**Closed 2026-11-11, and it was cheap.** The refusal was there to stop `--script` being
+dropped in silence, not to forbid the combination. So `wire_backends()` now selects
+`u2_input_script` when a script is given and the SDL renderer was chosen, and the guard
+refuses only when neither is true. `SDL_VIDEODRIVER=dummy` makes it headless and
+reproducible: the frame composes and uploads, the keys come from a file. The reason it
+mattered is concrete rather than hypothetical -- the death reload (owner ruling, same
+date) lives in the menu's `P` branch, which only runs when the renderer can present
+pixels, so for a day the ruling shipped with no scripted route to it at all. CP5's
+`menu reload` case is that route now: seed, four keys to clear the opening presentation,
+`P`, a fatal step, a key, and it asserts the band comes back to the record's HP after the
+announcement. It skips when no SDL build is present, because SDL is an owner-install
+dependency; `make sdl-static` or `bash deploy/linuxbuild/build.sh` produces it.
+
 
 ## Invariants (checked at every checkpoint)
 
