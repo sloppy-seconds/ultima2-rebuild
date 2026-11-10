@@ -1,4 +1,32 @@
-# sub_6fa3 — mechanical clean (bulk wave); behavior not yet reviewed
+# space_status_values — the readout's VALUE pass: four two-digit values at column 37, then the
+#           scroll margin and the CMD cursor are set for the command loop
+# name-evidence: read 2026-11-10 after an owner playtest found the hyperwarp prompt missing and
+#           letters dropped from the HP/FOOD display. In address order:
+#             L_0071a4  `mov $0x28,%al ; mov %al,0x31` -- right_margin := 0x28 for the draws.
+#             L_0071ab  four times: cursor := (column 0x25 = 37, rows 0x14..0x17 = 20..23) via
+#                       L_0053eb, then `mov DS:E5 / DS:4CA / DS:4CB / DS:4CC` and `call L_0055b5`,
+#                       which prints the byte as TWO BCD digits. So the readout reads FUEL=08,
+#                       not FUEL=8, and the labels' own two leading spaces put their visible text
+#                       at column 32 -- one column left of the values' 37 is what makes the pair
+#                       line up as `FUEL=08`.
+#             L_0071fd  `mov $0x1f,%al ; mov %al,0x31` -- right_margin := 0x1f (31). This is the
+#                       byte that keeps the readout whole: the row scroll (asm/5025,
+#                       `CL=0 DL=DS:0x31`) runs from column 0 to the margin inclusive, so at 31
+#                       it stops one column short of the readout's first visible glyph at 32.
+#                       With any wider margin every CMD line that scrolls shaves a column off the
+#                       readout, and after two scrolls `  FUEL=6` reads `YUEL=6`.
+#             L_007202  cursor := (column 0, row 0x17 = 23) then `ret` -- the CMD prompt prints
+#                       from the left edge of the bottom row. Leaving the cursor wherever the last
+#                       positioned print put it makes the next `CMD: ` land past the margin, wrap,
+#                       and scroll the pane once per prompt.
+#           CALLERS: asm/6999's loop head (L_006c7a, before every `CMD: `) and asm/6DFD's
+#           hyperwarp flow. It is a per-pass repaint, not an entry-only draw -- that is the
+#           repair the frames show and no other routine in the tree does.
+# provenance: static, decoded 2026-11-10 from file 0x71a3..0x7211 instruction by instruction;
+#           the observable it explains is measured in captures/spice86/g39-rocket-flight
+#           (22-right.png, 23-hyperspace.png) and dive-sweep-rate (21-dive-a.png)
+# confidence: high for the geometry and the two margin writes; the BCD printer's digit count is
+#           read from the frames (FUEL=08) as well as the call to L_0055b5
 # func 6FA3..702F  len 008D B  evidence: call+reko
 # calls: L_0053eb, L_0055b5
 # confidence: low (bytes proven by check_func.py)

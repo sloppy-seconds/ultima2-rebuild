@@ -1,4 +1,34 @@
-# space_status — space-travel status readout (fuel, xeno)
+# space_status — the space screen: mode-4 clear, the readout labels, and the CMD loop
+# RENAMED HEADING 2026-11-10 (was "space-travel status readout (fuel, xeno)"). The readout is
+#           only a third of what this routine does, and the missing two thirds were the bug an
+#           owner found by playing: the hyperwarp target prompt never appeared and letters were
+#           missing from the HP/FOOD display. The head, in address order:
+#             L_006b9a  `call L_004c3e` -- INT 10h AH=00 AL=04, set 320x200 graphics mode 4. A
+#                       mode set CLEARS the display, and the game's text is glyphs in that same
+#                       buffer, so this is the space screen's clear. It is why no space frame
+#                       shows the overworld's H.P./FOOD/EXP/GOLD block and why the launch line
+#                       is gone (g39 22-right.png starts its pane at HYPERWARP ENGAGED!).
+#             L_006bd9  `mov $0x28,%al ; mov %al,0x31` -- right_margin := 0x28 BEFORE the labels.
+#                       The overworld leaves it at 0x1d, and at 0x1d a string starting at column
+#                       30 wraps on its first character and resumes at the left margin of the
+#                       next row -- which is how `  XENO=9` landed across the CMD lines and ate
+#                       characters out of the status block.
+#             L_006be0  `mov $0x1e,%bl` -- the label cursor is column 30, not 32. The literals
+#                       carry two leading spaces, so the visible text starts at column 32, which
+#                       is the x=256 the frames measure. Byte and frame agree once the padding is
+#                       counted.
+#             L_006c46  `mov $0x20,%al ; mov %al,0x31` -- margin 0x20, immediately narrowed to
+#                       0x1f by asm/6FA3 (asm/6FA3_space_status_values.asm) a few instructions
+#                       later. That 0x1f is the load-bearing byte: the row scroll runs from
+#                       column 0 to the margin inclusive (asm/5025: `CL=0 DL=DS:0x31`), so at 31
+#                       the scroll window stops one column short of the readout's first visible
+#                       glyph at 32 and the CMD pane can scroll all it likes without touching it.
+#             L_006c79  the CMD loop head: `call L_0071a3` (asm/6FA3) THEN `CMD: `. The status
+#                       pass redraws the values and parks the text cursor at column 0 of row 23,
+#                       which is why every echo starts at the left edge of the bottom row.
+#           Evidence: captures/spice86/g39-rocket-flight (the frames) and the engine's
+#           space_labels / space_values in engine/src/game/commands.c, gated by
+#           engine/tests/space_view_gate.py leg 6.
 # name-evidence: strings '  FUEL=' / '  XENO='
 #           The FUEL label is not a guess about what the slot means: at runtime 0x6BD0 this
 #           routine reads DS:E5, does `stc ; cmc ; sbb $1,%al ; das ; cmc` and stores it back, so
