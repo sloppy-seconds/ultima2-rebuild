@@ -5,7 +5,7 @@
 #           HERE!!!!!"). Largest handler; many local branches.
 # func 38B0..3B91  len 02E2 B  evidence: seed+reko (jump table cs:0730 entry L)
 # provenance: live:airport32 (+2 other harvests), static
-#           entry executed in 6 of 214 harvests; derived by tools/provenance_from_traces.py
+#           entry executed in 12 of 226 harvests; derived by tools/provenance_from_traces.py
 # confidence: medium (flow + messages proven by bytes; NPC/quest semantics inferred)
 # notes: re-decoded with tools/decode_str.py (str_out-aware); gas re-encode diffs
 #        kept as .byte (disp8/disp16 and reg-op form choices)

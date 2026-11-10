@@ -4,7 +4,7 @@
 #           success prints " READY."
 # func 43F3..44D3  len 00E1 B  evidence: seed+reko (jump table cs:0730 entry W)
 # provenance: live: cmd_W executed in captures/spice86/wonly/, observed 2026-10-26.
-#           entry executed in 2 of 214 harvests; derived by tools/provenance_from_traces.py
+#           entry executed in 3 of 226 harvests; derived by tools/provenance_from_traces.py
 #           The menu at 0x43F3/0x4445 and the success path at 0x44C0 are all present in that
 #           harvest's ExecutedInstructions. The capture drove the whole success branch: with
 #           DS:97 poked to 01 (own CLOTH) the digit `1` printed " READY." and DS:62 went 06 -> 01,
