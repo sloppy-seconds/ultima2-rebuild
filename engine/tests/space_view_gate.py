@@ -28,6 +28,26 @@ evidence and not against the fix.
 Legs 3 and 4 of the handoff's plan (orbit-vs-deep-space text, dive sector) are NOT here:
 leg 4 is already covered by space_check.c, and leg 3 needs a scripted run that can reach
 space, which the suite cannot do yet. Recorded as open in docs/handoff-space-view.md.
+
+Leg 5 (the dive sweep's pacing), added 2026-11-10 after the owner reported the descent moving
+"much too fast ... you can't really see where to stop". In the original one march step is one
+frame and the frame is paid for in CGA writes: asm/5AB1_map_render is called once per step, and
+nothing else in the loop draws, so the rate is the render's cost -- measured at 492,074 emulated
+cycles per step (captures/spice86/dive-sweep-rate). The engine's render is a memcpy, so the rate
+cannot be inherited and has to be stated. This leg checks that it is stated, that the wait sits
+inside the loop between the present and the key poll, and that the stated milliseconds still agree
+with the cited cycle count -- so retuning the number without the measurement goes red.
+
+Control for leg 5, demonstrated rather than asserted: the gate takes the source path from
+U2_DIVE_GATE_SRC, so a copy of commands.c with the wait deleted can be run against it. From the
+repo root: copy engine/src/game/commands.c somewhere scratch (under /var/tmp, not /tmp), delete
+the `seam_wait_ms(ctx, U2_DIVE_STEP_MS);` line from the copy, and run
+
+    U2_DIVE_GATE_SRC=/var/tmp/commands_nowait.c python3 engine/tests/space_view_gate.py
+
+which must report the two pacing checks and the ordering check as FAIL. The copy is what makes
+this a control instead of a comment: the gate is shown going red on the real file shape, from the
+same directory and the same ref position CI will use.
 """
 import os
 import re
@@ -35,7 +55,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-CMD = os.path.join(ROOT, "engine", "src", "game", "commands.c")
+CMD = os.environ.get("U2_DIVE_GATE_SRC") or os.path.join(ROOT, "engine", "src", "game", "commands.c")
 VIEW_H = os.path.join(ROOT, "engine", "src", "game", "space_view.h")
 ASM = os.path.join(ROOT, "asm", "6CC4_space_ship_erase.asm")
 
@@ -120,6 +140,40 @@ cx = re.search(r"#define\s+U2_SPACE_CENTRE_X\s+\(([^)]+)\)", hdr).group(1)
 cy = re.search(r"#define\s+U2_SPACE_CENTRE_Y\s+\(([^)]+)\)", hdr).group(1)
 check(cx.endswith("/ 2") and cy.endswith("/ 2"),
       "the radiating field is centred on the view centre (measured centroid 127,63)")
+
+# ---- leg 5: the dive sweep is paced, and its rate is the measured render cost ------
+# The period clock the game was written for. The figure below is not a taste setting: it is
+# how the cited cycle count becomes milliseconds, and the check recomputes it.
+PERIOD_HZ = 4_770_000
+dm = re.search(r"#define\s+U2_DIVE_STEP_MS\s+(\d+)", src)
+check(dm is not None, "the dive step's pacing is a named constant, not an inline number")
+if dm:
+    ms = int(dm.group(1))
+    # the comment next to the constant must cite the measurement it came from
+    tail = src[dm.end():dm.end() + 1200]
+    cyc = re.search(r"([\d,]{6,}) emulated cycles", src)
+    check(cyc is not None,
+          "the pacing cites a measured cycles-per-step figure, so it cannot be retuned blind")
+    if cyc:
+        cycles = int(cyc.group(1).replace(",", ""))
+        check(round(cycles / PERIOD_HZ * 1000) == ms,
+              f"{ms} ms is {cycles} cycles at {PERIOD_HZ/1e6} MHz "
+              f"(expected {round(cycles / PERIOD_HZ * 1000)} ms)")
+
+dm_loop = re.search(r"static void rocket_descent\(.*?\n\}\n", src, re.S)
+check(dm_loop is not None, "rocket_descent found in commands.c")
+if dm_loop:
+    dbody = re.sub(r"/\*.*?\*/", "", dm_loop.group(0), flags=re.S)
+    dbody = re.sub(r"//[^\n]*", "", dbody)
+    check("u2_space_descent_step" in dbody and "u2_overworld_draw" in dbody,
+          "each dive step marches the sweep and redraws the surface (the render IS the frame)")
+    check("seam_wait_ms(ctx, U2_DIVE_STEP_MS)" in dbody,
+          "the dive loop waits one step period per frame (an unpaced sweep is unaimable)")
+    i_present = dbody.find("seam_present_frame")
+    i_wait = dbody.find("seam_wait_ms")
+    i_poll = dbody.find("seam_key_poll")
+    check(-1 < i_present < i_wait < i_poll,
+          "the wait sits after the present and before the key poll, as in the original's loop")
 
 if fails:
     print(f"\nSPACE VIEW GATE: FAIL ({len(fails)})")

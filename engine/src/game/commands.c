@@ -1094,7 +1094,39 @@ static int space_hyperwarp(u2_ctx *ctx)
  * it stopped on is the verdict: 0x08 grass lives, anything else jumps to the death tail
  * at runtime 0x0E62. On a survived dive Earth clears the parked flag (its pads are
  * authored into mapx41) and off-Earth records the landing cell (nothing authored that
- * pad, so the save record is the only thing that puts the rocket back). */
+ * pad, so the save record is the only thing that puts the rocket back).
+ *
+ * THE SWEEP IS THE ANIMATION, and it is fidelity. The original's loop body is march, then
+ * `call L_005cb1`, then a speed-delay lookup, then a key poll — and L_005cb1 is not what it
+ * looked like: it is asm/5AB1_map_render, the whole sector render (viewport origin, stage
+ * the visible 20x10 window from mapx, blit it to the CGA planes, copy the underlay). So one
+ * march step is one frame, the ship the player watches is the stamp that render draws, and
+ * the pattern the owner described — north to south, shift right, repeat — is exactly
+ * y += 2 with x += 1 every fourth step. See asm/38B0_cmd_L's header and
+ * captures/spice86/dive-sweep-rate/README.md.
+ *
+ * The landing rule was already observed on both arms before this capture — fatal on water at
+ * (7,62) in sector 40 and on forest at (5,44) in sector 90 (captures/spice86/g39-rocket-flight),
+ * survivable on 0x08 grass at (1,10) in sector 40 (captures/spice86/g59-grass-landing). This one
+ * re-observed the fatal arm with a frame and added the rate and the render identity. The march
+ * cycles 256 cells and 28 of them are grass on Earth, so aiming is a 1-in-9 timing window about
+ * every 26 s at the measured step rate — see docs/needs-gameplay.md G63.
+ */
+
+/* One march step is one frame, and in the original the frame is paid for in CGA writes:
+ * 492,074 emulated cycles between steps, measured over 13 consecutive steps at
+ * --cycles 3000 (captures/spice86/dive-sweep-rate/dive1.csv), which at the 4.77 MHz the
+ * game was written for is 103 ms and about 9.7 steps/s — a full north-to-south sweep of 32
+ * steps in about 3.3 s, with x advancing 8 cells per sweep.
+ *
+ * The engine's own render is a memcpy, so the rate cannot fall out of the work the way it
+ * does in the original; it has to be stated. This is that statement, and it is a measured
+ * number and not a taste setting. There is no timeout behind it: the speed-delay slot the
+ * original loads in the same loop is discarded by both of its callees (see
+ * asm/0711_speed_delay_lookup), so nothing in the bytes sets a different figure.
+ */
+#define U2_DIVE_STEP_MS 103
+
 static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
 {
     u2_state *st = &ctx->state;
@@ -1113,6 +1145,10 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
          * repaints the whole frame including the text pane, so presenting it here is
          * exactly that clear-and-replace. */
         if (seam_present_frame(ctx)) return;
+        /* The original's frame boundary. Placed after the present and before the poll so
+         * a keypress is answered at the same point in the cycle the original answers it —
+         * after the frame it belongs to has been drawn, not before it. */
+        seam_wait_ms(ctx, U2_DIVE_STEP_MS);
         u2_key k;
         const int r = seam_key_poll(ctx, &k);
         if (r < 0) return;                             /* input exhausted: original blocks */
