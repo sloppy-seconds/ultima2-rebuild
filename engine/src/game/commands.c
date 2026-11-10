@@ -1102,6 +1102,20 @@ static void space_paint(u2_ctx *ctx, u2_overworld *ow)
     u2_space_scene sc;
     u2_space_scene_from(ctx, &sc);
     u2_space_scene_draw(&ow->frame, &sc);
+
+    /* The field clear takes the WHOLE frame -- u2_frame_clear memsets every row, not
+     * just the view rectangle -- so the text pane has to be composited back over it or
+     * the `CMD:` prompt and the FUEL/XENO/YAKO/ZABO readout simply vanish. Owner
+     * reported it on the first re-flight, 2026-11-10: "we make it to space but the cmd>
+     * etc disappears, I'm sure it stays visible in the origin as you need to be able to
+     * hit H and the XYZ coords". He is right and the frames agree: g39 frame 22-right
+     * shows the text pane carrying `CMD: RIGHT`, `CMD:` and the four-value readout
+     * under the star field.
+     *
+     * This is the same composite the overworld does at the end of its own draw
+     * (overworld.c, u2_font_draw_vram_rows after draw_view). Omitting it is what made
+     * the screen look inert even though the loop was alive and reading keys. */
+    u2_font_draw_vram_rows(&ow->frame, &ctx->vram, U2_MSG_TOP, U2_ROWS - 1);
 }
 
 static void space_loop(u2_ctx *ctx, u2_overworld *ow)
