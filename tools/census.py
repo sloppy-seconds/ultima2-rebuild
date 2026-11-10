@@ -282,19 +282,31 @@ def build():
         vsrc = ('asm/2FAD_vehicle_board_dispatch.asm'
                 if mb in VEHICLES else 'asm/363B_cmd_G.asm')
         eff = TILE_EFFECTS.get(mb)
+        own = OWNER_NAMES.get(ai)
+        role = tile_role(ai, mb, t.get('kind', ''))
+        # art 0x28 keeps role 'site door' and name 'I' at once: map 0xA0 >> 2 == 0x28, so the
+        # door genuinely IS the letter-I glyph reused. That is a real collision, not a mapping
+        # bug, and the owner confirmed it -- so it carries both and neither is hidden.
+        if role == 'letter' or ai in SIGN_PARTS:
+            role = 'sign'
+        sign_part = SIGN_PARTS.get(ai, 'glyph' if role == 'sign' else '')
         trows.append({'art': '0x%02x' % ai, 'map_byte': '0x%02x' % mb,
                       'kind': t.get('kind', ''), 'description': t.get('description', ''),
                       'instances': inst.get(ai, 0),
-                      'role': tile_role(ai, mb, t.get('kind', '')),
+                      'role': role,
+                      'sign_part': sign_part,
                       'gate_value': '0x%02x' % ((mb >> 1) & 0x7F),
                       'walkable': foot_ladder_walkable(mb),
-                      # asm proof outranks the font mapping where both speak; neither is a guess.
-                      'name': (named[0] if named else (fname or (vlabel or ''))),
-                      'name_source': (('asm/%s' % named[1]) if named
-                                      else ('structural: art 0x20-0x39 is A-Z, 0x30 excluded'
-                                            if fname else
-                                            (vsrc if vlabel else ''))),
-                      'name_grade': 'measured' if (named or fname or vlabel) else 'unnamed',
+                      # asm proof outranks the owner list, which outranks the structural font
+                      # mapping; none of the three is a guess about appearance.
+                      'name': (named[0] if named else
+                               (own[0] if own else (fname or (vlabel or '')))),
+                      'name_source': (('asm/%s' % named[1]) if named else
+                                      (own[1] + ' -- ' + own[2]) if own else
+                                      ('structural: art 0x20-0x39 is A-Z, 0x30 excluded'
+                                       if fname else (vsrc if vlabel else ''))),
+                      'name_grade': ('measured' if named else own[1] if own else
+                                     'measured' if (fname or vlabel) else 'unnamed'),
                       'entry_effect': eff[0] if eff else '',
                       'entry_message': eff[1] if eff else '',
                       'boardable_by': BOARDABLE.get(mb, ''),
@@ -356,7 +368,7 @@ COLUMNS = {
               'resolved', 'grade', 'source', 'note'],
     'vehicle': ['layer', 'sector', 'x', 'y', 'byte', 'what', 'art', 'gate_value',
                 'source', 'grade'],
-    'tile': ['art', 'map_byte', 'kind', 'role', 'name', 'name_source', 'name_grade',
+    'tile': ['art', 'map_byte', 'kind', 'role', 'sign_part', 'name', 'name_source', 'name_grade',
              'gate_value', 'walkable', 'entry_effect', 'entry_message', 'boardable_by',
              'creature_hp', 'creature_damage', 'creature_special',
              'instances', 'description', 'note', 'source', 'grade'],
@@ -460,6 +472,44 @@ TILE_EFFECTS = {
     0x70: ('town paving',        '',                             'asm/2423'),
 }
 BOARDABLE = {0x44: 'horse', 0x48: 'ship', 0x4C: 'plane', 0x50: 'rocket'}
+
+
+# Names the owner supplied on 2026-11-09 after reviewing the census page. Each entry records
+# whether bytes independently prove it (`measured`, and says which routine) or whether it stands
+# on the owner's knowledge of the game (`recalled (owner)`). The grades must not flatten just
+# because both arrive in the same column -- that flattening is what let "shallow water" through.
+# Sources are prefixed 'proven:' / 'owner:' deliberately: a bare 'asm/...' here would be read as
+# a file citation by verify's rot check, and these are reason strings, not citations.
+OWNER_NAMES = {
+    0x03: ('forest', 'measured', 'proven: tile-art-spec §7; asm/248B leaves map 0x0C unnamed'),
+    0x05: ('village entrance', 'measured', 'proven: site_for_tile case 5 (overworld.c)'),
+    0x06: ('town entrance', 'measured', 'proven: site_for_tile case 6, label U2_S_SITE_TOWN'),
+    0x07: ('tower entrance', 'measured', 'proven: site_for_tile case 7'),
+    0x08: ('castle entrance', 'measured', 'proven: site_for_tile case 8'),
+    # DISPUTES tile-art-spec § 7, which named this "mountain pass" from the arch in the lattice.
+    # The owner's reading and site_for_tile agree: the arch is a cave mouth in the hillside.
+    0x09: ('dungeon entrance', 'measured',
+           'proven: site_for_tile case 9; DISPUTES tile-art-spec §7 "mountain pass"'),
+    0x0A: ('signpost', 'measured', 'proven: tile-art-spec §7'),
+    # The census already carried this row's -1000 HP effect from the same byte; the name was
+    # derivable and was left blank anyway.
+    0x17: ('force field', 'measured', 'proven: asm/24B1 force-field gate on map 0x5C'),
+    0x1C: ('brick road', 'measured',
+           'proven: asm/2423 town paving on map 0x70; resolves the "marsh" note as wrong'),
+    0x1D: ('solid black', 'measured', 'proven: tile-art.tsv, 256 black px'),
+    0x1E: ('solid white', 'measured', 'proven: tile-art.tsv, 256 white px'),
+    0x1F: ('sign counter', 'recalled (owner)', 'owner: a space or plain counter in a sign board'),
+    0x30: ('moongate', 'measured', 'proven: map 0xC0; also the time door'),
+    0x3A: ('sign border right', 'recalled (owner)', 'owner: right border cap of a sign board'),
+    0x3B: ('sign border left', 'recalled (owner)', 'owner: left border cap of a sign board'),
+}
+
+# The signage family. The letters are not bare glyphs: tile-art.tsv describes them as "capital A
+# with bars above and below", and tile-art-spec § 7a records that treating those bars as optional
+# made every letter tile come out wrong. The owner's framing explains why -- a letter tile is a
+# small SIGN PANEL bearing a letter, and it has to join edge-to-edge with the counter and the two
+# border caps. The bars are the frame, not decoration.
+SIGN_PARTS = {0x1F: 'counter', 0x3A: 'border right', 0x3B: 'border left'}
 
 
 def tile_role(art_index, map_byte, kind):
@@ -574,15 +624,19 @@ def verify(tables):
     t = tables['tile']
     if any(not r.get('role') for r in t):
         bad.append('a tile has no role: tile_role() is not covering the kind set')
-    letters = [r for r in t if r.get('role') == 'letter']
-    # 24, not 25: tile-art.tsv classifies art 0x30 as `font`, but it is the MOONGATE and the
-    # absent Q is the proof the range is a font. Role precedence gives it to moongate, so the
-    # letter role holds A-P plus R-Z. Asserting 25 here would be asserting the old misreading.
-    if len(letters) != 24:
-        bad.append('expected 24 letter tiles (A-P, R-Z; 0x30 is the moongate), found %d'
-                   % len(letters))
-    if any(not r.get('name') for r in letters):
-        bad.append('a letter tile is unnamed: the font mapping is not being applied')
+    signs = [r for r in t if r.get('role') == 'sign']
+    glyphs = [r for r in signs if r.get('sign_part') == 'glyph']
+    # 24 glyphs, not 25: art 0x30 is classified `font` by tile-art.tsv but it is the MOONGATE,
+    # and the absent Q is the proof the range is a font. Asserting 25 would assert the old
+    # misreading. 27 signs total = 24 glyphs + counter + two border caps.
+    if len(glyphs) != 24:
+        bad.append('expected 24 sign glyphs (A-P, R-Z; 0x30 is the moongate), found %d'
+                   % len(glyphs))
+    if len(signs) != 27:
+        bad.append('expected 27 tiles in the signage family (24 glyphs + counter + 2 caps), '
+                   'found %d' % len(signs))
+    if any(not r.get('name') for r in signs):
+        bad.append('a sign tile is unnamed: the signage mapping is not being applied')
     # Every entry effect we claim must still cite a routine that exists.
     for r in t:
         if r.get('entry_effect'):

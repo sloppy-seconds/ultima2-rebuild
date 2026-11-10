@@ -39,6 +39,7 @@ COLUMNS = [
     ('gate_value', 'gate'),
     ('kind', 'kind'),
     ('role', 'role'),
+    ('sign_part', 'sign part'),
     ('name', 'NAME'),
     ('name_grade', 'name grade'),
     ('walkable', 'walk'),
