@@ -160,8 +160,18 @@ if [ "$VERIFY" = 1 ]; then
     trap 'rm -rf "$TMP"' EXIT
     mkdir -p "$TMP/save" "$TMP/dbg"
 
-    SAVE_SRC="$SAVES_HOST/PLAYER"
-    [ -r "$SAVE_SRC" ] || SAVE_SRC="original/player"
+    # Name the RECORD, not the slot. Since the save-scoped-worlds work (D6) the record
+    # lives at <save-dir>/<slot>/PLAYER, so $SAVES_HOST/PLAYER is a directory in a tree
+    # that has ever run, and a plain file only in a pre-slot one. `cp` on a directory
+    # without -r is an error, and the smoke test was reaching for whichever it found --
+    # so a deployment that had never once verified a save was silently possible.
+    if [ -r "$SAVES_HOST/PLAYER/PLAYER" ]; then
+        SAVE_SRC="$SAVES_HOST/PLAYER/PLAYER"
+    elif [ -r "$SAVES_HOST/PLAYER" ]; then
+        SAVE_SRC="$SAVES_HOST/PLAYER"
+    else
+        SAVE_SRC="original/player"
+    fi
     if [ -r "$SAVE_SRC" ]; then
         cp "$SAVE_SRC" "$TMP/save/PLAYER"
     elif [ -r "references/ultima2/player" ]; then
