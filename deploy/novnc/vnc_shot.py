@@ -73,7 +73,19 @@ def ppm_write(path, width, height, rgb):
 
 
 def grab(host, port, timeout):
-    s = socket.create_connection((host, port), timeout=timeout)
+    # A container that has just come up refuses the connection for a second or two before
+    # x11vnc has its display, so a refused connect is retried for the same reason the
+    # greeting is: `up.sh --shot` immediately after `up.sh` is the normal sequence, and
+    # "connection refused" there reads as a broken tool rather than a starting server.
+    s = None
+    for attempt in range(10):
+        try:
+            s = socket.create_connection((host, port), timeout=timeout)
+            break
+        except (ConnectionRefusedError, OSError):
+            if attempt == 9:
+                raise
+            time.sleep(0.5)
     s.settimeout(timeout)
 
     ver = b""
