@@ -95,10 +95,31 @@ if h_n:
     check(span("U2_SPACE_SHIP_H_FROM", "U2_SPACE_SHIP_H_TO") == int(h_n.group(1)),
           f"horizontal stroke is {h_n.group(1)} px, matching asm/6CC4")
 
-# The star field must be labelled as what it is: an enhancement with no byte behind it.
+# The star field must state honestly what is and is not decoded.
 VIEW_C = os.path.join(ROOT, "engine", "src", "game", "space_view.c")
-check("NOT DECODED" in read(VIEW_C),
-      "the star field is labelled an enhancement, not fidelity (no routine decoded)")
+vc = read(VIEW_C)
+check("NOT decoded" in vc or "NOT DECODED" in vc,
+      "the star field states plainly that the per-star algorithm is undecoded")
+
+# ---- leg 3: the field is plotted into the measured asm/4B76 view -------------------
+# The five warp frames in g39 have white pixels spanning exactly x 16..271 and
+# y 16..143 -- 256 columns and 128 rows from asm/4B76's 16/16 origin pair. A field that
+# drifts outside that rectangle is drawing somewhere the original cannot.
+vx = int(re.search(r"#define\s+U2_SPACE_VIEW_X\s+(\d+)", hdr).group(1))
+vy = int(re.search(r"#define\s+U2_SPACE_VIEW_Y\s+(\d+)", hdr).group(1))
+vcols = int(re.search(r"#define\s+U2_SPACE_VIEW_COLS\s+(\d+)", hdr).group(1))
+vrows = int(re.search(r"#define\s+U2_SPACE_VIEW_ROWS\s+(\d+)", hdr).group(1))
+check((vx, vy) == (16, 16),
+      f"view origin is ({vx},{vy}), matching asm/4B76's DS:4BF/DS:4C1 = 16/16")
+check(vcols == 256 and vrows == 128,
+      f"view is {vcols}x{vrows}, matching the measured x 16..271 / y 16..143 extent")
+check(vx + vcols - 1 == 271 and vy + vrows - 1 == 143,
+      "the view rectangle's far corner is exactly the measured far corner")
+
+cx = re.search(r"#define\s+U2_SPACE_CENTRE_X\s+\(([^)]+)\)", hdr).group(1)
+cy = re.search(r"#define\s+U2_SPACE_CENTRE_Y\s+\(([^)]+)\)", hdr).group(1)
+check(cx.endswith("/ 2") and cy.endswith("/ 2"),
+      "the radiating field is centred on the view centre (measured centroid 127,63)")
 
 if fails:
     print(f"\nSPACE VIEW GATE: FAIL ({len(fails)})")
