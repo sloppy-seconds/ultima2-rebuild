@@ -2047,17 +2047,23 @@ character (a zero-gold fixture silently lost eight checks the moment the charge 
 every arm collapsed into the price refusal) and asserts `9999 -> 9499` on the unblessed refusal,
 the blessed grant, and a plain `THANK YOU` recipient, plus `317` unchanged with the money refusal.
 
-**OPEN DEFECT — a full-width line loses one character.** Found the same day, while writing that
-gate, and not yet fixed. `state.c` sets `right_margin = 0x28` = 40, but the screen is 40 columns
-wide (valid 0..39), and `seam_char_print` wraps only when `right_margin < cursor_col`. A glyph
-therefore reaches `cursor_col == 40`, `u2_vram_poke` returns silently on an out-of-range column,
-and the character is gone: the fixture printed `...THAT MU` / `H!` and dropped the `C`. The
-original gets the same margin byte and loses nothing, because its printer is the BIOS teletype at
-`col 40`, which wraps on its own. Not yet reproduced on a real screen — the overworld runs with
-`right_margin` at 29, which is why every capture so far has looked clean — so the exposure is
-unknown and the fix is a decision: clamp the margin to `U2_COLS - 1`, or make the printer wrap at
-column 40 the way `INT 10h` does. The second is the faithful one. The wrap also moves with the
-margin, which is why `commerce_check` asserts the first half of the refusal line only.
+**NOT A DEFECT — and the first version of this entry was wrong. A full-width line drops one character, and so does the original.** Opened earlier on 2026-11-11 while writing that gate, and corrected the same day by reading the printer instead of describing it.
+
+The mechanism, measured: `state.c` sets `right_margin = 0x28` = 40, but the screen is 40 columns wide (valid 0..39), and `seam_char_print` pokes at `cursor_col`, then increments, then wraps only when `right_margin < cursor_col`. A glyph at column 39 leaves the cursor at 40, `40 < 40` is false so no wrap happens, and the next glyph is poked at column 40 — where `u2_vram_poke` returns silently on an out-of-range column. One character per line that exactly fills the width; then the cursor becomes 41, the check fires, and printing resumes at column 0 of the next row. The fixture printed `...THAT MU` / `H!` and lost the `C` of `MUCH!`.
+
+The original does the same thing, in the same order, and that is the part the first version got wrong:
+
+```
+asm/503D  L_00523d  mov $0x9,%ah ; int $0x10                    ; AH=09: write at cursor.
+asm/504A  L_00524a  incb 0x2e                                   ; cursor_col++
+          L_00524e  mov 0x31,%al ; cmp 0x2e,%al ; jb L_00520d   ; margin < col -> wrap
+```
+
+Write, then increment, then check — identical to the engine — and `AH=09` is *not* the teletype. The sentence this entry used to carry said the original's printer was the BIOS teletype at column 40, wrapping on its own, which is wrong twice over: `AH=0E` is the teletype and this site does not call it. So with the same margin byte the original also lets its cursor byte reach 40, and what it then does is address column 40 through the BIOS, whose CRTC arithmetic (`page + row*40 + col`) spills into the next row's first cell — where the following glyph overwrites it. Same net visible result: one glyph gone.
+
+**Grade, because the two halves are not the same strength:** the instruction order is measured from `asm/`; the spill-and-overwrite is inferred from how a 40-column CRTC computes an address and has never been seen. What is genuinely unproven is narrower than what this entry first claimed to be a defect — whether the spilled glyph is briefly visible, or whether the BIOS clamps column 40 on set. G76 is the frame that settles it.
+
+Where margin `0x28` is live: `state_init`, `status.c:53`, `title.c:286`. The overworld runs at `0x1d` (29), the Z screen at `0x26` (38), space at `0x1f`/`0x20` — which is why no capture ever showed this and only a fixture left at the init margin did. The practical consequence, and the reason it surfaced at all: **the wrap point moves with the margin**, so a gate that greps a long line for its whole sentence can fail on one screen and pass on another. That is why `commerce_check` asserts the first half of `YOU DONT HAVE THAT MUCH!` only, and why the CP6 shell gate strips row breaks before matching.
 
 ## cmd_R and cmd_N land, and the string emitter had been lying for weeks (2026-10-29)
 
