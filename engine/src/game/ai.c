@@ -26,6 +26,7 @@
 
 #include "game/ai.h"
 #include "game/combat.h"
+#include "game/overworld.h"   /* u2_death: Minax's strike kills on the HP borrow */
 #include "game/monsters.h"   /* U2_MON_SLOTS */
 #include "core/rng.h"
 #include "core/seam.h"
@@ -66,6 +67,40 @@ static int abs8(uint8_t v)
 {
     const int8_t s = (int8_t)v;
     return s < 0 ? -s : s;
+}
+
+/* Minax's own type byte and reach, from asm/1040. The type test is `cmp $0x40,%al`
+ * (asm/1040 file 0x1244) and the reach is `abs(dx) < 4 && abs(dy) < 4` via asm/50EF
+ * — a wider ring than asm/0AAA's special gate (which is `< 3`), and with no roll in
+ * front of it: asm/1040 strikes every turn she is in range. 0x40>>2 == 0x10 is the
+ * art tile the bestiary match names Minax (docs/art-index.md), which is how the
+ * type byte is identified; the name is third-party, the byte is ours. */
+#define U2_AI_TYPE_MINAX  0x40
+#define U2_AI_MINAX_RANGE 4
+
+/* asm/1040 -> asm/0F8E_combat_minax_attack. Minax's ranged strike, run from the
+ * gated sweep's role-0 arm (asm/102B sends role 0 to asm/1040, and asm/1040 is
+ * reached from asm/218b, the no-move tail, so she fires without moving). asm/0F8E
+ * prints MINAX CRIES: DIE FOOL! then a packed-decimal minus-one on the HIGH byte
+ * of the HP pair (DS:51) — exactly 100 HP, the low byte DS:52 untouched — and a
+ * borrow (the hundreds byte already 0) jumps to the death tail at asm/0C62. So a
+ * character at 99 HP or below dies to one strike and one at 9999 dies after 100.
+ * Observed executing 2026-11-12 in the original (captures/spice86/minax-fight-live/):
+ * the owner read the line on screen and HP fell ~100 a strike from about three cells
+ * away, indoors — the first time this path ran anywhere in the project's history. */
+static void minax_strike(u2_ctx *ctx, int slot, int mdx, int mdy, u2_ai_report *rep)
+{
+    u2_state *st = &ctx->state;
+    seam_str_out(ctx, U2_S_MINAX_CRIES);
+    seam_char_print(ctx, '\r');
+    u2_trace(ctx, "mon_minax", "1040", "slot=%d type=40 reach=(%d,%d) hp_hi=%02x",
+             slot, mdx, mdy, st->hp);
+    if (st->hp == 0) {
+        u2_death(ctx);                  /* the hundreds byte underflowed: death tail */
+    } else {
+        st->hp = u2_bcd_dec1(st->hp);   /* -100 HP, packed decimal, low byte untouched */
+    }
+    rep->minax_strikes++;
 }
 
 /*
@@ -408,12 +443,13 @@ u2_ai_report u2_ai_creature_turn(u2_ctx *ctx, u2_world *w, int px, int py)
          *
          * Inside the gated sweep, asm/102B and asm/1033:
          *
-         *   role == 0    -> asm/1040, the Minax proximity check, and thence next
-         *                   slot for everything that is not Minax. Inert, in
-         *                   practice: monx00 ships 0 in every slot, and eight of
-         *                   the thirty-two in a town do nothing until violence
-         *                   wakes them (see u2_ai_alarm). The Minax arm is still
-         *                   not modelled.
+         *   role == 0    -> asm/1040, the Minax proximity check. Only mon_type 0x40
+         *                   (Minax) does anything: she strikes from inside the < 4
+         *                   reach without moving (asm/0F8E), handled in the branch
+         *                   below. Everything else at role 0 falls to the next slot,
+         *                   inert: monx00 ships 0 in every slot, and eight of the
+         *                   thirty-two in a town do nothing until violence wakes them
+         *                   (see u2_ai_alarm).
          *   role & 0x80  -> next slot. asm/1033 is `js <next>`, so bit 7 excludes
          *                   0x81..0x85, which are the scripted townsfolk that
          *                   asm/3C2E_cmd_O enumerates one by one.
@@ -438,7 +474,30 @@ u2_ai_report u2_ai_creature_turn(u2_ctx *ctx, u2_world *w, int px, int py)
         int casts = 1, retreat = 1, moves = 1, wander = 0, contact = 1;
         if (gated_sweep) {
             const uint8_t role = st->mon_role[slot];
-            if (role == 0 || (role & 0x80)) continue;
+            if (role == 0) {
+                /* asm/102B sends role 0 to asm/1040, the Minax proximity check.
+                 * asm/1040 tests mon_type == 0x40 and, only for Minax, runs the
+                 * reach test and the strike; everything else that is role 0 falls
+                 * through to the next slot, inert. This is the arm the engine used
+                 * to `continue` past, which is why Minax never moved, never rolled
+                 * and never struck, and why the owner saw no ranged hit in a castle.
+                 * She strikes without moving: asm/1040 hangs off asm/218b, the
+                 * no-move tail. */
+                if (st->mon_type[slot] == U2_AI_TYPE_MINAX) {
+                    const int mdx = abs8((uint8_t)(px - st->mon_x[slot]));
+                    const int mdy = abs8((uint8_t)(py - st->mon_y[slot]));
+                    if (mdx < U2_AI_MINAX_RANGE && mdy < U2_AI_MINAX_RANGE) {
+                        minax_strike(ctx, slot, mdx, mdy, &rep);
+                        /* asm/0F8E's death arm is a jmp into asm/0C62, not a return,
+                         * so a kill aborts the sweep rather than visiting the rest of
+                         * the slots. Unwind on the flag the same way the caller does. */
+                        if (ctx->death_pending)
+                            return rep;
+                    }
+                }
+                continue;
+            }
+            if (role & 0x80) continue;
             /* The original's dispatch is `cmp $0x3,%al ; jae L_001286` (asm/1035): role >= 3 goes to
              * the wander. There is no "role > 3" skip. The old `if (role > 3) continue;` could never
              * fire — a census of all 33 shipped monx files finds no role above 3 — but it was the

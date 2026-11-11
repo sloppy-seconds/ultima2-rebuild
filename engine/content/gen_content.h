@@ -212,6 +212,8 @@
 #define U2_S_SAVED_BY_IDOL "SAVED BY IDOL!"
 /* exe@0x11F8 */
 #define U2_S_THIEF_STOLE "A THIEF STOLE SOMETHING!"
+/* exe@0x1192 */
+#define U2_S_MINAX_CRIES "MINAX CRIES: DIE FOOL!"
 /* exe@0x358C */
 #define U2_S_ENTER "ENTER"
 /* exe@0x359C */

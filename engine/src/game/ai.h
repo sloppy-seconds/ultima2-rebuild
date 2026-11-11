@@ -30,6 +30,10 @@ typedef struct u2_ai_report {
     int stolen;     /* successful thefts (asm/0FCD)                             */
     int retreated;  /* slots whose pursuit vector was negated (asm/0B0F)        */
     int contacts;   /* slots that would have stepped onto the player (asm/0B4D)  */
+    /* Minax's ranged strike (asm/1040 -> asm/0F8E): how many times she fired the
+     * < 4 proximity attack this turn. She is role 0 in a castle, so this is the
+     * only thing the gated sweep does for her; see the gated_sweep branch in ai.c. */
+    int minax_strikes;
     /* The melee damage pool at DS:22. Each contacting creature that lands a blow
      * adds `mon_hp >> 2 + 1` (asm/0B79) and the caller applies the pool with
      * asm/0BDB's randomised mask. Zero means nothing landed, and asm/0BD1 is what

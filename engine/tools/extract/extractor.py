@@ -240,6 +240,13 @@ MANIFEST = [
     ("U2_S_SLEEP_SPELL",       "0F48_combat_sleep_spell.asm",    ("run", 0x114B, 12, "SLEEP SPELL!")),
     ("U2_S_SAVED_BY_IDOL",     "0F48_combat_sleep_spell.asm",    ("run", 0x1173, 14, "SAVED BY IDOL!")),
     ("U2_S_THIEF_STOLE",       "0FCD_combat_thief_steal.asm",    ("run", 0x11F8, 24, "A THIEF STOLE SOMETHING!")),
+    # CP8 1a — Minax's ranged strike (asm/1040 -> asm/0F8E). exe-only for the same reason as
+    # the specials above: the db carries a trailing 0x8d (the game's newline glyph) between the
+    # text and the terminator, which puts it outside DB_RE. Offset/length read off asm/0F8E
+    # (the db sits at file 0x1192, right after the `call L_0051df` at 0x118f) and confirmed
+    # unique in the exe on 2026-11-12. Length 22 stops before the 8d; the engine emits the
+    # newline itself, exactly as the other special-message callers do.
+    ("U2_S_MINAX_CRIES",       "0F8E_combat_minax_attack.asm",   ("run", 0x1192, 22, "MINAX CRIES: DIE FOOL!")),
     # Site transitions (docs/sector-rulesets.md § 6). cmd_E's " WHAT?" is the
     # second of eleven copies of that literal in the file, so every one of these is
     # addressed by offset rather than by index; the offsets were read off the asm

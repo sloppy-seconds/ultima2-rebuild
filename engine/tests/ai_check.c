@@ -339,6 +339,81 @@ int main(void)
     CHECK(rep.retreated == 0 && ctx.state.mon_x[13] == 6,
           "role 2 does not run: the retreat test is on the role-1 path only");
 
+    /* --- Minax (asm/1040 -> asm/0F8E): role 0, type 0x40, strikes from range ----
+     * The gap this closes. The gated sweep used to `continue` past every role-0 slot,
+     * so Minax — who is role 0 in a castle — never moved, never rolled and never
+     * struck. The owner won the original and read MINAX CRIES: DIE FOOL! from three
+     * cells away, indoors (captures/spice86/minax-fight-live/); the engine printed
+     * nothing. asm/1040 tests mon_type==0x40 and, only for her, runs an
+     * `abs(dx)<4 && abs(dy)<4` reach and the strike (asm/0F8E: the line, then a
+     * packed-decimal minus-one on the HP HIGH byte DS:51 = exactly 100 HP, borrow =
+     * death). She does not move: asm/1040 hangs off asm/218b, the no-move tail. The
+     * five-cell arm is the control that makes the < 4 window real rather than
+     * decorative, and the no-roll assertion separates this from asm/0AAA's special
+     * gate, which rolls 1-in-8 before it fires.
+     */
+    /* Hit: three cells on each axis, indoors, role 0, type 0x40. HP high byte 0x90
+       (9000) must come out 0x89 (8900) — exactly 100 lower, low byte untouched. */
+    arm(&ctx, &w, GRASS, 13, 5, 5, 40, 0x40);
+    ctx.state.sector_second = 1;
+    ctx.state.mon_role[13] = 0;
+    ctx.state.hp = 0x90; ctx.state.unk_52 = 0x00;
+    u2_status_draw(&ctx);
+    seam_goto(&ctx, 0, U2_MSG_BOTTOM);
+    const uint32_t rolls_before_minax = u2_rng_rolls(&ctx);
+    rep = u2_ai_creature_turn(&ctx, &w, 8, 8);   /* dx=3, dy=3: inside the < 4 ring */
+    CHECK(rep.minax_strikes == 1 && ctx.state.hp == 0x89 && ctx.state.unk_52 == 0x00,
+          "Minax at 3 cells: HP high byte 0x90 -> 0x89 (exactly -100), low byte untouched");
+    CHECK(u2_rng_rolls(&ctx) == rolls_before_minax,
+          "asm/1040 strikes unconditionally: no asm/0AAA-style roll is spent");
+    CHECK(ctx.state.mon_x[13] == 5 && ctx.state.mon_y[13] == 5,
+          "she strikes without moving (asm/1040 is the no-move tail)");
+    int minax_found = 0;
+    for (int row = U2_MSG_TOP; row <= U2_MSG_BOTTOM; row++)
+        if (strstr(msg_text(&ctx, row, buf), "MINAX CRIES: DIE FOOL!") != NULL)
+            minax_found = 1;
+    CHECK(minax_found, "asm/0F8E prints MINAX CRIES: DIE FOOL!");
+
+    /* CONTROL: five cells on x is outside the < 4 window — untouched, no print, no roll.
+       Without this a gate that always fired would look identical to the check above. */
+    arm(&ctx, &w, GRASS, 13, 3, 8, 40, 0x40);
+    ctx.state.sector_second = 1;
+    ctx.state.mon_role[13] = 0;
+    ctx.state.hp = 0x90; ctx.state.unk_52 = 0x00;
+    rep = u2_ai_creature_turn(&ctx, &w, 8, 8);   /* dx=5: outside */
+    CHECK(rep.minax_strikes == 0 && ctx.state.hp == 0x90 && u2_rng_rolls(&ctx) == 0,
+          "control: Minax five cells away neither strikes nor rolls (the < 4 window is real)");
+
+    /* The exact boundary: dx==4 is NOT < 4, so a creature four cells out is spared. */
+    arm(&ctx, &w, GRASS, 13, 4, 8, 40, 0x40);
+    ctx.state.sector_second = 1;
+    ctx.state.mon_role[13] = 0;
+    ctx.state.hp = 0x90;
+    rep = u2_ai_creature_turn(&ctx, &w, 8, 8);   /* dx=4: not < 4 */
+    CHECK(rep.minax_strikes == 0 && ctx.state.hp == 0x90,
+          "the reach is strictly < 4: four cells on x is out of range");
+
+    /* CONTROL for the type test: role 0 but NOT Minax (a plain Fighter) stays inert,
+       so the strike cannot be firing for every role-0 creature. */
+    arm(&ctx, &w, GRASS, 13, 5, 5, 40, 0x30);
+    ctx.state.sector_second = 1;
+    ctx.state.mon_role[13] = 0;
+    ctx.state.hp = 0x90;
+    rep = u2_ai_creature_turn(&ctx, &w, 8, 8);
+    CHECK(rep.minax_strikes == 0 && ctx.state.hp == 0x90 && rep.moved == 0,
+          "control: role 0 with type 0x30 is inert — the strike is gated on mon_type 0x40");
+
+    /* Death on borrow: the HP high byte already 0 means the minus-one underflows and
+       asm/0F8E jmps to the death tail (asm/0C62). A character at 99 HP or below dies
+       to one strike. */
+    arm(&ctx, &w, GRASS, 13, 5, 5, 40, 0x40);
+    ctx.state.sector_second = 1;
+    ctx.state.mon_role[13] = 0;
+    ctx.state.hp = 0x00; ctx.state.unk_52 = 0x50;   /* 099 HP or less */
+    rep = u2_ai_creature_turn(&ctx, &w, 8, 8);
+    CHECK(rep.minax_strikes == 1 && ctx.death_pending,
+          "Minax at HP high byte 0 borrows and runs the death tail (asm/0C62)");
+
     /* --- the world-map sweep is NOT role-gated (asm/0A38 -> asm/0A6D) -------- */
     /* The regression this exists for. asm/0A38 dispatches the post-command tail on
      * the sector's second decimal digit: 0 jumps to the sweep at asm/0A6D, which

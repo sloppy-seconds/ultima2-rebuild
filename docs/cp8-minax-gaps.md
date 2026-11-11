@@ -52,16 +52,25 @@ and saw neither in the engine.
 
 ### What to build, in order
 
-1. **`asm/1040` + `asm/0F8E`.** In the gated sweep, replace the bare `continue` for `role == 0`
-   with: if `mon_type == 0x40`, run the proximity test and the Minax strike, then go to the next
-   slot; otherwise continue as now. The strike is `MINAX CRIES: DIE FOOL!` then a packed-decimal
-   minus-one on `DS:51`, death on borrow. Gate on the **observable**: a player three cells away
-   with known HP must come out 100 lower, and a player five cells away must be untouched. The
-   five-cell arm is the control that makes the range window real rather than decorative.
+1. **`asm/1040` + `asm/0F8E`.** **SHIPPED 2026-11-12.** In the gated sweep the bare `continue`
+   for `role == 0` now runs the Minax arm: if `mon_type == 0x40`, the reach test
+   (`abs(dx) < 4 && abs(dy) < 4`) and the strike fire, then the slot is done; every other
+   role-0 creature still continues inert. The strike is `MINAX CRIES: DIE FOOL!` (added to
+   the extractor as `U2_S_MINAX_CRIES`, asm/0F8E file 0x1192) then a packed-decimal minus-one
+   on `DS:51`, death on borrow, and a kill aborts the sweep the way asm/0F8E's `jmp` to
+   asm/0C62 does. Gated in `ai_check` (8 new checks): a player three cells away comes out
+   exactly 100 lower; the four-cell and five-cell arms are the controls that make the `< 4`
+   window real rather than decorative; the type-0x30 control proves the strike is gated on
+   `mon_type == 0x40`; the no-roll check separates it from asm/0AAA's special; and the
+   high-byte-zero check proves the death-on-borrow. Disabling the arm turns the three positive
+   checks red and leaves the controls green.
 2. **The teleport.** Needs a decode first. Start from the chamber geometry in the frames and
    from `asm/2CB5`'s neighbourhood; do not guess a destination.
 3. **Re-check the dungeon sweep** (`engine/src/game/dungeon.c`), which has its own type table and
    its own sleep effect (`type 7 ... paral_sleep := rand & 7`) and may have the same skip.
+   **Checked 2026-11-12: it does not.** The dungeon sweep never reads `mon_role`, so there is
+   no role-0 skip; its special dispatch is on the dungeon type table (cases 2/5/7), and Minax
+   is a castle creature that never appears in a dungeon. No change needed there.
 
 ## 3. The engine's ending is not the ending
 
