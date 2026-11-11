@@ -1,7 +1,9 @@
 # minax_proximity_check — Minax strikes from up to four cells away
 # name-evidence: tests mon_type == 0x40, then |mon_x - player_x| < 4 and
 #   |mon_y - player_y| < 4 via asm/50EF (abs of a signed byte), then calls
-#   L_00118e = asm/0F8E_combat_minax_attack. Type 0x40 is Minax: the art index is
+#   L_00118e = asm/0F8E_combat_minax_attack. The reach-test instructions themselves are
+#   in the fall-through fragment asm/1048_minax_reach_test (this file is only the
+#   `cmp $0x40 ; jne` type gate); read together asm/1040 + asm/1048 are the one routine. Type 0x40 is Minax: the art index is
 #   type>>2 (docs/art-index.md) and 0x40>>2 == 0x10, the tile asm/0F8E's own note
 #   identifies as Minax by bitmap identity.
 # reached from: TWO places. (1) the role dispatch: asm/102B's `or %al,%al ; je L_001240`

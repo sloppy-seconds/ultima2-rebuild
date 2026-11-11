@@ -72,8 +72,31 @@ and saw neither in the engine.
    `mon_type == 0x40` and not on the role; the no-roll check separates it from asm/0AAA's
    special; and the high-byte-zero check proves the death-on-borrow. Reverting to the
    handoff's `role == 0`-only premise turns 8 checks red.
-2. **The teleport.** Needs a decode first. Start from the chamber geometry in the frames and
-   from `asm/2CB5`'s neighbourhood; do not guess a destination.
+2. **The teleport — NOT FOUND in the decoded binary (2026-11-12).** The handoff said
+   "start from `asm/2CB5`'s neighbourhood," but `asm/2CB5` is the **kill/victory** gate, not
+   a hit path, and there is no teleport on the hit path either. Reading the three places a
+   teleport could live:
+   - **The player's attack, survive branch** (`asm/2E3D` file 0x30CA): `mov %al,0x177(%di)`
+     (store reduced HP) then `jmp L_000c33` (return to the command loop). No type check, no
+     move, no teleport.
+   - **Minax's own AI path** (`asm/1040` → `asm/1048` → `asm/0F8E`): the reach test and the
+     strike, then fall to the next slot (`L_00126d`). It never writes `mon_x`/`mon_y`, so she
+     does not move. She is role 0x84, which routes to `asm/1040` and back — she is stationary
+     at her spawn cell (60,3 in `monx03`).
+   - **Every writer of `mon_x`(0x137)/`mon_y`(0x157)** in the tree (`asm/0CC0`, `asm/0CDC`,
+     `asm/212E`, `asm/215C`, `asm/216E`, `asm/2216`, `asm/2233`, `asm/4F11`, `asm/10CE`,
+     `asm/10FC`): all add a ±1 step vector and wrap with `and $0x3f`. None writes a fixed
+     chamber coordinate or a large delta, which is what a teleport would have to do.
+   So the "teleports between the NE and SW chambers on every hit" claim is **not supported by
+   the bytes examined**. The frames are 1/s and mix fight, the Z status screen and the ending;
+   they show the fight happening but cannot decode a mechanism, and the previous session's
+   "observed" grade was a person seeing Minax in two chambers, not a traced position change.
+   **What would settle it definitively:** a live capture — seed a character into sector 03,
+   `spice86_type.py --peek` Minax's `mon_x`/`mon_y` (slot 31, `DS:137+31`/`DS:157+31`), attack
+   her once, and re-peek. If the cell changed, a teleport exists and the diff names the writer;
+   if it did not, the claim is refuted outright. That is agent-drivable and is the honest next
+   step; guessing a destination from chamber geometry is what the handoff warned against and
+   what the bytes do not support.
 3. **Re-check the dungeon sweep** (`engine/src/game/dungeon.c`), which has its own type table and
    its own sleep effect (`type 7 ... paral_sleep := rand & 7`) and may have the same skip.
    **Checked 2026-11-12: it does not.** The dungeon sweep never reads `mon_role`, so there is
