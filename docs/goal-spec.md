@@ -31,6 +31,16 @@ The walkthrough's endgame paragraph, verbatim in substance:
 > Minax. One hit! […] she has teleported to the chamber in the southwest corner. Head there
 > and attack again. Keep switching between the two until she dies.
 
+**The two-chamber teleport loop is now OBSERVED, not recalled.** Owner play session in the
+original, 2026-11-12, `captures/spice86/minax-fight-live/`: *"every hit she teleports between
+the north east chamber and the south west chamber."* The walkthrough's description was right
+about both corners and about the mechanic being a repeat rather than a one-shot. What is still
+**recalled and unverified** is the rest of that paragraph: that one hit is always a miss on the
+first try, that the quicksword is required rather than merely sufficient, and the 9900 HP
+threshold in W4. The owner also reported a ranged attack landing on him throughout, which is
+consistent with the `asm/0AD3` specials acting at range and with magic missile having no resist
+at all -- HP fell from 9000 to 2336 with a cloak in place.
+
 Split into a **readiness conjunction** (checkable before entering) and a **fight loop**
 (checkable during).
 
