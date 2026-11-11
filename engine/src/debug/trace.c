@@ -39,4 +39,12 @@ void u2_trace(u2_ctx *ctx, const char *seam, const char *asmref,
     }
     va_end(ap);
     fputc('\n', ctx->trace.out);
+    /* Flushed, not buffered. stdio to a file is fully buffered, so a trace written
+     * through this seam could only be read AFTER the process exited -- which makes it
+     * a post-mortem and not an observation. The deploy now points a live play session's
+     * trace at a bind-mounted path so the turn flow can be watched while the player is
+     * in the world, and that only works if each line reaches the file when it is
+     * written. Nothing that reads a trace depends on the timing: every gate greps the
+     * file after the run ends, and this only makes the bytes arrive sooner. */
+    fflush(ctx->trace.out);
 }

@@ -239,7 +239,21 @@ podman build -t "$IMAGE:latest" "$HERE" >/dev/null
 # The entrypoint's own U2_ARGS default carries no --cleanroom, so asking for substitute
 # art means overriding it here or the flag silently goes nowhere -- which is precisely the
 # class of bug this script was written to catch, relocated one layer down.
-U2_ARGS="--sdl --debug-path /saves/debug"
+U2_ARGS="--sdl --debug-path /saves/debug --trace=/saves/engine-trace.txt"
+# The trace is here because the container otherwise emits NOTHING observable about a
+# running session: no memory API, no debugger attach, no state read. Every question about
+# what the engine is doing mid-play could only be answered by copying the save out and
+# re-running it headless somewhere else, which is reconstruction rather than observation --
+# and it silently assumes the save is current, which it is not unless the player has
+# entered a site since (the engine writes the record on site entry only, so a save can be
+# a dozen sectors behind where the player is standing).
+#
+# /saves is the bind mount of $SAVES_HOST on the host, so this lands at
+# $SAVES_HOST/engine-trace.txt and is readable without touching the container. It is
+# line-flushed (see engine/src/debug/trace.c) so tailing it shows turns as they resolve.
+# `--debug-path` above has been here for a while and does nothing on its own: the per-turn
+# debug writer is opted into by `--debug cli`, which is not passed, and it would emit a
+# 640x400 ppm per turn on top of that.
 # Default is the splash screen and title flow, because that is what a player meets and
 # what the original shows. --play-map is the engine's development entry: it jumps
 # straight into the overworld, skipping the intro, the title and character creation, so
