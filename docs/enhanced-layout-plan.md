@@ -202,6 +202,68 @@ are the invasive ones and should not start until they are ruled.
 | S7 | box-1 avatar through the theme map | reuses today's overlay fix; assert it draws the mapped tile |
 | S8 | docs, and the § 6 questions onto `needs-gameplay.md` | — |
 
+## 7a. Owner-requested enhancement, 2026-11-11 — the helm automap
+
+*(numbered 7a because it is a slice request that sits on top of the slice table above;
+§ 8 and § 9 keep their numbers, since other documents point at them.)*
+
+**Status: requested, not ruled, not started.** Recorded here rather than built, and it
+is an *enhancement*, so it lives behind `--enhanced` and must not change what a
+classic-mode player sees. Classic keeps what the original does: press `V`, spend one
+HELM, see the sector drawn, press a key, back to the game (`CP5 H1`,
+`captures/spice86/vhelm-sector-map-live`).
+
+The request, as the owner put it: in enhanced mode, **while the player holds one or
+more helms**, the current sector map is drawn persistently in the side panel — no key
+press, no charge per look. And in a **dungeon or tower** the map is not given at all
+up front: it starts blank and every step fills in the section you have walked, so the
+automap is earned by moving rather than by holding the item.
+
+Why it is cheap to want and not free to build:
+
+- **The panel does not exist yet.** This whole document is the panel, and S1–S4 are
+  unstarted. The automap is a box in that panel, so it is downstream of S1 and S2 at
+  minimum, and of whatever the § 4 font ruling picks, because the box's pixel width is
+  what sets how much of a 64x64 sector can be shown.
+- **The sector half is nearly free.** `helm_map_draw` in `game/commands.c` already
+  renders a whole sector from `u2_world_tile_at` at 4x2 px per cell with a density
+  ladder measured from the frames. A panel box is the same draw at a different scale
+  into a different rectangle. The density ladder is fitted to five art values, so
+  widening it is a measurement task, not a guess.
+- **The dungeon half is the real work, and it is a new state.** A sector map is static;
+  a fog-of-war automap is *accumulated*, and nothing in the engine currently holds
+  "cells the player has seen". That means a new per-save structure, and it raises
+  questions the bytes cannot answer because the original has no such feature:
+  what a step reveals (the cell only, a radius, or the lit radius the dungeon light
+  already computes), whether the map survives leaving and re-entering the site, whether
+  it survives death, and whether it is written to the save overlay under `saves/<slot>/`
+  alongside the mapx overlay or kept in memory only.
+- **Dungeon geometry is not sector geometry.** A dungeon is 16 pages of 16x16 with its
+  own byte semantics — `0x80` is rock there and something else on a sector map, `0x40`
+  is a chest — and `docs/art-index.md` already records that dungeons do not stamp the
+  grid the same way. So the automap needs its own per-page grid, not a reuse of the
+  sector view.
+
+What it would need before anyone writes code, in order:
+
+1. S1 and S2 landed, so there is a panel with a box of known pixel extent.
+2. A ruling on **persistence**: is the explored dungeon map saved, or session-only?
+   Saved means it belongs in the save overlay and needs a format decision; session-only
+   means it resets on reload and should say so in the UI.
+3. A ruling on **reveal rule**: cell-only, fixed radius, or the existing light radius.
+   The third is the most defensible, because the dungeon already computes a lit radius
+   for drawing, so it would reuse a proven quantity rather than invent one.
+4. A decision on whether holding a helm in a dungeon reveals the *sector* map, the
+   *dungeon* map, or nothing until you have walked — the request reads as the last, but
+   it is worth writing down which, because the item currently costs a charge in the
+   original and an automap that also costs charges would be a different feature.
+
+No gate is proposed yet, for the reason this project keeps learning: a gate for a
+feature whose shape is undecided gets written against the first implementation and then
+argues for it forever. When this is ruled, the assertion should be the visible one — a
+panel box whose lit cells match the sector's land pattern, and in a dungeon, a box that
+is empty at the door and grows monotonically with steps taken.
+
 ## 8. Risks worth stating plainly
 - **No byte authority.** The DOS layout is derived from the binary. This layout would
   be derived from photographs of a different binary we have not disassembled. That is
