@@ -717,6 +717,13 @@ int  u2_bcd16(uint8_t lo, uint8_t hi);
 uint8_t u2_bcd_dec1(uint8_t v);
 uint8_t u2_bcd_inc1(uint8_t v);
 
+/* The two ceiling-aware forms. `saturate` is the enhanced-mode flag — pass U2_SATURATE(ctx)
+ * from game code — and it is a parameter rather than a global so the pure helpers stay
+ * testable against the original's wrap without a ctx. See core/state.c for why the wrap is
+ * real and why only the enhanced game caps. */
+uint8_t u2_bcd_inc_sat(uint8_t v, int saturate);
+uint8_t u2_bcd_add_sat(uint8_t cur, uint8_t amount, int saturate);
+
 void u2_state_init(u2_state *s);
 
 /* Resume the DS mirror from a checkpoint file: whitespace-separated hex bytes starting at

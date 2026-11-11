@@ -239,6 +239,34 @@ else
     sed 's/^/        /' "$WORK/helm.build"
 fi
 
+# --- CP5 S1: enhanced mode caps its counters instead of rolling over ------------------
+#
+# The original has no ceiling guard anywhere: asm/2045 wraps 99 to 00, asm/2DC1 drops the
+# carry out of the gold add (the owner watched +2 exp on a 9999 character display 0001),
+# and asm/3C2E's stat grind is four chained DAA adds with nothing after them — which is
+# why the period walkthrough's "stop at 95" exists at all. The owner ruled 2026-11-11 that
+# the enhanced game caps. Fidelity keeps the wrap, because it is byte-proven and the
+# fidelity run is the differential, so every assertion here is a pair and a change that
+# fixes only one mode goes red.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent \
+        -o "$WORK/saturation_check" tests/saturation_check.c src/core/*.c src/game/*.c \
+        src/debug/*.c 2>"$WORK/sat.build"; then
+    if "$WORK/saturation_check" > "$WORK/sat.out" 2>&1; then
+        n=$(sed -n 's/^saturation_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/sat.out")
+        if [ "${n:-0}" -eq 0 ]; then
+            bad "CP5 S1 saturation executed 0 checks — the test is not running"
+        else
+            ok "CP5 S1 saturation: 99 and 9999 hold in enhanced, still wrap in original ($n checks)"
+        fi
+    else
+        sed 's/^/        /' "$WORK/sat.out"
+        bad "CP5 S1: a counter rolls over where it should cap, or a fidelity wrap was lost"
+    fi
+else
+    bad "CP5 S1 harness did not build:"
+    sed 's/^/        /' "$WORK/sat.build"
+fi
+
 # --- 1f. the death tail (CP5 W8) -------------------------------------------
 # asm/0C62..0C99 as one span, checked against the captured frame in
 # captures/spice86/cp5-weak-fight/death1.png. It links the whole game core rather

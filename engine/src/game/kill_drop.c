@@ -80,29 +80,30 @@ void u2_combat_kill_drop(u2_ctx *ctx, uint8_t dead_type)
          * where captures/spice86/castle-03-live was taken and where Townsfolk belong.
          * The type>>2 == art_index fold that would have been the lazy route is explicitly
          * retracted in asm/0ADB's header as "a hypothesis about the renderer". */
-        ctx->state.keys = u2_bcd_inc1(ctx->state.keys);
-        ctx->state.keys = u2_bcd_inc1(ctx->state.keys);
+        ctx->state.keys = u2_bcd_inc_sat(ctx->state.keys, U2_SATURATE(ctx));
+        ctx->state.keys = u2_bcd_inc_sat(ctx->state.keys, U2_SATURATE(ctx));
         return;
     }
     if (dead_type == U2_AI_TYPE_THIEF) {
         /* asm/2CE9/2CF2: one roll, `cmp $0x40,%al`, so 64/256 = 25%. asm/2CF6 then adds 1
          * to DS:66, which state.h names `tools` (asm/277B spends them in a dungeon). */
         if (u2_rand_byte(ctx) < 0x40u)
-            ctx->state.tools = u2_bcd_inc1(ctx->state.tools);
+            ctx->state.tools = u2_bcd_inc_sat(ctx->state.tools, U2_SATURATE(ctx));
         /* asm/2D00/2D03: a SECOND roll picks the slot. Two rolls, not one -- reading this
          * as a single draw gets the joint distribution wrong. */
         const unsigned idx = (unsigned)(u2_rand_byte(ctx) & 0x0Fu);
         if (idx != 0)
-            ctx->state.items_held[idx] = u2_bcd_inc1(ctx->state.items_held[idx]);
+            ctx->state.items_held[idx] = u2_bcd_inc_sat(ctx->state.items_held[idx],
+                                                        U2_SATURATE(ctx));
         return;
     }
     if (dead_type == 0xF0u) {
         /* asm/2D26..2D3A: 25% for a HELM (DS:DB = items_held[5]), then asm/2D3D..2D52 adds
          * (rand & 3) + 1 to DS:64, which is `torches`. */
         if (u2_rand_byte(ctx) < 0x40u)
-            ctx->state.items_held[5] = u2_bcd_inc1(ctx->state.items_held[5]);
+            ctx->state.items_held[5] = u2_bcd_inc_sat(ctx->state.items_held[5], U2_SATURATE(ctx));
         for (unsigned n = 1u + (u2_rand_byte(ctx) & 3u); n; --n)
-            ctx->state.torches = u2_bcd_inc1(ctx->state.torches);
+            ctx->state.torches = u2_bcd_inc_sat(ctx->state.torches, U2_SATURATE(ctx));
         return;
     }
     if (dead_type == 0xF8u) {
@@ -111,7 +112,7 @@ void u2_combat_kill_drop(u2_ctx *ctx, uint8_t dead_type)
          * caster leaving behind a wand or a staff is the consistency check that this arm
          * is read correctly rather than merely plausibly. */
         const unsigned idx = 1u + (unsigned)(u2_rand_byte(ctx) & 1u);
-        ctx->state.items_held[idx] = u2_bcd_inc1(ctx->state.items_held[idx]);
+        ctx->state.items_held[idx] = u2_bcd_inc_sat(ctx->state.items_held[idx], U2_SATURATE(ctx));
     }
     /* Every other type: asm/2D8B is a bare nop and the tail jmp to the reward follows with
      * no grant at all. Silence here is the original's, and it is cited by the byte that

@@ -91,6 +91,46 @@ uint8_t u2_bcd_inc1(uint8_t v)
     return (uint8_t)(t & 0xFFu);
 }
 
+/* The enhanced-mode ceiling on a packed-decimal counter, as one function rather than a
+ * dozen hand-written guards, because a guard that exists in only some of the places that
+ * increment is worse than no guard: it makes the wrap look intentional everywhere else.
+ *
+ * The original has no ceiling guard anywhere. asm/2045's `clc ; adc $1,%al ; daa` turns 99
+ * into 00, asm/2DC1 drops the carry out of the gold add the same way, and asm/3C2E's Hotel
+ * clerk grind is four chained DAA adds with nothing after them — which is the real reason
+ * the period walkthrough says "stop at 95", since 95 + 4 = 99 is the last raise that does
+ * not wrap. The owner ruled on 2026-11-11 that the enhanced game caps instead of rolling
+ * over, at every counter: stats, gold, exp, food, and held counts.
+ *
+ * Fidelity mode keeps the wrap. It is byte-proven, and a fidelity run that silently
+ * saturated would stop being a differential.
+ *
+ * The test is `n < v`, not `v == 0x99`: a packed-decimal add can only ever come out below
+ * what it went in if it wrapped, so this holds for any valid BCD input and does not need a
+ * table of ceilings. */
+uint8_t u2_bcd_inc_sat(uint8_t v, int saturate)
+{
+    const uint8_t n = u2_bcd_inc1(v);
+    if (saturate && n < v)
+        return v;                 /* 99 + 1 would have rolled over to 00 */
+    return n;
+}
+
+/* The same rule for a two-byte field, where the wrap is the pair going backwards rather
+ * than one byte. `amount` is added with the same chained-DAA shape asm/2DC1 uses. */
+uint8_t u2_bcd_add_sat(uint8_t cur, uint8_t amount, int saturate)
+{
+    unsigned t = (unsigned)cur + (unsigned)amount;
+    if ((t & 0xFu) > 9u)
+        t += 6u;
+    if (t > 0x99u)
+        t += 0x60u;
+    const uint8_t n = (uint8_t)(t & 0xFFu);
+    if (saturate && n < cur)
+        return cur;
+    return n;
+}
+
 int u2_bcd16(uint8_t lo, uint8_t hi)
 {
     return (((lo >> 4) * 10 + (lo & 0x0F)) * 100) +

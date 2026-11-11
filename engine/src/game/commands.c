@@ -1752,7 +1752,7 @@ static u2_cmd_result cmd_G(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
     }
 
     uint8_t *pool = armour ? ctx->state.armour_owned : ctx->state.weapons_owned;
-    pool[idx] = u2_bcd_inc1(pool[idx]);
+    pool[idx] = u2_bcd_inc_sat(pool[idx], U2_SATURATE(ctx));
     cmd_done(ctx);
     return U2_CMD_DONE;
 }

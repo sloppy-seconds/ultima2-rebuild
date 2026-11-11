@@ -23,6 +23,17 @@ typedef enum u2_fidelity {
     U2_FIDELITY_ENHANCED = 1    /* same rules; dead ends removed */
 } u2_fidelity;
 
+/* Every place the original lets a packed-decimal counter roll over, the enhanced game
+ * caps it instead. Pass this as the `saturate` argument to u2_bcd_inc_sat and
+ * u2_bcd_add_sat (core/state.h). It is a macro rather than a function so the call sites
+ * read as the rule they implement: `count = u2_bcd_inc_sat(count, U2_SATURATE(ctx))`.
+ *
+ * Fidelity mode deliberately keeps the wrap. It is byte-proven — asm/2045, asm/2DC1 and
+ * asm/3C2E's stat grind all add with no guard after them — and the original-fidelity run
+ * is the differential, so a silent saturation there would hide the very behaviour the
+ * comparison exists to catch. */
+#define U2_SATURATE(ctx) ((ctx)->fidelity == U2_FIDELITY_ENHANCED)
+
 /* Which art set the display draws from — an independent axis from `fidelity`
  * (which is a rules axis) and from `mode` (a renderer axis). It changes no game
  * rules, so it is available in both fidelity modes.

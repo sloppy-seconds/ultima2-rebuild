@@ -218,8 +218,9 @@ static uint8_t daa_add(unsigned raw, int cf, int af, int *carry_out)
  * faulting or saturating — the B1 ticket's measured value, and the same wrap
  * seen live when a +2 exp on a 9999 character displayed 0001.
  */
-static void bcd_adc2(uint8_t *hi, uint8_t *lo, uint8_t amount)
+static void bcd_adc2(uint8_t *hi, uint8_t *lo, uint8_t amount, int saturate)
 {
+    const uint8_t hi_was = *hi, lo_was = *lo;
     int c = 0, af = 0;
     unsigned raw = (unsigned)(*lo) + amount;
     af = (((*lo & 0x0Fu) + (amount & 0x0Fu)) > 9u) ? 1 : 0;
@@ -228,6 +229,15 @@ static void bcd_adc2(uint8_t *hi, uint8_t *lo, uint8_t amount)
     raw = (unsigned)(*hi) + (unsigned)c;
     af = (((*hi & 0x0Fu) + (unsigned)c) > 9u) ? 1 : 0;
     *hi = daa_add(raw, raw > 0xFFu, af, &c);   /* this carry is dropped on purpose */
+
+    /* Enhanced mode stops at 9999 instead of rolling to 0001. The pair going DOWN is the
+     * wrap — a BCD add that does not overflow can only raise the value — and comparing the
+     * pair with the same helper on both sides keeps the byte-order inversion of state.h out
+     * of the test. */
+    if (saturate && u2_bcd16(*hi, *lo) < u2_bcd16(hi_was, lo_was)) {
+        *hi = hi_was;
+        *lo = lo_was;
+    }
 }
 
 /*
@@ -330,8 +340,8 @@ static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *
          * DS:59 is the LOW byte. Same inversion for exp (low is DS:57 = exp_hi).
          * Reading the names at face value swaps the bytes and corrupts every
          * reward. Flagged in state.h; fix both sides together or neither. */
-        bcd_adc2(&ctx->state.gold_lo, &ctx->state.gold_hi, r.gold);  /* hi=58 lo=59 */
-        bcd_adc2(&ctx->state.exp_lo,  &ctx->state.exp_hi,  r.exp);   /* hi=56 lo=57 */
+        bcd_adc2(&ctx->state.gold_lo, &ctx->state.gold_hi, r.gold, U2_SATURATE(ctx));
+        bcd_adc2(&ctx->state.exp_lo,  &ctx->state.exp_hi,  r.exp,  U2_SATURATE(ctx));
         if (out) *out = r;
         return 2;
     }

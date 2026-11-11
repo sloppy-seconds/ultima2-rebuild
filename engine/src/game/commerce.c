@@ -142,8 +142,14 @@ static int bcd_sbb(unsigned a, unsigned sub, int borrow_in, unsigned *out)
 
 /* `clc ; adc $1,%al ; daa` — the one-step BCD increment asm/181A uses for food and asm/2045
  * uses for an owned-count slot. Both discard the carry out of the byte, so 99 wraps to 00
- * and nothing upstream guards it. */
-static uint8_t bcd_inc1(uint8_t v)
+ * and nothing upstream guards it.
+ *
+ * No caller uses it directly any more: every increment site in this file went through
+ * u2_bcd_inc_sat, which applies this same rule and then holds the value in enhanced mode
+ * where the owner ruled that counters cap rather than roll over (core/ctx.h, U2_SATURATE).
+ * It stays because u2_bcd_inc_sat is the shared form of exactly this instruction, and
+ * inlining it there would hide which original opcode the behaviour comes from. */
+[[maybe_unused]] static uint8_t bcd_inc1(uint8_t v)
 {
     int cf = 0;
     return daa_add(v, 1u, 0, &cf);
@@ -313,7 +319,7 @@ static u2_transact_result sell_from_catalogue(u2_ctx *ctx,
     seam_str_out(ctx, U2_S_SHOP_SOLD);
     const int idx = digit + counts_base;
     if (idx >= 0 && idx < counts_n)
-        counts[idx] = bcd_inc1(counts[idx]);
+        counts[idx] = u2_bcd_inc_sat(counts[idx], U2_SATURATE(ctx));
     return U2_TRANSACT_OPEN;
 }
 
@@ -381,7 +387,7 @@ static u2_transact_result shop_grocery(u2_ctx *ctx)
     /* asm/181A: `clc ; mov [DS:53],%al ; adc $0x1,%al ; daa ; mov %al,[DS:53]` — one food
      * unit, in packed decimal, on the low byte only. "PER 100" is the vendor's joke about
      * the price, not a quantity: the byte adds one. */
-    ctx->state.food = bcd_inc1(ctx->state.food);
+    ctx->state.food = u2_bcd_inc_sat(ctx->state.food, U2_SATURATE(ctx));
     seam_str_out(ctx, U2_S_THANK_YOU_AGAIN);
     return U2_TRANSACT_OPEN;
 }
@@ -487,7 +493,9 @@ static void tribute(u2_ctx *ctx)
 
     /* asm/42E2: `clc ; mov 0x51,%al ; adc 0x1f,%al ; daa ; mov 0x51,%al`. */
     int cf = 0;
-    st->hp = daa_add(st->hp, rung, 0, &cf);
+    const uint8_t hp_new = daa_add(st->hp, rung, 0, &cf);
+    /* Enhanced mode does not let a heal roll the hundreds byte over; see U2_SATURATE. */
+    st->hp = (U2_SATURATE(ctx) && hp_new < st->hp) ? st->hp : hp_new;
 }
 
 u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
@@ -771,7 +779,7 @@ u2_steal_result u2_commerce_steal(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
          * same byte asm/181A moves when you BUY it, so a stolen meal and a bought one are
          * indistinguishable in the save. */
         seam_str_out(ctx, U2_S_STEAL_FOOD);
-        st->food = bcd_inc1(st->food);
+        st->food = u2_bcd_inc_sat(st->food, U2_SATURATE(ctx));
         return U2_STEAL_FOOD;
     }
     case U2_STEAL_ARMOUR:
@@ -780,7 +788,7 @@ u2_steal_result u2_commerce_steal(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
          * REFLECT and POWER are unreachable. */
         seam_str_out(ctx, U2_S_STEAL_ARMOUR);
         { const int i = u2_rand_byte(ctx) & 3u;
-          st->armour_owned[i] = bcd_inc1(st->armour_owned[i]); }
+          st->armour_owned[i] = u2_bcd_inc_sat(st->armour_owned[i], U2_SATURATE(ctx)); }
         return U2_STEAL_ARMOUR;
     case U2_STEAL_WEAPONS:
         /* asm/4024: `roll & 7`, +1, on [DS:76 + that]. weapons_owned[0] is HANDS and the +1
@@ -788,7 +796,7 @@ u2_steal_result u2_commerce_steal(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
          * SWORD cannot be stolen either. */
         seam_str_out(ctx, U2_S_STEAL_WEAPONS);
         { const int i = (u2_rand_byte(ctx) & 7u) + 1;
-          st->weapons_owned[i] = bcd_inc1(st->weapons_owned[i]); }
+          st->weapons_owned[i] = u2_bcd_inc_sat(st->weapons_owned[i], U2_SATURATE(ctx)); }
         return U2_STEAL_WEAPONS;
     case U2_STEAL_NO_LUCK:
         /* The south halves, and every site kind that is neither a town nor a village. The game
@@ -926,7 +934,7 @@ u2_offer_result u2_commerce_offer(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
     case 0x83: {
         seam_str_out(ctx, U2_S_OFFER_HERE_TAKE_THIS);
         const int i = (u2_rand_byte(ctx) & 7u) + 1;   /* DAGGER..PHASER, never QUICK SWORD */
-        st->weapons_owned[i] = bcd_inc1(st->weapons_owned[i]);
+        st->weapons_owned[i] = u2_bcd_inc_sat(st->weapons_owned[i], U2_SATURATE(ctx));
         return U2_OFFER_WEAPON;
     }
 
@@ -942,6 +950,13 @@ u2_offer_result u2_commerce_offer(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
         int unused = 0;
         uint8_t out = 0;
         (void)u2_offer_raise_for(roll, hundreds, *stats[idx], &unused, &out);
+        /* The raise itself is left byte-faithful inside u2_offer_raise_for — its unit test
+         * pins the 99 -> 04 carry chain the original actually performs, and that has to stay
+         * true for the original-fidelity run. The ceiling is applied here, at the store, so
+         * enhanced mode stops at 99 while fidelity still wraps. A stat that came back lower
+         * than it went in is the wrap; hold the old value instead. */
+        if (U2_SATURATE(ctx) && out < *stats[idx])
+            out = *stats[idx];
         *stats[idx] = out;
         seam_str_out(ctx, U2_S_OFFER_ALAKAZAM);
         return U2_OFFER_RAISE;
