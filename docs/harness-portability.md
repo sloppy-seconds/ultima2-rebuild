@@ -1862,3 +1862,13 @@ screens, and rebuilding from a reverted source produced two byte-identical frame
 form: when a gate's observable is a capture taken by the program under test, verify the capture
 moves when the feature moves and does not move when it does not. A pixel assertion that has
 never been shown to go red is a text assertion with extra steps. → Tier 2, harness contract.
+
+- 2026-11-12 — an emulator's executed-instruction trace was treated as proof that a routine ran,
+  and it was the wrong instrument. The buffer is a small rolling window, so a command pressed once
+  had already scrolled out by the time the harvest landed, while per-turn code was still present.
+  Two claims written from it were wrong, and dumping "immediately" did not help because the window
+  rolls in seconds of ordinary play. The fix is a rule about evidence classes, not about this
+  binary: for a one-shot event, read the memory the event writes, over the live endpoint, right
+  away; reserve the trace for "did this ever run across a long session". General form: check the
+  retention window of any execution log before citing it as evidence of a single occurrence, and
+  prefer the observable the event actually changes. → Tier 2, harness contract.

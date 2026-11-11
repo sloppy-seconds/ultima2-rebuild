@@ -2216,6 +2216,20 @@ Where margin `0x28` is live: `state_init`, `status.c:53`, `title.c:286`. The ove
   `status_tick()` only decremented the three paralysis bytes, because `asm/0C33` starts at `DS:26B`.
   `asm/0C54`/`asm/0C5B` tick `DS:26A` the same way, and nothing could set it until now — so the
   handler that sets it came with the fix, or every creature on the map would have frozen forever.
+* **Confirmed live in the original by the owner's own play, 2026-11-12, and the scope is wider
+  than this section implied.** Pressing `N` in `deploy/spice86-novnc` spent a coin (`DS:E3`
+  `09 -> 08 -> 07`) and set the counter, which read `0x0F` a few commands later — set to `0x14`
+  and decayed one per handled input event, exactly as `asm/0C5B` has it. Creatures stopped.
+  The point worth keeping is **where** it stopped them: in a chamber, not on the world map. The
+  freeze lives in the step gate `asm/2199`, which the site and dungeon sweeps reach through the
+  same move routine the wilderness does, so `N` works everywhere and `docs/contract-creature-tick.md`
+  § 5b already said so correctly ("every species, every tile"). The claim that site creatures were
+  exempt was invented in conversation, not read from the tree, and the owner's recollection —
+  "towns/castles generally act the same as overworld" — was the thing that turned out to match the
+  bytes. `DS:26A` is read in exactly two places in the binary, `asm/2199` and `asm/0C54`, and
+  written in two, `asm/3C04` and `asm/080D`; there is no third, site-specific reader to exempt.
+  The engine matches by construction: `ai.c` puts the check in `creature_may_enter`, the gate,
+  not in the sweep.
 
 **And the run exposed an emitter bug that had been corrupting shipped game text.**
 `engine/tools/extract/extractor.py` escaped non-printable bytes as C hex escapes (`\xNN`), but a C

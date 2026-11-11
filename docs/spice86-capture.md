@@ -321,6 +321,19 @@ target, or the response renders somewhere other than the `CMD:` log.
 | dungeon-specific probe | `tools/dungeon_capture.py` | no |
 | prove a routine executed | `tools/cfg_printed.py` (reads `ExecutedInstructions`) | no |
 
+**`ExecutedInstructions` is a rolling window, not a session log, and it is small.** Measured
+2026-11-12 in `deploy/spice86-novnc`: a harvest taken seconds after a one-shot command held
+2241 game-segment instructions, all distinct, and the command's own addresses were absent —
+while the command tail, which runs on every turn, was present. Dumping immediately after the
+event does not fix it; the window had already scrolled past within seconds of ordinary play.
+So the row above is true for "did this ever run in a long-running session" and false for
+"did this run just now". For a one-shot — a command pressed once, a branch taken once — the
+reliable witness is a **memory read of the effect**, taken over the MCP endpoint while the
+session is live. That is how `cmd_N` was finally confirmed: `DS:E3` went `09 -> 08 -> 07` and
+`DS:26A` read `0x0F` (set to `0x14`, decayed five commands), while every `cmd_N` address in
+the same dump was absent. Two claims were written from block lists and both were wrong; the
+bytes in memory were right the first time.
+
 Two things worth internalising from that table. **The screen is a memory read, not a
 screenshot** — `vga_screen.py` reconstructs the text mode from the VGA buffer in a
 dump, so "what did the game display" is answerable headless even without the MCP
