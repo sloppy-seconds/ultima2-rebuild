@@ -970,6 +970,34 @@ static void flight_line(u2_ctx *ctx, const char *word)
  * plumbing is site_leave(), which this loop has no proven route into), and the redraw call at
  * asm/5CB1, which the engine's own draw replaces.
  */
+/* The plane's own frame cost, in ms per march step.
+ *
+ * The two flight loops in cmd_L are paced by the same thing -- each iteration ends in the
+ * whole sector render, `3cd6 call L_005cb1 ; 3cd9 jmp 3c5f` back to the top -- but they do
+ * not do the same work. The plane loop also calls L_0060c7 every iteration and runs a key
+ * dispatch over the arrow table, so its step is strictly more expensive than the rocket
+ * dive's and its true figure sits somewhat ABOVE the dive's, not equal to it.
+ *
+ * So this number is BORROWED, on purpose and by ruling (owner, 2026-11-11: "borrow the dive
+ * figure and we can do a measure later... give the plane its own constant, that way if we
+ * have to change it later we don't have to decouple it then"). It is not a guess about the
+ * plane: 103 ms is a measurement of asm/5AB1_map_render, the routine this loop calls, so it
+ * is a floor. What it is not is the plane's own measurement, which is why it does not share
+ * the dive's name -- one constant per loop means the capture closes the gap by editing one
+ * line instead of first unpicking two loops that were welded together.
+ *
+ * The capture that replaces it: docs/needs-gameplay.md G77. Seed a brass button
+ * (items_held[11], DS:E1), board, launch, poll x,y,cycles per step exactly as
+ * captures/spice86/dive-sweep-rate did. flight-launched-live cannot substitute: one-shot
+ * harvest, ExecutionFlow but no per-step cycle timestamps, so there are no deltas to take.
+ *
+ * What is NOT behind either loop: a timeout. The speed-delay slot this loop loads is slot 1
+ * (`mov $0x2,%bx ; call L_000911`, a forced-keep, which is why the 2026-10-28d census
+ * missed it) and its value is discarded by both of its callees, exactly like the dive's
+ * slot 14. See asm/0711_speed_delay_lookup.
+ */
+#define U2_PLANE_STEP_MS 103
+
 static u2_cmd_result launch_plane(u2_ctx *ctx, u2_overworld *ow)
 {
     seam_str_out(ctx, U2_S_LAUNCH_PLANE);
@@ -1027,6 +1055,15 @@ static u2_cmd_result launch_plane(u2_ctx *ctx, u2_overworld *ow)
         ow->x = (int)(((uint8_t)ow->x + (uint8_t)dx) & 0x3Fu);
         ow->y = (int)(((uint8_t)ow->y + (uint8_t)dy) & 0x3Fu);
         u2_overworld_draw(ctx, ow);
+        /* The original's frame boundary, and the reason this loop stopped being a blur.
+         * Owner report 2026-11-11: "planes have the same issues as rockets, once launched
+         * they fly really quick, no delays" -- correct, and the same defect: the loop drew
+         * a frame per cell and paid nothing for it, so its rate was however fast a memcpy
+         * is, paced only by seam_present_frame on the empty-poll branch (~16 ms, vsync).
+         * Placed after the draw and before the next poll, which is where the original's
+         * render sits: `3cd6 call L_005cb1 ; 3cd9 jmp 3c5f` back to the top of the loop.
+         * See U2_PLANE_STEP_MS for why the figure is borrowed and what closes that. */
+        seam_wait_ms(ctx, U2_PLANE_STEP_MS);
     }
 
     cmd_done(ctx);
@@ -1303,6 +1340,11 @@ static int space_hyperwarp(u2_ctx *ctx, u2_overworld *ow)
  * asm/0711_speed_delay_lookup), so nothing in the bytes sets a different figure.
  */
 #define U2_DIVE_STEP_MS 103
+
+/* The plane's flight loop has its own figure, defined next to that loop rather than
+ * here: U2_PLANE_STEP_MS, above launch_plane. Same mechanism -- one asm/5AB1_map_render
+ * per iteration -- different cost, so the two are deliberately not one number. */
+#define U2_PLANE_STEP_MS 103
 
 static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
 {
