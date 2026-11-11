@@ -244,18 +244,36 @@ int main(void)
     CHECK(u2_combat_cannon(&c, 11, 12, &a) == 0 && c.state.mon_hp[4] == 200,
           "cannon at an empty cell misses and hurts nothing");
 
-    /* A cannon kill pays nothing: asm/2C19's death branch lands on asm/2CA4, which stamps the
-     * emptied cell, and the gold/exp rolls live on the melee path (asm/2E3D) instead. This is
-     * the assertion that stops someone "fixing" the cannon to share the melee reward. */
+    /* A cannon kill pays, and this is the assertion that used to claim the opposite.
+     * The old comment read "asm/2C19's death branch lands on asm/2CA4, which stamps the
+     * emptied cell, and the gold/exp rolls live on the melee path instead", and it was a
+     * correct reading of eleven bytes and a wrong reading of the game: asm/2CA4 has no `ret`,
+     * and the byte after it is asm/2CB5_combat_kill_minax_gate, on through the drop dispatch
+     * to asm/2D8C_combat_kill_reward. Observed 2026-11-11 in
+     * captures/spice86/cannon-kill-live: `KILLED--GOLD+13--EXP.+03` from a one-cell shot.
+     * The visible line and the slot clear are gated end-to-end by engine/tests/cannon_kill.py;
+     * what this unit can pin is that the reward struct is populated on the cannon route too. */
     arm(&c, 9, 0x40, 0x40, 3);
     c.state.mon_hp[4] = 0x30;                 /* 30 BCD, below the minimum roll of 32 */
-    const uint8_t gold_was = c.state.gold_lo, exp_was = c.state.exp_lo;
+    /* Zeroed rather than sampled, so the add is checkable exactly: with the field-name
+     * inversion of state.h (gold_lo = DS:58 is the HIGH byte, gold_hi = DS:59 the LOW),
+     * a small reward from zero lands entirely in the _hi fields. */
+    c.state.gold_lo = c.state.gold_hi = 0;
+    c.state.exp_lo  = c.state.exp_hi  = 0;
     int rr = u2_combat_cannon(&c, 10, 12, &a);
     CHECK(rr == 2, "a cannon blow above the creature's hp kills it (got %d)", rr);
     CHECK(c.state.mon_type[4] == 0 && c.state.mon_kind[4] == 0,
           "the kill clears type and kind");
-    CHECK(a.gold == 0 && a.exp == 0 && c.state.gold_lo == gold_was && c.state.exp_lo == exp_was,
-          "a cannon kill awards no gold and no exp — asm/2CA4, not asm/2E3D");
+    CHECK(a.gold >= 1 && (a.gold & 0x17u) == a.gold && (a.gold & 1u) == 1u,
+          "a cannon kill rolls gold like a melee kill: (rand & 0x17) | 1 (got %u)", a.gold);
+    CHECK((a.exp & 0x08u) == 0,
+          "a cannon kill rolls exp like a melee kill: rand & 7 (got %u)", a.exp);
+    CHECK(c.state.gold_hi == a.gold && c.state.gold_lo == 0
+          && c.state.exp_hi == a.exp && c.state.exp_lo == 0,
+          "the reward reached the totals, in the inverted field order asm/2DC1 uses "
+          "(gold %02x%02x exp %02x%02x for +%u/+%u)",
+          c.state.gold_lo, c.state.gold_hi, c.state.exp_lo, c.state.exp_hi,
+          (unsigned)a.gold, (unsigned)a.exp);
 
     /* --- CP8: the victory gate, asm/2CB5_combat_kill_minax_gate ------------------------
        `mov 0x197(%di),%al ; cmp $0x40,%al ; jne <kill-drop>`. The kill path branches on the

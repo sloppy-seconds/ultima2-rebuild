@@ -243,17 +243,29 @@ static void bcd_adc2(uint8_t *hi, uint8_t *lo, uint8_t amount)
  *     sector writer and is wired at the caller.
  */
 /* The shared damage tail: asm/2E3D for a melee swing and asm/2C19 for a cannon both reach the
- * same BCD subtract on mon_hp and the same inverted-sense lethal test. Kept as one function on
- * purpose — the gold/exp byte-inversion note below is the sort of thing that goes wrong in
- * exactly one of two copies of it.
+ * same BCD subtract on mon_hp and the same inverted-sense lethal test, and BOTH then run the
+ * same kill tail — stamp, Minax gate, drop dispatch, reward. Kept as one function on purpose —
+ * the gold/exp byte-inversion note below is the sort of thing that goes wrong in exactly one of
+ * two copies of it.
  *
- * `award` is the difference between the two routes, and it is a parameter rather than an
- * assumption. The melee kill path (asm/2E3D file 0x3114 / 0x3141) rolls gold and exp. The
- * cannon's death branch is a different target — asm/2C19's `jae` lands on asm/2CA4, which moves
- * the creature's x/y into the cursor and calls the grid reader, i.e. it stamps the cell it just
- * emptied, and there is no reward roll anywhere on that path. So a cannon kill pays nothing, and
- * that is a byte reading rather than a simplification. */
-static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *out, int award)
+ * There used to be an `award` parameter here, defaulting the cannon to no reward, on the static
+ * reading that asm/2C19's `jae` lands on asm/2CA4 (stamp the emptied cell) and that "there is no
+ * reward roll anywhere on that path". That reading was wrong, and it was wrong in the way this
+ * project keeps being wrong: the reward is reached by FALL-THROUGH, not by a call, so no static
+ * pass found an edge. asm/2CA4 ends at a `call L_0052b3` and the next bytes are
+ * asm/2CB5_combat_kill_minax_gate, then the drop dispatch at asm/2CD3/asm/2D22, and both of
+ * those arms tail-jump to combat_kill_reward at asm/2D8C — the same reward the melee branch
+ * reaches. Observed 2026-11-11 in captures/spice86/cannon-kill-live: a cannon kill of a
+ * one-cell target printed `KILLED--GOLD+13--EXP.+03` and moved DS:56..59 exactly as a melee
+ * reward does. Two consequences, both now the engine's behaviour: a cannon kill pays gold and
+ * exp and rolls the type-keyed drop, and because the Minax gate sits on that same fall-through,
+ * a cannon kill of Minax wins the game (G75 was settled by the chain, not by a guess).
+ *
+ * This is the third frigate combat claim to be settled against the running game in two days —
+ * the three-space range, attacking from the deck, and now the reward — and each time the
+ * listing was read correctly and the *reach* of a branch was read wrong or the behaviour was
+ * assumed to be absent because the game is silent about it. */
+static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *out)
 {
     u2_attack r;
     memset(&r, 0, sizeof r);
@@ -297,26 +309,18 @@ static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *
          * and on nothing else. Minax falls through into asm/2CCD_victory_call and the ending;
          * every other type jumps past it to asm/2CD3, the drop dispatch below. It is a
          * fall-through rather than a call, which is the second time in twelve bytes that this
-         * address range hid a routine from every static pass (see asm/2D07).
-         *
-         * Gated on `award` for the same reason the drop is: the cannon's death branch reaches
-         * asm/2CA4 instead and skips this path entirely. Whether a cannon kill of Minax wins
-         * is not evidenced in either direction, so this mirrors the existing gate instead of
-         * inventing a second one, and G75 is the capture that would settle it. */
-        if (award) {
-            if (dead_type == U2_MON_TYPE_MINAX)
-                u2_victory(ctx);
-            else
-                u2_combat_kill_drop(ctx, dead_type);
-        }
+         * address range hid a routine from every static pass (see asm/2D07). The cannon reaches
+         * it too — see the note above this function; it was gated on `award` until the
+         * cannon-kill capture refuted that. */
+        if (dead_type == U2_MON_TYPE_MINAX)
+            u2_victory(ctx);
+        else
+            u2_combat_kill_drop(ctx, dead_type);
 
         /* asm/2E3D file 0x3114 / 0x3141: gold += (rand & 0x17) | 1, exp += rand & 7.
-         * Reproduces the live `KILLED--GOLD+1--EXP.+02` shape exactly. The cannon reaches
-         * asm/2CA4 instead and skips this entirely — see the `award` note above. */
-        if (!award) {
-            if (out) *out = r;
-            return 2;
-        }
+         * Reproduces the live `KILLED--GOLD+1--EXP.+02` shape exactly, and the same block is
+         * what the cannon's kill reaches by fall-through (`KILLED--GOLD+13--EXP.+03`,
+         * captures/spice86/cannon-kill-live). */
         r.gold = (uint8_t)((u2_rand_byte(ctx) & 0x17u) | 1u);
         r.exp  = (uint8_t)(u2_rand_byte(ctx) & 0x07u);
 
@@ -367,7 +371,7 @@ int u2_combat_attack(u2_ctx *ctx, int slot, u2_attack *out)
     unsigned dmg = (((unsigned)ctx->state.readied_weapon * 8u)
                     + (unsigned)ctx->state.stat_str) >> 2;
     r.damage = (uint8_t)dmg;
-    return apply_damage_to_slot(ctx, slot, dmg, out, 1);
+    return apply_damage_to_slot(ctx, slot, dmg, out);
 }
 
 /* asm/35ED..asm/3611: the FRIGATE'S CANNON.
@@ -443,5 +447,5 @@ int u2_combat_cannon(u2_ctx *ctx, int cx, int cy, u2_attack *out)
      * whatever rand_byte produced, so this is a floor of 32 and not a range of 32..63. */
     const unsigned dmg = (unsigned)(u2_rand_byte(ctx) | 0x20u);
     r.damage = (uint8_t)dmg;
-    return apply_damage_to_slot(ctx, slot, dmg, out, 0);
+    return apply_damage_to_slot(ctx, slot, dmg, out);
 }

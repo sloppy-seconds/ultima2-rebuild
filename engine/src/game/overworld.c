@@ -1919,6 +1919,38 @@ int u2_overworld_run(u2_ctx *ctx, u2_overworld *ow)
  *     draws creatures from the arrays rather than stamping them into the map, so
  *     there is no stamp to remove.
  */
+/* The kill tail, shared by the melee swing and the frigate's cannon because the original
+ * shares it: asm/2D8C's reward block prints KILLED--GOLD+n--EXP.+m on its own CMD line,
+ * the emptied cell goes back to terrain, and the cleared creature block is written to the
+ * sector so a save cannot resurrect it. The cannon reaches it by FALL-THROUGH from
+ * asm/2CA4 (see u2_combat_cannon), which is what captures/spice86/cannon-kill-live proved
+ * after a static pass had concluded the opposite.
+ *
+ * The cell used to be written 0x80 here, on the strength of `movb $0x80,(%bx,%si)` at file
+ * 0x30F4. That byte is a staging-space flag, not a map byte: in map space the renderer's >>2
+ * turns it into art 32, the first letter glyph, so the engine left a letter A on the grass
+ * for the rest of the visit. captures/spice86/cp5-fight/screen3.png -> screen4.png (sector
+ * 31, a town) shows the original leaving plain floor.
+ *
+ * The cleared record has to reach the sector buffer too: asm/2305 carries both FCB names —
+ * MAPXFF at file 0x2538 and MONXFF at 0x2548 — so the original rewrites the creature block
+ * as well as the map (docs/phase4-implementation.md, the asm/2305 row). */
+static void announce_kill(u2_ctx *ctx, u2_overworld *ow, const u2_attack *a)
+{
+    char num[8];
+    u2_monsters_restamp(ctx, &ow->world);
+    u2_monsters_store(ctx, &ow->world);
+    seam_str_out(ctx, U2_S_KILLED);
+    snprintf(num, sizeof num, "%u", (unsigned)a->gold);
+    seam_str_out(ctx, num);
+    seam_str_out(ctx, U2_S_EXP_PLUS);
+    snprintf(num, sizeof num, "%02u", (unsigned)a->exp);
+    seam_str_out(ctx, num);
+    u2_status_draw(ctx);          /* gold and exp moved */
+    seam_char_print(ctx, '\r');
+    seam_str_out(ctx, U2_S_CMD_PROMPT);
+}
+
 void u2_overworld_attack_dir(u2_ctx *ctx, u2_overworld *ow, const char *word, int dx, int dy)
 {
     seam_str_out(ctx, word);                  /* continues the ATTACK-- line */
@@ -2004,35 +2036,8 @@ void u2_overworld_attack_dir(u2_ctx *ctx, u2_overworld *ow, const char *word, in
      * differently: gold unpadded, exp two digits. */
     seam_char_print(ctx, '\r');
     seam_str_out(ctx, U2_S_CMD_PROMPT);
-    if (r == 2) {
-        char num[8];
-        /* The dead creature's cell goes back to terrain. asm/2E3D clears the
-         * record — hp, type and kind — and the grid is a derived view (map_base
-         * plus the live stamps), so re-stamping after the clear is what puts the
-         * floor back. This used to write 0x80 into the cell instead, on the
-         * strength of `movb $0x80,(%bx,%si)` at file 0x30F4. That byte is a
-         * staging-space flag, not a map byte: in map space the renderer's >>2
-         * turns it into art 32, the first letter glyph, so the engine left a
-         * letter A on the grass for the rest of the visit.
-         * captures/spice86/cp5-fight/screen3.png -> screen4.png (sector 31, a
-         * town) shows the original leaving plain floor. */
-        u2_monsters_restamp(ctx, &ow->world);
-        /* And the cleared record has to reach the sector buffer, or a save writes
-         * the monster back out alive. asm/2305 carries both FCB names — MAPXFF at
-         * file 0x2538 and MONXFF at 0x2548 — so the original rewrites the creature
-         * block as well as the map (docs/phase4-implementation.md, the asm/2305
-         * row). */
-        u2_monsters_store(ctx, &ow->world);
-        seam_str_out(ctx, U2_S_KILLED);
-        snprintf(num, sizeof num, "%u", (unsigned)a.gold);
-        seam_str_out(ctx, num);
-        seam_str_out(ctx, U2_S_EXP_PLUS);
-        snprintf(num, sizeof num, "%02u", (unsigned)a.exp);
-        seam_str_out(ctx, num);
-        u2_status_draw(ctx);          /* gold and exp moved */
-        seam_char_print(ctx, '\r');
-        seam_str_out(ctx, U2_S_CMD_PROMPT);
-    }
+    if (r == 2)
+        announce_kill(ctx, ow, &a);
 }
 
 /* Composites and presents a whole game frame on demand.
@@ -2395,9 +2400,36 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             const int cx = (ow->x + dx) & (U2_SECTOR_EDGE - 1);
             const int cy = (ow->y + dy) & (U2_SECTOR_EDGE - 1);
             u2_attack at;
-            if (u2_combat_cannon(ctx, cx, cy, &at) == 0)
+            const int fired = u2_combat_cannon(ctx, cx, cy, &at);
+            if (fired == 0)
                 seam_str_out(ctx, U2_S_MISS);
             seam_char_print(ctx, '\r');
+            if (fired == 2) {
+                /* A kill pays, and says so on its own CMD line, exactly as a melee kill
+                 * does: the cannon's death branch reaches asm/2D8C's reward block by
+                 * fall-through (see u2_combat_cannon), and the live frame reads
+                 * `CMD: FIRE DIRECT-EAST` / `KILLED--GOLD+13--EXP.+03` / `CMD:`
+                 * (captures/spice86/cannon-kill-live). */
+                seam_str_out(ctx, U2_S_CMD_PROMPT);
+                announce_kill(ctx, ow, &at);
+                creature_turn(ctx, ow);
+                continue;
+            }
+            if (fired) {
+                /* Owner request 2026-11-11: "maybe we can add a HIT to the fire when it hits
+                 * so its more obvious". Original mode stays silent, because the original is:
+                 * there is no str_out between asm/35F0's probe and asm/3611's apply, and
+                 * captures/spice86/cannon-range-live measured a live non-lethal hit printing
+                 * `FIRE DIRECT-EAST` and nothing more. Enhanced mode gets the amount through
+                 * the one announcement seam (game/feedback.h, E3), which is the only place
+                 * engine-invented text may enter, is greppable to this call site, and keeps
+                 * the CP2 differential meaningful. A kill already announces itself on both
+                 * fidelities: KILLED--GOLD+n--EXP.+m is the original's, reached by
+                 * fall-through (captures/spice86/cannon-kill-live). */
+                char note[24];
+                snprintf(note, sizeof note, "[cannon -%u HP]", (unsigned)at.damage);
+                u2_feedback(ctx, note);
+            }
             seam_str_out(ctx, U2_S_CMD_PROMPT);
             creature_turn(ctx, ow);
             continue;

@@ -753,6 +753,23 @@ else
     bad "CP5 E1: the tile-effect ladder disagrees with asm/248B/2495/24B1/24B5"
 fi
 
+# --- CP5 W10: what a frigate cannon shot does, lethal and not ---------------------------
+#
+# Two claims, both settled against the running game on 2026-11-11 and both asserted here on
+# the visible outcome. A kill pays: asm/2C19's `jae` lands on asm/2CA4, which ends at a call
+# and FALLS THROUGH into the Minax gate, the drop dispatch and asm/2D8C's reward — the
+# original printed `KILLED--GOLD+13--EXP.+03` for a one-cell kill, where the engine had an
+# `award` parameter paying nothing. A hit that does not kill is silent in the original
+# (measured, cannon-range-live) and gets a bracketed damage line in enhanced mode only, on
+# the owner's request. Four controls were run red before this was trusted; see the gate's
+# own docstring.
+if U2_BIN=./u2 python3 tests/cannon_kill.py > "$WORK/w10.log" 2>&1; then
+    ok "CP5 W10: cannon shot — kill pays KILLED--GOLD+n--EXP.+m on both fidelities (asm/2CA4 fall-through), non-lethal hit silent in original / announced in enhanced (14 cases)"
+else
+    sed 's/^/        /' "$WORK/w10.log" | tail -12
+    bad "CP5 W10: the cannon's kill tail or its hit feedback disagrees with asm/2C19/2CA4/2D8C"
+fi
+
 # --- E2: the wound flash, both directions ----------------------------------------------
 #
 # The ring (asm/5255 -> asm/4C1E, XOR on, tone, XOR off) marks the VICTIM'S cell:
