@@ -396,7 +396,7 @@ static void run_play(u2_ctx *ctx)
                      * happened inside u2_overworld_loop. A save that has become
                      * unreadable falls to the top of the loop, which prints the
                      * original's own "(INSERT PLAYER DISK)" and waits for ESC. */
-                    if (ctx->death_pending) {
+                    if (ctx->death_pending && !ctx->quit_on_death) {
                         /* The world loop does not clear on entry -- it assumes the path
                          * that entered it did, which is what asm/0764's 'P' branch does
                          * before it reads the disk. So the reload clears here, or the

@@ -54,9 +54,9 @@ def seed_case(name, tiles=None, items=None, hp_pair=None):
     return work
 
 
-def state_case(name, keys, tiles=None, items=None, hp_pair=None):
+def state_case(name, keys, tiles=None, items=None, hp_pair=None, extra=()):
     work = seed_case(name, tiles, items, hp_pair)
-    text = G.run_stdout(work, keys, name)
+    text = G.run_stdout(work, keys, name, extra=extra)
     return text, G.state_from_text(text)
 
 
@@ -111,7 +111,13 @@ def main():
     check("none", s and hp(s) == 9997, "hp %d (want 9997)" % (hp(s) if s else -1))
 
     # death: HP 0004 onto a swamp underflows the BCD pair and asm/0C62 owns the tail.
-    text, s = state_case("death", ["RIGHT"], tiles={G.EAST: 0x04}, hp_pair=(0x00, 0x04))
+    #
+    # --quit-on-death because this case asserts on the corpse in the final dump, and the
+    # game now reloads the last save on death by default (owner ruling 2026-11-11). The
+    # flag is the dev affordance for exactly this; without it the reload would put a live
+    # character where the evidence is read and the check would pass while proving nothing.
+    text, s = state_case("death", ["RIGHT"], tiles={G.EAST: 0x04}, hp_pair=(0x00, 0x04),
+                         extra=("--quit-on-death",))
     check("death", "IS DEAD!" in text, "death tail %s" %
           ("printed" if "IS DEAD!" in text else "MISSING"))
 

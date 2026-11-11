@@ -344,6 +344,21 @@ typedef struct u2_ctx {
      * the null one the headless default picks. */
     int renderer_explicit;
     int play_map;            /* --play-map: enter the CP4 overworld directly */
+    /* --quit-on-death: a dev affordance for the scripted gates, and nothing else.
+     *
+     * Death reloads the last save. That is unconditional and it is the product: a game
+     * that quits when you die is not a game that reloads your save, and the owner ruled
+     * so on 2026-11-11 after the noVNC session turned out to quit — because it boots
+     * through --play-map, which had the reload switched off for the gates.
+     *
+     * What the gates actually need is narrower than "do not reload": they assert on the
+     * state the run leaves behind, and CP4 G2's four arms and tests/swamp_damage.py's
+     * death case grep `IS DEAD!` out of the final dump. So they pass this flag and keep
+     * that evidence, and every other entry — including the one a player is inside —
+     * reloads. If the flag ever becomes the default again, those gates must move to
+     * reading the death turn rather than the final state, or they will pass while
+     * proving nothing. */
+    int quit_on_death;
     int dev;                 /* --dev: development affordances, off by default.
                               * THE RULE, and it is the reason the flag exists: --dev may add
                               * observation and an exit path, and may NEVER change game

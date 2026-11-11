@@ -349,12 +349,16 @@ else
     esac
 fi
 
-# --- 1i. the development entry stays observable after death -------------------
-# The shipped entries reload the last save when a death unwinds the loop (title.c's 'P'
-# loop, game.c's enhanced-mode handoff). --play-map must NOT, and this is the gate that
-# keeps it that way: CP4 G2's four arms and tests/swamp_damage.py's death case assert
-# on the state a run leaves behind, so a reload on this entry would replace a corpse
-# with a live character and turn three gates green while they proved nothing.
+# --- 1i. the corpse is available to the gates, and only to them -----------------
+# Death reloads the last save on EVERY entry now, including --play-map (owner ruling
+# 2026-11-11). It used to be that --play-map did not reload, which is how the noVNC play
+# session quit on death while every death test stayed green: the session boots through this
+# entry, and this entry was the exception.
+#
+# What the gates genuinely need is narrower — CP4 G2's four arms and swamp_damage.py's
+# death case assert on the state a run leaves behind — so they pass --quit-on-death and get
+# the corpse, and nothing else does. This block asserts the flag still produces it: if the
+# flag ever became a no-op, those three gates would go green while proving nothing.
 #
 # The seed's character carries food 999999; zeroing it makes the FIRST step underflow,
 # which is the cheapest death a scripted run can produce.
@@ -368,14 +372,14 @@ else
         sed 's/^/        /' "$WORK/death.food.err"
     else
         printf '0xf0\nq\n' > "$WORK/death.keys"
-        ./u2 --headless --play-map --cleanroom \
+        ./u2 --headless --play-map --cleanroom --quit-on-death \
              --data-dir "$WORK/death/content" --save-dir "$WORK/death/save" \
              --script "$WORK/death.keys" --dump-state > "$WORK/death.reload.out" 2>&1
         case "$(cat "$WORK/death.reload.out")" in
           *"IS DEAD!"*)
-              ok "CP5 dev entry: the death is still what the run leaves behind (no reload on --play-map)" ;;
+              ok "CP5 dev entry: --quit-on-death still leaves the corpse, so the gates that read it keep their evidence" ;;
           *)
-              bad "CP5 dev entry: the run did not end dead — a reload here would blind CP4 G2 and swamp_damage.py"
+              bad "CP5 dev entry: --quit-on-death did not leave a corpse — the flag is a no-op and CP4 G2 and swamp_damage.py would pass while proving nothing"
               tail -12 "$WORK/death.reload.out" | sed 's/^/        /' ;;
         esac
         case "$(cat "$WORK/death.reload.out")" in

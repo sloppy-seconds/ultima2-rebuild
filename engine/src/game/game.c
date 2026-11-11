@@ -155,31 +155,32 @@ void u2_game_run(u2_ctx *ctx)
          * mode never showed the defect only because its tail restarts and the player
          * comes back in through 'P'. */
         if (ctx->enter_world && !ctx->exit_code) {
-            u2_overworld ow;
-            (void)u2_overworld_run(ctx, &ow);
+            for (;;) {
+                u2_overworld ow;
+                (void)u2_overworld_run(ctx, &ow);
 
-            /* Death returns to the menu rather than ending the program (owner ruling
-             * 2026-11-11). The 'P' path inside the title flow handles its own death
-             * without leaving the loop; this is the enhanced-mode path, which enters the
-             * world from here, so the handoff and the trip back have to happen here too.
-             * title_skip_intro is what makes "back to the menu" a menu and not the
-             * splash again, and enter_world is cleared because the dead character is not
-             * a character to drop back into. */
-            if (ctx->death_pending) {
-                /* Same ruling as the 'P' path: reload the record and drop back in.
-                 * It has to be an explicit u2_save_load here, not just another trip
-                 * through overworld_enter, because init_state spawns from ctx->state --
-                 * the copy in memory, which is the thing death just zeroed. The 'P' path
-                 * gets this for free because its loop re-reads the disk at the top.
-                 * With nothing readable to come back to, the menu is the fallback, and
-                 * title_skip_intro keeps that trip from replaying the splash. */
+                /* Death reloads the last save and drops straight back into the world
+                 * (owner ruling 2026-11-11). It has to be an explicit u2_save_load,
+                 * not just another trip through overworld_enter, because init_state
+                 * spawns from ctx->state — the copy in memory, which is the thing
+                 * death just zeroed.
+                 *
+                 * This used to `continue` the OUTER loop, which runs u2_title_flow
+                 * first: the comment claimed "reload the record and drop back in" and
+                 * it did the first half, so a death here went to the menu. The loop is
+                 * now the inner one, and the menu is only where you land when there is
+                 * genuinely nothing to come back to. */
+                if (!ctx->death_pending || ctx->quit_on_death)
+                    break;
                 if (u2_save_load(ctx) == U2_SAVE_OK) {
                     seam_clear_screen(ctx);   /* see title.c: the world loop does not clear */
+                    if (ctx->input_exhausted)
+                        break;                /* restored first, then ended: see main.c */
                     continue;
                 }
                 ctx->title_skip_intro = 1;
                 ctx->enter_world = 0;
-                continue;
+                break;
             }
         }
 

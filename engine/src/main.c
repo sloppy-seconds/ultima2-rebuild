@@ -62,6 +62,7 @@ static void usage(const char *argv0)
         "                  exit. If the list has no x11 or wayland, the binary\n"
         "                  cannot open a window on any desktop.\n"
         "  --play-map      enter the overworld screen directly (CP4 development entry)\n"
+        "  --quit-on-death dev: stop at death instead of reloading the last save\n"
         "  --dev           development affordances only (Ctrl-Q ends the run). Off by\n"
         "                  default, and it never changes game behaviour: without it the\n"
         "                  engine implements the game and nothing else.\n"
@@ -445,6 +446,10 @@ int main(int argc, char **argv)
             ctx.renderer_explicit = 1;
         } else if (strcmp(a, "--play-map") == 0) {
             ctx.play_map = 1;
+        } else if (strcmp(a, "--quit-on-death") == 0) {
+            /* Dev affordance for the scripted gates only. Death reloads the last save
+             * unconditionally otherwise; see u2_ctx::quit_on_death. */
+            ctx.quit_on_death = 1;
         } else if (strcmp(a, "--dev") == 0) {
             /* Development affordances. May add observation and an exit path; may never
              * change game behaviour. See u2_ctx::dev. */
@@ -1129,18 +1134,41 @@ int main(int argc, char **argv)
          * character on disk rather than as a blank state. The note goes to stderr
          * unconditionally: on this development entry "sector 31 ... 32 creatures"
          * is the difference between a silent no-op and a diagnosable one, and the
-         * CP5 fight scripts are driven entirely by reading it back. */
-        u2_overworld ow;
-        const int rc = u2_overworld_init_state(&ctx, &ow);
-        fprintf(stderr, "overworld: %s\n", ow.note);
-        if (rc == 0)
+         * CP5 fight scripts are driven entirely by reading it back.
+         *
+         * Death reloads here too. This branch used to be the one place that did not,
+         * which was invisible until it wasn't: the noVNC play session boots through
+         * --play-map, so the entry with the reload switched off was the entry the
+         * owner was playing in, and dying quit the game. The gates that read the
+         * corpse out of the final dump now say so explicitly with --quit-on-death.
+         *
+         * The loop cannot spin. Each pass ends in the death handoff, which waits for a
+         * key; a spent script makes the world loop return at once, and input_exhausted
+         * breaks here rather than re-entering a world nothing can play in. A save that
+         * cannot be read is also a break, not a retry. */
+        for (;;) {
+            u2_overworld ow;
+            const int rc = u2_overworld_init_state(&ctx, &ow);
+            fprintf(stderr, "overworld: %s\n", ow.note);
+            if (rc != 0)
+                break;
             u2_overworld_loop(&ctx, &ow);
-        /* No death reload here, deliberately, even though the shipped entries do it
-         * (title.c's 'P' loop, game.c's enhanced-mode handoff). This is the development
-         * entry the scripted gates drive, and those gates assert on the state the run
-         * leaves behind: CP4 G2's four arms and tests/swamp_damage.py's death case all
-         * read "IS DEAD!" out of the final dump. A reload would put a live character in
-         * their place and every one of them would go green while proving nothing. */
+            if (!ctx.death_pending || ctx.quit_on_death)
+                break;
+            if (u2_save_load(&ctx) != U2_SAVE_OK)
+                break;
+            /* The clear belongs to whoever draws the new world over the corpse; the
+             * handoff deliberately leaves the death frame up. */
+            seam_clear_screen(&ctx);
+            /* Checked AFTER the reload, and that ordering is the bug this gate exists.
+             * A spent script used to break out before the save was re-read, so the
+             * scripted runs that every death test used could never observe the reload —
+             * which is precisely how "the game quits when you die" stayed invisible.
+             * Now the record is restored and the screen cleared first, and only then does
+             * a spent script end the run: on the live character, not the corpse. */
+            if (ctx.input_exhausted)
+                break;
+        }
     } else {
         u2_game_run(&ctx);
     }

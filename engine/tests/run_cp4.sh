@@ -305,6 +305,11 @@ fi
 # screen. Thirteen food units and one step makes the charge itself observable — and
 # it discriminates the amount, because the port once passed decimal 19 where the
 # asm's immediate 0x19 was meant and charged thirteen, which survives.
+#
+# --quit-on-death: the four arms read `IS DEAD!` out of the final dump, and the game now
+# reloads the last save on death by default (owner ruling 2026-11-11). This is the flag's
+# whole reason to exist — a dev affordance for gates that assert on the corpse, not a
+# behaviour a player can ever be shown.
 for arm in water-poor grass-poor water-rich none-poor; do
     python3 tests/cp5_fight_seed.py "$WORK/g2-$arm" >/dev/null 2>&1
     python3 tests/g2_step_food.py "$WORK/g2-$arm" "$arm" >/dev/null 2>&1
@@ -312,7 +317,7 @@ for arm in water-poor grass-poor water-rich none-poor; do
     if [ "$arm" != "none-poor" ]; then
         printf '0xf2\n' > "$WORK/g2-$arm.keys"    # 0xf2 is U2_KEY_LEFT: step west
     fi
-    ./u2 --headless --play-map --cleanroom \
+    ./u2 --headless --play-map --cleanroom --quit-on-death \
          --data-dir "$WORK/g2-$arm/content" --save-dir "$WORK/g2-$arm/save" \
          --script "$WORK/g2-$arm.keys" --dump-state > "$WORK/g2-$arm.out" 2>&1
 done
@@ -335,6 +340,22 @@ if grep -q "IS DEAD!" "$WORK/g2-water-poor.out"; then
 else
     bad "CP4 G2: a refused step cost no food — asm/2423 charges ahead of the verdict and the engine must too"
     sed 's/^/        /' "$WORK/g2-water-poor.out" | tail -6
+fi
+
+# --- death reloads the last save, always ----------------------------------------------
+#
+# Owner ruling 2026-11-11. The reload was implemented and gated before this, and the
+# noVNC session still quit on death, because the gates drove the menu's 'P' path while the
+# session boots through --play-map — the one entry with the reload switched off so that
+# G2 above could read the corpse out of the final dump. A behaviour that lives only on the
+# path nobody plays is not a behaviour. This gate drives the entry the session actually
+# uses, asserts the default is a reload, and asserts --quit-on-death still leaves the
+# corpse so the gates above cannot silently lose their evidence.
+if python3 tests/death_reload.py > "$WORK/death-reload.log" 2>&1; then
+    ok "CP4 death reload: dying restores the saved character in the live process; --quit-on-death keeps the corpse for the gates that read it (6 cases)"
+else
+    sed 's/^/        /' "$WORK/death-reload.log" | tail -10
+    bad "CP4 death reload: dying does not put the saved character back, or the dev flag stopped leaving a corpse"
 fi
 
 # --- the map actually renders, when the player has their files ------------
