@@ -358,6 +358,26 @@ else
     bad "CP4 death reload: dying does not put the saved character back, or the dev flag stopped leaving a corpse"
 fi
 
+# --- a saved map never walls off a creature with a ghost ---------------------------------
+#
+# asm/2233 restores a departure cell from mon_kind[slot], the terrain the creature saved when
+# it arrived. The engine restored map_base instead, and map_base comes from a sector file the
+# release itself already baked creature bytes into -- so every departure re-planted a creature
+# byte with nothing behind it. The step gate reads the stamped grid, so each one became a
+# permanent wall: the owner watched an orc refuse a phantom at (29,25) in sector 00, 618
+# times, on open grass. Owner ruling 2026-11-11: match what asm/2305 does, which writes map
+# and monx from one path so a stamp always has its creature.
+#
+# This is the disk half; ai_check's M3 is the memory half of the same property, and both are
+# needed -- the fix was first rejected because M3 went red, and M3 turned out to be asserting
+# against a fixture that left mon_kind zeroed.
+if python3 tests/ghost_stamp.py > "$WORK/ghost-stamp.log" 2>&1; then
+    ok "CP4 ghost stamp: a saved map holds no creature byte without a saved creature behind it (4 cases)"
+else
+    sed 's/^/        /' "$WORK/ghost-stamp.log" | tail -10
+    bad "CP4 ghost stamp: the saved map walls off a living creature with a stamp nothing occupies"
+fi
+
 # --- the map actually renders, when the player has their files ------------
 # The point of the whole CP4 chain: sector + tiles + viewport + framebuffer
 # producing real pixels. Skips without the content, so CI stays honest.

@@ -74,6 +74,19 @@ static void arm(u2_ctx *ctx, u2_world *w, uint8_t tile,
     ctx->state.mon_y[slot]    = (uint8_t)y;
     ctx->state.mon_hp[slot]   = hp;
     ctx->state.mon_type[slot] = type;
+    /* The slot's terrain byte, populated the way a real load populates it.
+     *
+     * mon_kind (DS:1B7) is not decoration: asm/2233 restores a departure cell from it, and
+     * in a loaded game it holds the terrain from monx's kind column -- monx00 ships 0x08
+     * grass in all 31 live slots. arm() used to leave it at whatever memset(ctx,0,...)
+     * produced, which is 0x00, open water. Every leg that never touched the field was
+     * therefore testing a world where creatures stand on water they never entered, and the
+     * only restore path that could see the difference (map_base, which ignores the field)
+     * passed anyway. That is why the bug this hides stayed hidden.
+     *
+     * A leg that wants terrain under the creature other than `ground()`'s fill still sets
+     * mon_kind itself, and that assignment now overrides this one rather than fighting it. */
+    ctx->state.mon_kind[slot] = tile;
 }
 
 /* The first roll a freshly-seeded ctx serves, so a test can pick a seed whose

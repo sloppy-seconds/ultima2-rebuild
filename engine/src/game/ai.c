@@ -260,7 +260,17 @@ static int creature_step(u2_ctx *ctx, u2_world *w, int slot, int dx, int dy,
          *  wrong, and it is left because a move that this function returns without
          *  touching still has to converge.
          */
-        u2_world_tile_put(w, ox, oy, w->map_base[u2_world_tile_index(ox, oy)]);
+        /* asm/2233: restore the departure cell from the SLOT's terrain byte, not from
+         * map_base. `mov 0x1b7(%di),%al` then `mov %al,(%bx,%si)` -- the header says it
+         * outright: "THIS is what DS:1B7 is for". map_base is loaded from the sector file,
+         * and the shipped files already carry baked creature stamps (mapx00 holds 0x3c x13,
+         * 0xf8 x5, 0x38 x5, 0xfc x3), so restoring from it re-planted a creature byte into
+         * a cell no creature occupies. The step gate reads the stamped grid, so each of
+         * those is a permanent wall: measured at (29,25) in sector 00, an orc refusing a
+         * phantom 618 times while standing on open grass. The slot byte cannot lie that
+         * way -- asm/225A only ever writes it from a cell the creature is genuinely
+         * entering, and a creature loaded from monx arrives naming its own terrain. */
+        u2_world_tile_put(w, ox, oy, st->mon_kind[slot]);
         /* asm/225A: save the NEW cell's terrain into the slot, then stamp.
          * asm/2233 fetches the destination tile and asm/225a stores it into
          * DS:1B7[di] before writing the type byte over it, so the slot byte is a
@@ -356,7 +366,9 @@ static int creature_wander_step(u2_ctx *ctx, u2_world *w, int slot, int px, int 
     /* Per-move stamp, the rule established in creature_step: the type byte stamped into the grid IS
      * the occupancy rule, so it must be current for the next creature's gate test, not refreshed
      * once after the pass. */
-    u2_world_tile_put(w, ox, oy, w->map_base[u2_world_tile_index(ox, oy)]);
+    /* asm/2233 again: the retreat reaches the commit through the same pair, so the same
+     * slot-sourced restore applies. See the pursuit path for why not map_base. */
+    u2_world_tile_put(w, ox, oy, st->mon_kind[slot]);
     /* asm/225A, same rolling save as the pursuit path: the retreat reaches the commit
      * through the same pair in the original, so the slot byte follows here too. */
     st->mon_kind[slot] = w->map[u2_world_tile_index(nx, ny)];

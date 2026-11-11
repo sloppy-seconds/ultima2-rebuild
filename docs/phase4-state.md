@@ -1215,21 +1215,31 @@ DS:1B7 is for". The engine restored `map_base` instead -- a buffer loaded from a
 already contains baked stamps -- so every departure re-planted a creature byte with nothing
 behind it. That is the ghost, and it is why the original has none.
 
-Tried, measured, and **reverted because it is not sufficient.** Changing both restore sites
-(`ai.c` pursuit and retreat) to `st->mon_kind[slot]` took ghosts in the written pair from 24
-to 0 on the owner's save, and a gate written to assert it passed. But `ai_check`'s **M3**
-leg -- *"no cell is stamped with no creature behind it after the turn"* -- went red in the
-same build. So the change fixes the on-disk symptom while leaving an in-memory stamp that no
-slot byte accounts for, and two gates cannot disagree about the same property.
+Tried, measured, **reverted once, and now shipped.** Changing both restore sites (`ai.c`
+pursuit and retreat) to `st->mon_kind[slot]` took ghosts in the written pair from 24 to 0 on
+the owner's save. But `ai_check`'s **M3** leg -- *"no cell is stamped with no creature behind
+it after the turn"* -- went red in the same build, so the change was pulled rather than
+committed with two gates disagreeing about one property.
 
-**The next step is the collision, not the fix.** Something in the turn stamps a cell that
-`mon_kind` never learned about -- candidates worth measuring, in order: the arrival save at
-`asm/225A` writes the destination's *grid* byte into the slot, so if a destination can ever
-hold a stamp the slot inherits it; a spawn that stamps without going through the arrival
-pair leaves a cell whose slot byte is whatever `asm/0CEE_spawn_tile_store` put there; and a
-slot cleared by death or despawn never restores at all. M3 is the sharper instrument here
-because it sees the state before anything is written out. Do not re-apply the `mon_kind`
-change on its own; make M3 pass with it first, and let M3 be the judge.
+**The collision was the fixture, and finding that out was the actual work.** `arm()`, the
+helper every `ai_check` leg uses, opens with `memset(ctx, 0, sizeof *ctx)` and then sets
+`mon_x`, `mon_y`, `mon_hp`, `mon_type` -- and never sets `mon_kind`. So in every fixture the
+field the fix reads was `0x00`, which is open water: the fixture described creatures standing
+on water they had never entered, and the only restore path that could notice (`map_base`,
+which ignores the field entirely) passed regardless. The assertion immediately above M3 names
+the failure mode in its own words -- *"the cell it left was restored to its own terrain, not
+**to a constant**"* -- and it held only because nothing read the constant.
+
+`arm()` now populates `mon_kind[slot]` the way a real load does, from the ground under the
+creature, mirroring `asm/0CEE_spawn_tile_store`; a leg that wants different terrain under the
+creature still sets the byte itself and overrides that default. With the fixture realistic and
+the restore fixed, `ai_check` is **60 checks, 0 failures** and the disk-level gate passes.
+
+Two gates now hold the same property from both ends: `ai_check` M3 in memory before anything
+is written, and `engine/tests/ghost_stamp.py` on the files after a save (wired into CP4, 4
+checks, control seen red by pointing the restore back at `map_base`). Neither alone would
+have caught this -- the disk gate passed while M3 was red, and M3 was green while the disk was
+wrong.
 
 So a creature boxed in by mountain, water, or a knot of other creatures stays put in the
 engine because it stays put in the original. A pack that converges into a clump can freeze
