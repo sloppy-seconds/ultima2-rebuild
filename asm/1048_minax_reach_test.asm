@@ -35,6 +35,10 @@
 #           § 2 for the teleport claim and why the decoded paths do not support it.
 # func 1048..106C  len 0025 B  evidence: seed+reko
 # calls: L_00118e, L_0052ef
+# provenance: static. Read from the listing 2026-11-12 while proving the CP8 1a fix against
+#           monx03; bytes proven by tools/check_func.py. The reach test and the strike call
+#           are bytes; the L_0052ef magnitude helper is flagged unidentified above. Never
+#           executed in a harvest (the Minax fight is frames-only, no trace of this path).
 # confidence: high for the reach test's shape and threshold (bytes read directly); low for
 #           the L_0052ef helper's exact function (flagged above)
 # label: kept as sub_1048 on purpose — labels are body and CP0 md5s them
