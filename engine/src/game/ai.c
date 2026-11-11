@@ -30,6 +30,7 @@
 #include "core/rng.h"
 #include "core/seam.h"
 #include "core/state.h"
+#include "debug/trace.h"
 #include "core/world.h"
 #include "gen_content.h"
 
@@ -202,10 +203,36 @@ static int creature_step(u2_ctx *ctx, u2_world *w, int slot, int dx, int dy,
     for (int i = 0; i < n; i++) {
         const int nx = (st->mon_x[slot] + cands[i][0]) & U2_AI_GRID_MASK;
         const int ny = (st->mon_y[slot] + cands[i][1]) & U2_AI_GRID_MASK;
-        if (!creature_may_enter(ctx, w, st->mon_type[slot], nx, ny))
+        if (!creature_may_enter(ctx, w, st->mon_type[slot], nx, ny)) {
+            /* Live-session diagnostic (owner, 2026-11-11: three orcs would not move, and
+             * the trace had nothing to say about it -- ai.c emitted no creature events at
+             * all, so a refusal could only be reasoned about, never seen). One line per
+             * refused candidate with the tile byte that refused it, which is the whole
+             * difference between "stuck" and "stuck because the species rule rejects the
+             * ground next to it".
+             *
+             * `backed` is the part that decides a defect from a rule. The stamp IS the
+             * occupancy rule, so a refusal on a creature-type byte is only faithful if a
+             * live creature is actually standing there. If nothing occupies the cell, the
+             * stamp is a ghost -- left behind by a death, a cleared slot, or an early exit
+             * from a pass -- and the refusing creature is walled off by something that is
+             * not in the game. */
+            int backed = 0;
+            for (int j = 0; j < U2_MON_SLOTS; j++)
+                if (st->mon_type[j] && st->mon_x[j] == nx && st->mon_y[j] == ny)
+                    { backed = 1; break; }
+            u2_trace(ctx, "mon_refused", "2199",
+                     "slot=%d type=%02x from=(%d,%d) to=(%d,%d) tile=%02x backed=%d",
+                     slot, st->mon_type[slot], st->mon_x[slot], st->mon_y[slot],
+                     nx, ny, u2_world_tile_at(w, nx, ny), backed);
             continue;
-        if (nx == px && ny == py)
+        }
+        if (nx == px && ny == py) {
+            u2_trace(ctx, "mon_stay", "2201",
+                     "slot=%d type=%02x at=(%d,%d) first candidate is the player cell",
+                     slot, st->mon_type[slot], st->mon_x[slot], st->mon_y[slot]);
             return 0;                    /* asm/2201: accepted, but it is the player */
+        }
         const int ox = st->mon_x[slot], oy = st->mon_y[slot];
         st->mon_x[slot] = (uint8_t)nx;
         st->mon_y[slot] = (uint8_t)ny;
@@ -245,8 +272,12 @@ static int creature_step(u2_ctx *ctx, u2_world *w, int slot, int dx, int dy,
          * under a creature that moved before saving. */
         st->mon_kind[slot] = w->map[u2_world_tile_index(nx, ny)];
         u2_world_tile_put(w, nx, ny, st->mon_type[slot]);
+        u2_trace(ctx, "mon_move", "225A", "slot=%d type=%02x (%d,%d)->(%d,%d)",
+                 slot, st->mon_type[slot], ox, oy, nx, ny);
         return 1;
     }
+    u2_trace(ctx, "mon_stay", "2260", "slot=%d type=%02x at=(%d,%d) every candidate refused",
+             slot, st->mon_type[slot], st->mon_x[slot], st->mon_y[slot]);
     return 0;
 }
 
