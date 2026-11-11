@@ -247,6 +247,12 @@ MANIFEST = [
     # unique in the exe on 2026-11-12. Length 22 stops before the 8d; the engine emits the
     # newline itself, exactly as the other special-message callers do.
     ("U2_S_MINAX_CRIES",       "0F8E_combat_minax_attack.asm",   ("run", 0x1192, 22, "MINAX CRIES: DIE FOOL!")),
+    # CP8 1b — Minax's teleport message (asm/2C2D gate -> asm/2C38 teleport). Proven live
+    # 2026-11-12: a surviving hit on the type-0x40 creature swaps her mon_x/mon_y and prints
+    # this. The db in asm/2C38 is `db 0x8d,"SHE'S GONE!!!",0x00` -- a leading 0x8d (the game's
+    # newline glyph) before the text, so the engine emits the newline itself and the length
+    # covers only the 13 text bytes at file 0x2e93 (confirmed unique in the exe).
+    ("U2_S_SHE_GONE",          "2C38_minax_teleport_swap.asm",  ("run", 0x2e93, 13, "SHE'S GONE!!!")),
     # Site transitions (docs/sector-rulesets.md § 6). cmd_E's " WHAT?" is the
     # second of eleven copies of that literal in the file, so every one of these is
     # addressed by offset rather than by index; the offsets were read off the asm

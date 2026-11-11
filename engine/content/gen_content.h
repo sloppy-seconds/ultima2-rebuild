@@ -214,6 +214,8 @@
 #define U2_S_THIEF_STOLE "A THIEF STOLE SOMETHING!"
 /* exe@0x1192 */
 #define U2_S_MINAX_CRIES "MINAX CRIES: DIE FOOL!"
+/* exe@0x2E93 */
+#define U2_S_SHE_GONE "SHE'S GONE!!!"
 /* exe@0x358C */
 #define U2_S_ENTER "ENTER"
 /* exe@0x359C */

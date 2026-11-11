@@ -72,31 +72,29 @@ and saw neither in the engine.
    `mon_type == 0x40` and not on the role; the no-roll check separates it from asm/0AAA's
    special; and the high-byte-zero check proves the death-on-borrow. Reverting to the
    handoff's `role == 0`-only premise turns 8 checks red.
-2. **The teleport — NOT FOUND in the decoded binary (2026-11-12).** The handoff said
-   "start from `asm/2CB5`'s neighbourhood," but `asm/2CB5` is the **kill/victory** gate, not
-   a hit path, and there is no teleport on the hit path either. Reading the three places a
-   teleport could live:
-   - **The player's attack, survive branch** (`asm/2E3D` file 0x30CA): `mov %al,0x177(%di)`
-     (store reduced HP) then `jmp L_000c33` (return to the command loop). No type check, no
-     move, no teleport.
-   - **Minax's own AI path** (`asm/1040` → `asm/1048` → `asm/0F8E`): the reach test and the
-     strike, then fall to the next slot (`L_00126d`). It never writes `mon_x`/`mon_y`, so she
-     does not move. She is role 0x84, which routes to `asm/1040` and back — she is stationary
-     at her spawn cell (60,3 in `monx03`).
-   - **Every writer of `mon_x`(0x137)/`mon_y`(0x157)** in the tree (`asm/0CC0`, `asm/0CDC`,
-     `asm/212E`, `asm/215C`, `asm/216E`, `asm/2216`, `asm/2233`, `asm/4F11`, `asm/10CE`,
-     `asm/10FC`): all add a ±1 step vector and wrap with `and $0x3f`. None writes a fixed
-     chamber coordinate or a large delta, which is what a teleport would have to do.
-   So the "teleports between the NE and SW chambers on every hit" claim is **not supported by
-   the bytes examined**. The frames are 1/s and mix fight, the Z status screen and the ending;
-   they show the fight happening but cannot decode a mechanism, and the previous session's
-   "observed" grade was a person seeing Minax in two chambers, not a traced position change.
-   **What would settle it definitively:** a live capture — seed a character into sector 03,
-   `spice86_type.py --peek` Minax's `mon_x`/`mon_y` (slot 31, `DS:137+31`/`DS:157+31`), attack
-   her once, and re-peek. If the cell changed, a teleport exists and the diff names the writer;
-   if it did not, the claim is refuted outright. That is agent-drivable and is the honest next
-   step; guessing a destination from chamber geometry is what the handoff warned against and
-   what the bytes do not support.
+2. **The teleport — PROVEN LIVE and DECODED (2026-11-12). An earlier static pass in this
+   same session WRONGLY refuted it; that retraction is retracted.** A live peek-diff settled
+   it beyond doubt: seeded a maxout character adjacent to Minax (slot 31, type 0x40) in
+   sector 03, one QUICK SWORD hit took her HP 255→199 and moved slot 31 from **(60,3) to
+   (3,60)** (`mon_x` 0x3c→0x03, `mon_y` 0x03→0x3c). The mechanism is on the **melee/cannon
+   survive path**, which the first static pass had not read — it read `asm/2E3D` (a different
+   HP-subtract route) and Minax's AI path, and concluded wrongly that nothing moves her.
+   The real path:
+   - `asm/2C19_monster_hp_subtract` (shared by the cmd_A melee chain and the cannon) subtracts
+     HP; a surviving blow falls through to `asm/2C26_monster_hp_set` (store HP).
+   - `asm/2C2D_minax_hit_teleport_gate`: `mov 0x197(%di),%al ; cmp $0x40,%al ; je L_002e38` —
+     if the surviving creature is Minax, jump to the teleport; every other type returns.
+   - `asm/2C38_minax_teleport_swap`: **swaps `mon_x` and `mon_y`**, clears the old cell's stamp
+     and stamps the new one, sets `mon_role = 0x84`, and prints `SHE'S GONE!!!`. The swap is
+     its own inverse, so successive hits oscillate her between (60,3) and (3,60) — the NE↔SW
+     chambers the owner saw. It is a coordinate swap, not a fixed destination or a random jump.
+   Implemented in the engine as `u2_minax_teleport()` (overworld.c), called from the melee and
+   cannon survive paths when `r==1 && mon_type==0x40`; gated in `site_check` (swap, role 0x84,
+   `SHE'S GONE!!!`, and the swap-back oscillation). Removing the swap turns the gate red.
+   **Bonus for G75a:** `asm/2C38` calls `L_0061a6` (the same helper beside the ending's inline
+   `MAPX30` filename) between two `L_004d26` calls, right after mutating Minax's grid cell —
+   which is evidence that `L_0061a6` is a sector **save** (persist the world after a mutation),
+   not a screen call. Corroborating, not byte-proven (its body is still unread).
 3. **Re-check the dungeon sweep** (`engine/src/game/dungeon.c`), which has its own type table and
    its own sleep effect (`type 7 ... paral_sleep := rand & 7`) and may have the same skip.
    **Checked 2026-11-12: it does not.** The dungeon sweep never reads `mon_role`, so there is

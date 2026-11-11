@@ -2006,6 +2006,29 @@ static void announce_kill(u2_ctx *ctx, u2_overworld *ow, const u2_attack *a)
     seam_str_out(ctx, U2_S_CMD_PROMPT);
 }
 
+/* asm/2C2D -> asm/2C38: Minax's teleport on a SURVIVING hit. When a blow lands on the
+ * type-0x40 creature and it survives (HP stored at asm/2C26), asm/2C2D tests
+ * mon_type==0x40 and jumps to asm/2C38, which SWAPS mon_x and mon_y -- so her NE spawn
+ * (60,3) in monx03 becomes the SW (3,60), and a second hit swaps it back. That is the
+ * NE<->SW oscillation the owner saw, and it is a coordinate swap, not a fixed destination.
+ * asm/2C38 also clears the old cell's stamp and stamps the new one (the restamp below does
+ * the same job from the mon arrays), sets mon_role to 0x84 (file 0x2e89), and prints
+ * "SHE'S GONE!!!" (leading 0x8d newline). Proven live 2026-11-12: seeded adjacent to Minax
+ * in sector 03, one QUICK SWORD hit took her 255->199 and moved slot 31 from (60,3) to
+ * (3,60). Reached by BOTH melee and cannon, because asm/2C2D sits on the shared asm/2C19
+ * HP-subtract survive path. */
+void u2_minax_teleport(u2_ctx *ctx, u2_world *w, int slot)
+{
+    u2_state *st = &ctx->state;
+    const uint8_t ox = st->mon_x[slot];
+    st->mon_x[slot] = st->mon_y[slot];
+    st->mon_y[slot] = ox;
+    st->mon_role[slot] = 0x84;              /* asm/2C38 file 0x2e89: mov $0x84,[di+0x1d7] */
+    u2_monsters_restamp(ctx, w);            /* asm/2C38 clears old cell, stamps new */
+    seam_char_print(ctx, '\r');             /* the db's leading 0x8d newline glyph */
+    seam_str_out(ctx, U2_S_SHE_GONE);
+}
+
 void u2_overworld_attack_dir(u2_ctx *ctx, u2_overworld *ow, const char *word, int dx, int dy)
 {
     seam_str_out(ctx, word);                  /* continues the ATTACK-- line */
@@ -2054,6 +2077,11 @@ void u2_overworld_attack_dir(u2_ctx *ctx, u2_overworld *ow, const char *word, in
      * interleaving of flash against the "--HIT!!!" print is not observed; this
      * order is the engine's and says so. */
     u2_flash_cell(ctx, ctx->screen_player_col + dx, ctx->screen_player_row + dy);
+
+    /* asm/2C2D: a surviving hit on Minax (type 0x40) teleports her (see
+     * u2_minax_teleport). r==1 is the survive return from u2_combat_attack. */
+    if (r == 1 && ctx->state.mon_type[slot] == 0x40)
+        u2_minax_teleport(ctx, &ow->world, slot);
 
     /* asm/2BE9 is three bytes: `call L_00133a`, then it falls into the "--HIT!!!"
      * printer at asm/2BEC. So the alarm rings before the player is told they
@@ -2455,10 +2483,16 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             const int cx = (ow->x + dx) & (U2_SECTOR_EDGE - 1);
             const int cy = (ow->y + dy) & (U2_SECTOR_EDGE - 1);
             u2_attack at;
+            const int cslot = u2_monsters_at(ctx, cx, cy);   /* before firing: the swap moves her */
             const int fired = u2_combat_cannon(ctx, cx, cy, &at);
             if (fired == 0)
                 seam_str_out(ctx, U2_S_MISS);
             seam_char_print(ctx, '\r');
+            /* asm/2C2D is on the shared asm/2C19 survive path, so a non-lethal CANNON hit on
+             * Minax teleports her exactly as a melee hit does. fired==1 is the survive case
+             * (fired==2 already continued into announce_kill above). */
+            if (fired == 1 && cslot >= 0 && ctx->state.mon_type[cslot] == 0x40)
+                u2_minax_teleport(ctx, &ow->world, cslot);
             if (fired == 2) {
                 /* A kill pays, and says so on its own CMD line, exactly as a melee kill
                  * does: the cannon's death branch reaches asm/2D8C's reward block by

@@ -309,6 +309,12 @@ void u2_overworld_pass(u2_ctx *ctx, u2_overworld *ow);
 void u2_overworld_attack_dir(u2_ctx *ctx, u2_overworld *ow, const char *word,
                              int dx, int dy);
 
+/* asm/2C2D -> asm/2C38: Minax's teleport on a surviving hit. Swaps mon_x/mon_y of the
+ * given slot, sets mon_role to 0x84, restamps the grid, and prints "SHE'S GONE!!!".
+ * Called from the melee and cannon survive paths when the hit creature is type 0x40.
+ * Proven live 2026-11-12 (sector 03: one hit moved slot 31 from (60,3) to (3,60)). */
+void u2_minax_teleport(u2_ctx *ctx, u2_world *w, int slot);
+
 /*
  * asm/3389 cmd_E: enter the site on the cell the player stands on, or refuse with
  * " WHAT?" / ONLY ON FOOT!. Owned here rather than in commands.c because it needs the

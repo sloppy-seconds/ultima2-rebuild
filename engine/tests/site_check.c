@@ -309,6 +309,37 @@ int main(int argc, char **argv)
               "control: grass under foot is not a signpost, no sign is read");
     }
 
+    /* --- Minax's teleport on a surviving hit (asm/2C2D -> asm/2C38) ----------------
+     * Proven live 2026-11-12: seeded adjacent to Minax (slot 31, type 0x40) in sector 03,
+     * one QUICK SWORD hit took her 255->199 and moved slot 31 from (60,3) to (3,60).
+     * asm/2C38 SWAPS mon_x and mon_y (so the NE spawn becomes the SW, and a second hit
+     * swaps back -- the NE<->SW oscillation), sets mon_role to 0x84, and prints
+     * "SHE'S GONE!!!". The type-0x40 gate itself is asm/2C2D, enforced by the melee and
+     * cannon callers (r==1 && mon_type==0x40); this exercises the mechanism directly. */
+    {
+        u2_ctx c; u2_world w;
+        memset(&c, 0, sizeof c); memset(&w, 0, sizeof w);
+        u2_vram_init(&c.vram); u2_state_init(&c.state);
+        w.map_loaded = 1;
+        const int slot = 31;
+        c.state.mon_type[slot] = 0x40;
+        c.state.mon_x[slot] = 60; c.state.mon_y[slot] = 3;
+        c.state.mon_role[slot] = 0x84;
+        u2_minax_teleport(&c, &w, slot);
+        CHECK(c.state.mon_x[slot] == 3 && c.state.mon_y[slot] == 60,
+              "teleport swaps x,y: (60,3) -> (3,60), the NE->SW move");
+        CHECK(c.state.mon_role[slot] == 0x84,
+              "teleport sets mon_role to 0x84 (asm/2C38 file 0x2e89)");
+        CHECK(grid_has(&c, "SHE'S GONE!!!"),
+              "teleport prints SHE'S GONE!!! (asm/2C38 file 0x2e93)");
+        /* The swap is its own inverse: a second hit returns her to the NE corner. This is
+           what makes the behaviour an oscillation between two chambers, not a one-way move,
+           and it is the property the owner's "teleports between NE and SW" describes. */
+        u2_minax_teleport(&c, &w, slot);
+        CHECK(c.state.mon_x[slot] == 60 && c.state.mon_y[slot] == 3,
+              "second teleport swaps back to (60,3): the NE<->SW oscillation");
+    }
+
     printf("site_check: %d checks, %d failures%s\n", checks, fails,
            skipped ? " (data cross-check skipped)" : "");
     return fails != 0;

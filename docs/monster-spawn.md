@@ -142,7 +142,7 @@ and then **enumerates the individual high values**, each with its own scripted o
 | `0x82` | `L_003f10` | with `[DS:6C]==0` prints `EARN THE RING!`, else `THE RING IS YOURS!` and sets `[DS:D6]=1` — the **RING slot** from C5 |
 | `0x83` | `L_003f52` | third scripted recipient |
 
-`asm/2C38_sub_2c38` writes the constant `0x84` into `[DI+0x1D7]` immediately before
+`asm/2C38_minax_teleport_swap` writes the constant `0x84` into `[DI+0x1D7]` immediately before
 printing `SHE'S GONE!!!` — a departure transition, not a mood. And `asm/102B_sub_102b`
 tests the slot for **zero**, which is what an empty-slot check looks like.
 
