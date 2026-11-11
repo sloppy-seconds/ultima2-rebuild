@@ -2,10 +2,11 @@
 
 Owner spec, 2026-11-11:
   * max stats
-  * HP, GOLD, EXP and FOOD all 8000, so none of them is close enough to 9999 that a
-    single reward or wound wraps the packed-decimal field and the number loops — that
-    wrap is real (the Hotel clerk grind proves 99 -> 04) and it makes a test run
-    unreadable rather than hard.
+  * HP, GOLD and EXP 8000, so none of them is close enough to 9999 that a single reward
+    or wound wraps the packed-decimal field and the number loops — that wrap is real (the
+    Hotel clerk grind proves 99 -> 04) and it makes a test run unreadable rather than hard.
+  * FOOD set so the band READS 8000, which means 800000 in the field: food is six digits
+    and the band prints the top four. See the note at the assignment.
   * plenty of TRI-LITHIUM and ANKH, so losing a few to a thief is not a dead end.
   * NOT the quick sword and NOT the ring, so both acquisitions can be validated:
     the quick sword is cmd_O role 0x81 in sector 32 (ENILNO IS YOURS!, DS:7F) and the
@@ -54,7 +55,15 @@ edit('maxout', OUT)
 edit('set', OUT, 'weapon', str(WEAP_PHASER))
 for name, value in (('str', 99), ('agi', 99), ('sta', 99),
                     ('cha', 99), ('wis', 99), ('int', 99),
-                    ('hp', 8000), ('gold', 8000), ('exp', 8000), ('food', 8000)):
+                    ('hp', 8000), ('gold', 8000), ('exp', 8000),
+                    # FOOD is a SIX-digit field and the status band prints only the top
+                    # four digits, so the number the player reads and the number the field
+                    # holds are not the same thing: 800000 displays as FOOD=8000, while
+                    # putting 8000 in the field displays as FOOD=0080. The owner asked for
+                    # what he sees, which is 8000 on the band. HP, GOLD and EXP are
+                    # four-digit fields and take their face value; food is the one that
+                    # does not, and u2_edit.py's own FIELDS table says so in a comment.
+                    ('food', 800000)):
     edit('set', OUT, name, str(value))
 edit('set', OUT, 'name', 'ENDGAME')
 # Era-3 Earth wilderness, on a land cell, with the return cell set to the same place so
