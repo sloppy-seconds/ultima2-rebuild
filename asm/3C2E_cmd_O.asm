@@ -38,6 +38,17 @@
 #        era 1990 A.D., kind town -- so the game hard-codes sector 32 as the only place any of
 #        these offers do anything. That is a byte-level anchor for sector 32 being the Hotel
 #        California town (docs/place-index.md § 3c), which tile text alone could not give.
+#        THE AMOUNT IS A PRICE, NOT ONLY A THRESHOLD (added 2026-11-11). L_003e92 is
+#        `call L_002252`, which is asm/2052_gold_spend_price, reached immediately after the
+#        digit is stored to DS:27 and DS:28 is zeroed and BEFORE the role/sector dispatch
+#        below. So every offer is charged hundreds x 100 gold; a refused offer is charged too
+#        (EARN THE RING costs 500); and a player who cannot cover it gets asm/2070's
+#        YOU DONT HAVE THAT MUCH!, which tail-jumps to the command loop and never reaches the
+#        blessing check at all. How this was missed: grepping this file's own bytes for the
+#        gold displacements 0x58/0x59 returns nothing, which is true of these 0x18E bytes and
+#        false of the routine — the deduction is one call away, in a file whose name says what
+#        it does. The engine had no such call, and the owner reported the omission on
+#        2026-11-11: 317 gold in hand, an offer of 500, and EARN THE RING came back.
 #        Thresholds: 0x81 (ENILNO IS YOURS!, the quicksword) and 0x82 (the ring) both require
 #        cmp $0x5 / jb, i.e. **at least 5 hundreds = 500 gold**. The walkthrough's own two
 #        numbers for the ring were 500 in its table and 900 in its prose; the bytes gate on 500.
