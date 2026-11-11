@@ -52,18 +52,26 @@ and saw neither in the engine.
 
 ### What to build, in order
 
-1. **`asm/1040` + `asm/0F8E`.** **SHIPPED 2026-11-12.** In the gated sweep the bare `continue`
-   for `role == 0` now runs the Minax arm: if `mon_type == 0x40`, the reach test
+1. **`asm/1040` + `asm/0F8E`.** **SHIPPED 2026-11-12, then CORRECTED the same day against
+   the shipped data.** In the gated sweep the bare `continue` for `role == 0` now runs the
+   Minax arm: if `mon_type == 0x40`, the reach test
    (`abs(dx) < 4 && abs(dy) < 4`) and the strike fire, then the slot is done; every other
-   role-0 creature still continues inert. The strike is `MINAX CRIES: DIE FOOL!` (added to
-   the extractor as `U2_S_MINAX_CRIES`, asm/0F8E file 0x1192) then a packed-decimal minus-one
-   on `DS:51`, death on borrow, and a kill aborts the sweep the way asm/0F8E's `jmp` to
-   asm/0C62 does. Gated in `ai_check` (8 new checks): a player three cells away comes out
-   exactly 100 lower; the four-cell and five-cell arms are the controls that make the `< 4`
-   window real rather than decorative; the type-0x30 control proves the strike is gated on
-   `mon_type == 0x40`; the no-roll check separates it from asm/0AAA's special; and the
-   high-byte-zero check proves the death-on-borrow. Disabling the arm turns the three positive
-   checks red and leaves the controls green.
+   role-0 creature still continues inert. **The correction, found by proving it against
+   `monx03`:** the handoff said Minax is `role == 0`, but `monx03` slot 31 (type 0x40) is
+   `role 0x84`. asm/102B's `je` (role==0) and asm/1033's `js` (any bit-7 role) BOTH route to
+   asm/1040, and Minax reaches it through the **bit-7** branch. So the strike must be gated on
+   `role == 0 || (role & 0x80)`, not `role == 0` alone — the first cut of this fix gated on
+   `role == 0` and so still skipped her. The scripted townsfolk at 0x81..0x83 share the bit-7
+   route and stay inert because asm/1040 rejects their type. The strike is
+   `MINAX CRIES: DIE FOOL!` (added to the extractor as `U2_S_MINAX_CRIES`, asm/0F8E file
+   0x1192) then a packed-decimal minus-one on `DS:51`, death on borrow, and a kill aborts the
+   sweep the way asm/0F8E's `jmp` to asm/0C62 does. Gated in `ai_check` (9 new checks): a
+   player three cells away comes out exactly 100 lower at role 0x84 AND at role 0 (both entry
+   branches); the four-cell and five-cell arms are the controls that make the `< 4` window
+   real rather than decorative; the bit-7-type-0x30 control proves the strike is gated on
+   `mon_type == 0x40` and not on the role; the no-roll check separates it from asm/0AAA's
+   special; and the high-byte-zero check proves the death-on-borrow. Reverting to the
+   handoff's `role == 0`-only premise turns 8 checks red.
 2. **The teleport.** Needs a decode first. Start from the chamber geometry in the frames and
    from `asm/2CB5`'s neighbourhood; do not guess a destination.
 3. **Re-check the dungeon sweep** (`engine/src/game/dungeon.c`), which has its own type table and

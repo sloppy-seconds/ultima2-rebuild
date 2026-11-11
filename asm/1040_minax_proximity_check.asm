@@ -4,10 +4,16 @@
 #   L_00118e = asm/0F8E_combat_minax_attack. Type 0x40 is Minax: the art index is
 #   type>>2 (docs/art-index.md) and 0x40>>2 == 0x10, the tile asm/0F8E's own note
 #   identifies as Minax by bitmap identity.
-# reached from: the creature move routine at asm/218b, and only when [DS:4A] != 0
-#   (the sector's second digit). asm/218b is reached both when a creature's
-#   candidate cell is the player's cell and when all three candidate moves were
-#   refused, so this check runs for blocked creatures too, not only adjacent ones.
+# reached from: TWO places. (1) the role dispatch: asm/102B's `or %al,%al ; je L_001240`
+#   sends role == 0 here, and asm/1033's `js L_001240` sends any bit-7 role here (the sign
+#   comes from the same `or`). Minax is role 0x84 in monx03 (slot 31, type 0x40), so she
+#   reaches this routine through the bit-7 `js`, NOT through role == 0 -- the handoff's
+#   "Minax is role 0" was wrong about the value. The scripted townsfolk at 0x81..0x83 also
+#   route here and fall out at the `jne L_00126d` because their type is not 0x40. (2) the
+#   creature move routine at asm/218b, and only when [DS:4A] != 0 (the sector's second
+#   digit). asm/218b is reached both when a creature's candidate cell is the player's cell
+#   and when all three candidate moves were refused, so this check runs for blocked movers
+#   too. Path (1) is why she strikes every turn without moving.
 # not: the general monster attack. Contact with the player produces no attack at
 #   all — see docs/monster-spawn.md § 13, which is also the correction of the
 #   "0x1240 sits in a gap" note that blocked CP5 W6 for a session.

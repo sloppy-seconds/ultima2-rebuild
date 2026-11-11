@@ -339,24 +339,27 @@ int main(void)
     CHECK(rep.retreated == 0 && ctx.state.mon_x[13] == 6,
           "role 2 does not run: the retreat test is on the role-1 path only");
 
-    /* --- Minax (asm/1040 -> asm/0F8E): role 0, type 0x40, strikes from range ----
-     * The gap this closes. The gated sweep used to `continue` past every role-0 slot,
-     * so Minax — who is role 0 in a castle — never moved, never rolled and never
-     * struck. The owner won the original and read MINAX CRIES: DIE FOOL! from three
-     * cells away, indoors (captures/spice86/minax-fight-live/); the engine printed
-     * nothing. asm/1040 tests mon_type==0x40 and, only for her, runs an
-     * `abs(dx)<4 && abs(dy)<4` reach and the strike (asm/0F8E: the line, then a
-     * packed-decimal minus-one on the HP HIGH byte DS:51 = exactly 100 HP, borrow =
-     * death). She does not move: asm/1040 hangs off asm/218b, the no-move tail. The
-     * five-cell arm is the control that makes the < 4 window real rather than
-     * decorative, and the no-roll assertion separates this from asm/0AAA's special
-     * gate, which rolls 1-in-8 before it fires.
+    /* --- Minax (asm/1040 -> asm/0F8E): bit-7 role, type 0x40, strikes from range ----
+     * The gap this closes, and the correction that came from proving it against the
+     * shipped data. The gated sweep used to `continue` past every role-0 AND every
+     * bit-7 slot, so Minax — who is role 0x84 in monx03 (slot 31, type 0x40), NOT
+     * role 0 as the handoff stated — never moved, never rolled and never struck. The
+     * owner won the original and read MINAX CRIES: DIE FOOL! from three cells away,
+     * indoors (captures/spice86/minax-fight-live/); the engine printed nothing.
+     * asm/102B (role==0, je) and asm/1033 (bit 7, js) BOTH route to asm/1040, which
+     * tests mon_type==0x40 and, only for her, runs an `abs(dx)<4 && abs(dy)<4` reach
+     * and the strike (asm/0F8E: the line, then a packed-decimal minus-one on the HP
+     * HIGH byte DS:51 = exactly 100 HP, borrow = death). She does not move: asm/1040
+     * hangs off asm/218b, the no-move tail. The five-cell arm is the control that
+     * makes the < 4 window real rather than decorative, and the no-roll assertion
+     * separates this from asm/0AAA's special gate, which rolls 1-in-8 before it fires.
      */
-    /* Hit: three cells on each axis, indoors, role 0, type 0x40. HP high byte 0x90
-       (9000) must come out 0x89 (8900) — exactly 100 lower, low byte untouched. */
+    /* Hit: three cells on each axis, indoors, role 0x84 (Minax's real role in monx03,
+       reached via asm/1033's js), type 0x40. HP high byte 0x90 (9000) must come out
+       0x89 (8900) — exactly 100 lower, low byte untouched. */
     arm(&ctx, &w, GRASS, 13, 5, 5, 40, 0x40);
     ctx.state.sector_second = 1;
-    ctx.state.mon_role[13] = 0;
+    ctx.state.mon_role[13] = 0x84;
     ctx.state.hp = 0x90; ctx.state.unk_52 = 0x00;
     u2_status_draw(&ctx);
     seam_goto(&ctx, 0, U2_MSG_BOTTOM);
@@ -374,11 +377,21 @@ int main(void)
             minax_found = 1;
     CHECK(minax_found, "asm/0F8E prints MINAX CRIES: DIE FOOL!");
 
+    /* asm/102B's role==0 branch reaches asm/1040 too: the same strike must fire for a
+       role-0 Minax, so both entry branches are covered, not just the one she uses. */
+    arm(&ctx, &w, GRASS, 13, 5, 5, 40, 0x40);
+    ctx.state.sector_second = 1;
+    ctx.state.mon_role[13] = 0x00;
+    ctx.state.hp = 0x90;
+    rep = u2_ai_creature_turn(&ctx, &w, 8, 8);
+    CHECK(rep.minax_strikes == 1 && ctx.state.hp == 0x89,
+          "role 0 also reaches asm/1040 (asm/102B's je): a role-0 Minax strikes too");
+
     /* CONTROL: five cells on x is outside the < 4 window — untouched, no print, no roll.
        Without this a gate that always fired would look identical to the check above. */
     arm(&ctx, &w, GRASS, 13, 3, 8, 40, 0x40);
     ctx.state.sector_second = 1;
-    ctx.state.mon_role[13] = 0;
+    ctx.state.mon_role[13] = 0x84;
     ctx.state.hp = 0x90; ctx.state.unk_52 = 0x00;
     rep = u2_ai_creature_turn(&ctx, &w, 8, 8);   /* dx=5: outside */
     CHECK(rep.minax_strikes == 0 && ctx.state.hp == 0x90 && u2_rng_rolls(&ctx) == 0,
@@ -387,28 +400,30 @@ int main(void)
     /* The exact boundary: dx==4 is NOT < 4, so a creature four cells out is spared. */
     arm(&ctx, &w, GRASS, 13, 4, 8, 40, 0x40);
     ctx.state.sector_second = 1;
-    ctx.state.mon_role[13] = 0;
+    ctx.state.mon_role[13] = 0x84;
     ctx.state.hp = 0x90;
     rep = u2_ai_creature_turn(&ctx, &w, 8, 8);   /* dx=4: not < 4 */
     CHECK(rep.minax_strikes == 0 && ctx.state.hp == 0x90,
           "the reach is strictly < 4: four cells on x is out of range");
 
-    /* CONTROL for the type test: role 0 but NOT Minax (a plain Fighter) stays inert,
-       so the strike cannot be firing for every role-0 creature. */
+    /* CONTROL for the type test: bit-7 role but NOT Minax (a plain Fighter at 0x84,
+       like the scripted townsfolk at 0x81..0x83) stays inert, so the strike cannot be
+       firing for every bit-7 creature. This is the case the handoff's role-0 framing
+       would have missed: the scripted folk and Minax share the bit-7 route. */
     arm(&ctx, &w, GRASS, 13, 5, 5, 40, 0x30);
     ctx.state.sector_second = 1;
-    ctx.state.mon_role[13] = 0;
+    ctx.state.mon_role[13] = 0x84;
     ctx.state.hp = 0x90;
     rep = u2_ai_creature_turn(&ctx, &w, 8, 8);
     CHECK(rep.minax_strikes == 0 && ctx.state.hp == 0x90 && rep.moved == 0,
-          "control: role 0 with type 0x30 is inert — the strike is gated on mon_type 0x40");
+          "control: bit-7 role with type 0x30 is inert — the strike is gated on mon_type 0x40");
 
     /* Death on borrow: the HP high byte already 0 means the minus-one underflows and
        asm/0F8E jmps to the death tail (asm/0C62). A character at 99 HP or below dies
        to one strike. */
     arm(&ctx, &w, GRASS, 13, 5, 5, 40, 0x40);
     ctx.state.sector_second = 1;
-    ctx.state.mon_role[13] = 0;
+    ctx.state.mon_role[13] = 0x84;
     ctx.state.hp = 0x00; ctx.state.unk_52 = 0x50;   /* 099 HP or less */
     rep = u2_ai_creature_turn(&ctx, &w, 8, 8);
     CHECK(rep.minax_strikes == 1 && ctx.death_pending,

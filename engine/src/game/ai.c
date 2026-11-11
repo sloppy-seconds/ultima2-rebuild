@@ -443,16 +443,18 @@ u2_ai_report u2_ai_creature_turn(u2_ctx *ctx, u2_world *w, int px, int py)
          *
          * Inside the gated sweep, asm/102B and asm/1033:
          *
-         *   role == 0    -> asm/1040, the Minax proximity check. Only mon_type 0x40
-         *                   (Minax) does anything: she strikes from inside the < 4
-         *                   reach without moving (asm/0F8E), handled in the branch
-         *                   below. Everything else at role 0 falls to the next slot,
-         *                   inert: monx00 ships 0 in every slot, and eight of the
-         *                   thirty-two in a town do nothing until violence wakes them
-         *                   (see u2_ai_alarm).
-         *   role & 0x80  -> next slot. asm/1033 is `js <next>`, so bit 7 excludes
-         *                   0x81..0x85, which are the scripted townsfolk that
-         *                   asm/3C2E_cmd_O enumerates one by one.
+         *   role == 0    -> asm/1040 (asm/102B's `or %al,%al ; je L_001240`). See the
+         *                   bit-7 row: asm/1040 strikes only for mon_type 0x40 and
+         *                   sends everything else to the next slot, so a role-0 slot
+         *                   is inert unless it is Minax. monx00 ships 0 in every slot,
+         *                   and eight of the thirty-two in a town do nothing until
+         *                   violence wakes them (see u2_ai_alarm).
+         *   role & 0x80  -> asm/1040 too (asm/1033's `js L_001240`, sign from the same
+         *                   `or`). This is the branch Minax actually takes: she is role
+         *                   0x84 in monx03 (slot 31, type 0x40), NOT role 0 as the
+         *                   handoff stated. The scripted townsfolk at 0x81..0x83
+         *                   (types 0x30/0x68/0xfc) also route here and stay inert
+         *                   because asm/1040 rejects their type.
          *   role == 1    -> asm/1082 -> asm/0AA7: the full pass. Raw pursuit
          *                   vector, the proximity gate and the special, the unit
          *                   step, the retreat test, then the move.
@@ -474,15 +476,20 @@ u2_ai_report u2_ai_creature_turn(u2_ctx *ctx, u2_world *w, int px, int py)
         int casts = 1, retreat = 1, moves = 1, wander = 0, contact = 1;
         if (gated_sweep) {
             const uint8_t role = st->mon_role[slot];
-            if (role == 0) {
-                /* asm/102B sends role 0 to asm/1040, the Minax proximity check.
-                 * asm/1040 tests mon_type == 0x40 and, only for Minax, runs the
-                 * reach test and the strike; everything else that is role 0 falls
-                 * through to the next slot, inert. This is the arm the engine used
-                 * to `continue` past, which is why Minax never moved, never rolled
-                 * and never struck, and why the owner saw no ranged hit in a castle.
-                 * She strikes without moving: asm/1040 hangs off asm/218b, the
-                 * no-move tail. */
+            /* asm/102B sends role == 0 (the `or %al,%al ; je L_001240`) and asm/1033
+             * sends any bit-7 role (the `js L_001240`, flags from the same `or`)
+             * BOTH to asm/1040, the Minax proximity check. asm/1040 tests
+             * mon_type == 0x40 and, only for Minax, runs the reach test and the
+             * strike; everything else at those roles falls to the next slot, inert.
+             *
+             * Minax herself is role 0x84 in monx03 (slot 31, type 0x40), so she
+             * reaches asm/1040 through the BIT-7 branch, not the role==0 branch. The
+             * handoff said "role 0" — wrong about the value, right that she reaches
+             * asm/1040. The scripted townsfolk at 0x81..0x83 (types 0x30/0x68/0xfc)
+             * also route here and stay inert because asm/1040 rejects their type,
+             * exactly as the old `role & 0x80 -> continue` did. She strikes without
+             * moving: asm/1040 hangs off asm/218b, the no-move tail. */
+            if (role == 0 || (role & 0x80)) {
                 if (st->mon_type[slot] == U2_AI_TYPE_MINAX) {
                     const int mdx = abs8((uint8_t)(px - st->mon_x[slot]));
                     const int mdy = abs8((uint8_t)(py - st->mon_y[slot]));
@@ -497,7 +504,6 @@ u2_ai_report u2_ai_creature_turn(u2_ctx *ctx, u2_world *w, int px, int py)
                 }
                 continue;
             }
-            if (role & 0x80) continue;
             /* The original's dispatch is `cmp $0x3,%al ; jae L_001286` (asm/1035): role >= 3 goes to
              * the wander. There is no "role > 3" skip. The old `if (role > 3) continue;` could never
              * fire — a census of all 33 shipped monx files finds no role above 3 — but it was the
