@@ -15,7 +15,15 @@
 #           that is aware of the site kind (`cmpb $0x4,[DS:4A]`, tower). That makes
 #           asm/3611 the best remaining lead for how town and tower NPCs take damage,
 #           since no spawn arm assigns them HP at all.
-# provenance: static, 2026-10-22
+# THE KILL EXIT, added 2026-11-11. `jae L_002ea4` is the death branch, and asm/2CA4 is not the
+#           end of it: that routine has no `ret` and falls through into the Minax gate, the
+#           kill-drop dispatch and asm/2D8C_combat_kill_reward. So a cannon kill pays gold and
+#           exp and rolls a drop exactly as a melee kill does — observed in
+#           captures/spice86/cannon-kill-live as `KILLED--GOLD+13--EXP.+03`. Read the tail
+#           before concluding a kill branch stops where its jump lands; see
+#           asm/2CA4_combat_kill_stamp for the full chain and for the engine defect this
+#           fall-through caused.
+# provenance: static, 2026-10-22; kill exit live 2026-11-11 (cannon-kill-live)
 # confidence: low (bytes proven by check_func.py; the caller's role is inferred)
 # label: kept as sub_2c19 on purpose — labels are body (CP0)
 # func 2C19..2C25  len 000D B  evidence: seed+reko
