@@ -33,9 +33,20 @@ WHAT IT READS (generated tables and curated inputs only -- it invents nothing):
     disasm/source-gamercorner-locations.csv   vendored upstream table
     bestiary/bestiary.tsv         creature names joined by bitmap identity
     original/ultimaii.exe         the time-door cell table, read at 0x2998
-    original/mapx*, updated/MAPG* tile instances (vehicles, racks)
+    original/mapx*, updated/MAPG* tile instances (vehicles, racks, site doors)
+    engine/src/game/overworld.c   the tile -> site-sector rule, site_for_tile()
 
 WHAT IT WRITES: disasm/census/<entity>.tsv. This tool is the ONLY writer of that directory.
+
+THE SITE TABLE, added 2026-11-11. One row per enterable door in a wilderness map: the
+sector the door stands in, its cell, what kind of site it opens, the sector that opens, and
+where you arrive inside it. The rule is not invented here — it is `site_for_tile()`'s, which
+keys on the art index (`tile >> 2`) and returns the ones digit of the sector to load, so
+the destination is always `tens of the wilderness + that digit`. This exists because
+"where do I stand to test X" was being answered by hand-scanning map bytes every time, and
+a hand-kept list of coordinates drifts and then looks authoritative. `--verify` reports
+doors that lead to a missing sector and site sectors with no door at all; both are real
+findings from the damaged root mapx set, not formatting problems.
 
 USAGE
     python3 tools/census.py                       # build
@@ -72,6 +83,20 @@ GRID = 64
 # docs/art-index.md, closed as G1 at 256/256 pixel match.
 VEHICLES = {0x44: 'horse', 0x48: 'ship', 0x4C: 'plane', 0x50: 'rocket'}
 RACKS = {0x54: 'armour rack', 0x58: 'weapon rack'}
+
+# Which wilderness tile leads into which site, and where you arrive. The mapping is
+# engine-side and byte-derived — site_for_tile() in engine/src/game/overworld.c keys on
+# `tile >> 2`, i.e. the art index, and returns the ones digit of the sector to load — so
+# this table is the same rule, restated here rather than re-derived from a guess.
+# The arrival cell is the other half of the same function: asm/342A's street cell for the
+# three settlement kinds, and (5,5) for the two that are not streets.
+SITE_ART = {
+    5: (1, 'village',  0x1f, 0x3e),
+    6: (2, 'town',     0x1f, 0x3e),
+    8: (3, 'castle',   0x1f, 0x3e),
+    7: (4, 'tower',    5, 5),
+    9: (5, 'dungeon',  5, 5),
+}
 
 # The guide's World column uses its own era labels. This is the only mapping in this file that
 # is not read from bytes, so it is stated as a table rather than derived from a string match.
@@ -353,8 +378,47 @@ def build():
                 r['name_source'] = c['source']
                 r['name_grade'] = 'inferred (third-party)'
 
+    # ---- site: every enterable door, and the sector it leads to ---------------------------
+    #
+    # One row per site tile found in a wilderness map. The wilderness is the sector whose
+    # ones digit is 0, and the door's art gives the ones digit of the sector it opens, so
+    # the destination is `tens of the wilderness + that digit` — which is the same rule the
+    # engine uses and the reason sector 41 is reachable from 40 and nowhere else.
+    #
+    # This exists because finding a place to test means knowing which cell to stand on, and
+    # that was being re-derived by hand-scanning map bytes every time. It is generated for
+    # the usual reason: a hand-kept list of coordinates drifts, and a drifted coordinate is
+    # worse than none because it looks authoritative.
+    sirows = []
+    sec_by_key = {(r['layer'], r['sector']): r for r in srows}
+    for (layer, sec), data in sorted(maps.items()):
+        if not sec.endswith('0'):
+            continue                      # sites are entered from the wilderness only
+        for i, v in enumerate(data):
+            entry = SITE_ART.get(v >> 2)
+            if not entry:
+                continue
+            digit, kind, ax, ay = entry
+            dest = sec[:-1] + str(digit)
+            drow = sec_by_key.get((layer, dest))
+            sirows.append({
+                'layer': layer, 'from_sector': sec,
+                'world': drow['world'] if drow else '',
+                'era': drow['era'] if drow else '',
+                'kind': kind, 'art': '0x%02x' % (v >> 2), 'map_byte': '0x%02x' % v,
+                'x': i % GRID, 'y': i // GRID,
+                'dest_sector': dest,
+                'dest_exists': 'yes' if drow else 'no',
+                'dest_name': drow['name'] if drow else '',
+                'dest_name_source': drow['name_source'] if drow else '',
+                'dest_guide_name': drow['guide_name'] if drow else '',
+                'arrival': '%d,%d' % (ax, ay),
+                'source': 'mapx/MAPG tile bytes + site_for_tile() in engine/src/game/overworld.c',
+                'grade': 'observed',
+            })
+
     return {'world': wrows, 'sector': srows, 'place': prows, 'vehicle': vrows,
-            'tile': trows, 'npc': nrows, 'creature': crows,
+            'tile': trows, 'npc': nrows, 'creature': crows, 'site': sirows,
             'gate': gate_rows(D('original', 'ultimaii.exe'))}
 
 
@@ -377,6 +441,9 @@ COLUMNS = {
     'creature': ['art', 'name', 'hp', 'damage', 'special', 'verdict', 'source', 'grade'],
     'gate': ['era', 'era_index', 'gate_index', 'x', 'y', 'dest_era', 'dest_era_index',
              'source', 'grade'],
+    'site': ['layer', 'from_sector', 'world', 'era', 'kind', 'art', 'map_byte',
+             'x', 'y', 'dest_sector', 'dest_exists', 'dest_name', 'dest_name_source',
+             'dest_guide_name', 'arrival', 'source', 'grade'],
 }
 
 
@@ -557,6 +624,7 @@ def font_name(art_index):
 def verify(tables):
     """The invariants. Each one names what it caught, because a check without a story rots."""
     bad = []
+    missing_doors, unreachable_sites = [], []
     s = tables['sector']
     unnamed = [r for r in s if r['name_source'] == 'unnamed']
     # A sector with no name is allowed, but only as a visible `unnamed`, never as a blank.
@@ -646,6 +714,33 @@ def verify(tables):
             if cite and not glob.glob(os.path.join(ROOT, 'asm', stem + '*.asm')):
                 bad.append('tile %s cites %s for its entry effect and no such asm file exists'
                            % (r['art'], cite))
+    # ---- the site table -----------------------------------------------------------------
+    # A door that leads nowhere is a real finding, not a formatting problem: the root mapx
+    # set is damaged by a 1990s folder merge (docs/planet-maps-galaxy-patch.md § 3a), so a
+    # wilderness can carry a tile whose destination file was overwritten or never shipped.
+    # Those rows say so in dest_exists rather than being dropped, and the counts are printed
+    # by --verify so growth in either list is visible instead of silent.
+    if not tables.get('site'):
+        bad.append('site table is empty — no enterable door was found in any wilderness map, '
+                   'which means the tile scan is broken and not that the game has no towns')
+    seen_dests = {(x['layer'], x['dest_sector']) for x in tables.get('site', [])}
+    for r in tables.get('site', []):
+        if not r['from_sector'].endswith('0'):
+            bad.append('site row %s/%s is in %s, which is a site sector and cannot hold a door'
+                       % (r['kind'], r['dest_sector'], r['from_sector']))
+        if r['dest_exists'] == 'no':
+            missing_doors.append('%s %s door at (%d,%d) -> %s' %
+                                 (r['layer'], r['from_sector'], r['x'], r['y'], r['dest_sector']))
+    for r in tables['sector']:
+        if r['kind'] in ('village', 'town', 'castle', 'tower', 'dungeon'):
+            if (r['layer'], r['sector']) not in seen_dests:
+                unreachable_sites.append('%s %s (%s)' % (r['layer'], r['sector'], r['kind']))
+    print('  site: %d doors; %d lead to a missing sector; %d site sectors have no door'
+          % (len(tables.get('site', [])), len(missing_doors), len(unreachable_sites)))
+    for m in missing_doors:
+        print('    door to nothing: %s' % m)
+    for u in unreachable_sites:
+        print('    no door: %s' % u)
     return bad, named, len(unnamed)
 
 
@@ -668,7 +763,7 @@ def main():
     ap.add_argument('--verify', action='store_true', help='build in memory and assert invariants')
     ap.add_argument('--check-fresh', action='store_true',
                     help='fail if the committed census differs from a fresh build')
-    ap.add_argument('--what', default=None, help='print one entity: world|sector|place|npc|tile|creature|gate|vehicle')
+    ap.add_argument('--what', default=None, help='print one entity: world|sector|place|npc|tile|creature|gate|vehicle|site')
     ap.add_argument('--where', default=None, help='filter as column=value, substring match')
     ap.add_argument('--out', default=CENSUS_DIR)
     a = ap.parse_args()

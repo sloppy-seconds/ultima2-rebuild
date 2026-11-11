@@ -445,13 +445,20 @@ Verification, in two independent layers:
 
 * **`disasm/census/` is the one-stop lookup, and it is generated.** `tools/census.py` joins the
   place, planet, npc and tile indices, the two wiki crosswalks, the vendored guide table, the
-  bestiary and the exe's own gate table into eight tables: `world`, `sector`, `place`, `npc`,
-  `tile`, `creature`, `gate`, `vehicle`. Ask it before hand-joining anything:
+  bestiary and the exe's own gate table into nine tables: `world`, `sector`, `place`, `npc`,
+  `tile`, `creature`, `gate`, `vehicle`, and `site`. Ask it before hand-joining anything:
 
   ```bash
   python3 tools/census.py --what sector --where world=pluto
   python3 tools/census.py --what vehicle --where what=rocket
+  python3 tools/census.py --what site --where dest_name=Pirates   # where to stand to enter
   ```
+
+  The `site` table is one row per enterable door in a wilderness map — the sector and cell the
+  door is in, the kind of site it opens, the destination sector, and the arrival cell — so
+  "where do I stand to test X" is a lookup instead of a hand-scan of map bytes. Its rule is
+  `site_for_tile()`'s, not a guess, and `--verify` reports doors that lead to a missing sector
+  and site sectors with no door.
 
   It is the only writer of that directory, and it invents nothing — every row names its source.
   Two gates cover it in `check_all.sh`: `--verify` asserts the data's invariants (every guide row
