@@ -1152,7 +1152,57 @@ occupies the refusing cell) and then measured, in the owner's own live session:
 | another creature's stamp | `tile=3c backed=1` x3234, `34` x660, `38` x702, `fc` x616, `f8` x709 | faithful: the stamp **is** the occupancy rule (`asm/2199` header) |
 | mountain | `tile=10 backed=0` x1896, all present in the pristine map | faithful: `asm/21BD` refuses `0x10`, and the player is refused it too (`--INVALID MOVE!`) |
 | open water | `tile=00` x474 on one orc | faithful: only `0x2C`/`0x48` may enter water |
-| ghost stamps | `backed=0` on a creature-type byte: **none**; all 32 distinct `backed=0` cells were mountain | no stale-stamp defect found |
+| ghost stamps | **RETRACTED, same day, and the retraction is the finding.** The first check looked only at `backed=0` cells in one live session and found mountain, and I wrote "none" from that. A direct save-cycle test afterwards -- move creatures in sector 00, press `Q`, read the written pair back -- found **24 cells in the saved `mapx00` that no creature in the saved `monx00` owns.** Ghosts are real. | **open defect**, below |
+
+### Open defect: the saved map and the saved creature table disagree
+
+`asm/2305` writes `MAPXFF` and `MONXFF` from the same path, so in the original a stamp in
+`mapx` always has the creature that made it in the `monx` written beside it. That is why
+the original has no ghosts, and it is the owner's own observation, not an inference.
+
+The engine's wiring for the same rule exists and is not the problem: `overworld.c:145`
+calls `u2_monsters_store` when `rep.moved || rep.stolen`, and `ai.h` documents that
+contract. A scripted move-and-save in sector 00 does produce both `mapx00` and `monx00` in
+the slot overlay. The files are both written; **they just do not agree.**
+
+Measured, scripted run (sector 00, 30 idle turns with `--auto-pass-polls 2`, then `Q`),
+comparing the written overlay against `original/mapx00` and the written `monx00`:
+
+```
+mapx00 diffs vs pristine (first 10 of many):
+  (32,27) fc->08   (32,28) 3c->08   (32,29) f8->08   (32,30) f4->08
+  (29,31) 0c->3c   (30,31) 0c->fc   (31,31) 3c->08   (32,31) 3c->08
+  (33,31) 3c->08   (29,32) 0c->3c
+live creatures in saved monx00: 31      unbacked cells in saved mapx00: 24
+```
+
+Two opposite corruptions in one write:
+
+1. **Shipped stamps erased.** `mapx00` as released already contains baked creature bytes
+   (`0x3c` x13, `0xf8` x5, `0x38` x5, `0xfc` x3 -- the residue of someone's play session
+   in 1983). When a creature departs one of those cells the engine restores `map_base`,
+   which was loaded from the same file and therefore holds the stamp, and the net effect
+   in the written file is grass where the release had a stamp.
+2. **New stamps orphaned.** Stamps written this session land in the map, and after the
+   creatures move again the map keeps cells no saved creature occupies.
+
+Either way the consequence is the one the owner reported: a living creature refuses a cell
+whose byte says `orc` with nothing standing on it, forever, because the ghost is now
+terrain and `map_base` cannot clear it. Slot 26 in the live session was blocked this way at
+(29,25), 618 refusals, `tile=30 backed=0`.
+
+Not yet decided, and it needs the owner: whether the overlay should store the **unstamped**
+ground (`map_base`) and let `monx` carry the creatures -- which makes ghosts structurally
+impossible but stops mirroring `asm/2305` byte for byte -- or whether the stamped write-back
+stays and the load path must clear any stamp not named by the `monx` loaded with it. The
+first is simpler and matches the observable; the second is the one the bytes of `asm/2305`
+argue for. **Do not pick one from this note without asking.**
+
+What is NOT in dispute after all of this: the step gate itself. `asm/21BD` refusing `0x10`
+mountain, `0x04` and `0x00` for everything except the two water kinds is correct and the
+engine reproduces it; the viewport-to-grid bridge (`seam=view`) is correct; and the era-0
+moongate cells prove the grid origin is right. The bug is in what gets saved, not in what
+blocks movement.
 
 So a creature boxed in by mountain, water, or a knot of other creatures stays put in the
 engine because it stays put in the original. A pack that converges into a clump can freeze
