@@ -2140,15 +2140,24 @@ bytes agree on the ship and disagree on both numbers.
   → `asm/3606` damage → `asm/3611` → `asm/2C19` subtract.** It closes the standing question in
   `asm/2C19_monster_hp_subtract`'s header ("what selects the slot and why that magnitude is not
   established"), and it means `asm/3611` is not the town-NPC damage path it was once promoted to.
-* **On a hit the original prints nothing.** No `str_out` exists between the probe and the damage
-  apply, and the death branch (`asm/2C19`'s `jae` to `asm/2CA4`) stamps the emptied cell instead
-  of announcing it. So `--MISS` is the only text, and the silence is cited rather than assumed.
-  The tone that would have been the audible feedback is `asm/5EAC`, deliberately not emitted:
-  `asm/5DA9`'s frequency arithmetic is unconfirmed against a heard tone, and a guessed tone is
-  worse than none.
-* **A cannon kill awards nothing.** The melee reward rolls live on `asm/2E3D`'s path; the cannon
-  reaches `asm/2CA4`. `apply_damage_to_slot` takes an `award` flag so the two cannot be silently
-  merged by whoever edits it next, and `attack_check` asserts the no-reward property.
+* **On a hit that does not kill the original prints nothing.** No `str_out` exists between the
+  probe and the damage apply, and `captures/spice86/cannon-range-live` measured it: `FIRE
+  DIRECT-EAST` and no damage line. So `--MISS` is the only text on a survivable shot, and the
+  silence is cited rather than assumed. Enhanced mode now announces the amount through the
+  feedback seam on the owner's request (2026-11-11, "add a HIT to the fire when it hits so its
+  more obvious"); original mode keeps the silence, and `engine/tests/cannon_kill.py` asserts
+  both halves. The tone that would have been the original's audible feedback is `asm/5EAC`,
+  deliberately not emitted: `asm/5DA9`'s frequency arithmetic is unconfirmed against a heard
+  tone, and a guessed tone is worse than none.
+* **~~A cannon kill awards nothing.~~ WRONG, corrected 2026-11-11 by
+  `captures/spice86/cannon-kill-live`.** This was the sentence "the cannon reaches `asm/2CA4`",
+  and `asm/2CA4` was read as an ending because it is eleven bytes that end at a `call`. It has no
+  `ret`: the next byte is `asm/2CB5_combat_kill_minax_gate`, and the chain runs through the
+  kill-drop dispatch into `asm/2D8C_combat_kill_reward`. The original printed
+  `KILLED--GOLD+13--EXP.+03` for a one-cell cannon kill. The `award` flag is gone from
+  `apply_damage_to_slot` — both routes now share the whole tail, which is what the bytes say —
+  and `attack_check`'s no-reward assertion went with it. The same tail means a cannon kill rolls
+  a drop and can win the game (see the G75 addendum).
 
 **Two disagreements, both left open as G49 rather than resolved by typing.**
 
@@ -2192,7 +2201,8 @@ arrow arrived, and the frame read `CMD: FIRE DIRECT-PASS` with the arrow landing
 command. `--delay 0.05` fixes it. A `--PASS` on an aim prompt in a capture is usually this, and it
 is the harness, not the game.
 
-Still open from G49: a cannon **kill** has never been seen, so the no-reward reading stays static,
+Still open from G49: ~~a cannon **kill** has never been seen, so the no-reward reading stays static,~~
+— seen at last on 2026-11-11 and the static reading did not survive it, see the bullet above —
 and no cannon has ever been fired after a real `BOARD`.
 
 ### ...then the owner drove it himself, and the manual turns out to be the thing that was wrong
