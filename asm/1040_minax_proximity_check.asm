@@ -18,6 +18,17 @@
 #           harvest has ever executed this path — the only Minax strings in the corpus
 #           (`MINAX IS DEAD!!`, `MINAX CRIES: DIE FOOL!`) are discovered-but-not-executed, and
 #           docs/phase4-state.md records them as still unexecuted.
+# EXECUTED 2026-11-12, ending the note above. Owner play session in the original under
+#           Spice86 (captures/spice86/minax-fight-live/): he reported "she cries die fool and
+#           range attacks me, when I'm about 3 steps away from her", inside a castle chamber.
+#           That is this routine's own window stated in plain language -- `|mon_x - player_x|
+#           < 4` and the same on y, i.e. up to three cells on each axis -- observed
+#           independently by a person rather than read off the listing, and it is the first
+#           execution of this path anywhere in the project's history. The `< 4` half of the
+#           third-party "exactly 100 damage, range 3" claim is therefore no longer merely
+#           corroborated by our bytes; the behaviour has been seen. Also confirmed by the
+#           same session: it fires indoors, which is what `reached from asm/218b ... only when
+#           [DS:4A] != 0` predicts, and HP fell 9000 -> 2336 at roughly 100 a strike.
 # confidence: medium — the bytes and the reachability are solid, the Minax naming rests on the
 #           art index rather than on any text this routine prints
 # func 1040..1047  len 0008 B  evidence: seed+reko

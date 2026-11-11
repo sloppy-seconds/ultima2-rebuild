@@ -21,6 +21,14 @@
 #   after 100 strikes, which is why goal-spec's W4 threshold of 9900 is worth chasing -- it
 #   is within one hundredth of the ceiling this instruction can address. Third-party claim
 #   promoted to measured-by-bytes; the range-3 half is asm/1040's own `< 4` window.
+#   ** OBSERVED 2026-11-12: this routine has now executed.** Owner play session in the
+#   original (captures/spice86/minax-fight-live/); he read `MINAX CRIES: DIE FOOL!` on screen
+#   and reported the strike landing from about three cells away, indoors. Until that session
+#   both of this routine's strings were recorded in the corpus as discovered-but-not-executed,
+#   so the 100-damage subtract above had never been seen to run against a live character. It
+#   has now: HP fell from 9000 to 2336 during the fight, which is the high-byte decrement
+#   firing roughly 67 times, and the character survived because the borrow only arrives when
+#   the hundreds byte underflows -- exactly the behaviour the byte sequence predicts.
 #   The two writes at 11AC/11AF zero DS:19 and DS:1A, which asm/29D2 uses as scratch loop
 #   cursors for the creature sweep (it does `incb 0x1a ... cmp $0x40`), so this reads as
 #   "reset the sweep before the strike". INFERRED, not proven.
