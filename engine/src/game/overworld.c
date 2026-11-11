@@ -2206,6 +2206,17 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
          * game vanishing with that message still in an unshown frame. */
         if (ctx->death_pending) break;
 
+        /* CP8 1d: a type-0x40 kill runs u2_victory, which prints the ending and sets
+         * ctx->victory. The original does not return from that path -- it enters the
+         * rocket-flight loop and never comes back -- so the engine ends the run here,
+         * the same way it unwinds on death. Without this the loop kept polling input
+         * with player_stamp=0x28 (drawn as a rocket via player_art=stamp>>1) in the
+         * still-loaded chamber: the "turned into a rocket standing in a chamber" the
+         * owner saw. Checked after the draw/present above so the ending text is on
+         * screen before the run stops. The callers (title.c 'P', game.c, --play-map)
+         * already treat a non-death loop return as "the session is over". */
+        if (ctx->victory) break;
+
         u2_key k;
         const int r = seam_key_poll(ctx, &k);
         if (r < 0) break;

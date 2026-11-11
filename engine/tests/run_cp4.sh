@@ -358,6 +358,20 @@ else
     bad "CP4 death reload: dying does not put the saved character back, or the dev flag stopped leaving a corpse"
 fi
 
+# --- CP8 1d: a type-0x40 kill ends the run -------------------------------------------------
+#
+# The original never returns from the victory path (it enters the rocket-flight loop). The
+# engine prints the ending and must then stop, the way it stops on death. Before the fix
+# nothing consumed ctx->victory, so the loop kept playing with the player drawn as a rocket
+# in the chamber. victory_end.py drives a real type-0x40 kill through the loop and asserts
+# the ending is on the FINAL frame (the loop stopped there) and the run terminated cleanly.
+if python3 tests/victory_end.py > "$WORK/victory-end.log" 2>&1; then
+    ok "CP8 victory end: a type-0x40 kill runs the ending and the loop unwinds on ctx->victory"
+else
+    sed 's/^/        /' "$WORK/victory-end.log" | tail -10
+    bad "CP8 victory end: the run did not end on a Minax kill, or the ending did not render"
+fi
+
 # --- a saved map never walls off a creature with a ghost ---------------------------------
 #
 # asm/2233 restores a departure cell from mon_kind[slot], the terrain the creature saved when
