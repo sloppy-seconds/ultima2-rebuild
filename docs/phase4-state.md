@@ -3256,7 +3256,7 @@ stop mechanism is found, the renderer's remaining difference cannot be attribute
 change is justified by it. Fixing `bp_read.py` against this Spice86 is the next step, and it is a
 tool fix, not a renderer fix.
 
-## The frigate: ATTACK is allowed aboard it, and FIRE never hits (owner-found, 2026-11-10)
+## The frigate: ATTACK "allowed" aboard it, and FIRE "never hits" (owner-found 2026-11-10, **both closed 2026-11-11 as not defects**)
 
 **Recorded as a defect to solve later, not investigated and not fixed.** Owner found both while
 re-flying the rocket playtest on 2026-11-10, aboard the frigate:
@@ -3269,6 +3269,46 @@ re-flying the rocket playtest on 2026-11-10, aboard the frigate:
 Both are graded **owner observation** — reported from play, not yet reproduced against bytes or a
 capture. That is the correct starting grade and it outranks any inference here, per the standing
 rule; it also means neither has a named root cause yet.
+
+### Closed 2026-11-11: the original does both, and so does the engine
+
+Neither turned out to be a defect, and the section's own "what would settle each" is what
+settled them. Recorded here in full because a closed report is worth more than a deleted one.
+
+**Defect 1 is refuted by one live sample** — `captures/spice86/frigate-attack-live`. Headless
+original, `[DS:13]` poked to `0x24` (the equivalence to a real boarding was established on
+2026-10-29), a creature planted one cell east with `[DS:26A]` frozen, then `A` + `Right`. The
+screen reads `ATTACK--EAST--HIT!!!` and `mon_hp[5]` goes `0x99` → `0x77`. The static side agrees:
+no file in the attack chain — `asm/2B8F`, `asm/2B9B`, `asm/2BAD` — reads `DS:13` at all. So the
+engine allowing `A` aboard the frigate is the original allowing it, and the policy-table fix this
+section was reaching for would have introduced a bug. The recollection was a design expectation;
+this binary does not share it, and it is the second time the frigate's combat behaviour has lost
+to the running game after the three-space cannon.
+
+**Defect 2 is a range problem, not a damage problem.** The engine's cannon resolves: planted a
+creature in the one cell the ship could reach in sector 31, boarded at (14,25), sailed west onto
+the open-water cell, fired west — `CMD: FIRE DIRECT-WEST` with **no `--MISS`**, and the target's
+`mon_hp` went `0x99` → `0x00`. Silence on a hit and a binary subtract, which is exactly what
+`asm/35F0..asm/3611` and `captures/spice86/cannon-range-live` say the original does.
+
+What makes it *feel* like it never hits is two measured rules stacking:
+
+- the cannon reaches **one cell** (`asm/23E6` probes a single cell; `cannon-range-live` hit at 1
+  and missed at 2 and 3, twice each), and
+- the ship sails **only map byte `0x00`** — `asm/2619` accepts `[DS:29] == 0x00` and nothing
+  else, and `captures/spice86/ship-port-boniface` measured it refusing its own dock tile and
+  grass.
+
+So a frigate sits in open water and a target has to be in one of the four cells around it. On land
+maps that is rare, which is what the owner was seeing. `passability_ladder.py`'s travel-mode cases
+already pin the ship's rule against `asm/253B`'s arms, and the cannon's one-cell reach and
+binary damage are pinned by `attack_check`/`combat_check`, so both halves are gated at the
+verdict level even though nothing here needed changing.
+
+The lesson kept from this is the one the section already named: both claims were graded owner
+observation, which is the right grade and the right instinct, and the answer was a poke and a
+keypress rather than a code change. Two of the three frigate combat recollections this project
+has held were wrong, both wrong in the direction of "the original would not let me do that".
 
 ### Where to look, so the next person does not start from zero
 
@@ -3302,9 +3342,13 @@ whether the cannon ray reaches the creature sweep at all, or prints and discards
   rule, say who can do it: an agent can drive it headless with a seeded world and a poked
   creature, so it is not owner-blocked.
 
-Neither is gated today, and the space-view lesson applies directly: a gate that asserts a
+At the time neither was gated — the closure above supersedes this paragraph and the two below it,
+which are kept as the record of what was believed on 2026-11-10 rather than as live guidance. The
+space-view lesson still applies directly: a gate that asserts a
 function was called proves nothing about what the player sees. Any check written for these should
 assert the visible outcome — a refusal line, or a creature's HP dropping — not that a handler ran.
+That is the standard the closure was measured against, and it is why defect 2 needed a planted
+target and an HP read rather than a trace line.
 
 ## Audit: every input-poll loop that never presents (owner-commissioned, 2026-11-10)
 
