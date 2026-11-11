@@ -2034,6 +2034,31 @@ listed as not-evidenced were not waiting on gameplay — they were waiting on th
   bought things while the band kept showing the old number. The redraw sits in the TRANSACT arm
   where the mutation happened, with the reason in the comment.
 
+**OFFER now charges, 2026-11-11.** `u2_commerce_offer` never paid for anything. `asm/3C2E` stores
+the `HOW MUCH (*100)` digit to `DS:27`, zeroes `DS:28`, and calls `asm/2052_gold_spend_price`
+**before** the role/sector dispatch, so every offer costs `hundreds x 100` gold — including the
+ones that end in `THANK YOU VERY MUCH!` and the one that ends in `EARN THE RING!`. A purse that
+cannot cover it gets `asm/2070`'s `YOU DONT HAVE THAT MUCH!`, which tail-jumps to the command
+loop, so the blessing check is never reached and the trial subtract is added back. The owner hit
+the omission directly: 317 gold, an offer of 500, and the engine cheerfully discussed the blessing.
+`u2_spend_price()` already existed and was already faithful to the inverted `jb` — four shop arms
+used it and the offer path simply did not call it. Gate: the CP6 ring block, which now funds the
+character (a zero-gold fixture silently lost eight checks the moment the charge landed, because
+every arm collapsed into the price refusal) and asserts `9999 -> 9499` on the unblessed refusal,
+the blessed grant, and a plain `THANK YOU` recipient, plus `317` unchanged with the money refusal.
+
+**OPEN DEFECT — a full-width line loses one character.** Found the same day, while writing that
+gate, and not yet fixed. `state.c` sets `right_margin = 0x28` = 40, but the screen is 40 columns
+wide (valid 0..39), and `seam_char_print` wraps only when `right_margin < cursor_col`. A glyph
+therefore reaches `cursor_col == 40`, `u2_vram_poke` returns silently on an out-of-range column,
+and the character is gone: the fixture printed `...THAT MU` / `H!` and dropped the `C`. The
+original gets the same margin byte and loses nothing, because its printer is the BIOS teletype at
+`col 40`, which wraps on its own. Not yet reproduced on a real screen — the overworld runs with
+`right_margin` at 29, which is why every capture so far has looked clean — so the exposure is
+unknown and the fix is a decision: clamp the margin to `U2_COLS - 1`, or make the printer wrap at
+column 40 the way `INT 10h` does. The second is the faithful one. The wrap also moves with the
+margin, which is why `commerce_check` asserts the first half of the refusal line only.
+
 ## cmd_R and cmd_N land, and the string emitter had been lying for weeks (2026-10-29)
 
 `captures/spice86/cmd-nr-live` — one headless run, maxed Fighter in sector 32, two command letters.

@@ -164,6 +164,12 @@ build-specific and the engine may be modelling a variant. Worth a look before CP
   in the bytes are `cmp $0x5`: five hundreds, so **500**, and the amount is one digit — 900 is
   not enterable. The claim is a plausible misremembering of the same handler's other figure, and
   the digit width is what rules it out rather than the walkthrough disagreeing with itself.
+  **And it is spent, not just compared** (2026-11-11): `asm/3C2E` calls `asm/2052_gold_spend_price`
+  before it looks at who the recipient is, so the 500 leaves the purse even when the answer is
+  EARN THE RING!, and a player short of it gets YOU DONT HAVE THAT MUCH! instead of ever hearing
+  about the blessing. That also makes the clerk's random +4 a **purchased** service at 100 gold
+  per 4 points, which is a second, independent reason the walkthrough's "stop at 95" advice
+  exists: 95 + 4 = 99 is the last raise that does not wrap, and each one costs money.
 
 ## 5. How to use this file
 
