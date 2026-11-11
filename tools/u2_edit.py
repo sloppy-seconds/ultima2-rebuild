@@ -162,9 +162,17 @@ SPELL_NAMES = ['NONE', 'LIGHT', 'DOWN LADDER', 'UP LADDER', 'PASSWALL', 'SURFACE
 
 # A durable test character: strong, unkillable, fully kitted.
 # Power armour (6) + quick sword (9) + keys and torches, one of every item and
-# every weapon owned. Stats 40 are a conservative "strong", NOT a proven cap;
-# the TEST character was observed live with str=50 (BCD 0x50).
-MAXOUT = {'str': 40, 'agi': 40, 'sta': 40, 'cha': 40, 'wis': 40, 'int': 40,
+# every weapon owned.
+#
+# Stats are 99, the packed-decimal maximum of the field, not a conservative "strong".
+# They used to be 40 on the grounds that 40 was not a proven cap — and that is true, the
+# TEST character was observed live at str=50 (BCD 0x50) — but 40 was still the wrong
+# number for a test character, because the point of maxout is to survive long enough to
+# reach content, and the owner ruled 99 on 2026-11-11 for exactly that reason. Note the
+# original has no ceiling guard on any stat add site (see the Hotel clerk grind in
+# asm/3C2E, which is four chained DAA adds with nothing after them), so 99 is a value
+# the game will happily walk past into 00 if you keep grinding it.
+MAXOUT = {'str': 99, 'agi': 99, 'sta': 99, 'cha': 99, 'wis': 99, 'int': 99,
           'hp': 9999, 'food': 999999, 'gold': 9999, 'exp': 9999}
 ARMOUR_BASE = 0x76      # weapons owned, DS:76+i  (the name is wrong; the comment is right)
 ITEM_BASE = 0xD6        # items held, DS:D6+i
