@@ -5,6 +5,25 @@
 #           wave catch-all spanning 0x10E7 bytes and the victory block is only its first ~0x160.
 #           Splitting it out is the right change and it is a structural one (it retiles the CP0
 #           map), so it is left for the owner rather than done inside a decode commit.
+#           ** EXECUTED 2026-11-12: every step below has now been watched, in order, in the
+#           original by the owner** (captures/spice86/minax-fight-live/, 1104 one-second
+#           frames). His report: "i don't change, but the map slow gets fades out then i end
+#           up in a rocket flying and I get the 'you have saved the universe'." That is this
+#           listing, in sequence, and three things came out of matching them:
+#           1. The 64x64 fill of 0x74 with `call L_005cb1` plus a delay on every OUTER
+#              iteration is a PROGRESSIVE fade, not an instant blackout -- 64 renders, which
+#              is why it crawls. "Repaints a whole sector black" was right about the byte and
+#              wrong about the experience.
+#           2. `DS:13 = 0x28` is the ROCKET code and the `75E1..` loop walking DS:01 by one
+#              per step with a delay is the rocket FLYING. The player sprite does not change;
+#              the mode byte does. The engine rendered a rocket in the player's cell when this
+#              fired, which reads as a transformation and is not one -- check victory.c
+#              against this before trusting that frame.
+#           3. The fade was seen in the chamber the player was standing in, which is NOT
+#              sector 30, so the embedded `MAPX30  ` filename being the fill target is now
+#              the weakest claim in this header rather than one of the stronger ones.
+#           Still unestablished after this: what `L_005417` returns, and whether `L_0061a6`
+#           beside that filename is a sector load or a screen call.
 # victory sequence, decoded statically 2026-11-09 (file offsets; image = file - 0x200):
 #   74A1  movb $0x28,DS:31          ; right_margin = 40, so the text prints in a narrow column
 #   74A6  call str_out              ; "\r\r     MINAX IS DEAD!!\rALL HER WORKS SHALL DIE!\r"

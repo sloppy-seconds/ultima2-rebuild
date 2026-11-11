@@ -15,6 +15,17 @@
 # func 2CCD..2CD2  len 0006 B  evidence: seed+reko
 # confidence: medium (the bytes are solid; the callee's meaning is decoded statically and has
 #           never executed in any capture)
+#           ** CORRECTED 2026-11-12: it has executed.** Owner play session in the original
+#           (captures/spice86/minax-fight-live/). The gate at asm/2CB5 fired on a killed
+#           type-0x40 creature, this routine's `call L_0074a0` ran, and the whole ending
+#           followed on screen -- `MINAX IS DEAD!!`, the progressive fade, the rocket flight,
+#           `YOU HAVE SAVED THE UNIVERSE`. The confidence line above is left as written
+#           because it records what was true when the header was cut; this line supersedes it.
+#           Note the fall-through warning below is now load-bearing in a new way: the only
+#           witness this project has of the fall-through firing is a person watching a screen,
+#           because the trace window in the noVNC container rolls past a one-shot event in
+#           seconds and this routine's addresses were absent from a dump taken immediately
+#           after the kill. See the retention caveat in docs/spice86-capture.md.
 # provenance: static, 2026-11-09. Discovered-but-not-executed: the strings it prints appear in
 #           CFG blocks (branch successors Spice86 expanded statically) but in no
 #           ExecutedInstructions. See AGENTS.md on CFG blocks not being proof of execution.
