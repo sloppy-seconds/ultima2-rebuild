@@ -1204,6 +1204,33 @@ engine reproduces it; the viewport-to-grid bridge (`seam=view`) is correct; and 
 moongate cells prove the grid origin is right. The bug is in what gets saved, not in what
 blocks movement.
 
+**Ruled 2026-11-11, and attempted: match `asm/2305`.** The owner chose the second option --
+keep the stamped write-back, because that is what the original does -- and noted that the
+save-layout rework may retire the whole problem later.
+
+That led straight at one expression. `asm/2233` is `mov 0x1b7(%di),%al` then
+`mov %al,(%bx,%si)`: the departure cell is restored from **`mon_kind[slot]`**, the terrain
+byte the creature saved when it arrived, and the routine's own header says "THIS is what
+DS:1B7 is for". The engine restored `map_base` instead -- a buffer loaded from a file that
+already contains baked stamps -- so every departure re-planted a creature byte with nothing
+behind it. That is the ghost, and it is why the original has none.
+
+Tried, measured, and **reverted because it is not sufficient.** Changing both restore sites
+(`ai.c` pursuit and retreat) to `st->mon_kind[slot]` took ghosts in the written pair from 24
+to 0 on the owner's save, and a gate written to assert it passed. But `ai_check`'s **M3**
+leg -- *"no cell is stamped with no creature behind it after the turn"* -- went red in the
+same build. So the change fixes the on-disk symptom while leaving an in-memory stamp that no
+slot byte accounts for, and two gates cannot disagree about the same property.
+
+**The next step is the collision, not the fix.** Something in the turn stamps a cell that
+`mon_kind` never learned about -- candidates worth measuring, in order: the arrival save at
+`asm/225A` writes the destination's *grid* byte into the slot, so if a destination can ever
+hold a stamp the slot inherits it; a spawn that stamps without going through the arrival
+pair leaves a cell whose slot byte is whatever `asm/0CEE_spawn_tile_store` put there; and a
+slot cleared by death or despawn never restores at all. M3 is the sharper instrument here
+because it sees the state before anything is written out. Do not re-apply the `mon_kind`
+change on its own; make M3 pass with it first, and let M3 be the judge.
+
 So a creature boxed in by mountain, water, or a knot of other creatures stays put in the
 engine because it stays put in the original. A pack that converges into a clump can freeze
 permanently by mutual stamping, and that is the original's behaviour, not a port defect.
