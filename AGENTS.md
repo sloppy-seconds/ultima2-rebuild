@@ -64,7 +64,14 @@ recommendation in § 3a is to keep the loop-scoped structure rather than test th
 > a record a pre-slot tree left behind (`u2_slot_adopt_legacy`, spec § 4b, an owner-approved
 > amendment to D6) because the drop-in layout has no installer to run. The gate for the whole change is `engine/tests/content_immutable.py`, wired
 > into `run_cp4.sh`, and it runs its own red control every time. **To start a fresh
-> agent, read `docs/handoff-2026-11-03.md` first (**current entry point** — the rocket and
+> agent, read `docs/handoff-2026-11-12.md` first (**current entry point** — the Minax session:
+> the game was won in the original, which retired several "never executed" notes in `asm/`, and
+> the open work is CP8 (Minax is skipped entirely by one line in `ai.c`, her teleport is observed
+> but undecoded, invulnerable castle creatures have no mechanism in the engine, and the engine's
+> ending has neither the fade nor the flight), plus the signpost arm of `cmd_E` with its frame
+> already captured. It also carries the seven hazards that cost this session time — read § 4
+> before touching a container or injecting a key.) The queue it supersedes is
+> `docs/handoff-2026-11-03.md` (the rocket and
 > space session: G39, G59, G60 and G62 closed and G63/G64 added. `DS:13 = 0x28` finally
 > observed after 167 empty harvests; the parked-rocket triple `DS:69/6A/6B` decoded, which
 > is the reason a rocket launch silently saves; the world coordinate tables at file
