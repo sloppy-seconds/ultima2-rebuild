@@ -373,6 +373,13 @@ static void run_demo(u2_ctx *ctx)
  * note naming the display requirement rather than pretending to play. */
 static void run_play(u2_ctx *ctx)
 {
+    /* asm/0764 clears the screen before it reads the disk. The world loop does not
+     * clear on entry (it assumes the entering path did — the same reason the death
+     * reload below clears before it re-reads), so without this the title text drawn
+     * into the vram text band by draw_title persisted under the map after loading.
+     * Owner-reported 2026-11-12 (handoff § 1f). The map pixels are cleared by the
+     * frame render; this is the text band, which only seam_clear_screen resets. */
+    seam_clear_screen(ctx);
     for (;;) {
         u2_key k;
         u2_save_result r = u2_save_load(ctx);
