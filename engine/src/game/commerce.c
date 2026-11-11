@@ -863,6 +863,31 @@ u2_offer_result u2_commerce_offer(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
         return U2_OFFER_NOBODY;                 /* caller gone; nothing printed, nothing moved */
     const uint8_t hundreds = (uint8_t)d;
 
+    /* The offer is PAID, and it is paid before the game decides who is being paid.
+     * asm/3C2E stores the digit to DS:27, zeroes DS:28, and calls L_002252, which is
+     * asm/2052_gold_spend_price — a routine whose own header lists cmd_O among its five
+     * inbound callers. DS:27 subtracts from the HIGH gold byte, so one unit is 100 gold and
+     * 5 costs 500. If the BCD subtract borrows, asm/2070 adds the pair back, prints
+     * YOU DONT HAVE THAT MUCH! and tail-jumps to the command loop instead of returning, so
+     * this arm prints nothing further.
+     *
+     * This call was missing here entirely, and the owner reported the omission on 2026-11-11:
+     * with 317 gold he offered 500 to the sector-32 ring man and got EARN THE RING!. The
+     * original never reaches the blessing check on too little money; it says YOU DONT HAVE
+     * THAT MUCH! and takes nothing. The amount is therefore a price and not a threshold, and
+     * the `cmp $0x5` below is a minimum on top of it. Because the charge precedes the role
+     * gate it applies to every recipient: a 1-hundred offer to a random townsman costs 100
+     * gold and then says THANK YOU VERY MUCH!, and the Hotel clerk's stat raise is a paid
+     * service at 100 gold per 4 points.
+     *
+     * How it was missed: a grep of cmd_O's own bytes for the gold displacements 0x58/0x59
+     * came back empty and the conclusion was drawn that the routine does not touch gold.
+     * True of the 0x18E bytes in that file, wrong about the routine — the deduction is one
+     * call away, in a file whose name says what it does. */
+    const uint8_t price[2] = { hundreds, 0x00 };   /* DS:27 = high, DS:28 = low */
+    if (!u2_spend_price(ctx, price))
+        return U2_OFFER_BROKE;
+
     /* Bit 7 of the role byte decides everything, and the whole special path is additionally
      * gated on sector 32 -- `[DS:4A]==2 && [DS:49]==3`. Outside that one town a quest role
      * prints the same THANK YOU a plain creature gets, which is a byte-level anchor for

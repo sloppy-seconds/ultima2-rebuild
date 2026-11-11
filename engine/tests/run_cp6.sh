@@ -751,7 +751,16 @@ printf '\n'
             || bad "CP6 ring: Antos said nothing -- the blessing cannot be earned"
 
         # The ring man, unblessed: asm/3C2E prints EARN THE RING! and hands nothing over.
+        #
+        # Gold is set on purpose, and that is the half that was missing. asm/3C2E pays the
+        # offer BEFORE it looks at who is being offered to: the digit goes to DS:27, DS:28 is
+        # zeroed, and L_002252 (asm/2052_gold_spend_price) subtracts the pair from gold. So
+        # 5 hundreds costs 500 gold even when the recipient then refuses, and a player who
+        # cannot cover it never reaches the blessing check at all — they get YOU DONT HAVE
+        # THAT MUCH! from asm/2070, which abandons cmd_O rather than returning to it. The
+        # owner hit the missing charge on 2026-11-11 with 317 gold in hand.
         python3 ../tools/u2_edit.py set ../original/player sector 32 -o "$WORK/ring/save/PLAYER/PLAYER" >/dev/null 2>&1
+        python3 ../tools/u2_edit.py set "$WORK/ring/save/PLAYER/PLAYER" gold 9999 >/dev/null 2>&1
         python3 ../tools/u2_edit.py setpos "$WORK/ring/save/PLAYER/PLAYER" 25 3 >/dev/null 2>&1
         printf 'O\n\360\n5\n' > "$WORK/ring/offer.keys"   # OFFER, up at (25,2), 5 hundreds
         unblessed=$(./u2 --headless --play-map --data-dir ../original \
@@ -763,10 +772,35 @@ printf '\n'
         echo "$unblessed" | grep -qa '"items":"00 ' \
             && ok "CP6 ring: and the RING slot is still empty, so the refusal is real and not cosmetic" \
             || bad "CP6 ring: the unblessed offer put a ring in DS:D6 anyway"
+        echo "$unblessed" | grep -qa '"gold":9499' \
+            && ok "CP6 ring: and the 500 was taken even though nothing was granted (asm/3C2E pays, then asks who)" \
+            || bad "CP6 ring: the unblessed offer was free -- cmd_O's call to asm/2052 is not being made"
+
+        # Broke: 317 gold offered against a 500 ask. This is the exact state the owner was in,
+        # and the original's answer is the affordability line, not the blessing line.
+        python3 ../tools/u2_edit.py set "$WORK/ring/save/PLAYER/PLAYER" gold 317 >/dev/null 2>&1
+        broke=$(./u2 --headless --play-map --data-dir ../original \
+                     --save-dir "$WORK/ring/save" --script "$WORK/ring/offer.keys" \
+                     --dump-state 2>&1)
+        # The refusal line is 24 chars and the CMD window is 30 wide with the prompt and the
+        # amount already on its row, so it WRAPS: the grid reads `YOU DONT HAVE` on one row and
+        # `THAT MUCH!` on the next, with the status band interleaved between them. A grep for
+        # the literal sentence can never match a wrapped line, and a gate that greps for one and
+        # passes is worse than no gate — so the pipes and row breaks are stripped first and the
+        # two halves are matched across whatever the renderer put between them.
+        echo "$broke" | tr -d '|\n' | grep -qa "DONT HAVE.*THAT MUCH" \
+            && ok "CP6 ring: 317 gold against a 500 ask prints asm/2070's refusal (wrap-tolerant)" \
+            || bad "CP6 ring: an unaffordable offer was accepted -- there is no price check on cmd_O"
+        echo "$broke" | grep -qa '"gold":317' \
+            && ok "CP6 ring: and the trial subtract was added back, so a refusal costs nothing" \
+            || bad "CP6 ring: an unaffordable offer moved gold anyway — asm/2070's add-back is missing"
+        echo "$broke" | grep -qa "EARN THE RING" \
+            && bad "CP6 ring: a broke offer reached the blessing check -- the charge must come first" || true
 
         # And blessed: the same run, the same creature, the same amount, with the flag set.
         # The assertion is the inventory, not the line: "THE RING IS YOURS!" scrolls off the
         # log before the dump, and the slot is the thing the player keeps.
+        python3 ../tools/u2_edit.py set "$WORK/ring/save/PLAYER/PLAYER" gold 9999 >/dev/null 2>&1
         python3 ../tools/u2_edit.py set "$WORK/ring/save/PLAYER/PLAYER" blessing 1 >/dev/null 2>&1
         blessed=$(./u2 --headless --play-map --data-dir ../original \
                         --save-dir "$WORK/ring/save" --script "$WORK/ring/offer.keys" \
@@ -774,6 +808,9 @@ printf '\n'
         echo "$blessed" | grep -qa '"items":"01 ' \
             && ok "CP6 ring: with the blessing the same offer puts the ring in DS:D6" \
             || bad "CP6 ring: the blessed offer did not give the ring"
+        echo "$blessed" | grep -qa '"gold":9499' \
+            && ok "CP6 ring: and the grant is worth the 500 it cost (9999 -> 9499)" \
+            || bad "CP6 ring: the blessed offer did not pay for the ring"
         echo "$blessed" | grep -qa "EARN THE RING" \
             && bad "CP6 ring: the blessed offer still refused -- the seed did not reach the run" || true
     else

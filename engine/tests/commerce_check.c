@@ -97,6 +97,15 @@ static void arm_offer(u2_ctx *ctx, u2_overworld *ow, uint8_t role, uint8_t bless
     ctx->state.sector_first = (uint8_t)first;
     ctx->state.sector_second = (uint8_t)second;
     ctx->state.blessing = blessing;
+    /* The offer is PAID before the recipient is identified: asm/3C2E stores the digit to
+     * DS:27, zeroes DS:28 and calls asm/2052_gold_spend_price, which subtracts the pair from
+     * gold and refuses with YOU DONT HAVE THAT MUCH! when the BCD borrow says you are short.
+     * A zero-gold fixture therefore never reaches any arm below — it stops at the price check,
+     * which is how this fixture silently lost eight checks on 2026-11-11 when the charge was
+     * added. Funded at 9999 so the arms under test are reachable; the payment is asserted on
+     * its own rather than assumed away here. */
+    ctx->state.gold_lo = 0x99;      /* DS:58, the HIGH byte despite the name */
+    ctx->state.gold_hi = 0x99;      /* DS:59 */
     ow->x = 10;
     ow->y = 10;
     ow->world.map_loaded = 1;
@@ -471,6 +480,9 @@ int main(void)
               "500 gold to the sector-32 role-0x82 man without the blessing");
         CHECK(grid_has(&ctx, U2_S_OFFER_EARN_RING), "EARN THE RING! is what he says");
         CHECK(ctx.state.items_held[0] == 0, "and no ring changes hands");
+        CHECK(ctx.state.gold_lo == 0x94 && ctx.state.gold_hi == 0x99,
+              "and the 500 was taken even though he refused: 9999 -> 9499 (%02x%02x)",
+              ctx.state.gold_lo, ctx.state.gold_hi);
 
         /* The reader, blessed: THE RING IS YOURS! and DS:D6 goes to 1. */
         arm_offer(&ctx, &ow, 0x82, 1, 3, 2);
@@ -478,6 +490,37 @@ int main(void)
               "the same offer after the blessing");
         CHECK(grid_has(&ctx, U2_S_OFFER_RING_IS_YOURS), "THE RING IS YOURS! is what he says");
         CHECK(ctx.state.items_held[0] == 1, "DS:D6, the RING slot, is set to 1");
+        CHECK(ctx.state.gold_lo == 0x94 && ctx.state.gold_hi == 0x99,
+              "the grant costs the same 500 (9999 -> 9499)");
+
+        /* Broke: the exact state the owner was in on 2026-11-11, 317 gold against a 500 ask.
+         * The original answers with asm/2070's line and never reaches the blessing check, and
+         * the trial subtract is added back so a refusal costs nothing. The line WRAPS on a
+         * real screen — `YOU DONT HAVE` on one row, `THAT MUCH!` on the next, status band
+         * interleaved — so both halves are looked for rather than the whole sentence, which
+         * grid_has() could never match across a row boundary. */
+        arm_offer(&ctx, &ow, 0x82, 1, 3, 2);
+        ctx.state.gold_lo = 0x03;               /* 317 gold */
+        ctx.state.gold_hi = 0x17;
+        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_BROKE,
+              "317 gold against a 500 ask is refused for money, not for the blessing");
+        CHECK(grid_has(&ctx, "YOU DONT HAVE"),
+              "YOU DONT HAVE THAT MUCH! is on the grid (first half: the line wraps, and the "
+              "wrap point moves with the right margin)");
+        CHECK(ctx.state.gold_lo == 0x03 && ctx.state.gold_hi == 0x17,
+              "and the add-back left the purse untouched (%02x%02x)",
+              ctx.state.gold_lo, ctx.state.gold_hi);
+        CHECK(ctx.state.items_held[0] == 0, "and no ring, of course");
+
+        /* The charge is not a quest-arm thing. asm/2052 runs before the role gate, so a plain
+         * recipient is paid too — which is also what makes the Hotel clerk's stat raise a
+         * service bought at 100 gold per 4 points rather than a free gift. */
+        arm_offer(&ctx, &ow, 0x01, 0, 3, 2);    /* role bit 7 clear: THANK YOU */
+        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_THANK_YOU,
+              "a plain recipient still says THANK YOU VERY MUCH!");
+        CHECK(ctx.state.gold_lo == 0x94 && ctx.state.gold_hi == 0x99,
+              "and still cost 500, because asm/2052 runs before the role gate (%02x%02x)",
+              ctx.state.gold_lo, ctx.state.gold_hi);
 
         /* Controls on the reader: the sector gate and the amount gate. */
         arm_offer(&ctx, &ow, 0x82, 1, 3, 1);       /* sector 31: blessed, wrong town */

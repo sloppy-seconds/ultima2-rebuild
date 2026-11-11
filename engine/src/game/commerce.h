@@ -214,7 +214,10 @@ typedef enum u2_offer_result {
     U2_OFFER_RING,          /* THE RING IS YOURS! — DS:D6 set */
     U2_OFFER_WEAPON,        /* HERE TAKE THIS! — one weapon count goes up */
     U2_OFFER_RAISE,         /* ALAKAZAM! — a stat went up by 4 x hundreds */
-    U2_OFFER_REFUSED        /* the 2 of 8 that prints THANK YOU instead of raising */
+    U2_OFFER_REFUSED,       /* the 2 of 8 that prints THANK YOU instead of raising */
+    U2_OFFER_BROKE          /* YOU DONT HAVE THAT MUCH! — asm/2052 could not subtract the
+                             * amount from gold, and asm/2070 abandons cmd_O rather than
+                             * returning to it, so nothing else prints */
 } u2_offer_result;
 
 /* Runs the whole handler after the direction is known: the creature scan, the amount
