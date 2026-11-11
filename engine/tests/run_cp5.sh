@@ -210,6 +210,35 @@ else
     sed 's/^/        /' "$WORK/atk.build"
 fi
 
+# --- CP5 H1: the magical helm's VIEW draws the sector ------------------------------
+#
+# A pixel assertion, deliberately. The engine spent the helm and printed VIEW / WITH
+# MAGICAL HELM! for months while showing nothing, and every message-level test stayed
+# green, because the message was never the missing part. The geometry and the density
+# ladder come from captures/spice86/vhelm-sector-map-live (three sectors, three frames,
+# each matching its own mapx), and the control was run red before this was trusted:
+# make every cell's density zero and the land-half check goes red while the charge and
+# the two refusal controls stay green, which is what proves the gate tests the picture
+# and not the handler.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -Isrc/platform \
+        -o "$WORK/helm_map_check" tests/helm_map_check.c src/core/*.c src/game/*.c \
+        src/debug/*.c 2>"$WORK/helm.build"; then
+    if "$WORK/helm_map_check" > "$WORK/helm.out" 2>&1; then
+        n=$(sed -n 's/^helm_map_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/helm.out")
+        if [ "${n:-0}" -eq 0 ]; then
+            bad "CP5 V1 helm view executed 0 checks — the test is not running"
+        else
+            ok "CP5 H1 helm view: sector drawn in the map band, one helm per press, both refusals draw nothing ($n checks)"
+        fi
+    else
+        sed 's/^/        /' "$WORK/helm.out"
+        bad "CP5 H1: the helm's VIEW does not draw the sector"
+    fi
+else
+    bad "CP5 H1 harness did not build:"
+    sed 's/^/        /' "$WORK/helm.build"
+fi
+
 # --- 1f. the death tail (CP5 W8) -------------------------------------------
 # asm/0C62..0C99 as one span, checked against the captured frame in
 # captures/spice86/cp5-weak-fight/death1.png. It links the whole game core rather

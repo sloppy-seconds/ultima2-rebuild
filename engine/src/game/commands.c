@@ -712,28 +712,75 @@ static u2_cmd_result cmd_X(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
     return U2_CMD_DONE;
 }
 
+/* The helm's VIEW, drawn.
+ *
+ * Geometry measured 2026-11-11 in captures/spice86/vhelm-sector-map-live: the sector's
+ * 64x64 cells at 4x2 logical pixels each from (17,16), so the picture is 256x128 and the
+ * CMD window below it is left alone. The origin is not a guess — in sector 00 the topmost
+ * land row of mapx00 is row 8 and the lit pixels begin at y=32; in sector 30 the topmost
+ * land row is 2 and they begin at y=20. Same origin either way, and the left edge agrees
+ * from each map's leftmost land column.
+ *
+ * Water is black and land is a dither whose density rises with the art index; mean
+ * luminance in sector 30 was art 0 -> 9.6, art 1 -> 50, art 2 -> 47, art 3 -> 76,
+ * art 4 -> 114 out of 255. Arts above 4 occur once or twice there, so there is no measured
+ * table for them: the ladder below is fitted to what was measured and is a description of
+ * the frames, not a model of the mechanism, because the per-art dither has not been traced
+ * to anything in asm/. */
+static int helm_cell_density(uint8_t map_byte)
+{
+    if (map_byte == 0)
+        return 0;                                   /* water */
+    const unsigned art = (unsigned)(map_byte >> 2);
+    if (art <= 2) return 2;
+    if (art == 3) return 3;
+    return 4;
+}
+
+static void helm_map_draw(u2_ctx *ctx, u2_overworld *ow)
+{
+    enum { OX = 17, OY = 16, CW = 4, CH = 2 };
+    /* A fixed spread over the 8 pixels of a cell, so density k reads as a dither rather
+     * than as a solid corner. */
+    static const uint8_t spread[CW * CH] = { 0, 5, 2, 7, 4, 1, 3, 6 };
+
+    u2_frame_clear(&ow->frame, U2_CGA_BLACK);
+    for (int cy = 0; cy < U2_SECTOR_EDGE; cy++) {
+        for (int cx = 0; cx < U2_SECTOR_EDGE; cx++) {
+            const int lit = helm_cell_density(u2_world_tile_at(&ow->world, cx, cy));
+            for (int i = 0; i < lit; i++)
+                u2_frame_put_logical(&ow->frame, OX + cx * CW + spread[i] % CW,
+                                     OY + cy * CH + spread[i] / CW, U2_CGA_WHITE);
+        }
+    }
+    /* The CMD window keeps drawing over the map, which is what the frames show: the view
+     * replaces the play field and not the text band beneath it. */
+    u2_font_draw_vram_rows(&ow->frame, &ctx->vram, U2_MSG_TOP, U2_ROWS - 1);
+    seam_present_frame(ctx);
+}
+
 /* asm/437E_cmd_V: VIEW.
  *
  * DS:DB is items_held[5], and U2_T_ITEMS[5] is "HELM" — so the gate is literally "do you hold a
  * HELM", with no inference left in it. Second gate is DS:4A (the sector's second decimal digit)
  * below 4; at or above 4 it prints the same VIEW WHAT? refusal.
  *
- * Observed live 2026-10-26 (captures/spice86/vhelm/): with DS:DB = 01 read BEFORE the press and
- * DS:4A = 00, pressing V replaced the whole play field with a WORLD MAP — continents in white on
- * black — and DS:DB read 00 afterwards, so the view costs one helm. A second press with none left
- * prints VIEW WHAT?.
+ * Observed live 2026-10-26 (captures/spice86/vhelm/) and re-observed 2026-11-11
+ * (captures/spice86/vhelm-sector-map-live, which is the one to read): with a helm held and
+ * DS:4A = 00, pressing V replaced the play field with a map and DS:DB read one lower
+ * afterwards. The 2026-10-26 note called the picture a WORLD MAP with continents. It is
+ * not: it is the sector you are standing in, and the oval that read as continents in
+ * sector 00 is mapx00's own landmass. The charge is one per press, measured at 07 -> 06
+ * -> 05, and at zero the handler prints VIEW WHAT? rather than going negative.
  *
- * WHAT IS NOT MODELLED, and deliberately not faked: the map itself. The original sets DS:23/24 to
- * 0x20,0x20, calls L_002bd2, waits on L_00514d until AH == 0xFF, then clears two 256-byte tables
- * at 0x272 and 0x372. Where the continent art comes from is unidentified — it is not the sector
- * grid and not the tile atlas — so the engine prints the message and spends the helm, and the
- * overlay is an open gap rather than an invented approximation. Spending the charge without
- * showing the view is a known wrongness of enhanced and fidelity alike; a plausible fake map
- * would be worse, because it would look finished.
+ * The map is now drawn. See helm_map_draw for the geometry and the density ladder, both
+ * measured, and engine/tests/helm_map_check for the gate — which is a pixel assertion on
+ * purpose, because the message was never the missing part and a message-level test stayed
+ * green for months over an empty screen.
  */
 static u2_cmd_result cmd_V(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
 {
-    (void)ow; (void)letter;
+    (void)letter;
 
     if (ctx->state.items_held[5] == 0 || ctx->state.sector_second >= 4) {
         seam_str_out(ctx, U2_S_VIEW_WHAT);
@@ -745,6 +792,27 @@ static u2_cmd_result cmd_V(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
     seam_char_print(ctx, '\r');            /* the original's 0x8d newline glyph */
     seam_str_out(ctx, U2_S_VIEW_HELM_B);
     ctx->state.items_held[5] = bcd_dec1(ctx->state.items_held[5]);
+
+    /* The view is modal and it costs one helm, both measured rather than inferred:
+     * DS:DB poked to 07 read back 06 after one press and 05 after two, and at 00 the
+     * handler prints VIEW WHAT? instead of going negative. asm/437E polls L_00514d
+     * until AH == 0xFF, i.e. it waits for a key, then clears the two staging tables at
+     * DS:272 and DS:372 and tail-jumps to the tick.
+     *
+     * Polled rather than blocked, and presented by hand rather than through
+     * seam_key_wait: the registered presenter redraws the WORLD, which would paint over
+     * the map before the player ever saw it. A spent script makes poll return -1, so this
+     * cannot hang a headless run. */
+    helm_map_draw(ctx, ow);
+    for (;;) {
+        u2_key k;
+        const int r = seam_key_poll(ctx, &k);
+        if (r != 0)
+            break;
+        if (ctx->clock && ctx->clock->sleep_ms)
+            ctx->clock->sleep_ms(ctx, 32);
+    }
+
     cmd_done(ctx);
     return U2_CMD_DONE;
 }
@@ -1917,8 +1985,10 @@ static u2_cmd_result cmd_D(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
  *      scan, which is why it could not share the unlock/steal plumbing wholesale. The shops are
  *      game/commerce.c; the street-merchant half (asm/412C, asm/41D9, the tlkx printer at
  *      asm/154E) is still CP6.
- *   V  "VIEW WHAT?" and the helm view need an inventory view; the Z screen has the lists but
- *      not the per-item selection cmd_V walks.
+ *   V  done 2026-11-11. An earlier note here said the helm view "needs an inventory view"
+ *      and a "per-item selection cmd_V walks". Neither is in asm/437E: it tests the HELM
+ *      count at DS:DB, tests the site digit at DS:4A, prints, decrements, draws the sector
+ *      and waits for a key. No selection, no menu.
  *   W  the armour menu needs armour ownership and the strength gate; asm/43F3's menu is read
  *      but the ownership bytes are not modelled.
  *   X  implemented 2026-10-29 as the dismount (asm/44D4); it was listed here as "destroy item"
@@ -1959,7 +2029,8 @@ static const cmd_fn cmd_table[CMD_COUNT] = {
     cmd_S, /* S  steal: asm/3F25, the TRANSACT ray at a shoppe, quadrant loot, no creature scan */
     cmd_T, /* T  transact: asm/4050, the ray and the shops in game/commerce.c */
     cmd_U, /* U  unlock aim: asm/42F1, prints UNLOCK DIRECTION- and awaits a direction */
-    cmd_V, /* V  view: asm/437E, needs a HELM held and sector digit < 4; the map overlay is NOT modelled */
+    cmd_V, /* V  view: asm/437E, needs a HELM held and sector digit < 4; draws the sector
+            *    as a 64x64 overview at 4x2 px per cell and waits for a key (CP5 H1) */
     cmd_W, /* W  wear armour: asm/43F3, full menu then digit then ownership and strength gates */
     cmd_X, /* X  X-IT dismount: asm/44D4, returns the tile and the class-dependent foot stamp */
     cmd_Y, /* Y  yell: asm/4542 + its echo loop asm/4551..4567, display-only */
