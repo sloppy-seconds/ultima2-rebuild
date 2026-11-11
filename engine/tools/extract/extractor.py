@@ -254,6 +254,25 @@ MANIFEST = [
     ("U2_S_ENTER",             "3389_cmd_E.asm",          ("run", 0x358C, 5, "ENTER")),
     ("U2_S_ENTER_WHAT",        "3399_sub_3399.asm",       ("run", 0x359C, 6, " WHAT?")),
     ("U2_S_ONLY_ON_FOOT",      "33AE_move_only_on_foot.asm", ("run", 0x35B1, 14, "-ONLY ON FOOT!")),
+    # CP8 1e — cmd_E's signpost arm (asm/3389 -> the art-10 arm -> asm/3525 -> asm/353C
+    # reads DS:49 -> asm/3546 era dispatch). Pressing E on a signpost (art 0x0A, tile
+    # 0x28) prints "-THE SIGN READS:" then the era label for the sector tens digit, on
+    # the next line. Captured on frame from the original 2026-11-12 and matching the
+    # static decode, including the leading dash and the 0x0d that breaks the line.
+    # The five era labels are asm/3546's dec/je dispatch on DS:49: 0 LEGENDS, 1 9M BC,
+    # 2 1423 BC, 3 1990 AD, >=4 2112 AD. All offsets confirmed unique in the exe on
+    # 2026-11-12. "-THE SIGN READS:" carries a trailing 0x0d (the game's newline) before
+    # the terminator, so the length stops before it and the engine emits the newline.
+    ("U2_S_SIGN_READS",        "3525_sub_3525.asm",          ("run", 0x3728, 16, "-THE SIGN READS:")),
+    ("U2_S_ANOS_LEGENDS",      "3566_sub_3566.asm",          ("run", 0x3768, 14, "ANOS: LEGENDS!")),
+    # "ANOS: 9,000,000 B.C." is contiguous in the exe at 0x377d but the clean wave cut it
+    # in half across asm/3577 (`db "ANOS:"`) and asm/3582 (`db " 9,000,000 B.C."`), so no
+    # single asm file's data stream carries the whole literal and it cannot be proven
+    # present in asm/. It is exe-only for that reason and named on UNPROVABLE below.
+    ("U2_S_ANOS_9M_BC",        "3577_sub_3577.asm",          ("run", 0x377d, 20)),
+    ("U2_S_ANOS_1423_BC",      "3596_show_year_1990.asm",    ("run", 0x3798, 15, "ANOS: 1423 B.C.")),
+    ("U2_S_ANOS_1990_AD",      "3596_show_year_1990.asm",    ("run", 0x37ae, 15, "ANOS: 1990 A.D.")),
+    ("U2_S_ANOS_2112_AD",      "3546_time_index_message.asm", ("run", 0x3752, 15, "ANOS: 2112 A.D.")),
     ("U2_S_DESCEND",           "334D_cmd_D.asm",          ("run", 0x3550, 7, "DESCEND")),
     ("U2_S_DESCEND_WHAT",      "334D_cmd_D.asm",          ("run", 0x3566, 6, "-WHAT?")),
     # cmd_I (IGNITE TORCH) and cmd_K (KLIMB), decoded 2026-10-29. Both handlers are cut by the
@@ -642,6 +661,9 @@ UNPROVABLE = frozenset({
     "U2_S_MAGIC_SPELL_READY",  # asm/3B92 (15 db bytes in the file, none of them this)
     "U2_S_FOOD_YES_A",         # asm/17F5
     "U2_S_FOOD_YES_B",         # asm/17F5
+    "U2_S_ANOS_9M_BC",         # asm/3577: "ANOS:" here, " 9,000,000 B.C." in asm/3582;
+                               # contiguous in the exe at 0x377d but split across two asm
+                               # files, so no single file's data stream proves the whole.
 })
 
 DB_LINE_RE = re.compile(r"^\s*db\s+(.*?)\s*(?:#.*)?$")

@@ -30,6 +30,20 @@ static int fails, checks, skipped;
 #define CHECK(cond, ...) do { checks++; if (!(cond)) { fails++; \
     printf("  FAIL  " __VA_ARGS__); printf("\n"); } } while (0)
 
+/* Does the needle appear anywhere on the screen grid? The signpost prints two lines
+ * into the message window; asserting presence anywhere avoids pinning the exact row,
+ * which the seam's scroll controls. */
+static int grid_has(u2_ctx *ctx, const char *needle)
+{
+    char row[U2_COLS + 1];
+    for (int r = 0; r < U2_ROWS; r++) {
+        for (int c = 0; c < U2_COLS; c++) row[c] = (char)ctx->vram.cell[r][c].ch;
+        row[U2_COLS] = '\0';
+        if (strstr(row, needle)) return 1;
+    }
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     const char *label;
@@ -248,6 +262,52 @@ int main(int argc, char **argv)
      * 0x78 — the Q on-foot gate and cmd_E both use >= 0x78, so a class-dependent value must
      * not be mistaken for a vehicle. */
     CHECK(u2_foot_stamp(3) >= 0x78, "0x7E still passes every 'on foot' comparison in the game");
+
+    /* --- the signpost arm of cmd_E (asm/3389 -> asm/3525 -> asm/3546) -----------
+     * Standing on a signpost (art 0x0A, tile 0x28) outdoors and pressing E prints
+     * "-THE SIGN READS:" then the era label for the sector tens digit on the next
+     * line. Captured on frame from the original 2026-11-12. site_for_tile leaves art
+     * 10 as no-door, so this is u2_overworld_enter's own branch, not the site table.
+     * The era dispatch is asm/3546's dec/je ladder on DS:49: 0 LEGENDS, 1 9M BC,
+     * 2 1423 BC, 3 1990 AD, >=4 2112 AD. */
+    {
+        static const struct { uint8_t tens; const char *era; } eras[] = {
+            { 0, "ANOS: LEGENDS!" },
+            { 1, "ANOS: 9,000,000 B.C." },
+            { 2, "ANOS: 1423 B.C." },
+            { 3, "ANOS: 1990 A.D." },
+            { 4, "ANOS: 2112 A.D." },
+            { 9, "ANOS: 2112 A.D." },   /* >=4 fall-through: the off-Earth world index */
+        };
+        for (unsigned i = 0; i < sizeof eras / sizeof eras[0]; i++) {
+            u2_ctx c; u2_overworld ow;
+            memset(&c, 0, sizeof c); memset(&ow, 0, sizeof ow);
+            u2_vram_init(&c.vram);
+            u2_state_init(&c.state);
+            c.state.sector_first = eras[i].tens;
+            c.state.sector_second = 0;         /* outdoors */
+            c.state.player_stamp = 0x78;       /* on foot */
+            ow.x = 10; ow.y = 10;
+            ow.world.map_loaded = 1;
+            ow.world.map[10 * U2_SECTOR_EDGE + 10] = 0x28;   /* the signpost */
+            u2_overworld_enter(&c, &ow);
+            CHECK(grid_has(&c, "-THE SIGN READS:"),
+                  "signpost at era %u prints -THE SIGN READS:", eras[i].tens);
+            CHECK(grid_has(&c, eras[i].era),
+                  "signpost at DS:49=%u prints the era label %s", eras[i].tens, eras[i].era);
+        }
+        /* CONTROL: a non-signpost tile (grass) does NOT print the sign — it takes the
+           no-door " WHAT?" path. Without this the branch could fire on every tile. */
+        u2_ctx c; u2_overworld ow;
+        memset(&c, 0, sizeof c); memset(&ow, 0, sizeof ow);
+        u2_vram_init(&c.vram); u2_state_init(&c.state);
+        c.state.sector_second = 0; c.state.player_stamp = 0x78;
+        ow.x = 10; ow.y = 10; ow.world.map_loaded = 1;
+        ow.world.map[10 * U2_SECTOR_EDGE + 10] = 0x08;   /* grass, not a signpost */
+        u2_overworld_enter(&c, &ow);
+        CHECK(!grid_has(&c, "-THE SIGN READS:"),
+              "control: grass under foot is not a signpost, no sign is read");
+    }
 
     printf("site_check: %d checks, %d failures%s\n", checks, fails,
            skipped ? " (data cross-check skipped)" : "");

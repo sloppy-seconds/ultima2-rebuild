@@ -220,6 +220,18 @@
 #define U2_S_ENTER_WHAT " WHAT?"
 /* exe@0x35B1 */
 #define U2_S_ONLY_ON_FOOT "-ONLY ON FOOT!"
+/* exe@0x3728 */
+#define U2_S_SIGN_READS "-THE SIGN READS:"
+/* exe@0x3768 */
+#define U2_S_ANOS_LEGENDS "ANOS: LEGENDS!"
+/* exe@0x377D */
+#define U2_S_ANOS_9M_BC "ANOS: 9,000,000 B.C."
+/* exe@0x3798 */
+#define U2_S_ANOS_1423_BC "ANOS: 1423 B.C."
+/* exe@0x37AE */
+#define U2_S_ANOS_1990_AD "ANOS: 1990 A.D."
+/* exe@0x3752 */
+#define U2_S_ANOS_2112_AD "ANOS: 2112 A.D."
 /* exe@0x3550 */
 #define U2_S_DESCEND "DESCEND"
 /* exe@0x3566 */

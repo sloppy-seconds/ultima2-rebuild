@@ -248,6 +248,28 @@ int u2_site_for_tile(uint8_t tile, const char **label, int *ax, int *ay)
     return site_for_tile(tile, label, ax, ay);
 }
 
+/* asm/3546_time_index_message: the era label a signpost prints, keyed on the sector
+ * TENS digit (DS:49), which asm/353C loads into %di two instructions before this
+ * dispatch. The chain is a dec/je ladder, so the arms are 0/1/2/3/>=4:
+ *   0 -> "ANOS: LEGENDS!"        1 -> "ANOS: 9,000,000 B.C."
+ *   2 -> "ANOS: 1423 B.C."       3 -> "ANOS: 1990 A.D."      >=4 -> "ANOS: 2112 A.D."
+ * On Earth (DS:6D == 0) DS:49 is this era index, 0..4 (docs/moongates.md § 4). Off
+ * Earth DS:49 is the world index and the SAME chain runs, so a planet whose tens digit
+ * is >= 4 reads "2112 A.D." — the bytes are unambiguous about what it does, but whether
+ * that is the right thing to show off Earth is open (needs-gameplay: the dispatch has no
+ * proven arm past 4). The engine reproduces the byte-faithful dispatch and does not
+ * invent an off-Earth meaning the binary does not have. */
+static const char *signpost_era_label(uint8_t tens)
+{
+    switch (tens) {
+    case 0:  return U2_S_ANOS_LEGENDS;
+    case 1:  return U2_S_ANOS_9M_BC;
+    case 2:  return U2_S_ANOS_1423_BC;
+    case 3:  return U2_S_ANOS_1990_AD;
+    default: return U2_S_ANOS_2112_AD;
+    }
+}
+
 /* Clear the six creature arrays before a load, so a sector that authors no
  * monsters cannot inherit the last sector's table. */
 static void monsters_clear(u2_ctx *ctx)
@@ -1345,10 +1367,29 @@ void u2_overworld_enter(u2_ctx *ctx, u2_overworld *ow)
         seam_str_out(ctx, U2_S_CMD_PROMPT);
         return;
     }
+    const uint8_t tile = u2_world_tile_at(&ow->world, ow->x, ow->y);
+
+    /* asm/3389's tile dispatch has a signpost arm (art 0x0A, tile 0x28) that is not a
+     * door: it prints "-THE SIGN READS:" (asm/3525) then the era label for the sector
+     * tens digit (asm/353C reads DS:49 into asm/3546's dispatch), then returns to the
+     * command loop. site_for_tile leaves art 10 as no-door (0), so the signpost is
+     * caught here rather than in the site table — returning a digit from site_for_tile
+     * would make a signpost look like a gate to the sector cross-check in site_check,
+     * and every world sector ships exactly one. Captured on frame from the original
+     * 2026-11-12: standing on a signpost outdoors, E prints ENTER-THE SIGN READS: then
+     * the era on the next line. */
+    if ((tile >> 2) == 10) {
+        seam_str_out(ctx, U2_S_SIGN_READS);
+        seam_char_print(ctx, '\r');
+        seam_str_out(ctx, signpost_era_label(ctx->state.sector_first));
+        seam_char_print(ctx, '\r');
+        seam_str_out(ctx, U2_S_CMD_PROMPT);
+        return;
+    }
+
     const char *label = NULL;
     int ax = 0, ay = 0;
-    const int digit = site_for_tile(u2_world_tile_at(&ow->world, ow->x, ow->y),
-                                    &label, &ax, &ay);
+    const int digit = site_for_tile(tile, &label, &ax, &ay);
     if (digit == 0) {
         seam_str_out(ctx, U2_S_ENTER_WHAT);
         seam_char_print(ctx, '\r');
