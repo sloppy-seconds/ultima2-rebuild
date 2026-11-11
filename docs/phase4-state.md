@@ -1129,6 +1129,44 @@ the wrap difference is measurement noise and is not a defect.
 
 ---
 
+## Creatures that will not move (owner report 2026-11-11, closed against the trace)
+
+Owner: standing in the Time of Legends, a cluster of creatures would not move or attack,
+while others did. Reported three times, and my first two explanations were wrong, so the
+ruling here is the measurement and not the reasoning.
+
+**What was wrong with the first two answers.** "Forest" for `tile=10` was an art-index guess;
+`0x10` is **mountain** (art `0x04`, "white diamond lattice", `walkable=no`, measured from
+`asm/248B_swamp_damage_gate.asm`). The second theory, a 128-byte offset between the step
+gate and the renderer, was refuted by an independent anchor: the era-0 moongate cells
+`(29,56) (31,56) (33,56) (35,56)`, observed live in `docs/moongates.md`, read `0x08` grass
+at the engine's grid origin and `0x10` impassable mountain at the offset one. A gate you
+cannot step onto is not a gate, so the engine's origin is correct.
+
+**What the trace says.** `ai.c` emitted nothing about creature decisions, so the seam was
+added first (`mon_move` / `mon_refused` / `mon_stay`, with `backed` = a live creature
+occupies the refusing cell) and then measured, in the owner's own live session:
+
+| cause | evidence | verdict |
+| --- | --- | --- |
+| another creature's stamp | `tile=3c backed=1` x3234, `34` x660, `38` x702, `fc` x616, `f8` x709 | faithful: the stamp **is** the occupancy rule (`asm/2199` header) |
+| mountain | `tile=10 backed=0` x1896, all present in the pristine map | faithful: `asm/21BD` refuses `0x10`, and the player is refused it too (`--INVALID MOVE!`) |
+| open water | `tile=00` x474 on one orc | faithful: only `0x2C`/`0x48` may enter water |
+| ghost stamps | `backed=0` on a creature-type byte: **none**; all 32 distinct `backed=0` cells were mountain | no stale-stamp defect found |
+
+So a creature boxed in by mountain, water, or a knot of other creatures stays put in the
+engine because it stays put in the original. A pack that converges into a clump can freeze
+permanently by mutual stamping, and that is the original's behaviour, not a port defect.
+
+**What is still not verified, and it is the only loose end.** The screen-to-grid mapping.
+Every coordinate above is a grid coordinate from the trace; the owner reads the screen. If
+the viewport origin is computed wrong, the cell he sees as grass next to an orc is a
+different grid cell from the one the gate refused, and every conclusion above would be
+about the right rules applied to cells nobody has matched to the picture. One trace line in
+the renderer (viewport origin plus the tile under the player) closes it. Until then this
+section says *no defect was found in the step gate*, which is not the same as *the owner saw
+nothing*.
+
 ## Silent player effects (owner rule 2026-10-26)
 
 **The rule is in `AGENTS.md` § 3: every action by the player and every effect on the player must

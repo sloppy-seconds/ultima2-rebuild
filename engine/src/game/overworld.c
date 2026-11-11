@@ -13,6 +13,7 @@
 #include "game/commands.h"
 #include "game/overworld.h"
 #include "game/ai.h"           /* u2_ai_creature_turn: the monsters' turn */
+#include "debug/trace.h"
 #include "game/combat.h"      /* u2_combat_attack, u2_attack */
 #include "game/monsters.h"    /* u2_monsters_at: who is standing there */
 #include "game/commerce.h"    /* u2_commerce_transact: the TRANSACT ray and its shops */
@@ -1775,6 +1776,19 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
      * reaches for it when no sector is resident; see core/view.c. */
     u2_view_fill(&ow->view, &ow->world, ow->x, ow->y,
                  ow->view_mode, NULL, U2_OVERWORLD_EMPTY_GATE);
+
+    /* Screen-to-grid bridge, added 2026-11-11 because every creature-coordinate argument
+     * in this project is a grid coordinate while every observation the owner makes is a
+     * screen position, and nobody had ever written down the map between them. The viewport
+     * is 20x10 and the player is drawn at cell (9,5), so screen cell (c,r) is grid
+     * ((px-9+c) & 63, (py-5+r) & 63) on the world map. Without this, "that orc has grass
+     * on three sides" and "the gate refused tile=10" cannot be compared at all, and a
+     * correct rule checked against the wrong cell looks identical to a broken one. */
+    u2_trace(ctx, "view", "5AB1", "player=(%d,%d) origin=(%d,%d) tile_here=%02x",
+             ow->x, ow->y,
+             (ow->x - u2_view_player_col()) & (U2_SECTOR_EDGE - 1),
+             (ow->y - 5) & (U2_SECTOR_EDGE - 1),
+             u2_world_tile_at(&ow->world, ow->x, ow->y));
 
     /* The time door is stamped into the VIEW, not into the sector. The original stamps
      * 0xC0 into the resident grid, and whether that survives a save back into mapxNN is
