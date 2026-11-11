@@ -16,12 +16,28 @@
 #           The frame refutes it, and the mistake was reading memory and a cut-off text fragment and
 #           then writing the inference down as though it had been watched. Memory says what changed;
 #           only the screen says what the player saw. Those two disagreed here.
+#           RETRACTION, 2026-11-11 — the sentence below was wrong and is kept only so nobody
+#           quotes it. It said the map's source was unidentified and "is not the sector grid".
+#           It IS the sector grid: three sectors were drawn and each matched its own mapx file,
+#           including mapx00, whose landmass is the oval that this header earlier described as
+#           continents. See captures/spice86/vhelm-sector-map-live/ for the frames and the
+#           measurements. The mistake was the one AGENTS § 3 names: a memory trace and a
+#           cut-off string, written down as though it had been watched.
+#           WHAT THE MAP IS (measured 2026-11-11, captures/spice86/vhelm-sector-map-live):
+#           the current sector's own map, one cell per 8x4 real pixels, 64x64 cells = 512x256.
+#           Water is black; land is a dither whose density rises with the art index — mean
+#           luminance in sector 30 was art 0 → 9.6, art 1 → 50, art 2 → 47, art 3 → 76,
+#           art 4 → 114. The gate `cmp $0x4,%al; jae` on DS:4A is the site-kind digit, so
+#           wilderness passes too (all three frames were wilderness, site kind 0) and only
+#           towers and dungeons are refused.
 #           STILL NOT DECODED: how the map is produced. The body sets DS:23/24 to 0x20,0x20, calls
 #           L_002bd2, waits on L_00514d until AH == 0xFF, then clears two 256-byte tables at 0x272
 #           and 0x372 and tail-jumps to the tick. The wait-for-key and the two table clears match a
-#           modal overlay that is torn down on a keypress, which the frame agrees with, but the
-#           source of the continent art is unidentified — it is not the sector grid, and it is not
-#           the tile atlas.
+#           modal overlay that is torn down on a keypress, which the frame agrees with, and
+#           asm/29D2's body walks a mod-64 grid and calls the cell stamper at L_0052b3, which is
+#           consistent with staging the whole sector. What is still untraced is the per-art dither
+#           density: no table has been found for it, so the engine renders the densities measured
+#           above rather than claiming the mechanism that produces them.
 #           The gate is `cmp $0x4,%al; jae` on DS:4A, i.e. the sector's second decimal digit must
 #           be below 4. That is NOT the same axis as "towns and castles", which the engine derives
 #           from the tile under the player (site_kind). Recorded as an open discrepancy rather than
