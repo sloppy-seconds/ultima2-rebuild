@@ -148,6 +148,23 @@ gives different routes for each. This project measured a diagonal step at `asm/2
 it as simply how creatures move. If diagonals are a *version* difference, that measurement is
 build-specific and the engine may be modelling a variant. Worth a look before CP6 hard-codes it.
 
+**Three of those parked NPC claims have since closed, and one closed wrong** (2026-11-08 to
+2026-11-11, all static plus one owner play session each side):
+
+* *the Hotel California merchant's random +4 attribute* — **correct, and now observed.** One RNG
+  draw decides both whether it fires (`r < 6`, so 75%) and which stat it lands on, and the gain
+  is four BCD adds of the hundreds digit, so +4 per 100. There is no ceiling guard: owner play
+  2026-11-11 offered the clerk in sector 32 with every stat at 99 and got 4 back, which is the
+  wrap the bytes predict (99 → 00 with the carry chained into the next of the four adds → 04).
+  The claim's "random" is doing work here: the stat is not chosen by the amount offered.
+* *Father Antos's blessing* — **correct.** `DS:6C`, written by `asm/4209:422B` on Planet X in a
+  castle sector by role `0x81`. See `docs/npc-index.md` § 4 and G61.
+* *the old man's 900 gold for the ring* — **the mechanic is right and the number is not.** The
+  ring is `asm/3C2E`'s role-`0x82` arm in sector 32, gated on the blessing, but both thresholds
+  in the bytes are `cmp $0x5`: five hundreds, so **500**, and the amount is one digit — 900 is
+  not enterable. The claim is a plausible misremembering of the same handler's other figure, and
+  the digit width is what rules it out rather than the walkthrough disagreeing with itself.
+
 ## 5. How to use this file
 
 Treat every row as a prediction with a named place to test it. When a capture or a byte settles

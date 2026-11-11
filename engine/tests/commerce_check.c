@@ -378,6 +378,15 @@ int main(void)
         CHECK(out == 0x99, "95 + 4 is 99, the last safe stop, got %02x", out);
         u2_offer_raise_for(0, 1, 0x96, &idx, &out);
         CHECK(out == 0x00, "96 + 4 wraps to 00, because nothing guards the store, got %02x", out);
+        /* Owner observation 2026-11-11, from play: every stat maxed at 99, an offer of 100
+         * to the sector-32 clerk, and the stat came back as 4. Not 3 -- and that one is the
+         * carry chain. The first add wraps 99 to 00 and leaves CF set, and `adc` feeds it
+         * into the second add, so the four adds of 1 land on 04. A version that cleared the
+         * carry between the adds, which is the obvious way to write four decimal adds, lands
+         * on 03 and passes every other check in this block. */
+        u2_offer_raise_for(0, 1, 0x99, &idx, &out);
+        CHECK(out == 0x04,
+              "99 + 4 is 04, not 03: the wrap's carry feeds the next add, got %02x", out);
         /* 95 +2 +2 +2 +2: 97, 99, then the third add crosses the byte and the carry falls
          * off the end (99 +2 -> DAA -> A1 -> +60 -> 101 -> 01), then +2 +carry -> 04. */
         u2_offer_raise_for(0, 2, 0x95, &idx, &out);

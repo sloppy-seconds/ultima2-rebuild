@@ -113,7 +113,13 @@ layer+sector+record for that reason.
 
 * role `0x84` → **The Clerk**. The game gives a job title. The wiki treats him as an entity,
   and the bytes support the join independently: `cmd_O`'s generic arm handles exactly the roles
-  its special list omits, and this is the record that reaches the grind.
+  its special list omits, and this is the record that reaches the grind. He stands at (10,57) in
+  `monx32`, slot 30, and tlkx32 record 4 is `A CLERK STATES: WELCOME TO THE HOTEL CALIFORNIA!`.
+  Owner play 2026-11-11 confirmed the grind from the player's side: an offer to the clerk raised
+  a stat, and because every stat was maxed at 99 it came back as 4 — which is the no-ceiling-
+  guard decode being right, and specifically the carry being chained across the four DAA adds.
+  99 plus four adds of 1 is not 03: the first add wraps 99 to 00 and leaves the carry set, and
+  that carry lands in the second add, so the result is 04. `commerce_check` pins that case now.
 * role `0x82` → **Old man**. The game gives a description. The join is by function — role
   `0x82` in sector 32 is the only ring grant in the binary. He stands at (25,2) in
   `monx32`, slot 26; Father Antos is slot 12 at (1,48) in `monx93`. Those two cells are the
