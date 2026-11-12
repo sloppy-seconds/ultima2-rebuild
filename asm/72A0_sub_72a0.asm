@@ -22,16 +22,30 @@
 #           3. The fade was seen in the chamber the player was standing in, which is NOT
 #              sector 30, so the embedded `MAPX30  ` filename being the fill target is now
 #              the weakest claim in this header rather than one of the stronger ones.
-#           Still unestablished after this: what `L_005417` returns, and whether `L_0061a6`
-#           beside that filename is a sector load or a screen call.
+#           RESOLVED 2026-11-12 by a live capture (`captures/spice86/victory-live/`: 110
+#           frames + a change-triggered DS log + content-file md5s, driven by
+#           tools/spice86_play_capture.py while a seeded character killed a type-0x40
+#           creature in sector 30). Two answers:
+#           * `L_005417` is a RANDOM-BYTE GENERATOR, not a cell-addressing call. The
+#             `DS:23`/`DS:24` values it feeds (masked `& 0x3f`) during the fade are scattered
+#             across 0x00..0x3f with no monotonic pattern (66 sampled pairs, e.g. 22/19,
+#             39/19, 0a/1c, 14/09, 01/1b ...). So the 64x64 fill paints RANDOM cells black
+#             each iteration -- that is what makes it a slow fade, not a systematic sweep.
+#           * `L_0061a6` beside the `MAPX30  ` filename is NOT a sector save. Across the whole
+#             fade + flight the run-dir content files were md5'd every 2s and NONE changed
+#             (0 write events over 90 content files). The black repaint is in-memory grid
+#             only and is never persisted; the engine's victory.c correctly writes nothing.
+#           Bonus (G75c): the trailing flight loop is non-terminating -- `DS:00`/`DS:01` kept
+#             advancing (17,19 -> 62,57 -> ... -> 33,07) for the full 30s+ observed, so the
+#             rocket flies until the run is quit; it does not return to the command loop.
 # victory sequence, decoded statically 2026-11-09 (file offsets; image = file - 0x200):
 #   74A1  movb $0x28,DS:31          ; right_margin = 40, so the text prints in a narrow column
 #   74A6  call str_out              ; "\r\r     MINAX IS DEAD!!\rALL HER WORKS SHALL DIE!\r"
 #   74DA  mov $0x40,%al ; DS:1f=al  ; OUTER loop, 64 iterations
 #   74DF  call L_0060d7
 #   74E2  mov $0x40,%al ; DS:20=al  ; INNER loop, 64 iterations  (64 x 64 = 4096 = one whole grid)
-#   74E7  call L_005417 ; and $0x3f ; DS:23 = al                 ; a cell x, wrapped to 0..63
-#   74EF  call L_005417 ; and $0x3f ; DS:24 = al                 ; a cell y, wrapped to 0..63
+#   74E7  call L_005417 ; and $0x3f ; DS:23 = al                 ; a RANDOM byte, masked to 0..63 (see header: RNG, not a cell x)
+#   74EF  call L_005417 ; and $0x3f ; DS:24 = al                 ; a RANDOM byte, masked to 0..63 (the fade paints random cells)
 #   74F7  call L_0052b3
 #   74FA  mov $0x74,%al ; bx=[DS:06] ; [bx]=al                   ; write 0x74 through the grid ptr
 #   7502  decb DS:20 ; jne 74E7
