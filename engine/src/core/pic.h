@@ -40,12 +40,19 @@
  *   - the intro shows PICDRA (the Ultima II dragon logo) after the second presentation
  *     screen and before the title menu, held about five seconds. Observed: five
  *     consecutive one-second frames all matched picdra at 100%.
- *   - the 'D' demonstration shows PICSPA (starfield) and then PICMIN (the pyramid) with
- *     the story poem written over the bottom rows. Observed at one-second sampling, so
- *     WHICH couplet gets WHICH picture is inferred, not observed; see title.c.
+ *   - the 'D' demonstration writes the story poem over the bottom rows, one couplet per
+ *     picture, each held about eight seconds. Observed 2026-11-13 across ~130 frames of
+ *     several loops (captures/spice86/g58-demonstration): couplet 1 over PICOUT (outdoor
+ *     map), 2 over PICTWN (town), 4 over PICDNG (dungeon wireframe), 5 over PICSPA
+ *     (starfield), 6 (MINAX) over a field of figures over a cross (PICMIN? -- not a
+ *     pyramid, so the PICMIN label below is unverified). Couplet 3 (PLEAD WITH MEDIEVAL
+ *     KINGS) was never observed -- the town picture was directly followed by the dungeon
+ *     picture. The earlier "PICSPA then PICMIN, split inferred" note was a one-second-
+ *     sampling guess and is refuted; present_poem() in game/title.c still implements that
+ *     guess and needs the per-couplet pictures (flagged follow-up, cosmetic).
  *   - PICDNG, PICTWN and PICOUT are referenced by name in the executable (file offsets
- *     0x5c3, 0x63d, 0x72a) and are not used by either sequence above. Where they appear
- *     is not established.
+ *     0x5c3, 0x63d, 0x72a) and ARE used: they are the demonstration pictures under
+ *     couplets 4, 2 and 1 respectively (see the demonstration note above).
  *   - PICCAS is referenced at file offset 0x6ba and has NO file in the pack. The original
  *     has a picture load that can never find its data, and this engine inherits that.
  *
