@@ -37,6 +37,27 @@
 #     examined** -- `dec di ; jne` exits on reaching zero. Whether slot 0 can ever hold a
 #     creature that should be found is not established here. In monx31 slot 0 is a Guard at
 #     (29,30), so it is populated in at least one sector.
+#
+# SLOT-0 INVULNERABILITY -- CONFIRMED 2026-11-12 (this closes G78).
+#   The `dec %di ; jne` loop examines slots 31..1 and falls out at DI==0 WITHOUT examining
+#   slot 0. Because asm/4050_cmd_T (talk), asm/2BC4 (melee ATTACK) and asm/35F0 (cannon)
+#   all branch on `DI==0 -> no creature`, a creature parked in slot 0 is invisible to all
+#   three interactions: melee prints MISS (via asm/2BC7 `cmp $0,%bl; jne` falling to the
+#   MISS print at asm/2BD4->L_003009), talk prints FUNNY, NO RESPONSE, and the cannon finds
+#   nothing -- while the creature still draws on screen, still blocks the cell, and still
+#   runs its own AI and attacks the player. That is the whole invulnerability: there is no
+#   invulnerable flag, no locked HP byte and no monster-defense modifier in the hit roll
+#   (the roll at asm/2BDA is `hit iff (rand>>1) < [DS:4C]`, player agility only, measured);
+#   the creature is simply never scanned. LIVE PROOF (captures of 2026-11-12, Port Boniface
+#   sector 31, maxout agi-99 character): the guard the owner could not kill was slot 0 at
+#   (31,47); the three guards the same character killed in the same session were slots 1, 3
+#   and 4. All four are byte-identical (type 0x60, kind 0x70, role 0x01), which is exactly
+#   why no creature-table column can predict it -- the discriminator is the SLOT INDEX, not
+#   the creature's bytes. A breakpoint at the melee scan entry (runtime 2e3d) never fired on
+#   the invulnerable guard's attacks, confirming the attack is refused at asm/2BC7 (DI==0)
+#   before the roll and before asm/2E3D's damage scan. Engine divergence: u2_monsters_at
+#   scans slot 0, so the engine lets the player kill a creature the original makes
+#   unkillable; the faithful fix is to skip slot 0 in the target scan, matching this loop.
 #   * Two `ret`s, not one: 241E (found) and 2422 (exhausted). That is why the merged span
 #   * still grades as one routine -- the split rule requires the ret in the last row, and
 #     both are in the last row here.
