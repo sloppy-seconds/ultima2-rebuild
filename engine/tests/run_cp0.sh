@@ -279,7 +279,7 @@ if lic=$(./u2 --licenses 2>&1); then
     # Byte-fidelity, not a keyword grep: a notice that paraphrases SDL's licence is
     # worse than none, because it reads as compliance. The printed text must equal
     # the committed source file.
-    if printf '%s\n' "$lic" | grep -Fq "This notice may not be removed or altered from any source distribution."; then
+    if grep -Fq "This notice may not be removed or altered from any source distribution." <<< "$lic"; then
         ok "--licenses reproduces the zlib clause verbatim"
     else
         bad "--licenses does not reproduce the zlib text verbatim"
