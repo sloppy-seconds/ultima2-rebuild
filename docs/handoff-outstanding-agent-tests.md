@@ -12,6 +12,22 @@ the `who` column names an agent (or `both`), and the row tail confirms a genuine
 open sub-question (several rows carry a stale status column while the description
 records a later partial closure — those are annotated below).
 
+## Status (updated 2026-11-13) — the tables below are stale on these rows
+
+The Minax-session follow-up work closed several rows listed below as open. `docs/needs-gameplay.md`
+is the authority; this index lags it. Closed since generation, each by a named capture dir
+under `captures/spice86/`:
+
+- **G2** blocked step = 19 food (`g2-blocked-step`). **G5** mountain `0x10` blocks on foot (same step test).
+- **G55** refused swamp step = −5 HP (`g55-swamp-refused-step`); **engine fix shipped + gated** (CP5 E1).
+- **G69** frigate cannon = 0 food (`g69-cannon-food`). **G70** letter-P = 0 food, space = 10 (`g70-pass-vs-move`); **engine fix shipped + gated** (CP5 E1b).
+- **G4** mode `0x2e` = force-field tile, step effect = the −1000 (closed statically). **G42** boarding does NOT spend the gating item (3 samples + no `items_held` subtract).
+- **G41** class-dependent foot stamp — engine already correct (`u2_foot_stamp(pclass)`), the handover predated the fix.
+- **G68** charisma moves the price pair (`12 08`@Cha99 vs `07 30`@Cha10) but the curve is confounded by per-press item variation and `asm/20AB` is known-incomplete — **partial**, not closed.
+- Bonus (not a G-row): the horse travels **one cell** per turn and pays **38** food, confirmed by a real boarding (`horse-move-1cell`); the engine already matches.
+
+Still open and agent-drivable, roughly by cost: **G64b** (time-door transit trigger undecoded — stepping on the `DS:6E` gate cell is not sufficient), **G7** (needs a stat-add trigger), **G46** (CAST branches — needs a tower + spell), **G38/G48/G72** (guards/thieves — Towne Linda has no `0x60` guards; needs a different town or seeded creatures), **G6** (counter near 0), **G16** (`0xC0` event tile), **G58** (splash pics), **G71** (Pangea soft-lock). Blocked on off-Earth vehicle tiles (need the rocket or a planet setpos): **G77/G51/G49**. Blocked on tooling: **G30** (`spice86_type.py` has no modifier-key support for Ctrl-Y).
+
 ## How to drive any of these
 
 One canonical sidecar runs the four capture primitives together alongside play:
