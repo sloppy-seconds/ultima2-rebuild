@@ -194,6 +194,19 @@ typedef struct u2_ctx {
      * it. Without the latch a gate cannot distinguish "stamped on load" from "stamped by the
      * first sweep", which is exactly how a town-entry defect survived a passing test. */
     int diag_unstamped_at_load;
+    /* CP8 1d ending animation, measured by captures/spice86/victory-live/. The fade is
+     * 64x64 random-cell writes of the black tile, so with repeats it blackens ~63% of the
+     * 4096 cells; the count makes "the fade ran and painted randomly" assertable without
+     * parsing pixels. The flight is non-terminating in the original (flies until quit); the
+     * engine bounds it, and this counts the steps it actually drew before the run ended. */
+    int victory_fade_black;
+    int victory_flight_steps;
+    /* The world's dirty flag as the fade left it. MUST be 0: the original's fade is
+     * screen-only (G75a, 0 of 90 content files changed), so a dirty flag here is the
+     * engine promising a write-back the original never makes. The md5 check in
+     * tests/victory_end.py cannot see this on its own -- nothing stores after victory in
+     * that run -- so this flag is the discriminating assertion. */
+    int victory_map_dirty;
 
     /* Set by the overworld loop to a function that composites and presents a whole frame.
      * A handler that prints a prompt and then blocks reaches it through

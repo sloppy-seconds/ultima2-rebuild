@@ -2144,6 +2144,66 @@ static void overworld_present_now(u2_ctx *ctx)
     seam_present_frame(ctx);
 }
 
+/* CP8 1d ending animation, run by the loop (which owns the grid and the renderer)
+ * after u2_victory has printed the text and set ctx->victory. Faithful to asm/72A0's
+ * tail, measured live in captures/spice86/victory-live/. */
+
+/* The original's rocket-flight loop is non-terminating (measured flying 30s+ until
+ * quit). The engine bounds the flight to this many steps so the run ends on victory
+ * (the 1d owner decision) rather than hanging. One full wrap of the 64-cell grid. */
+#define U2_VICTORY_FLIGHT_STEPS 64
+
+/* asm/72A0 74DA..7511: 64 outer x 64 inner. Each inner picks a RANDOM cell (L_005417
+ * & 0x3f) and writes the black tile 0x74 through the grid pointer; one present per
+ * outer iteration is the delay. Random with repeats, so ~63% of the 4096 cells end
+ * black -- that is the "map slowly fades out" the owner saw, not a systematic sweep.
+ * The frame present is the pacing; no invented millisecond delay (the original's
+ * L_000911/L_0054ca durations are not cleanly measured, and a guessed one is worse). */
+static void victory_fade(u2_ctx *ctx, u2_overworld *ow)
+{
+    int blackened = 0;
+    for (int outer = 0; outer < U2_SECTOR_EDGE; outer++) {
+        for (int inner = 0; inner < U2_SECTOR_EDGE; inner++) {
+            const int x = seam_rand_byte(ctx) & (U2_SECTOR_EDGE - 1);
+            const int y = seam_rand_byte(ctx) & (U2_SECTOR_EDGE - 1);
+            const int i = u2_world_tile_index(x, y);
+            if (ow->world.map[i] != 0x74)
+                blackened++;
+            /* Written DIRECTLY, not through u2_world_tile_put: that function sets
+             * map_dirty, and the capture proved the original's fade is screen-only --
+             * 0 of 90 content files changed across the whole ending (G75a,
+             * captures/spice86/victory-live/). Dirtying here would let any later
+             * write-back persist a blackened sector, which the original never does.
+             * Both arrays are written so the fade is visible on the CGA staging path
+             * (map) and the EGA ground compositor (map_base), matching one grid write. */
+            ow->world.map[i]      = 0x74;
+            ow->world.map_base[i] = 0x74;
+        }
+        u2_overworld_draw(ctx, ow);
+        if (seam_present_frame(ctx)) break;   /* window closed mid-fade */
+    }
+    ctx->victory_fade_black = blackened;
+    /* Recorded so the gate can assert the fade did NOT dirty the map. See ctx.h. */
+    ctx->victory_map_dirty = ow->world.map_dirty;
+}
+
+/* asm/72A0 75E1..: the rocket walks DS:00/DS:01 by +1 & 0x3f each step with a present.
+ * The original's loop is non-terminating (measured flying 30s+ until quit); the engine
+ * bounds it to `steps` so the run ends, per the 1d owner decision to end on victory.
+ * This is a deliberate, documented deviation, not a claim that the original stops. */
+static void victory_flight(u2_ctx *ctx, u2_overworld *ow, int steps)
+{
+    for (int s = 0; s < steps; s++) {
+        ow->x = (ow->x + 1) & (U2_SECTOR_EDGE - 1);
+        ow->y = (ow->y + 1) & (U2_SECTOR_EDGE - 1);
+        ctx->state.sector_x = ow->x;
+        ctx->state.sector_y = ow->y;
+        u2_overworld_draw(ctx, ow);
+        if (seam_present_frame(ctx)) break;   /* window closed mid-flight */
+        ctx->victory_flight_steps++;
+    }
+}
+
 int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
 {
     /* The handoff is complete from here on: any key the play API parked while the title flow
@@ -2207,15 +2267,23 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
         if (ctx->death_pending) break;
 
         /* CP8 1d: a type-0x40 kill runs u2_victory, which prints the ending and sets
-         * ctx->victory. The original does not return from that path -- it enters the
-         * rocket-flight loop and never comes back -- so the engine ends the run here,
-         * the same way it unwinds on death. Without this the loop kept polling input
-         * with player_stamp=0x28 (drawn as a rocket via player_art=stamp>>1) in the
-         * still-loaded chamber: the "turned into a rocket standing in a chamber" the
-         * owner saw. Checked after the draw/present above so the ending text is on
-         * screen before the run stops. The callers (title.c 'P', game.c, --play-map)
-         * already treat a non-death loop return as "the session is over". */
-        if (ctx->victory) break;
+         * ctx->victory. The original does not return from that path -- it fades the map
+         * to black and then flies the rocket forever. The loop owns the grid and the
+         * renderer, so the animation runs here: victory_fade paints random cells black
+         * over 64 renders, victory_flight walks the rocket for a bounded number of steps
+         * (the original never stops; the engine ends the run, the 1d owner decision), then
+         * unwinds like it does on death. Checked after the draw/present above so the
+         * ending text is on screen before the fade begins. */
+        if (ctx->victory) {
+            victory_fade(ctx, ow);
+            /* asm/72A0 75D9 resets DS:00/DS:01 to 0 before the flight; u2_victory set
+             * ctx->state.sector_x/y but not the loop's ow->x/y mirror. Sync so the rocket
+             * flies from (0,0) as the original does, not from the kill cell. */
+            ow->x = ctx->state.sector_x;
+            ow->y = ctx->state.sector_y;
+            victory_flight(ctx, ow, U2_VICTORY_FLIGHT_STEPS);
+            break;
+        }
 
         u2_key k;
         const int r = seam_key_poll(ctx, &k);

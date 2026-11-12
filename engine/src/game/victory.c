@@ -16,21 +16,21 @@
  *   75D9  DS:00 = DS:01 = 0       player position
  *   75E1  loop with a delay, `jmp -0x2a` back: an ending animation that never returns
  *
- * What is deliberately NOT implemented, and why
- * ---------------------------------------------
- * The 64x64 repaint at 74DA is measured -- the bounds, the fill byte and the fact that it
- * goes through the grid pointer at [DS:06] are all bytes -- but WHICH grid it lands on is not.
- * The loop runs before the inline "MAPX30" filename appears, and the two calls it uses on the
- * way (L_005417 for the cell coordinates, L_0061a6 beside the filename) are inferred as
- * cell-addressing and file I/O rather than observed. So the engine reproduces the ending that
- * is proven and leaves the repaint out rather than guessing which sector gets blacked out and
- * persisting a wrong world. That is docs/needs-gameplay.md G75 items (a) and (b), and both
- * are agent-drivable: force a monx slot's type to 0x40 with tools/u2_edit.py, kill it, and the
- * gate runs against the original without a playthrough.
- *
- * The trailing animation loop is not reproduced either. The engine ends the run instead,
- * which is the behaviour a caller can act on; the original hangs, and G75(c) is the open
- * question of whether that hang is the intended ending or a dead program with a nice message.
+ * The repaint and the flight ARE implemented -- in the overworld loop, not here
+ * ---------------------------------------------------------------------------
+ * The 64x64 repaint at 74DA and the trailing flight loop at 75E1 are reproduced by
+ * victory_fade() and victory_flight() in game/overworld.c, because the loop owns the grid
+ * and the renderer and this function (called from the kill path) does not. What the capture
+ * captures/spice86/victory-live/ settled, and what those functions encode:
+ *   - L_005417 is a RANDOM-BYTE generator, not a cell-addressing call. The fade paints
+ *     random cells (masked &0x3f) with the black tile 0x74, so ~63% of the grid ends black
+ *     with repeats -- the "slow fade." It is NOT a systematic sweep of a named sector.
+ *   - L_0061a6 beside the "MAPX30" filename is NOT a sector save: 0 content files changed
+ *     across the whole ending. The repaint is in-memory grid only and is never persisted,
+ *     so the engine writes nothing to disk here (and correctly so).
+ *   - The flight loop is non-terminating in the original (flies until quit). The engine
+ *     bounds it (U2_VICTORY_FLIGHT_STEPS) and ends the run, the 1d owner decision.
+ * G75 items (a)/(b)/(c) are closed by that capture; see asm/72A0's header.
  */
 #include "game/victory.h"
 
@@ -45,7 +45,8 @@ void u2_victory(u2_ctx *ctx)
     ctx->victory = 1;
 
     seam_str_out(ctx, U2_S_MINAX_DEAD);
-    /* asm/72A0's 64x64 repaint would go here. See the note above -- omitted on purpose. */
+    /* asm/72A0's 64x64 fade runs in the overworld loop (victory_fade), not here: this
+     * function is on the kill path and has no grid or renderer. See the header note. */
     seam_str_out(ctx, U2_S_STRANGE_FORCE);
     seam_str_out(ctx, U2_S_WIN_UNIVERSE);
     seam_str_out(ctx, U2_S_WIN_FOUND_IN);

@@ -366,10 +366,10 @@ fi
 # in the chamber. victory_end.py drives a real type-0x40 kill through the loop and asserts
 # the ending is on the FINAL frame (the loop stopped there) and the run terminated cleanly.
 if python3 tests/victory_end.py > "$WORK/victory-end.log" 2>&1; then
-    ok "CP8 victory end: a type-0x40 kill runs the ending and the loop unwinds on ctx->victory"
+    ok "CP8 victory end: a type-0x40 kill runs the ending, fades, flies, and ends the run (no write-back)"
 else
     sed 's/^/        /' "$WORK/victory-end.log" | tail -10
-    bad "CP8 victory end: the run did not end on a Minax kill, or the ending did not render"
+    bad "CP8 victory end: the run did not end on a Minax kill, the ending did not render, the fade/flight did not run, or the ending dirtied the map"
 fi
 
 # --- a saved map never walls off a creature with a ghost ---------------------------------

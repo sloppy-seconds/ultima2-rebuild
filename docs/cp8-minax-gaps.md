@@ -117,6 +117,16 @@ sprite never becomes a rocket; the mode byte changes and the view changes with i
 flight, and the engine's renderer drew the mode byte as if it were the avatar. Both need
 fixing, and the fade is the part that makes it read as an ending rather than a teleport.
 
+**SHIPPED 2026-11-12.** The fade and the flight are implemented in `game/overworld.c`
+(`victory_fade` / `victory_flight`), called from the loop's `ctx->victory` branch because the
+loop owns the grid and the renderer; `victory.c` keeps the text and the state writes. The
+capture `captures/spice86/victory-live/` settled the two things the decode could not: the fade
+paints **random** cells black (`L_005417` is the RNG, `& 0x3f`), so ~63% of the 4096 cells end
+black — a slow dissolve, not a sweep of a named sector; and the ending **writes nothing to disk**
+(0 of 90 content files changed), so the engine's fade deliberately does not dirty the map. The
+flight is bounded at 64 steps because the original never stops. Gated by `tests/victory_end.py`
+with three mutation controls (gut the fade, gut the flight, dirtying write).
+
 ## Not a gap: any weapon will do
 
 The phaser took Minax from 199 to 33 and then killed her. `docs/goal-spec.md` W2's

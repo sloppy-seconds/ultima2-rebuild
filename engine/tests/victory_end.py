@@ -35,6 +35,7 @@ import re
 import shutil
 import subprocess
 import sys
+import hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENGINE_DIR = os.path.dirname(HERE)
@@ -110,11 +111,29 @@ def final_pos(text):
     return (int(m[-1][0]), int(m[-1][1])) if m else None
 
 
+def content_md5(work):
+    """md5 every file in the content dir: the engine-side G75a test."""
+    d = os.path.join(work, "content")
+    out = {}
+    for name in sorted(os.listdir(d)):
+        p = os.path.join(d, name)
+        if os.path.isfile(p):
+            with open(p, "rb") as f:
+                out[name] = hashlib.md5(f.read()).hexdigest()
+    return out
+
+
+def diag_int(text, field):
+    m = re.findall(r'"%s":(\d+)' % field, text)
+    return int(m[-1]) if m else None
+
+
 def main():
     work = "/var/tmp/u2-victory-end"
     if os.path.isdir(work):
         shutil.rmtree(work)
     build_site_seed(work)
+    before = content_md5(work)
 
     # A, RIGHT = attack east and kill the Minax at (3,0). Then two more east moves that
     # must NOT run: with the fix the loop breaks on victory right after presenting the
@@ -129,6 +148,37 @@ def main():
     p = final_pos(text)
     check(p is not None,
           "the run terminated with a state dump (it ended cleanly, did not hang or crash)")
+
+    # CP8 1d ending animation (measured by captures/spice86/victory-live/). The fade is
+    # 64x64 RANDOM-cell writes of the black tile, so with repeats it blackens ~63% of the
+    # 4096 cells -- assert it ran and painted randomly (not zero, not the whole grid), and
+    # that the flight stepped. These are the state-level proof of the fade/flight; the pixel
+    # rendering of the black tile is not headlessly assertable and is checked by eye.
+    black = diag_int(text, "victory_fade_black")
+    check(black is not None and 2000 <= black <= 3000,
+          "the fade ran and painted RANDOM cells black (%s of 4096, expect ~63%% with "
+          "repeats; 0 means no fade, 4096 would mean a systematic sweep, not random)" % black)
+    steps = diag_int(text, "victory_flight_steps")
+    check(steps is not None and steps > 0,
+          "the rocket-flight loop stepped (%s steps) before the run ended" % steps)
+
+    # G75a, engine side. The capture proved the original's ending writes NOTHING to disk
+    # (0 of 90 content files changed). The engine's fade mutates the in-memory grid, so this
+    # asserts that mutation never reaches the player's content: it must not dirty the map and
+    # get written back. Without the direct-write (u2_world_tile_put sets map_dirty) this goes
+    # red if anything stores after victory, and it is the property that keeps a won game from
+    # corrupting the sector files.
+    after = content_md5(work)
+    check(before == after,
+          "the ending wrote NOTHING to the player's content files (G75a: the original's fade "
+          "is screen-only; %d files compared)" % len(before))
+    # The discriminating assertion behind the md5 check: the md5 stays green in this run even
+    # with a dirtying write, because nothing stores after victory. The flag is what actually
+    # fails when the fade goes through u2_world_tile_put.
+    dirty = diag_int(text, "victory_map_dirty")
+    check(dirty == 0,
+          "the fade left the map clean (victory_map_dirty=%s, must be 0: the original never "
+          "schedules a write-back from the ending)" % dirty)
 
     if fails:
         print("  FAIL  %d victory-end checks are wrong" % len(fails))
