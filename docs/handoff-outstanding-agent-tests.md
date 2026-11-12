@@ -25,6 +25,7 @@ under `captures/spice86/`:
 - **G41** class-dependent foot stamp — engine already correct (`u2_foot_stamp(pclass)`), the handover predated the fix.
 - **G68** charisma moves the price pair (`12 08`@Cha99 vs `07 30`@Cha10) but the curve is confounded by per-press item variation and `asm/20AB` is known-incomplete — **partial**, not closed.
 - Bonus (not a G-row): the horse travels **one cell** per turn and pays **38** food, confirmed by a real boarding (`horse-move-1cell`); the engine already matches.
+- **G58** partial (`g58-demonstration`): the 'D' demonstration is one picture per couplet (PICOUT/PICTWN/PICDNG/PICSPA + a Minax field), refuting pic.h's inferred stars+pyramid; couplet 3 and the `present_poem` code fix remain open.
 
 Still open and agent-drivable, roughly by cost: **G64b** (time-door transit trigger undecoded — stepping on the `DS:6E` gate cell is not sufficient), **G7** (needs a stat-add trigger), **G46** (CAST branches — needs a tower + spell), **G38/G48/G72** (guards/thieves — Towne Linda has no `0x60` guards; needs a different town or seeded creatures), **G6** (counter near 0), **G16** (`0xC0` event tile), **G58** (splash pics), **G71** (Pangea soft-lock). Blocked on off-Earth vehicle tiles (need the rocket or a planet setpos): **G77/G51/G49**. Blocked on tooling: **G30** (`spice86_type.py` has no modifier-key support for Ctrl-Y).
 
