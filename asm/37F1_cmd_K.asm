@@ -13,7 +13,7 @@
 #           pair readable; neither one is decodable alone.
 # func 37F1..37F1  len 001 B  evidence: seed+reko (jump table cs:0730 entry K)
 # provenance: live:airport32 (+2 other harvests), static
-#           entry executed in 3 of 235 harvests; derived by tools/provenance_from_traces.py
+#           entry executed in 3 of 244 harvests; derived by tools/provenance_from_traces.py
 # confidence: high (handler role proven; split is a map-boundary artifact)
 # notes: stop-trunc — do not "fix" to `call`; operand bytes are outside range
 #           The spelling is the binary's, not ours: KLIMB with a K, in the same file as the

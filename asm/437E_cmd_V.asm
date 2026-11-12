@@ -2,7 +2,7 @@
 #           "VIEW\x8dWITH MAGICAL HELM!" variant.
 # func 437E..43F2  len 0075 B  evidence: seed+reko (jump table cs:0730 entry V)
 # provenance: live: cmd_V executed in captures/spice86/wvcap/ and wvcap-live/, observed 2026-10-26.
-#           entry executed in 8 of 235 harvests; derived by tools/provenance_from_traces.py
+#           entry executed in 8 of 244 harvests; derived by tools/provenance_from_traces.py
 #           Entry 0x437E is present in both harvests' ExecutedInstructions, and so is 0x4396 — the
 #           MAGICAL HELM branch, not just the refusal.
 #           OBSERVED ON SCREEN 2026-10-26 (captures/spice86/vhelm/, frame v_helm_view.png). With
