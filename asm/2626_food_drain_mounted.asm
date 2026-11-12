@@ -21,6 +21,13 @@
 #           plane sample came in at -39 (one charge, mod 10 = 9) for exactly that reason
 #           and was discarded only after a re-run that read DS:13 in the before-peek
 #           alongside the food. Confirm a forced byte at the moment of the input.
+#           CONFIRMED BY REAL BOARDING 2026-11-13 (this retires the caveat above):
+#           captures/spice86/horse-move-1cell — sector 3, a genuine horse tile (mapx03
+#           (36,24)) boarded with `B`, so DS:13 reached 0x22 by boarding, not a poke. One
+#           accepted arrow moved exactly ONE cell and fell the food odometer by exactly 38
+#           (751232 -> 751194). So the double charge is not a forced-byte artifact, and the
+#           horse travels one cell per turn: the "double" is the charge, not the distance.
+#           The engine's step_charges()==2 with a single-cell move already matches on both.
 # provenance: live:stepcost (tmp/20261025-213254, 2026-10-25)
 # confidence: high for the double subtract, medium for which real states reach it
 # func 2626..2663  len 003E B  evidence: call+reko
