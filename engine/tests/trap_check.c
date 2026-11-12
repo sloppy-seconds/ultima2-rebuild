@@ -96,6 +96,26 @@ int main(void)
               "control: floor 0 does not kill");
     }
 
+    /* --- scaling: the SAME roll traps on a deeper floor but not a shallower
+     * one. rng_state is fixed so the first rand is 1 in both; the only variable
+     * is the floor. This is the "deeper = higher chance" rule made deterministic:
+     * floor 1 -> 1 >= 1 -> no trap; floor 2 -> 1 < 2 -> trap. */
+    {
+        u2_ctx shallow; u2_overworld ow_s;
+        setup(&shallow, &ow_s, 0);
+        shallow.state.site_floor = 1;   /* rand(1) >= 1 -> no trap */
+        u2_dungeon_advance(&shallow, &ow_s);
+
+        u2_ctx deep; u2_overworld ow_d;
+        setup(&deep, &ow_d, 0);
+        deep.state.site_floor = 2;      /* rand(1) < 2 -> trap -> death */
+        u2_dungeon_advance(&deep, &ow_d);
+
+        CHECK(shallow.state.hp == 0x50 && deep.state.hp == 0,
+              "scaling: same roll (1) is safe on floor 1 but lethal on floor 2 "
+              "(shallow hp 0x%02x, deep hp 0x%02x)", shallow.state.hp, deep.state.hp);
+    }
+
     printf("trap_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
 }
