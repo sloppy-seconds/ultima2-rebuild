@@ -49,11 +49,14 @@ def sector(path):
 
 def monx(path):
     b = bytearray(256)
-    b[OFF_X] = MON_X
-    b[OFF_Y] = MON_Y
-    b[OFF_HP] = MON_HP
-    b[OFF_TYPE] = MON_TYPE
-    b[OFF_KIND] = MON_KIND
+    # SLOT 1, not slot 0: asm/23E6 find_creature_at_cursor never examines slot 0 (G78), so a
+    # slot-0 creature is invulnerable and the recorded kill would never land. Slot 1 is the
+    # nearest attackable slot at the same cell.
+    b[OFF_X + 1] = MON_X
+    b[OFF_Y + 1] = MON_Y
+    b[OFF_HP + 1] = MON_HP
+    b[OFF_TYPE + 1] = MON_TYPE
+    b[OFF_KIND + 1] = MON_KIND
     with open(path, "wb") as f:
         f.write(bytes(b))
 

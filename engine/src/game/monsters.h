@@ -89,6 +89,12 @@ void u2_monsters_restamp(u2_ctx *ctx, u2_world *w);
  * `EAST--INVALID MOVE!` over a tile the player was standing on the value of. */
 int u2_monsters_at(const u2_ctx *ctx, int x, int y);
 
+/* The slot at (x,y) that an ATTACK / TRANSACT / cannon can target, or -1 for none.
+ * Reproduces asm/23E6, which scans slots 31 down to 1 and NEVER examines slot 0, so a
+ * creature parked in slot 0 is invulnerable to melee, talk and cannon (G78). Use this for
+ * the attack target; use u2_monsters_at() for step-blocking, where slot 0 DOES block. */
+int u2_monsters_at_attackable(const u2_ctx *ctx, int x, int y);
+
 /* Count cells the grid claims are occupied but no creature slot actually sits on.
  *
  * This is the "he left a copy of him behind" invariant, stated so a machine can check it: the grid is

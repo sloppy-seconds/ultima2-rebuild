@@ -2046,7 +2046,10 @@ void u2_overworld_attack_dir(u2_ctx *ctx, u2_overworld *ow, const char *word, in
 
     const int tx = (ow->x + dx) & U2_SECTOR_MASK;
     const int ty = (ow->y + dy) & U2_SECTOR_MASK;
-    const int slot = u2_monsters_at(ctx, tx, ty);
+    /* asm/2BC4 calls asm/23E6 to find the target, and that scan never examines slot 0, so a
+     * creature in slot 0 is invulnerable (G78). u2_monsters_at_attackable reproduces it; the
+     * plain u2_monsters_at would let the player kill a creature the original makes unkillable. */
+    const int slot = u2_monsters_at_attackable(ctx, tx, ty);
 
     u2_attack a;
     memset(&a, 0, sizeof a);

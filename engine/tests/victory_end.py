@@ -61,15 +61,18 @@ def build_site_seed(work):
     with open(os.path.join(content, "mapx03"), "wb") as f:
         f.write(bytes([PAVING]) * 4096)
 
-    # monx03 slot 0: Minax (type 0x40) at (3,0), HP 1, role 0x84 (routes to asm/1040:
+    # monx03 slot 1: Minax (type 0x40) at (3,0), HP 1, role 0x84 (routes to asm/1040:
     # strikes, never moves). Columns: x 0..31, y 32..63, hp 64..95, type 96..127,
     # kind 128..159, role 160..191.
+    # SLOT 1, NOT SLOT 0: asm/23E6 find_creature_at_cursor never examines slot 0 (G78), so a
+    # slot-0 creature is invulnerable to melee. The real Minax lives in monx03 slot 31; slot 1
+    # here is the nearest attackable stand-in so the east swing can actually land the kill.
     mon = bytearray(384)
-    mon[0] = 3; mon[32] = 0
-    mon[64] = 1
-    mon[96] = 0x40
-    mon[128] = PAVING
-    mon[160] = 0x84
+    mon[1] = 3; mon[33] = 0
+    mon[65] = 1
+    mon[97] = 0x40
+    mon[129] = PAVING
+    mon[161] = 0x84
     with open(os.path.join(content, "monx03"), "wb") as f:
         f.write(bytes(mon))
 

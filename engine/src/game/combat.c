@@ -436,9 +436,11 @@ int u2_combat_cannon(u2_ctx *ctx, int cx, int cy, u2_attack *out)
     memset(&r, 0, sizeof r);
 
     /* asm/23E6, reached from asm/35F0: the scan runs DI from 31 down and stops at 0, so slot 0
-     * is never examined. Reproduced rather than routed through u2_monsters_at(), which scans 0
-     * upward and is the step-rejection question, not the asm/23E6 question — the two disagree
-     * about slot 0 on purpose and papering that over would lose the difference. */
+     * is never examined (G78). Kept inline here rather than routed through monsters.c's
+     * u2_monsters_at_attackable so combat.c stays self-contained for the CP5 combat_check
+     * harness, which links combat.c without monsters.c. The two scans are the same rule; the
+     * melee path (overworld.c) uses the shared helper. Deliberately NOT u2_monsters_at(), which
+     * scans 0 upward and is the step-rejection question — the two disagree about slot 0. */
     int slot = 0;
     for (int i = U2_MON_SLOTS - 1; i >= 1; i--) {
         if (ctx->state.mon_type[i] == 0)

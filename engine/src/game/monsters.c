@@ -312,6 +312,37 @@ int u2_monsters_at(const u2_ctx *ctx, int x, int y)
     return -1;
 }
 
+/* The slot at (x,y) that an ATTACK / TRANSACT / cannon can actually target, or -1 for none.
+ *
+ * This is asm/23E6 find_creature_at_cursor reproduced byte for byte, and it is deliberately a
+ * DIFFERENT scan from u2_monsters_at(). asm/23E6 is the scan the ATTACK chain (asm/2BC4),
+ * TRANSACT (asm/4050_cmd_T) and the cannon (asm/35F0) all call to decide whether a creature
+ * is even there before they roll or deal. Its loop is `mov $0x1f,%bl` (DI=31) ... `dec %di;
+ * jne`, which walks slots 31 down to 1 and falls out at DI==0 WITHOUT examining slot 0. So
+ * the occupant of slot 0 is invisible to every interaction that routes through it: melee
+ * prints MISS (asm/2BC7 `cmp $0,%bl; jne` falls to the MISS printer), talk prints FUNNY, NO
+ * RESPONSE, and the cannon finds nothing -- while the creature still draws, still blocks the
+ * cell (that is u2_monsters_at, which DOES include slot 0), and still runs its own AI. That
+ * is the original's whole invulnerability mechanism (G78): there is no invulnerable flag, no
+ * locked HP and no monster-defense term in the roll; the creature is simply never scanned.
+ *
+ * asm/23E6 tests [DI+0x197] (mon_type), not hp, so an empty slot is one with type 0. It does
+ * not skip a wounded (hp 0) creature -- that asymmetry belongs to the damage scan asm/2E3D,
+ * not this one. Returns the matching slot, or -1 when the scan exhausts (caller prints MISS).
+ */
+int u2_monsters_at_attackable(const u2_ctx *ctx, int x, int y)
+{
+    if (ctx == NULL)
+        return -1;
+    for (int i = U2_MON_SLOTS - 1; i >= 1; i--) {   /* 31 down to 1; slot 0 is never examined */
+        if (ctx->state.mon_type[i] == 0)
+            continue;
+        if (ctx->state.mon_x[i] == (uint8_t)x && ctx->state.mon_y[i] == (uint8_t)y)
+            return i;
+    }
+    return -1;
+}
+
 int u2_monsters_ghost_cells(const u2_ctx *ctx, const u2_world *w)
 {
     if (ctx == NULL || w == NULL || !w->map_loaded)

@@ -308,6 +308,35 @@ int main(void)
     u2_combat_attack(&c, 4, &a);
     CHECK(victory_calls == 0, "CONTROL: a Minax still standing does not end the game");
 
+    /* --- 7. slot 0 is invulnerable: asm/23E6 never scans it (G78) -------------------
+     * The original's invulnerability is not a flag, a locked HP byte or a monster-defense
+     * term. asm/23E6 find_creature_at_cursor walks slots 31..1 with `mov $0x1f,%bl; ... dec
+     * %di; jne` and falls out at DI==0 WITHOUT examining slot 0, so the ATTACK chain
+     * (asm/2BC4 -> asm/2BC7 `cmp $0,%bl; jne`) prints MISS for a slot-0 creature while it
+     * still draws, blocks the cell and attacks. u2_monsters_at_attackable reproduces that
+     * scan; u2_monsters_at (step-blocking) still includes slot 0, because the creature DOES
+     * block movement. Live proof (Port Boniface, sector 31): the unkillable guard was slot 0
+     * at (31,47); the three guards killed in the same session were slots 1,3,4, all
+     * byte-identical (type 0x60 kind 0x70 role 0x01). The discriminator is the slot index. */
+    {
+        u2_ctx z;
+        memset(&z, 0, sizeof z);
+        /* Two byte-identical guards, one in slot 0 (invulnerable) and one in slot 1. */
+        z.state.mon_type[0] = 0x60; z.state.mon_x[0] = 31; z.state.mon_y[0] = 47; z.state.mon_hp[0] = 255;
+        z.state.mon_type[1] = 0x60; z.state.mon_x[1] = 31; z.state.mon_y[1] = 48; z.state.mon_hp[1] = 255;
+        CHECK(u2_monsters_at_attackable(&z, 31, 47) == -1,
+              "slot 0 is NOT attackable (asm/23E6 never examines it) — the invulnerable guard");
+        CHECK(u2_monsters_at_attackable(&z, 31, 48) == 1,
+              "slot 1 IS attackable — the killable guard, byte-identical to slot 0");
+        /* CONTROL: the step-blocking scan still returns slot 0 (you cannot walk over it). */
+        CHECK(u2_monsters_at(&z, 31, 47) == 0,
+              "CONTROL: u2_monsters_at still returns slot 0 for step-blocking (it blocks movement)");
+        /* CONTROL 2: if the scan were changed to start at 0 (the mutation this gate exists to
+         * catch), slot 0 would become attackable. Assert it never returns slot 0. */
+        CHECK(u2_monsters_at_attackable(&z, 31, 47) != 0,
+              "the attack scan must never return slot 0 — gutting the skip fails here");
+    }
+
     printf("attack_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
 }

@@ -518,6 +518,17 @@ elif ! python3 tests/cp5_fight_seed.py "$WORK/w9" 2>"$WORK/w9.seed.err"; then
     bad "CP5 fight gate: the synthetic content did not build:"
     sed 's/^/        /' "$WORK/w9.seed.err"
 else
+    # asm/23E6 find_creature_at_cursor never examines slot 0 (G78), so a slot-0 creature is
+    # invulnerable to melee. The shared seed puts its Fighter in slot 0 (other CP5 checks patch
+    # slot 0 and rely on that); W9 kills the creature, so move it to slot 1, the nearest
+    # attackable slot at the same cell (3,0).
+    python3 - "$WORK/w9/content/monx00" <<'PYEOF'
+import sys
+p = sys.argv[1]; d = bytearray(open(p, 'rb').read())
+for col in (0, 32, 64, 96, 128, 160):
+    d[col + 1] = d[col + 0]; d[col + 0] = 0
+open(p, 'wb').write(bytes(d))
+PYEOF
     # The save is seeded with agility 0x80, which asm/2E3D makes a guaranteed hit
     # (the roll is rand>>1, so it maxes at 127), and EXP/GOLD at 9999 so the kill
     # reward has to wrap. Both halves are asserted: the line and the wrap.
