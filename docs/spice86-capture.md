@@ -219,6 +219,20 @@ Check it before writing anything new against a live session.
 | **read a live byte/word/block** | `tools/spice86_type.py --peek 8be:60:1` (hex `SEG:OFF[:LEN]`) | no — HTTP |
 | **force a live value to build a scenario** | `tools/spice86_type.py --poke 8be:60=00` (hex `SEG:OFF=BYTES`, always prints the read-back) | no — MCP |
 | **prove what the player saw** | `tools/spice86_screenshot.py NAME.png`, **before and after** the action | no — MCP |
+| **capture a one-shot event during play** | **`tools/spice86_play_capture.py --out /var/tmp/u2/cap --bp <ip> --frames`** — the sidecar: DS-field log + content md5s + breakpoints + frames, all at once | no — HTTP + RSP + MCP |
+
+**A teardown CFG harvest cannot hold a one-shot event, and a screenshot loop records no writes.**
+This is the reason `spice86_play_capture.py` exists, and it is measured, not folklore: the
+`minax-fight-live` owner session (2026-11-12) was captured with a 1/sec screenshot loop plus a
+`dumpAll` at teardown, and the resulting `ExecutionFlow` held only **3,782 instructions with zero
+hits** for the victory (`0x74A0`), the teleport gate (`0x2C2D`) or the Minax strike (`0x0F8E`) — the
+trace ring rolls in seconds, so a dump taken after the kill records the idle loop, not the kill.
+Frames show what the player saw but say nothing about what was *written*, so a persist question
+("does the ending save the sector?") is invisible to both. For any one-shot transition — a kill, a
+teleport, a mode change, a sector write — run `spice86_play_capture.py` alongside the play: it logs
+DS fields on change (memory persists even when the trace rolls), md5s the content files (a write is
+a diff), and arms breakpoints *before* the event (they fire on hit regardless of the ring). Do not
+hand-roll another shotloop.
 
 **Pair the frame with the claim.** A memory read and a trace say what changed and whether it ran;
 only a frame says what the player saw, and the two can disagree — `cmd_V`'s helm branch executed and
