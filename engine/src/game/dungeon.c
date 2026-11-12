@@ -141,10 +141,13 @@ u2_cmd_result u2_dungeon_advance(u2_ctx *ctx, u2_overworld *ow)
     seam_str_out(ctx, U2_S_TRAP);
 
     if (ctx->state.tools == 0) {
-        /* The no-tools arm is `jmp L_000e62`, the damage tail, and the amount and
-         * the HP path are UNDECODED — recorded as G47 in docs/needs-gameplay.md.
-         * Nothing is applied here and nothing is printed, because inventing a
-         * number would be worse than the gap: the gap has an owner and a name. */
+        /* asm/277B runtime 0x28E3: `jmp L_000e62`, which is the DEATH handler
+         * (asm/0C62, sub_0c62 — runtime 0x0e62 = file 0x0c62). A trap with no tools
+         * is INSTANT DEATH, not a damage roll: the handler zeroes HP/food/exp/gold
+         * and prints ' IS DEAD!'. Corrected 2026-11-13 — the earlier "damage tail,
+         * amount undecoded" reading misidentified the jump target; there is no amount.
+         * The death handler is screen-proven in captures/spice86/cp5-weak-fight. */
+        u2_death(ctx);
         u2_cmd_done(ctx);
         return U2_CMD_DONE;
     }

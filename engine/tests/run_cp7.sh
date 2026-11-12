@@ -428,4 +428,26 @@ fi
 
 echo
 if [ "$fail" -eq 0 ]; then echo "CP7 DUNGEON SPEC: PASS"; else echo "CP7 DUNGEON SPEC: FAIL"; fi
+# ---- trap: the two arms decided by the TOOLS counter (unit gate) ------------
+# asm/277B 0x28B1. A trap with no tools jumps to the death handler (instant death,
+# no damage amount); with tools it spends one and escapes. Deterministic because the
+# trap roll is the first rand_byte in u2_dungeon_advance. See tests/trap_check.c.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/trap_check" \
+        tests/trap_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/trap.build"; then
+    if "$WORK/trap_check" > "$WORK/trap.out" 2>&1; then
+        n=$(sed -n 's/^trap_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/trap.out")
+        if [ "${n:-0}" -eq 0 ]; then
+            bad "CP7 trap run executed 0 checks — the test is not running"
+        else
+            ok "CP7 trap: no-tools trap kills, tools trap spends one and escapes ($n checks)"
+        fi
+    else
+        bad "CP7 trap check failed:"
+        sed 's/^/        /' "$WORK/trap.out"
+    fi
+else
+    bad "CP7 trap harness did not build:"
+    sed 's/^/        /' "$WORK/trap.build"
+fi
+
 exit $fail

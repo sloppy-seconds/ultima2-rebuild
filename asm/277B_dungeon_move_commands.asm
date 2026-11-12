@@ -9,8 +9,14 @@
 #                    '-BLOCKED!'; [DS:00] = ([DS:00]+[DS:02]) & 0x3f; same for [DS:01]/
 #                    [DS:03]; then one rand against [DS:25] and on `jb` the TRAP.
 #   TRAP     0x28B1  [DS:26] = 0 (the torch goes out FIRST), 'ARGH! A TRAP!', then
-#                    [DS:66] == 0 -> jmp L_000e62 (the damage tail, amount undecoded, G47)
+#                    [DS:66] == 0 -> jmp L_000e62 (the DEATH handler, see below)
 #                    else 'ESCAPED! BY USE OF TOOLS!' and one packed-decimal tool spent.
+#                    CORRECTED 2026-11-13: L_000e62 is sub_0c62 (runtime 0x0e62 = file
+#                    0x0c62), the death handler that zeroes DS:51..59 and prints ' IS DEAD!'
+#                    (screen-proven: captures/spice86/cp5-weak-fight/death1.png). There is NO
+#                    damage amount and no partial hit: a trap with zero tools is INSTANT DEATH.
+#                    The earlier "damage tail, amount undecoded" reading was wrong — the jump
+#                    target is the same one the food borrow-outs and the force field use.
 #   TURN LEFT  0x2B13  if ([DS:03]) { [DS:02]=[DS:03]; [DS:03]=0 } else { [DS:03]=-[DS:02];
 #                    [DS:02]=0 }  — a quarter turn counter-clockwise on a SIGNED pair.
 #   TURN RIGHT 0x2B45  the mirror: if ([DS:02]) { [DS:03]=[DS:02]; [DS:02]=0 } else
@@ -25,7 +31,8 @@
 #
 # The trap roll compares against the FLOOR byte, so floor 0 has no traps at all and the
 # deeper the dungeon the more often one fires. That is the rule the bytes give; the rate
-# has never been observed, and the no-tools damage amount is still G47.
+# has never been measured. The no-tools arm is NOT a damage roll (see the TRAP block above):
+# it jumps straight to the death handler, so the only two outcomes are spend-a-tool or die.
 #        One fact inside it is nonetheless worth carrying, because it is the only place the
 #           game spends TOOLS: at runtime 0x28DC it prints 'ARGH! A TRAP!', reads DS:66, prints
 #           'ESCAPED! BY USE OF TOOLS!' at 0x28E9, and at 0x2904..0x290C does
@@ -45,7 +52,8 @@
 # provenance: static, read in full 2026-10-29 for CP7 from the raw bytes of this span; the
 #           ADVANCE/TURN behaviour is corroborated live by captures/spice86/tower-34 (arrows
 #           print TURN LEFT / TURN RIGHT) and captures/spice86/dungeon-35-live (A prints
-#           ADVANCE). The trap has never been observed firing — see G47.
+#           ADVANCE). The trap firing was observed 2026-11-13 (captures/spice86/g51-dungeon-A-attack:
+#           'ARGH! A TRAP!' and DS:26 -> 0; the seed carried tools so it took the ESCAPED arm).
 # confidence: low (bytes proven by check_func.py)
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 sub_277b:
