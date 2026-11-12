@@ -819,10 +819,24 @@ fi
 # before this was trusted: a 6-HP charge turns `enter` red, and firing the ladder on the
 # tile you stand on instead of the tile you enter turns five of eight red.
 if U2_BIN=./u2 python3 tests/swamp_damage.py > "$WORK/e1.log" 2>&1; then
-    ok "CP5 E1: tile effects — swamp -5 on entry only (3 owner controls), underflow is death, field -1000 and its ring gate (9 cases, silent in original / announced in enhanced)"
+    ok "CP5 E1: tile effects — swamp -5 on entry only (3 owner controls), underflow is death, field -1000 and its ring gate, refused mounted step onto a swamp still pays the 5 (G55) (11 cases)"
 else
     sed 's/^/        /' "$WORK/e1.log" | tail -10
     bad "CP5 E1: the tile-effect ladder disagrees with asm/248B/2495/24B1/24B5"
+fi
+
+# --- CP5 E1b: the two PASSes are not one cost (G70) -------------------------------------
+#
+# cmd_P (letter 'P', asm/3DBC) prints PASS and jmps to asm/0C33 (the status-counter tick)
+# and charges NOTHING; the walk-loop space bar (asm/0936 cmp $0x20) charges 10. The engine
+# used to charge 10 on both because they shared u2_overworld_pass. The move arm is the
+# odometer control that makes the letter-P zero mean something. Red-controlled before
+# trusting: charging cmd_P turns letter-p red (999989 != 999999).
+if U2_BIN=./u2 python3 tests/pass_food.py > "$WORK/e1b.log" 2>&1; then
+    ok "CP5 E1b: PASS food — letter-P 0, space 10, move 19 (odometer control) (G70)"
+else
+    sed 's/^/        /' "$WORK/e1b.log" | tail -10
+    bad "CP5 E1b: the PASS food charge disagrees with asm/3DBC (0) and asm/0936/090D (10)"
 fi
 
 # --- CP5 W10: what a frigate cannon shot does, lethal and not ---------------------------

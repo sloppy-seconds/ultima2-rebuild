@@ -133,11 +133,30 @@ def main():
           "hp %d, screen %s (want 9997 and the RING line)" %
           (hp(s) if s else -1, "ok" if "RING" in G.flatten(text) else "missing"))
 
+    # refused-swamp (G55): the ladder sits at asm/2423 entry, ahead of the verdict, so a
+    # MOUNTED step the horse refuses onto a swamp still pays the 5. Board the horse (B),
+    # then step east onto the swamp the horse will not enter (asm/2626 refuses mode 0x02).
+    # The move is refused (position unchanged) yet HP still falls by 5.
+    text, s = state_case("refused-swamp", ["B", "RIGHT"],
+                         tiles={G.ENTRY: G.TILE_HORSE, G.EAST: 0x04})
+    check("refused-swamp", s and G.pos(s) == G.ENTRY and hp(s) == 9992,
+          "pos %s hp %d (want refused at entry, 9992: the -5 fires before the verdict)" %
+          (G.pos(s) if s else None, hp(s) if s else -1))
+
+    # refused-mountain control: a refused step onto a NON-charging tile must stay free,
+    # or the charge is just per-attempt rather than the swamp tile effect (G55 control).
+    text, s = state_case("refused-mountain", ["B", "RIGHT"],
+                         tiles={G.ENTRY: G.TILE_HORSE, G.EAST: 0x10})
+    check("refused-mountain", s and G.pos(s) == G.ENTRY and hp(s) == 9997,
+          "pos %s hp %d (want refused at entry, 9997: mountain is not a charging tile)" %
+          (G.pos(s) if s else None, hp(s) if s else -1))
+
     if fails:
-        print("  FAIL  %d of 9 tile-effect cases wrong" % fails)
+        print("  FAIL  %d of 11 tile-effect cases wrong" % fails)
         return 1
     print("  PASS  tile effects: swamp -5 on entry (3 owner controls, silent in original "
-          "mode, announced in enhanced), underflow is death, field -1000 and its ring gate")
+          "mode, announced in enhanced), underflow is death, field -1000 and its ring gate, "
+          "and the ladder firing on a refused mounted step (G55) with its mountain control")
     return 0
 
 

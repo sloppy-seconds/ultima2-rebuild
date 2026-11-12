@@ -298,7 +298,7 @@ int u2_overworld_spend_food(u2_ctx *ctx, unsigned bcd_sub);
  * a jump-table letter) and by the idle auto-PASS (asm/08FF) — three sites in the
  * original, only one of which is a command letter.
  */
-void u2_overworld_pass(u2_ctx *ctx, u2_overworld *ow);
+void u2_overworld_pass(u2_ctx *ctx, u2_overworld *ow, int charge_food);
 
 /*
  * The ATTACK once its direction is known: print `word` on the current line, then

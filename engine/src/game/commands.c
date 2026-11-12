@@ -167,16 +167,18 @@ static u2_cmd_result cmd_Q(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
 
 /* asm/3DBC_cmd_P: PASS as a command letter, reached through cs:0730 entry P. It is a
    different site from the walk loop's space bar (asm/0936's `cmp $0x20,%al` at file
-   0x0B3C) even though both print the word and both charge 10 food at asm/090D, and the
-   engine keeps them apart for the reason that matters: only one of them is in the jump
-   table, so only one of them belongs in this file's table. The body lives in overworld.c
-   as u2_overworld_pass(), because the food charge and the sweep are that file's
-   primitives; what belongs here is the fact that P is a letter the table answers.
-   Like cmd_Q it does not call cmd_done(): echo_cmd already emits the CR and the prompt. */
+   0x0B3C), and the two do NOT cost the same: the space bar charges 10 food (measured
+   live), but cmd_P prints PASS and jmps to asm/0C33 (the status-counter tick) and charges
+   NOTHING - measured live, food flat across three letter-P passes with a move control
+   dropping 19 (captures/spice86/g70-pass-vs-move). The engine keeps them apart for that
+   reason and for the one that matters structurally: only cmd_P is in the jump table, so
+   only it belongs in this file's table. The body lives in overworld.c as
+   u2_overworld_pass(), which takes the food charge as a flag; cmd_P passes 0. Like cmd_Q
+   it does not call cmd_done(): echo_cmd already emits the CR and the prompt. */
 static u2_cmd_result cmd_P(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
 {
     (void)letter;
-    u2_overworld_pass(ctx, ow);
+    u2_overworld_pass(ctx, ow, 0);
     return U2_CMD_DONE;
 }
 

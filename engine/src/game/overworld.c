@@ -1324,10 +1324,17 @@ int u2_overworld_step_food(u2_ctx *ctx)
  *           the threshold that decides WHEN the idle arm fires is not (see
  *           U2_AUTO_PASS_POLLS).
  */
-void u2_overworld_pass(u2_ctx *ctx, u2_overworld *ow)
+void u2_overworld_pass(u2_ctx *ctx, u2_overworld *ow, int charge_food)
 {
     echo_cmd(ctx, U2_S_PASS);
-    if (food_spend(ctx, U2_FOOD_PER_PASS))
+    /* The two PASSes are not one cost. The idle auto-pass (asm/08FF) falls into asm/090D,
+     * the packed-BCD -10, and the walk-loop space bar was measured live at -10; both
+     * charge U2_FOOD_PER_PASS. cmd_P (asm/3DBC, the letter 'P') prints PASS and jmps to
+     * asm/0C33, the status-counter tick, and charges NOTHING - measured live (food flat
+     * across three letter-P passes, with a move control dropping 19; captures/spice86/
+     * g70-pass-vs-move). So the charge is a caller-supplied flag, not a constant: 1 for
+     * the space bar and the idle auto-pass, 0 for cmd_P. */
+    if (charge_food && food_spend(ctx, U2_FOOD_PER_PASS))
         u2_death(ctx);
     creature_turn(ctx, ow);
 }
@@ -2207,6 +2214,23 @@ static void victory_flight(u2_ctx *ctx, u2_overworld *ow, int steps)
     }
 }
 
+/* asm/248B_swamp_damage_gate -> asm/2495_swamp_damage (swamp, -5) then asm/24B1/24B5
+ * (force field, -1000 unless a ring protects): the tile-effect ladder. In the bytes it
+ * sits at the ENTRY of asm/2423, ahead of the passability verdict, so it fires on the
+ * destination cell whether the step is accepted OR refused - a horse turned away from a
+ * swamp by asm/2626 still pays the 5 (G55, captures/spice86/g55-swamp-refused-step:
+ * refused swamp -5, refused mountain 0). Gated on the outdoor map (DS:4A == 0). */
+static void u2_tile_effect_ladder(u2_ctx *ctx, u2_overworld *ow, int tx, int ty)
+{
+    if (ow->sector_lo != 0)
+        return;
+    const uint8_t dest = u2_world_tile_at(&ow->world, tx, ty);
+    if (dest == 0x04u)
+        u2_swamp_damage(ctx);
+    else if (dest == 0x5Cu)
+        u2_force_field(ctx);
+}
+
 int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
 {
     /* The handoff is complete from here on: any key the play API parked while the title flow
@@ -2306,7 +2330,7 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
              * recorded, not about whether an existing demo replays. */
             if (u2_demo_auto_pass_due(ctx)) {
                 ow->pending_cmd = 0;
-                u2_overworld_pass(ctx, ow);
+                u2_overworld_pass(ctx, ow, 1);
                 continue;
             }
 
@@ -2338,7 +2362,7 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
                      * would synthesise a second PASS on top of the one cmd_P already
                      * performed. */
                     u2_demo_mark_auto_pass(ctx);
-                    u2_overworld_pass(ctx, ow);
+                    u2_overworld_pass(ctx, ow, 1);
                     /* Not modelled: the original also steps every monster on
                      * this tick, observed live as one cell per auto-PASS while
                      * the player stood still. That is now what creature_turn
@@ -2414,8 +2438,9 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
              * 0x0B3C). 'P' is PASS too, but from the command jump table (asm/3DBC_cmd_P,
              * cs:0730 entry P) and it is handled in commands.c as cmd_P — the two are
              * separate sites in the original and only one of them is a command letter,
-             * so they no longer share an arm here. Both reach u2_overworld_pass(). */
-            u2_overworld_pass(ctx, ow);
+             * so they no longer share an arm here. Both reach u2_overworld_pass(), but the
+             * space bar charges 10 food (measured live) while cmd_P charges none. */
+            u2_overworld_pass(ctx, ow, 1);
             continue;
         default:
             /* The command jump table. asm/0A1F is the only route to the 26 handlers and it
@@ -2756,6 +2781,11 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             if (u2_overworld_step_food(ctx))
                 break;
 
+            /* G55: the tile-effect ladder sits at asm/2423 entry, ahead of the verdict, so
+             * a refused step onto a charging tile still applies it. The destination is
+             * (nx, ny) - the cell the step tried to enter, which the move did not reach. */
+            u2_tile_effect_ladder(ctx, ow, nx, ny);
+
             seam_str_out(ctx, U2_S_INVALID_MOVE);
             seam_char_print(ctx, '\r');               /* the game's newline */
             seam_str_out(ctx, U2_S_CMD_PROMPT);
@@ -2813,17 +2843,11 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
          * REJECTED attempt onto a swamp — a horse, which refuses mode 0x02 at asm/2626 —
          * would pay the 5 before the refusal. No capture has tested that; the owner's
          * three controls (PASS free, safe->swamp -5, swamp->safe free) are all satisfied
-         * by this accepted-step placement, which is the narrower claim. Open as
-         * docs/needs-gameplay.md G55; if a capture shows a refused mounted step onto a
-         * swamp costing HP, these two calls move above the verdict branch and nothing
-         * else changes. */
-        if (ow->sector_lo == 0) {
-            const uint8_t dest = u2_world_tile_at(&ow->world, ow->x, ow->y);
-            if (dest == 0x04u)
-                u2_swamp_damage(ctx);
-            else if (dest == 0x5Cu)
-                u2_force_field(ctx);
-        }
+         * by this accepted-step placement. CLOSED by G55 (captures/spice86/g55-swamp-
+         * refused-step): a refused mounted step onto a swamp DOES cost the 5, so the
+         * ladder now runs on the refused arm too via u2_tile_effect_ladder(), computed on
+         * the destination cell. The accepted arm calls the same helper. */
+        u2_tile_effect_ladder(ctx, ow, ow->x, ow->y);
 
         /* A time door fires on the step onto its cell — no prompt, no key, unlike a town
          * or tower gate, which is why this sits in the move path and not in cmd_E. Observed
