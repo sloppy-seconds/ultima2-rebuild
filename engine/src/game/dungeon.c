@@ -173,13 +173,12 @@ u2_cmd_result u2_dungeon_retreat(u2_ctx *ctx, u2_overworld *ow)
  * is that the direction is already known. The cell attacked is the one the facing
  * names, which is [DS:15], the same probe ADVANCE uses.
  *
- * CONTRADICTION ON RECORD: docs/spice86-live-findings.md § 13 tabulates `A` as
- * ADVANCE in a dungeon, from captures/spice86/dungeon-35-live, while
- * captures/spice86/tower-34 shows `A` printing ATTACK--MISS and the bytes above
- * show no arm that could print ADVANCE from the A jump-table entry. The engine
- * follows the bytes and the tower frame, and Up-arrow is ADVANCE either way, so
- * the movement that row was describing is still reachable. Recorded rather than
- * quietly resolved.
+ * CONTRADICTION RESOLVED 2026-11-13: docs/spice86-live-findings.md § 13 had tabulated `A` as
+ * ADVANCE in a dungeon (captures/spice86/dungeon-35-live), while captures/spice86/tower-34
+ * showed `A` printing ATTACK--MISS and the bytes above show no arm that could print ADVANCE
+ * from the A jump-table entry. captures/spice86/g51-dungeon-A-attack observed it directly
+ * (cmd_E on the sector-20 door, torch with I): `A` printed ATTACK--MISS and the corridor did
+ * not move; `Up` printed CMD: ADVANCE. So A = ATTACK, Up = ADVANCE, as the engine has it.
  */
 u2_cmd_result u2_dungeon_attack(u2_ctx *ctx, u2_overworld *ow)
 {
