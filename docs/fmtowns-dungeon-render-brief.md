@@ -41,6 +41,30 @@ perspective segments:
 This is corroborated by the lossless FM Towns screenshots (§ 4): first-person corridor,
 textured receding walls, sprite monsters scaled by distance.
 
+## 2b. The dungeon map files differ (DOS vs FM Towns) — measured 2026-11-13
+
+The two versions do **not** share a dungeon map format. This reframes what the codex must
+answer.
+
+| | DOS (what the engine reads today) | FM Towns |
+|---|---|---|
+| container | embedded in `mapxNN` (sector whose ones-digit is 4/5) | 7 separate named files: `DARDIN/FIRE/M/MINE/P/PERINIAN/TIME.DG3` |
+| size | 4096 B = 16 pages of 16x16 (`floor*256+y*16+x`, `asm/68C0`) | 2048 B = 8 pages of 16x16 |
+| cell encoding | bitmask: `0x80` rock, `0xC0` doorway, `0xE0` fake wall, `0x40` chest, `0x20` ladder bit | small integers 0..15, dominated by `0` and `2` (histogram of `M.DG3`: 0x00 x898, 0x02 x804, then 4/1/7/12/3/6/15/14/5/9) |
+
+Consequences:
+
+- **We do not adopt their grid format.** Our engine already reads the DOS `mapx` bitmask and
+  already resolves each cell to a *feature* (wall / doorway / chest / ladder / monster /
+  depth). What we need from the FM Towns binary is therefore **not** "how it parses `.DG3`"
+  but "given a feature at a depth, which tile + which screen rectangle."
+- **The small-int grid is a hint the FM Towns renderer is a direct value->tile lookup**
+  (`tile = table[cell]`), a simpler structure to find and read than bit-testing. So the codex
+  narrows to a compact **feature -> tile-index -> geometry** table we apply to our own
+  already-decoded DOS features.
+- **The named `.DG3` files are a cleaner tower-vs-dungeon discriminator** than sector numbers:
+  compare a tower file (likely `M` or `P`) against a dungeon file to settle § 3.7.
+
 ## 3. What the codex must specify
 
 A complete answer lets us render a frame from the dungeon grid + creature list with no
@@ -66,12 +90,19 @@ guessing. It must give, for each of the ~3-7 depth steps:
 B, ISO-9660 over raw MODE1/2352 sectors). Readable with the bespoke reader in
 `tools/fmtowns_xwalk.py` (`find_disc`, `disc_files`, `decode_bank`); 7z cannot parse it.
 
-**Likely FM Towns Ultima II program (the decompile target):** `ENCHANT.EXP` (1,072,398 B).
-The disc is "Ultima Trilogy 1-3" and the three large `.EXP` programs map to the trilogy by
-subtitle — `DARKNESS.EXP` (U1, First Age of Darkness), `ENCHANT.EXP` (U2, Revenge of the
-Enchantments), `EXODUS.EXP` (U3). **This mapping is a hypothesis to confirm** (strings /
-entry point), not measured. Also relevant: `DUNGEON.EUP` (9,466 B) and seven `*.DG3` files
-(2048 B each: DARDIN, FIRE, M, MINE, P, PERINIAN, TIME) which look like dungeon level data.
+**FM Towns Ultima II program (the decompile target) — CONFIRMED:** `ENCHANT.EXP`
+(1,072,398 B). Its own strings read `Ultima ][  - Revenge of Enchantress -` and
+`Roster data:ULTIMA II for FM-TOWNS`; the trilogy mapping is confirmed by the siblings'
+strings too (`DARKNESS.EXP` = "Ultima I - The First Age of Darkness", `EXODUS.EXP` =
+"Ultima III - EXODUS"). The file starts with magic `4D 50` ("MP"), the FM Towns executable
+format. **The FM Towns CPU is a Motorola 68020 (68k), not Z8000** — Ghidra (which REA drives)
+has first-class 68000 support, so route B is a normal native RE task, not an exotic-ISA
+gamble. The MP header means it must be loaded as a raw 68000 image at its base, not
+auto-parsed.
+
+Not the renderer: `DUNGEON.EUP` (9,466 B) is **Euphony music** (magic `EUPHONY`), not code.
+The seven `*.DG3` files (2048 B: DARDIN, FIRE, M, MINE, P, PERINIAN, TIME) are **dungeon
+level data** (the grid the renderer reads), not the renderer. See § 2b.
 
 **GRAPH banks (decode recipe):** 512-byte header, then 32x32 tiles at 4bpp packed, high
 nibble = left pixel, indices already in 0..7. Palette `k_pal` (index 0 = black =
@@ -99,13 +130,15 @@ segments; a handful of controlled frames at known depths pins the per-(side,dept
 table and the blit geometry. Downside: it infers the table from behaviour, so edge cases
 (doors, towers, unusual creatures) need targeted captures.
 
-**B — Decompile the FM Towns binary (authoritative, hard).** Disassemble `ENCHANT.EXP`
-(and `DUNGEON.EUP`) and read the dungeon-drawing routine directly. FM Towns is **Z8000**
-(16-bit Zilog); Ghidra's Z8000 support is limited, so this is a substantial, uncertain
-effort. If it lands, it answers § 3 exactly, including the tower discriminator.
+**B — Decompile the FM Towns binary (authoritative, now tractable).** Disassemble
+`ENCHANT.EXP` and read the dungeon-drawing routine directly. The FM Towns CPU is a
+**Motorola 68020**, which Ghidra supports well, so this is a large but ordinary native
+reverse-engineering task. Load `ENCHANT.EXP` as a raw 68000 image at its MP base. If it
+lands, it answers § 3 exactly, including the tower discriminator.
 
-Recommendation: start with **A** (cheap, reuses the emulator we already drive), fall back to
-**B** for the parts A cannot pin (tower discriminator, exact creature index).
+Recommendation: **B is now the primary route** (68020 is Ghidra-friendly, target confirmed),
+with **A** as corroboration for anything static analysis cannot pin (e.g. the tower
+discriminator if it turns out to be data-driven rather than code).
 
 ## 6. Current engine state (what the codex replaces)
 
@@ -122,4 +155,7 @@ will grow that into a dungeon tile set (walls/doors/chests/ladders/monsters).
 - Are ceiling/floor **tiles** or **flat fills**?
 - The **closed-door** state: the FM Towns port has it, DOS does not — do we mirror the port
   (owner earlier ruled open-archway for the flat renderer; a faithful blit may revisit this).
-- Confirm `ENCHANT.EXP` is the U2 program before committing to route B.
+- Why do FM Towns dungeons have **8 pages** (2048 B) where DOS has 16 (4096 B)? Fewer floors,
+  or a denser encoding? Affects whether the depth model transfers.
+- Which `.DG3` is the **tower** (likely `M` or `P`)? Cross-check against the DUNG1-vs-DUNG2
+  bank question in § 3.7.
