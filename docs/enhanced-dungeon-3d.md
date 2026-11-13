@@ -343,6 +343,39 @@ gated on owning a 1990 Japanese disc. This is the owner's call.
 4. Only then write the renderer against § 1's viewport-relative model and § 4's face set, with the
    § 3.5 gate.
 
+### 7a. Build order (owner-ruled 2026-11-13: disc-supplied route, open archway)
+
+Owner rulings that fix the scope: art route = **disc-supplied (A)**; doors = **open
+archway** (DOS-faithful, no new door state; the open-door screenshots give the archway
+graphic to key on `0xC0`); convergence = **pinhole `s(d)=1/(d+1)`** as the design default
+(the banks are flat texture tiles, so there is no FM Towns `r` to extract — it is ours).
+
+Build order, gate-first, each step committed green:
+
+1. **Geometry + flat-shaded corridor** (this step). New `engine/src/game/dungeon3d.c`: the
+   viewport-relative frames (VP = map-window centre, 7 depths, `s(d)=1/(d+1)`), fill
+   ceiling / floor / wall quads from `dg_scan`, stamp the depth sprite. Flat palette colours
+   first (no texture yet) so the geometry and the dispatch are proven before art is wired.
+   Wired behind `ctx->enhanced_layout` in `u2_dungeon_render`; CGA and classic EGA keep the
+   wireframe untouched. Gate `dungeon3d_check.c`: render a lit corridor into an enhanced
+   frame and assert large filled regions (ceiling + floor + at least one wall quad), the
+   corridor converges toward the centre, and ink stays inside the map window (x < 448).
+   Red-controlled by disabling the 3D path (falls back to wireframe → sparse lines → fails).
+2. **Bank loader.** Extend `fmtowns.c` to read `DUNG1/2`, `CHEST`, `DUNMON1/2/3` into the
+   theme pool (the GRAPH decode already exists); grow `fmtowns-crosswalk.tsv` a dungeon
+   section. Gate: the banks decode and the tile count matches.
+3. **Texture the quads.** Replace flat fills with the wall/floor/ceiling tiles from the
+   loaded banks (vertical-strip column mapping, Wolfenstein-style). Gate: a wall quad shows
+   bank texture, not a flat fill.
+4. **Face set + tower art.** Key wall-art selection on site kind (§ 4, § 5) so `DUNG2` (the
+   second set) drops in for towers once a known-tower capture confirms which bank is which.
+
+The `dungeon_art_neutral.py` gate (CP7) asserts the dungeon draws no theme art; it stays
+green through step 1 (flat colours are not theme art) and must be revisited at step 3 when
+the corridor starts consulting the theme atlas.
+
+---
+
 This stays its own plan with its own owner ruling, exactly as `enhanced-layout-plan.md`
 § 10 anticipated. The wireframe (CGA) and the scaled wireframe (classic EGA) are
 unaffected; this adds a third renderer behind the existing per-mode dispatch.

@@ -477,4 +477,30 @@ else
     sed 's/^/        /' "$WORK/dsc.build"
 fi
 
+# ---- enhanced 3D dungeon: a filled perspective corridor, not the wireframe ----
+# The enhanced map window draws the flat-shaded corridor (docs/enhanced-dungeon-3d.md
+# § 7a step 1). CGA and classic EGA keep the wireframe. See tests/dungeon3d_check.c.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/dungeon3d_check" \
+        tests/dungeon3d_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/d3d.build"; then
+    if "$WORK/dungeon3d_check" --selftest >"$WORK/d3d-st.out" 2>&1; then
+        if "$WORK/dungeon3d_check" >"$WORK/d3d.out" 2>&1; then
+            n=$(sed -n 's/^dungeon3d_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/d3d.out")
+            if [ "${n:-0}" -eq 0 ]; then
+                bad "CP7 dungeon 3d: executed 0 checks — the test is not running"
+            else
+                ok "CP7 dungeon 3d: enhanced draws a filled corridor, classic stays wireframe ($n checks)"
+            fi
+        else
+            bad "CP7 dungeon 3d check failed:"
+            sed 's/^/        /' "$WORK/d3d.out"
+        fi
+    else
+        bad "CP7 dungeon 3d gate cannot fail (selftest broke):"
+        sed 's/^/        /' "$WORK/d3d-st.out"
+    fi
+else
+    bad "CP7 dungeon 3d harness did not build:"
+    sed 's/^/        /' "$WORK/d3d.build"
+fi
+
 exit $fail

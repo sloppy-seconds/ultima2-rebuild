@@ -123,6 +123,22 @@ typedef struct u2_overworld u2_overworld;
 /* The light counter's refill value, written by both a torch and the LIGHT spell. */
 #define U2_DG_LIGHT_FULL 0x96u
 
+/* asm/6078's three-column sample, exposed so the enhanced 3D renderer (dungeon3d.c)
+ * reads the same topology the wireframe does rather than re-deriving it. */
+typedef struct u2_dg_scan {
+    uint8_t left[U2_DG_SAMPLE_DEPTH];
+    uint8_t ctr[U2_DG_SAMPLE_DEPTH];
+    uint8_t obj[U2_DG_SAMPLE_DEPTH];
+    uint8_t right[U2_DG_SAMPLE_DEPTH];
+} u2_dg_scan;
+
+void u2_dg_scan_build(const u2_ctx *ctx, const u2_overworld *ow, u2_dg_scan *s);
+
+/* The enhanced-mode perspective corridor (docs/enhanced-dungeon-3d.md). Flat-shaded
+ * first cut: ceiling / floor / wall quads + end cap from the scan, into the enhanced
+ * map window. Sprites and texture are later steps. */
+void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s);
+
 /* True when the resident sector is dungeon-shaped: site kind 4 (tower) or 5. */
 int u2_site_is_dungeon(const u2_ctx *ctx);
 

@@ -388,15 +388,8 @@ static void dg_6684(dg_view *); static void dg_66cb(dg_view *);
  * either hand, and all three advance by the facing vector once per depth. The
  * centre cell is read twice, once masked to the terrain nibble and once to the
  * stamp nibble, which is the two-layers-in-one-byte fact made visible in the
- * renderer itself. */
-typedef struct dg_scan {
-    uint8_t left[U2_DG_SAMPLE_DEPTH];
-    uint8_t ctr[U2_DG_SAMPLE_DEPTH];
-    uint8_t obj[U2_DG_SAMPLE_DEPTH];
-    uint8_t right[U2_DG_SAMPLE_DEPTH];
-} dg_scan;
-
-static void dg_scan_build(const u2_ctx *ctx, const u2_overworld *ow, dg_scan *s)
+ * renderer itself. The type lives in dungeon.h so dungeon3d.c shares the scan. */
+void u2_dg_scan_build(const u2_ctx *ctx, const u2_overworld *ow, u2_dg_scan *s)
 {
     int dx, dy;
     u2_dungeon_facing(ctx, &dx, &dy);
@@ -499,7 +492,7 @@ static void dg_sprite_page(const dg_view *v, const uint8_t *strokes, int base)
     }
 }
 
-static void u2_dungeon_sprites(u2_ctx *ctx, u2_overworld *ow, const dg_scan *s)
+static void u2_dungeon_sprites(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s)
 {
     if (!ow->world.strokes_loaded)
         return;                 /* no `monsters` in the content dir: draw no sprites */
@@ -524,7 +517,7 @@ static void u2_dungeon_sprites(u2_ctx *ctx, u2_overworld *ow, const dg_scan *s)
 
 /* asm/6144. One depth per iteration, [DS:482] is the loop variable and the same
  * value the shape routines index their tables with. */
-static void dg_draw(dg_view *v, const dg_scan *s)
+static void dg_draw(dg_view *v, const u2_dg_scan *s)
 {
     /* asm/6144 calls asm/6425 (runtime L_006625) in exactly two places: once at
      * runtime 0x634C before the loop is entered, and once at 0x635F inside the rock
@@ -587,8 +580,15 @@ void u2_dungeon_render(u2_ctx *ctx, u2_overworld *ow, int lit)
 {
     if (!lit) return;         /* asm/6000's `cmpb $0x0,0x26 ; je` — the darkness */
 
-    dg_scan s;
-    dg_scan_build(ctx, ow, &s);
+    u2_dg_scan s;
+    u2_dg_scan_build(ctx, ow, &s);
+
+    /* Enhanced mode draws the perspective corridor instead of the CGA wireframe
+     * (docs/enhanced-dungeon-3d.md). CGA and classic EGA keep the wireframe. */
+    if (ctx->enhanced_layout) {
+        u2_dungeon_render3d(ctx, ow, &s);
+        return;
+    }
 
     dg_view v;
     memset(&v, 0, sizeof v);
