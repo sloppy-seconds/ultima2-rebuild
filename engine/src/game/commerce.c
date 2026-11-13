@@ -19,6 +19,7 @@
 #include "core/seam.h"
 #include "core/state.h"
 #include "core/world.h"
+#include "game/ai.h"
 #include "game/monsters.h"
 
 #include "gen_content.h"
@@ -720,12 +721,17 @@ u2_steal_result u2_steal_loot_for(int x, int y, int site_kind)
  * strength of the shared English word, and the CP6 gate exists partly so that conflation
  * cannot come back quietly. */
 
-/* asm/3F7E, the one refusal exit. It also rolls a third time and reaches asm/133a when the
- * low three bits come out zero — a consequence for getting caught that this project has not
- * decoded, so it is named here and not invented. */
+/* asm/3F7E, the one refusal exit. Every failed steal reaches it — asm/3F59's near-cell miss
+ * and asm/3F5D's merchant-marker miss, both luck rolls, the already-alerted test and every
+ * quadrant miss all jump here — and it prints NO LUCK!, then rolls a THIRD time and, when the
+ * low three bits come out zero (one time in eight), calls asm/113A, which is u2_ai_alarm: the
+ * whole town's guards go to role 1. So a botched steal has a ~12.5% chance of alerting the
+ * sector. Decoded 2026-11-13; the consequence was previously left undecoded and unmodelled. */
 static u2_steal_result steal_no_luck(u2_ctx *ctx)
 {
     seam_str_out(ctx, U2_S_STEAL_NO_LUCK);
+    if ((u2_rand_byte(ctx) & 0x7u) == 0u)
+        u2_ai_alarm(ctx);
     return U2_STEAL_NO_LUCK;
 }
 

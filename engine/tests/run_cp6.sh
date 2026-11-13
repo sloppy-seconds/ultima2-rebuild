@@ -45,6 +45,23 @@ else
     sed 's/^/        /' "$WORK/cc.err" | head -10
 fi
 
+# --- 1b. the failed-steal alarm (asm/3F5D L_00417e -> asm/113A) --------------
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/steal_alarm_check" \
+        tests/steal_alarm_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/sac.err"; then
+    "$WORK/steal_alarm_check" > "$WORK/sac.out" 2>&1
+    rc=$?
+    sed 's/^/        /' "$WORK/sac.out"
+    n=$(sed -n 's/^steal_alarm_check: \([0-9]\{1,\}\) checks, [0-9]\{1,\} failures$/\1/p' "$WORK/sac.out" | tail -1)
+    if [ "$rc" -eq 0 ] && [ -n "$n" ]; then
+        ok "CP6 steal alarm: ${n:-0} checks, failed steal alerts the town 1 in 8"
+    else
+        bad "CP6 steal alarm: steal_alarm_check reported failures (rc=$rc)"
+    fi
+else
+    bad "CP6 steal alarm: steal_alarm_check.c did not compile"
+    sed 's/^/        /' "$WORK/sac.err" | head -10
+fi
+
 # --- 2/3. the behavioural half ----------------------------------------------
 # Every shop literal here is a `run` locator (the menus are multi-segment db lines the asm
 # fallback cannot index), so with no copy of the game they come out empty and the prints are

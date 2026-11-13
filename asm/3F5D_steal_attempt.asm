@@ -17,7 +17,7 @@
 #   far cell != 0x68                       ->  "NO LUCK!"
 #   [DS:47] != 3 (not a THIEF)             ->  one roll, js -> "NO LUCK!"
 #   then, for everyone:                     ->  one roll, js -> "NO LUCK!"
-#   [DS:1D7] == 1                           ->  "NO LUCK!"        (see the caveat below)
+#           [DS:1D7] == 1  ->  "NO LUCK!"   (the town-alarm flag; see the note below)
 #   [DS:4A] == 1 (village) and y < 0x20 and x >= 0x20  ->  "STEAL FOOD!"    [DS:53] += 1, BCD
 #   [DS:4A] == 2 (town)   and y < 0x20 and x >= 0x20  ->  "STEAL ARMOUR!"  [DS:96 + (roll&3)+1] += 1
 #   [DS:4A] == 2 (town)   and y < 0x20 and x <  0x20  ->  "STEAL WEAPONS!" [DS:76 + (roll&7)+1] += 1
@@ -38,17 +38,22 @@
 # `measured` from the listing; the class byte identity is the proven one (asm/1841 tests 1 for
 # cleric, asm/19AF tests 2 for wizard).
 #
-#           CAVEAT on the [DS:1D7] == 1 test, and it is the one thing here not to build on. DS:1D7 is the
-# base of the creature role array, and this is a bare un-indexed read of slot 0, on a path that
-# has no creature scan at all. Either the grid reader asm/52b3 leaves something there, or the
-# fragment boundary is wrong, or it is a genuine read of slot 0's role. It refuses on 1, and
-# the roles seen in the corpus are 0x60..0xFC, so 1 is not a role value in the sense the tlkx
-# index uses. Unresolved, and the engine refuses on it identically rather than guessing which
-# way the guess goes.
+#           RESOLVED 2026-11-13 on the [DS:1D7] == 1 test. DS:1D7 is the base of the creature
+# role array, and this is a bare un-indexed read of slot 0. It is NOT a role: [slot+0x1D7]==0x01
+# is the town-ALARM flag (see asm/40C0's header and docs/spice86-live-findings.md § 16, capture
+# cp5-g25-aggro). asm/113A (u2_ai_alarm) sets every slot 7..0 to 0x01 when a blow lands in a
+# town, and asm/114A is the loop that writes them, so slot 0 is always written and the un-indexed
+# read is a valid "is the town on alert" proxy. So the rule is: you cannot rob a shoppe while the
+# town is alerted. The engine refuses on mon_role[0]==1 identically, which is now known-correct.
 #
-# Also unread: the "NO LUCK!" path rolls once more and calls asm/133a only when the roll's
+# DECODED 2026-11-13: the "NO LUCK!" path rolls once more and calls asm/133a only when the roll's
 # low three bits are zero — `and $0x7,%al ; jne` skips it — so failing a steal has some
-# consequence about one time in eight. What it is, is not decoded.
+# consequence about one time in eight. What it is: asm/133a IS u2_ai_alarm (the same routine a
+# landed blow calls), so a botched steal alerts the whole town's guards about one time in eight.
+# Every failed steal reaches this exit (asm/3F59's near-cell miss and asm/3F5D's merchant miss,
+# both luck rolls, the already-alerted test and every quadrant miss all jump to L_00417e), so the
+# alarm can fire on an aim miss too. Engine wired in commerce.c steal_no_luck(); gated by
+# engine/tests/steal_alarm_check.c (CP6).
 steal_attempt:
 L_00415d:
         nop
