@@ -230,23 +230,75 @@ def disc_files(path):
 # --------------------------------------------------------------------------
 # decoding
 # --------------------------------------------------------------------------
+TIFF_MAGIC = b"II*\x00"
+
+
+def _tiff_first_ifd(blob):
+    """Minimal little-endian TIFF IFD reader for the first IFD: {tag: scalar}.
+    Scalar SHORT/LONG tags resolve to their value; array tags return their stored
+    offset, which is enough for the scalar tags the monster banks use (256/257/266/273)."""
+    if blob[:4] != TIFF_MAGIC:
+        return None
+    ifd = int.from_bytes(blob[4:8], "little")
+    n = int.from_bytes(blob[ifd:ifd + 2], "little")
+    tags = {}
+    for k in range(n):
+        e = ifd + 2 + k * 12
+        tag = int.from_bytes(blob[e:e + 2], "little")
+        typ = int.from_bytes(blob[e + 2:e + 4], "little")
+        cnt = int.from_bytes(blob[e + 4:e + 8], "little")
+        raw = blob[e + 8:e + 12]
+        if typ == 3 and cnt == 1:
+            tags[tag] = int.from_bytes(raw[:2], "little")
+        else:
+            tags[tag] = int.from_bytes(raw, "little")
+    return tags
+
+
+def bank_dims(blob):
+    """(w, h, strip_offset, fill_order). Raw banks (DUNG1/DUNG2/CHEST/MAP*) are 32x32
+    at HDR, high nibble = left. Monster banks (DUNMON1/2/3) are TIFF-wrapped with their
+    own size (128/64/32) and FillOrder=2 (low nibble = left). See
+    docs/fmtowns-dungeon-render-brief.md § 4."""
+    t = _tiff_first_ifd(blob)
+    if t is None:
+        return TILE_W, TILE_H, HDR, 1
+    return (t.get(256, TILE_W), t.get(257, TILE_H), t.get(273, HDR), t.get(266, 1))
+
+
 def decode_bank(blob):
-    body = blob[HDR:]
+    """Decode a GRAPH bank into a list of index lists (one per sprite/tile).
+    Raw banks are 32x32 4bpp high-nibble-left (values masked to 0..7, as measured);
+    monster banks are TIFF-wrapped 4bpp low-nibble-left at 128/64/32, 26 sprites, and
+    keep their full 0..15 range. The two formats are told apart by the TIFF magic."""
+    w, h, strip, fill = bank_dims(blob)
+    body = blob[strip:]
+    per = (w * h) // 2
     tiles = []
-    for t in range(len(body) // TILE_BYTES):
-        base = t * TILE_BYTES
-        px = [0] * (TILE_W * TILE_H)
-        for i in range(TILE_W * TILE_H):
-            j = base + (i >> 1)
-            b = body[j]
-            px[i] = (b >> 4 if i % 2 == 0 else b) & 7
+    for t in range(len(body) // per):
+        base = t * per
+        px = [0] * (w * h)
+        for i in range(w * h):
+            b = body[base + (i >> 1)]
+            lo, hi = b & 0xF, (b >> 4) & 0xF
+            if fill == 2:
+                px[i] = lo if i % 2 == 0 else hi
+            else:
+                px[i] = (hi if i % 2 == 0 else lo) & 7
         tiles.append(px)
     return tiles
 
 
-def png_from_indices(px, pal):
-    im = _pil_image().new("RGB", (TILE_W, TILE_H))
-    im.putdata([pal[i] for i in px])
+def tile_hw(px):
+    """(w, h) of a decoded tile, derived from its length (banks are square)."""
+    d = int(round(len(px) ** 0.5))
+    return d, d
+
+
+def png_from_indices(px, pal, w=TILE_W, h=TILE_H):
+    im = _pil_image().new("RGB", (w, h))
+    n = len(pal)
+    im.putdata([pal[i] if i < n else pal[-1] for i in px])
     buf = io.BytesIO()
     im.save(buf, "PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
@@ -359,7 +411,8 @@ def build_prefill(art, banks):
     cands = dict(OWNER_SETS)
     why = dict(OWNER_WHY)
     conf = {k: "owner" for k in OWNER_SETS}
-    sils = {bn: [sil_from_idx(t) for t in ts] for bn, ts in banks.items()}
+    sils = {bn: [sil_from_idx(t) for t in ts] for bn, ts in banks.items()
+            if ts and len(ts[0]) == TILE_W * TILE_H}
     frames = fm_frame_sils()
     names = bestiary_names()
 
@@ -458,8 +511,8 @@ def build_html(dos, banks, art, prefill, why, conf):
         # this after the planet-1-only default hid the only candidates that exist
         # for DOS arts 17, 3A and 3B, which are dungeon tiles.
         "hidden": [b for b in HIDDEN_BY_DEFAULT if b in banks],
-        "c": {b: [png_from_indices(t, PAL) for t in v] for b, v in banks.items()},
-        "g": {b: [png_from_indices(t, PAL_GREY) for t in v] for b, v in banks.items()},
+        "c": {b: [png_from_indices(t, PAL, *tile_hw(t)) for t in v] for b, v in banks.items()},
+        "g": {b: [png_from_indices(t, PAL_GREY, *tile_hw(t)) for t in v] for b, v in banks.items()},
     })
     # A data URL missing its prefix renders as a silent 404 per tile, which in a
     # browser looks like an empty tray rather than a bug. Refuse to emit that.
