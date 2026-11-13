@@ -88,6 +88,42 @@ absorb silently.
 
 ---
 
+## 0d. Dungeon banks located and decoded (2026-11-13, disc-supplied route)
+
+Owner ruled the art route **disc-supplied (FM Towns)** (§ 6, route A). The dungeon GRAPH
+banks were enumerated off the disc (`tools/fmtowns_xwalk.py`'s ISO reader) and decoded with
+the existing GRAPH format — 512-byte header, 32x32 tiles at 4bpp packed, high nibble left.
+No new decoder was needed; the overworld reader's format is identical.
+
+| bank | tiles | content (rendered, `k_pal` palette) |
+| --- | --- | --- |
+| `DUNG1` | 64 | dungeon walls — blue/cyan brick on black; matches the corridor screenshots |
+| `DUNG2` | 64 | a **second wall set** — yellow/olive walls with ornate doors and archways |
+| `CHEST` | 64 | red/green striped chest sprites + blue/yellow perspective frame pieces |
+| `DUNMON1` | 416 | dungeon monster sprites (large set) |
+| `DUNMON2` | 104 | monster sprites |
+| `DUNMON3` | 26 | monster sprites (viper, chest, blobs, wizard, …) |
+
+Two things settled and one trap recorded:
+
+* **Palette.** The banks decode correctly with the reader's `k_pal` (indices 0..7; index 0
+  is black and acts as the sprite transparent pen, matching the overworld `transparent_index
+  = 0`). The trap that cost a first pass: a lossless dungeon *screenshot*'s PNG colormap order
+  is **not** the bank index order (the capture tool reorders its colormap), so mapping bank
+  indices through the screenshot palette produced saturated red/yellow noise. `k_pal` is the
+  correct palette; the screenshot palette is not.
+* **Two wall banks exist.** `DUNG1` (blue brick) and `DUNG2` (yellow/olive with doors) are
+  visibly different sets, which is the first hard evidence behind the tower-vs-dungeon
+  hypothesis (§ 5). Which bank is the tower is still unconfirmed — it needs a known-tower
+  capture or the FM Towns binary's bank-selection table, not a guess.
+
+Still open in this workstream: the per-depth wall geometry and convergence rate are not read
+off these banks yet (they are flat 32x32 texture tiles, not pre-rendered perspective
+columns), so `r` (§ 1b) is not settled by them either. The renderer will texture-map these
+flat tiles onto the viewport-relative frames rather than blit pre-projected columns.
+
+---
+
 ## 1. Geometry: viewport-driven, not wireframe-driven
 
 **Correction to an earlier spike.** A first pass derived the projection from the CGA
@@ -252,6 +288,10 @@ none conclusive:
 - The FM Towns changelog (`original/updated/History.txt`) and the screenshot captions
   speak of "dungeon/tower" as a pair, and the screenshots show at least three distinct
   wall art sets (dungeon stone, the flat lab room, Minax's brick castle).
+- **Now on record (2026-11-13, § 0d):** the disc carries two distinct dungeon wall banks,
+  `DUNG1` (blue brick) and `DUNG2` (yellow/olive with doors). Two sets exist; which is the
+  tower is still unconfirmed, so the claim is upgraded from *recalled* to *observed that two
+  sets exist*, not yet *observed which is which*.
 - The DOS side already distinguishes site kinds and carries `site_floor`, so a per-kind
   art selection has somewhere to hang.
 
