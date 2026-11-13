@@ -4,6 +4,7 @@
 #
 #   ./up.sh                 # rebuild the static engine, verify it, start at the splash/title
 #   ./up.sh --load-save     # skip the intro and boot the saved character into the world
+#   ./up.sh --enhanced      # enhanced mode: EGA art, 1024x512 canvas, 3D dungeon
 #   ./up.sh --cleanroom     # deliberately ship the substitute art instead
 #   ./up.sh --port N        # host port (default 6082; 6081 is taken by another container)
 #   ./up.sh --down          # stop and remove the container
@@ -48,6 +49,7 @@ STAGED="$HERE/u2-sdl"
 
 CLEANROOM=0
 LOADSAVE=0
+ENHANCED=0
 DOWN=0
 SHOT=""
 STATUS=0
@@ -57,6 +59,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --cleanroom) CLEANROOM=1; shift ;;
         --load-save) LOADSAVE=1; shift ;;
+        --enhanced)  ENHANCED=1; shift ;;
         --down)      DOWN=1; shift ;;
         --status)    STATUS=1; shift ;;
         --shot)      if [ $# -gt 1 ] && [ "${2:0:1}" != "-" ]; then
@@ -162,7 +165,10 @@ BIN=engine/u2-sdl-static
 # so there is one definition rather than two that can drift.
 if ! make -C engine fresh >/dev/null 2>&1; then
     say "binary is stale -- forcing a clean rebuild:"
-    make -C engine fresh 2>&1 | sed -n '2,7p' | sed 's/^/up.sh:   /'
+    # `|| true` because this is the diagnostic echo, not the check: under
+    # `set -euo pipefail` the failing `make fresh` inside the pipeline killed
+    # the script here, so the recovery path below it had never once run.
+    make -C engine fresh 2>&1 | sed -n '2,7p' | sed 's/^/up.sh:   /' || true
     make -C engine clean
     bash deploy/linuxbuild/build.sh
     make -C engine fresh >/dev/null 2>&1 || die "still stale after a clean rebuild"
@@ -214,6 +220,7 @@ if [ "$VERIFY" = 1 ]; then
     ARGS=(--sdl --play-map --data-dir original --save-dir "$TMP/save"
           --debug-path "$TMP/dbg")
     [ "$CLEANROOM" = 1 ] && ARGS+=(--cleanroom)
+    [ "$ENHANCED" = 1 ] && ARGS+=(--enhanced)
 
     say "smoke-testing the built binary (art mode must match: $(art_expect))"
     SDL_VIDEODRIVER=dummy setsid "$ROOT/$BIN" "${ARGS[@]}" >"$TMP/out.txt" 2>&1 &
@@ -261,6 +268,12 @@ U2_ARGS="--sdl --debug-path /saves/debug --trace=/saves/engine-trace.txt"
 # because verifying the art mode needs a run that reaches the overworld.
 [ "$LOADSAVE" = 1 ] && U2_ARGS="$U2_ARGS --play-map"
 [ "$CLEANROOM" = 1 ] && U2_ARGS="$U2_ARGS --cleanroom"
+[ "$ENHANCED" = 1 ] && U2_ARGS="$U2_ARGS --enhanced"
+# The enhanced frame is U2_ENH_W x U2_ENH_H = 1024x512, and X will not enlarge
+# the screen the window sits on: a 640x400 Xvfb shows the top-left of the
+# enhanced game with no error (the entrypoint's own comment says so).
+GEOM=640x400x24
+[ "$ENHANCED" = 1 ] && GEOM=1024x512x24
 
 podman rm -f "$CONTAINER" >/dev/null 2>&1 || true
 # The cache moved out of the save directory (docs/save-scoped-worlds.md D4), so a
@@ -271,6 +284,7 @@ rm -f "$SAVES_HOST/tiles.u2tl"
 mkdir -p "$SAVES_HOST"
 podman run -d --name "$CONTAINER" -p "$HOST_PORT:6081" \
     -e U2_ARGS="$U2_ARGS" \
+    -e GEOMETRY="$GEOM" \
     -v "$ROOT/original:/content:ro,z" \
     -v "$SAVES_HOST:/saves:z" \
     "$IMAGE:latest" >/dev/null
