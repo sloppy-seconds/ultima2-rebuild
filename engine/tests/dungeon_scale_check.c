@@ -31,6 +31,7 @@
 #include "core/ctx.h"
 #include "core/state.h"
 #include "core/frame.h"
+#include "core/layout.h"
 #include "game/dungeon.h"
 #include "game/overworld.h"
 
@@ -134,6 +135,31 @@ int main(int argc, char **argv)
     CHECK(bw(&ega) <= 544 && bh(&ega) <= 288,
           "EGA dungeon ink stays within the doubled CGA layout (%dx%d, max 544x288)",
           bw(&ega), bh(&ega));
+
+    /* --- enhanced (1024x512, scale 2, fit map): fills the 448 map window ------ */
+    setup(&ctx, &ow);
+    ctx.enhanced_layout = 1;
+    u2_frame_free(&ow.frame);
+    if (u2_frame_init_size(&ow.frame, U2_ENH_W, U2_ENH_H, U2_ENH_SCALE) != 0) {
+        printf("  FAIL  could not init an enhanced frame\n");
+        return 1;
+    }
+    u2_dungeon_render(&ctx, &ow, 1);
+    bbox enh = ink_bbox(&ow.frame);
+    /* It must reach across the map window (448 wide), not sit CGA-sized. */
+    CHECK(bw(&enh) >= 300,
+          "enhanced dungeon fills the map window (width %d, want >=300)", bw(&enh));
+    /* It must be scaled UP from CGA, not stuck at the CGA 256x128. */
+    CHECK(bw(&enh) > bw(&cga),
+          "enhanced dungeon is larger than CGA (enh %d > cga %d)", bw(&enh), bw(&cga));
+    /* It must stay inside the map window and not spill into the side panel. */
+    CHECK(enh.maxx < U2_ENH_PANEL_X,
+          "enhanced dungeon stays left of the panel (maxx %d < %d)", enh.maxx, U2_ENH_PANEL_X);
+    CHECK(enh.maxy < U2_ENH_MAP_ROWS * 32,
+          "enhanced dungeon stays inside the map window (maxy %d < %d)",
+          enh.maxy, U2_ENH_MAP_ROWS * 32);
+    CHECK(enh.minx >= 0 && enh.miny >= 0,
+          "enhanced dungeon is not clipped at the origin (%d,%d)", enh.minx, enh.miny);
 
     u2_frame_free(&ow.frame);
 

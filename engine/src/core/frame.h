@@ -215,6 +215,18 @@ void u2_frame_pixel_scaled(u2_frame *f, int x, int y, uint8_t colour, int scale)
 void u2_frame_line_scaled(u2_frame *f, int x0, int y0, int x1, int y1,
                           uint8_t colour, int scale);
 
+/* Rational fit twins: map a logical point (x,y) to physical (ox + x*num/den,
+ * oy + y*num/den) and stamp a `thick`x`thick` block there. This is for a target
+ * window that is NOT an integer multiple of the logical layout — the enhanced
+ * map window is 448 px wide against the dungeon's 320 px logical width, so no
+ * integer block scale fills it without spilling into the side panel. A line is
+ * Bresenham'd in physical space after mapping its endpoints, so a straight line
+ * stays straight under the linear map. See the comment at their definition. */
+void u2_frame_pixel_fit(u2_frame *f, int x, int y, uint8_t colour,
+                        int ox, int oy, int num, int den, int thick);
+void u2_frame_line_fit(u2_frame *f, int x0, int y0, int x1, int y1, uint8_t colour,
+                       int ox, int oy, int num, int den, int thick);
+
 /*
  * Composite the map window from a filled viewport. This is the engine's
  * equivalent of asm/4ABB's flush loop: walk the 20x10 staging grid, skip the

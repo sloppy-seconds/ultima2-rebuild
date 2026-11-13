@@ -12,6 +12,7 @@
 #include "game/overworld.h"
 #include "game/combat.h"
 #include "core/frame.h"
+#include "core/layout.h"
 #include "core/seam.h"
 #include "core/state.h"
 #include "core/world.h"
@@ -275,10 +276,15 @@ int u2_dungeon_light_step(u2_ctx *ctx)
 
 typedef struct dg_view {
     u2_frame *f;
-    int scale;                /* 1 in CGA and enhanced, 2 in classic EGA. The dungeon
-                               * geometry is authored in 320x200 CGA space; this is
-                               * what the line and sprite writers multiply by so the
-                               * wireframe fills the map window of a doubled frame. */
+    /* The dungeon geometry is authored in 320x200 CGA space. The transform maps a
+     * logical point to physical pixels. Block mode (CGA, classic EGA) multiplies by
+     * `scale` and stamps a scale x scale block. Fit mode (enhanced) maps by num/den
+     * with a thick stamp, because the enhanced map window is 448 px wide against the
+     * dungeon's 320 px logical width — no integer block scale fills it without
+     * spilling into the side panel. */
+    int fit;                  /* 0 = block mode, 1 = fit mode */
+    int scale;                /* block mode: 1 in CGA, 2 in classic EGA */
+    int ox, oy, num, den, thick;  /* fit mode: physical = o + logical*num/den */
     int d;                    /* the depth index, [DS:482] in the original */
     int x1, y1, x2, y2;       /* the line drawer's four registers, DS:479..47C.
                                * x1/y1 are the PEN, not a per-call start point: asm/67B3
@@ -288,17 +294,31 @@ typedef struct dg_view {
     const char *who;          /* diagnostic: which shape routine set the registers */
 } dg_view;
 
-/* The dungeon geometry is authored in the 320x200 CGA layout. In classic EGA the
- * frame is that layout doubled (640x400, scale 2), so the wireframe scales by 2 and
- * fills the map window. Enhanced mode is NOT that: its map window is 448 px wide,
- * narrower than twice the dungeon's 320 px logical width, so scaling by the frame
- * scale would spill the view into the side panel. The enhanced dungeon is deferred
- * to the real-3D plan (docs/enhanced-layout-plan.md § 10), so it keeps the CGA-sized
- * view until that lands. */
-static int dg_scale(const u2_ctx *ctx, const u2_frame *f)
+/* Fill v's transform for the current art mode.
+ *
+ * The dungeon geometry is authored in the 320x200 CGA layout. In classic EGA the
+ * frame is that layout doubled (640x400, scale 2), so block scale 2 fills the map
+ * window exactly. Enhanced is NOT that: its map window is 448 px wide (14x32),
+ * 1.4x the dungeon's 320 px logical width, so block scale 2 would spill the view
+ * into the side panel and scale 1 leaves it CGA-sized. Enhanced therefore uses the
+ * rational fit map (448/320) with a 2x2 stamp to match the doubled line weight,
+ * vertically centred in the square window. This is our design, not a byte-faithful
+ * EGA dungeon (the real EGA dungeon is uncaptured; see docs/enhanced-layout-plan.md
+ * section 10 for the deferred real-3D route). */
+static void dg_set_transform(dg_view *v, const u2_ctx *ctx, const u2_frame *f)
 {
-    if (ctx->enhanced_layout) return 1;
-    return f->scale > 1 ? f->scale : 1;
+    if (ctx->enhanced_layout) {
+        v->fit = 1;
+        v->num = U2_ENH_MAP_COLS * 32;   /* 448 */
+        v->den = U2_SCREEN_W;            /* 320 */
+        v->thick = 2;
+        v->ox = 0;
+        /* Centre the 200-tall logical box (scaled to 280) in the 448-tall window. */
+        v->oy = (U2_ENH_MAP_ROWS * 32 - U2_SCREEN_H * v->num / v->den) / 2;
+    } else {
+        v->fit = 0;
+        v->scale = f->scale > 1 ? f->scale : 1;
+    }
 }
 
 /* Diagnostic seam. U2_DG_LINES=<path> makes every line the dungeon renderer draws land in
@@ -326,10 +346,16 @@ static void dg_line(dg_view *v)
     }
     /* The degenerate case is not drawn, and must not move the pen either: asm/67B3's
      * opening guard at 0x69B4 returns before the stepper when x1==x2 && y1==y2. */
-    if (v->x1 != v->x2 || v->y1 != v->y2)
-        u2_frame_line_scaled(v->f, DG_ORIGIN_X + v->x1, DG_ORIGIN_Y + v->y1,
-                             DG_ORIGIN_X + v->x2, DG_ORIGIN_Y + v->y2,
-                             U2_CGA_WHITE, v->scale);
+    if (v->x1 != v->x2 || v->y1 != v->y2) {
+        if (v->fit)
+            u2_frame_line_fit(v->f, DG_ORIGIN_X + v->x1, DG_ORIGIN_Y + v->y1,
+                              DG_ORIGIN_X + v->x2, DG_ORIGIN_Y + v->y2,
+                              U2_CGA_WHITE, v->ox, v->oy, v->num, v->den, v->thick);
+        else
+            u2_frame_line_scaled(v->f, DG_ORIGIN_X + v->x1, DG_ORIGIN_Y + v->y1,
+                                 DG_ORIGIN_X + v->x2, DG_ORIGIN_Y + v->y2,
+                                 U2_CGA_WHITE, v->scale);
+    }
 
     /* asm/67B3 is a stepper, not a reader: L_006a4b does `adc %al,0x479` and L_006a8f
      * does `adc %al,0x47a` once per pixel of the major axis, so on return [DS:479] and
@@ -442,7 +468,7 @@ static const uint8_t DG_DEPTH_LADDER[8] = {
  *
  * The colour index is the 2-bit value itself, because U2_CGA_BLACK/CYAN/MAGENTA/WHITE
  * are 0..3 in CGA order. */
-static void dg_sprite_page(u2_overworld *ow, const uint8_t *strokes, int base, int scale)
+static void dg_sprite_page(const dg_view *v, const uint8_t *strokes, int base)
 {
     int p = 0;
 
@@ -462,8 +488,13 @@ static void dg_sprite_page(u2_overworld *ow, const uint8_t *strokes, int base, i
         const int sy = DG_ORIGIN_Y + y * 4;
         for (int k = 0; k < 4; k++) {
             const uint8_t c = (uint8_t)((pat >> (6 - 2 * k)) & 3);
-            u2_frame_pixel_scaled(&ow->frame, sx + k, sy, c, scale);
-            u2_frame_pixel_scaled(&ow->frame, sx + k, sy + 1, c, scale);   /* the di+0x50 store */
+            for (int row = 0; row < 2; row++) {   /* the di+0x50 store draws 2 rows */
+                if (v->fit)
+                    u2_frame_pixel_fit(v->f, sx + k, sy + row, c,
+                                       v->ox, v->oy, v->num, v->den, v->thick);
+                else
+                    u2_frame_pixel_scaled(v->f, sx + k, sy + row, c, v->scale);
+            }
         }
     }
 }
@@ -472,7 +503,8 @@ static void u2_dungeon_sprites(u2_ctx *ctx, u2_overworld *ow, const dg_scan *s)
 {
     if (!ow->world.strokes_loaded)
         return;                 /* no `monsters` in the content dir: draw no sprites */
-    const int scale = dg_scale(ctx, &ow->frame);
+    dg_view v = { .f = &ow->frame };
+    dg_set_transform(&v, ctx, &ow->frame);
 
     /* asm/68ED starts by incrementing [DS:482], which asm/6144 left at the depth it
      * stopped on, and then walks di from 1 while di < that value. */
@@ -483,9 +515,9 @@ static void u2_dungeon_sprites(u2_ctx *ctx, u2_overworld *ow, const dg_scan *s)
             continue;
         if (di == 1) {
             const int blk = (stamp & (U2_STROKE_BLOCKS - 1)) * U2_STROKE_BLOCK;
-            dg_sprite_page(ow, ow->world.strokes, blk, scale);
+            dg_sprite_page(&v, ow->world.strokes, blk);
         } else {
-            dg_sprite_page(ow, ow->world.strokes, DG_DEPTH_LADDER[di & 7], scale);
+            dg_sprite_page(&v, ow->world.strokes, DG_DEPTH_LADDER[di & 7]);
         }
     }
 }
@@ -561,7 +593,7 @@ void u2_dungeon_render(u2_ctx *ctx, u2_overworld *ow, int lit)
     dg_view v;
     memset(&v, 0, sizeof v);
     v.f = &ow->frame;
-    v.scale = dg_scale(ctx, &ow->frame);
+    dg_set_transform(&v, ctx, &ow->frame);
     v.d = 0;
     /* Diagnostic: U2_DG_LINES=<path> records every drawn line with its routine and depth. */
     {

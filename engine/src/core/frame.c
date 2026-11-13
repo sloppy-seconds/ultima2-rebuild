@@ -292,6 +292,68 @@ void u2_frame_line_scaled(u2_frame *f, int x0, int y0, int x1, int y1,
     }
 }
 
+/* Rational fit writers. The dungeon's logical canvas is 320x200; the enhanced map
+ * window is 448x448, which is 1.4x the dungeon width, so an integer block scale
+ * either under-fills (1x) or overflows into the side panel (2x). These map each
+ * logical point through ox + x*num/den and stamp a thick x thick block, which
+ * fills the window at a fractional ratio while keeping the doubled frame's line
+ * weight (thick 2). The map is linear, so mapping a line's endpoints and
+ * Bresenham-ing in physical space keeps it straight. Colour masks to the four
+ * CGA indices exactly as the scaled writers do. */
+void u2_frame_pixel_fit(u2_frame *f, int x, int y, uint8_t colour,
+                        int ox, int oy, int num, int den, int thick)
+{
+    if (!f) return;
+    if (den < 1) den = 1;
+    if (thick < 1) thick = 1;
+    const uint8_t c = (uint8_t)(colour & 3);
+    const int px = ox + (int)((long)x * num / den);
+    const int py = oy + (int)((long)y * num / den);
+    for (int j = 0; j < thick; j++)
+        for (int i = 0; i < thick; i++)
+            u2_frame_put(f, px + i, py + j, c);
+}
+
+void u2_frame_line_fit(u2_frame *f, int x0, int y0, int x1, int y1, uint8_t colour,
+                       int ox, int oy, int num, int den, int thick)
+{
+    if (!f) return;
+    if (den < 1) den = 1;
+    if (thick < 1) thick = 1;
+    /* Map endpoints to physical, then Bresenham there with a thick x thick stamp
+     * (the enhanced frame is scale 2, so thick 2 matches the doubled line weight). */
+    const int px0 = ox + (int)((long)x0 * num / den);
+    const int py0 = oy + (int)((long)y0 * num / den);
+    const int px1 = ox + (int)((long)x1 * num / den);
+    const int py1 = oy + (int)((long)y1 * num / den);
+    int dx = px1 - px0, dy = py1 - py0;
+    if (dx < 0) dx = -dx;
+    if (dy < 0) dy = -dy;
+    const int sx = px1 > px0 ? 1 : -1;
+    const int sy = py1 > py0 ? 1 : -1;
+    const uint8_t c = (uint8_t)(colour & 3);
+    int err;
+    if (dx >= dy) {
+        err = -dx;
+        for (int x = px0, y = py0;; x += sx) {
+            for (int j = 0; j < thick; j++) for (int i = 0; i < thick; i++)
+                u2_frame_put(f, x + i, y + j, c);
+            if (x == px1) break;
+            err += 2 * dy;
+            if (err >= 0) { y += sy; err -= 2 * dx; }
+        }
+    } else {
+        err = -dy;
+        for (int x = px0, y = py0;; y += sy) {
+            for (int j = 0; j < thick; j++) for (int i = 0; i < thick; i++)
+                u2_frame_put(f, x + i, y + j, c);
+            if (y == py1) break;
+            err += 2 * dx;
+            if (err >= 0) { x += sx; err -= 2 * dy; }
+        }
+    }
+}
+
 void u2_frame_draw_view(u2_frame *f, const u2_view *v, const u2_tiles *t,
                         int overlay_art, int overlay_col, int overlay_row)
 {
