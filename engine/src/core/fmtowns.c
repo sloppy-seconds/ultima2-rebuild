@@ -8,11 +8,15 @@
  *   * the ISO reader walks directory records the same way, including the
  *     sector-boundary resync when a record length byte is zero, and takes the file
  *     name from offset 33 of the record exactly as the Python does;
- *   * the bank "decoder" is not a decoder. A GRAPH bank is a 512-byte header and
- *     then 32x32 tiles at 4bpp packed, high nibble left, values already masked to
- *     0..7. There is no compression and no bitplane interleave, and pretending
- *     otherwise would be the kind of plausible wrong model this project keeps
- *     recording in its handoffs;
+ *   * the bank "decoder" is not a decoder. A raw GRAPH bank (DUNG1/DUNG2/CHEST/MAP*)
+ *     is a 512-byte header and then 32x32 tiles at 4bpp packed, high nibble left,
+ *     values already masked to 0..7. The monster banks and EXTRA are instead TIFF-
+ *     wrapped (magic 49 49 2a 00) with FillOrder=2, i.e. low nibble left; the strip
+ *     still starts at byte 512 and EXTRA is still 32x32, so only the nibble order
+ *     differs for the banks the theme references. There is no compression and no
+ *     bitplane interleave, and pretending otherwise would be the kind of plausible
+ *     wrong model this project keeps recording in its handoffs. See
+ *     docs/fmtowns-dungeon-render-brief.md § 4;
  *   * the pool order is first-appearance across the crosswalk rows, in file order,
  *     so TILES is numbered identically on both sides.
  */
@@ -75,6 +79,28 @@ typedef struct {
 static long le32(const unsigned char *p)
 {
     return (long)p[0] | ((long)p[1] << 8) | ((long)p[2] << 16) | ((long)p[3] << 24);
+}
+
+static long le16(const unsigned char *p)
+{
+    return (long)p[0] | ((long)p[1] << 8);
+}
+
+/* FillOrder (TIFF tag 266) of a GRAPH bank's first IFD: 1 = high nibble left,
+ * 2 = low nibble left. Raw banks carry no TIFF magic and are fill 1. This mirrors
+ * fmtowns_xwalk.py:bank_dims so the C and Python derivations agree byte for byte. */
+static int bank_fill_order(const unsigned char *bank)
+{
+    if (!(bank[0] == 'I' && bank[1] == 'I' && bank[2] == 0x2a && bank[3] == 0))
+        return 1;
+    long ifd = le32(bank + 4);
+    int n = (int)le16(bank + ifd);
+    for (int k = 0; k < n; k++) {
+        long e = ifd + 2 + k * 12;
+        if (le16(bank + e) == 266)          /* FillOrder, SHORT */
+            return (int)le16(bank + e + 8);
+    }
+    return 1;
 }
 
 /* ------------------------------------------------------------------- the ISO */
@@ -253,16 +279,21 @@ static unsigned char *read_blob(const char *img, const dentry *f)
 }
 
 /* One tile of a GRAPH bank as 1024 palette indices. The bank stores two pixels per
- * byte, high nibble first, and the values are already within 0..7; the mask is
- * what the Python did and it is kept rather than "cleaned up". */
+ * byte. Raw banks are high nibble left with values already within 0..7 (the mask is
+ * what the Python did and is kept rather than "cleaned up"); TIFF banks with
+ * FillOrder=2 (EXTRA) are low nibble left. See bank_fill_order above. */
 static void tile_indices(const unsigned char *bank, long ntiles, long which,
                          unsigned char *px /* TILE_PX */)
 {
     (void)ntiles;
+    const int fill = bank_fill_order(bank);
     const long base = BANK_HDR + which * TILE_BYTES;
     for (int i = 0; i < TILE_PX; i++) {
         const unsigned char b = bank[base + (i >> 1)];
-        px[i] = (unsigned char)((i % 2 == 0 ? (b >> 4) : b) & 7);
+        if (fill == 2)
+            px[i] = (unsigned char)(i % 2 == 0 ? (b & 0xF) : ((b >> 4) & 0xF));
+        else
+            px[i] = (unsigned char)((i % 2 == 0 ? (b >> 4) : b) & 7);
     }
 }
 
