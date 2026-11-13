@@ -34,7 +34,15 @@ perspective segments:
   (column 4) and **45** (column 5) as further depth pieces — about **3 steps of corridor**
   per view. The **horizontal mirror** of each is the right-wall tile at that depth.
 - **DUNG2** = doors, at different sizes and sides (pre-projected per depth).
-- **CHEST** = chests and ladders, at different sizes (per depth).
+- **CHEST** = chests and ladders, at different sizes (per depth). Measured 2026-11-13
+  from the decoded bank (raw 32x32, 64 tiles), graded **inferred** (visual read + ink
+  coverage, not a decoded table): chests ramp by size across **#1 (tiny) -> #2-10
+  (medium) -> #11-23 (full-frame biggest)**; ladders and perspective frame pieces
+  (blue rails + orange rungs, the blue *diagonals* #48-60 being the receding-depth
+  projections) fill **#24-60**; blanks are **#0, 30, 39, 44-47, 53, 61, 62**; **#31** is
+  an unexplained white/cyan blob. Unlike the monsters, this size progression lives in
+  one bank's indices, not three LOD tiers. The exact `index -> (object, depth)` table is
+  still for the codex to make authoritative.
 - **DUNMON1 / DUNMON2 / DUNMON3** = the **same 26 monster sprites at three level-of-detail
   tiers**: 128x128 (near), 64x64 (mid), 32x32 (far). Verified 2026-11-13: bank 0 of each is
   the same knight sprite at 128/64/32. The renderer picks a tier by the monster's on-screen
