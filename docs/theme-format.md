@@ -213,13 +213,15 @@ art sat on disk unused, and where both the derived FM Towns theme and the fan pa
 `default` were installed, `default` won.
 
 The rule now, in one sentence: **an explicit choice always wins, and when nothing is
-chosen the engine takes EGA from an installed themes tree, preferring `fmtowns`.**
+chosen the engine takes EGA from an installed themes tree, preferring `10`, then
+`default`, then `fmtowns`.** (Owner ruling 2026-11-13 reversed the original
+fmtowns-first order; the fan pack's `10` is the preferred default.)
 
 What counts as explicit, and therefore suppresses the inference:
 
 | named | suppresses |
 | --- | --- |
-| `--ega`, `--cga`, `--cleanroom` | the art axis |
+| `--ega`, `--classic` (alias `--cga`), `--cleanroom` | the art axis |
 | `--ega-theme NAME`, `[themes] theme` | the theme preference **and** the axis — naming a theme is asking for themed art |
 | `--enhanced` | the axis only (it implies EGA); the theme preference still applies |
 | `[themes] dir` alone | nothing; it says where to look, not what to look for |
@@ -243,14 +245,17 @@ Three things make this safe rather than surprising.
   for `cleanroom` / `tiles extracted` to verify the artifact and a check that
   silently stopped matching is the failure mode that script exists to prevent.
 
-`--cga` is new and is the opt-out. Without it, making EGA automatic would have
-removed a capability that currently exists by default, which is the same defect the
+`--classic` is the opt-out (alias `--cga`): it forces the original CGA art even when
+a themes tree is present. Without it, making EGA automatic would have removed a
+capability that previously existed by default, which is the same defect the
 strict-`--ega` ruling was written to stop, pointing the other way.
 
-The gate is `engine/tests/artauto_check.c` (12 checks, v1 `EGATILES` fixtures so it
+The gate is `engine/tests/artauto_check.c` (15 checks, v1 `EGATILES` fixtures so it
 needs no art and no media), driving both lookup paths and both directions of the
-rule. Its red control is the preference reversed, which fails exactly the three
-preference checks and nothing else.
+rule, including `10` beating `fmtowns`. Its red control is the preference reversed to
+fmtowns-first, which fails the preference checks and nothing else. The `--classic`
+override is gated separately in `run_cp4.sh`: a themes tree with no flag must be EGA,
+and the same tree with `--classic` (or the `--cga` alias) must be CGA.
 
 ## 6. Scope
 

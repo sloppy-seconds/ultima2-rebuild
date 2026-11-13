@@ -2248,3 +2248,35 @@ directory, or skip and say why.
 
 `make test`: CP0..CP7 PASS.
 
+## 2026-11-13 — default graphics selection reversed; `--classic` added
+
+Owner ruling, five decisions. The default (no flags) pick order is now `10` ->
+`default` -> `fmtowns` -> CGA, reversing the 2026-11-06 fmtowns-first order: the fan
+pack's `10` is the preferred default because it is the best-looking of the four. On a
+full install that has both the fan themes and a derived FM Towns theme the default is
+now `10`; fmtowns is reached by `--ega-theme fmtowns` or by not installing the fan
+pack. `--classic` forces the original CGA art (the opt-out), with `--cga` kept as an
+alias. The installer no longer pins a theme in `config.ini` — it writes `dir = themes`
+plus a commented `# theme = 10` example — because a recorded theme is an explicit
+choice to auto-detection and would freeze the order and override a later `Ctrl-T`.
+
+Code: `U2_EGA_THEME_PREFERRED "10"` in `core/tiles_ega.h`; the autodetect candidate
+list in `core/tiles_ega.c` is now `10, default, fmtowns` (array widened to 3);
+`--classic`/`--cga` share one branch in `main.c`; `write_config` in `core/install.c`
+takes a `have_themes` flag and writes the commented example.
+
+Gates, both red-controlled:
+
+* `engine/tests/artauto_check.c` grew from 12 to 15 checks: `10` alone, `10` beating
+  fmtowns, and all-three resolving to `10`. Red control (autodetect reverted to
+  fmtowns-first) fails the five preference checks and nothing else.
+* `run_cp4.sh` gained a `--classic` block: a themes tree with no flag must be EGA
+  (control), and the same tree with `--classic` and with `--cga` must be CGA. Red
+  control (`--classic` renamed in the parser) fails the `--classic` check while the
+  `--cga` alias stays green.
+* `install_check.c` now asserts `config.ini` names the themes dir and pins no active
+  theme (a commented `# theme =` line is allowed), replacing the old
+  `theme = default` assertion.
+
+`make test`: CP0..CP7 PASS.
+

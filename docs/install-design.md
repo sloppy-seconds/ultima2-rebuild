@@ -215,18 +215,23 @@ Three reasons the per-theme file cannot move into a global one:
   rather than better
 
 What does go in `config.ini` is a `[themes]` section for the settings side: the
-themes directory, the selected theme, and anything else that is a preference rather
-than a fact about the art.
+themes directory, and anything else that is a preference rather than a fact about
+the art.
 
-**The installer records the theme the engine would pick on its own** (2026-11-06).
-`fmtowns` when it derived one, `default` when it only reshaped the fan pack, and no
-`[themes]` section at all when it built no themes. This is not cosmetic: a config
-line is an *explicit* choice as far as art auto-detection is concerned, so writing
-`theme = default` over a fmtowns derivation would pin the fan pack on exactly the
-installs that went to the trouble of deriving the better art — the feature would be
-inert on precisely the trees it exists for. `U2_INSTALL_THEMES` and
+**The installer does not record an active theme** (owner ruling, 2026-11-13; this
+reverses the 2026-11-06 behaviour described below). It writes `dir = themes` when it
+built any themes, plus a commented `# theme = 10` example, and no active `theme =`
+line. The reason: a config line is an *explicit* choice as far as art auto-detection
+is concerned, so a recorded theme would freeze the pick order and override a later
+`Ctrl-T` or a changed install. The engine auto-picks at launch instead — `10`, then
+`default`, then `fmtowns`, then CGA — so a tree installed here and a tree assembled
+by hand agree without a pinned line. `U2_INSTALL_THEMES` and
 `U2_EGA_THEMES_DIR_NAME` are tied by a `_Static_assert` in `core/install.c` rather
 than by two files agreeing.
+
+> Historical (2026-11-06, superseded): the installer used to record the theme it
+> thought the engine would pick (`fmtowns` if derived, else `default`). That froze
+> the choice into config.ini, which is why it was removed.
 
 Precedence, and this is the part that must be explicit or the feature rots:
 
