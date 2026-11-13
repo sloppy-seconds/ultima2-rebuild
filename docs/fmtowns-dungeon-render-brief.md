@@ -29,10 +29,17 @@ tile-selection and blit-geometry rules. That spec is the codex.
 The FM Towns dungeon does **not** texture-map a flat tile. It blits pre-projected
 perspective segments:
 
-- **DUNG1** = wall segments. A vertical column of the bank is the left wall receding
-  through depth steps: tiles **27, 35, 43, 51, 59** (column 3, rows 3-7), then **36, 44**
-  (column 4) and **45** (column 5) as further depth pieces — about **3 steps of corridor**
-  per view. The **horizontal mirror** of each is the right-wall tile at that depth.
+- **DUNG1** = wall segments (raw 32x32, 64 tiles, all ink=1.00 - solid brick, no
+  transparent background, so the shading/wedge shape is the signal), graded **inferred**
+  (visual read). A vertical column of the bank is one wall placement stepping through
+  depth: tiles **27, 35, 43, 51, 59** (column 3) recede, then **36, 44** (column 4) and
+  **45** (column 5) as further depth pieces; the **horizontal mirror** of each is the
+  right-wall tile at that depth. Groupings measured 2026-11-13: **flat frontal brick**
+  (end-caps / dead-end walls facing you) #1,2,4,5,6,7,39,40; **bright near side-wall**
+  segments (closest depth, lit cyan) #8,9,16,17,32,48; **receding side-wall wedges**
+  (blue wall against the black corridor void, stepping through depth) #18-31, 33-38,
+  41-63; **arched / corner end-caps** #62,63; **dark unlit variants** #0,3,10-15. The
+  exact `index -> (placement, depth)` table is for the codex to make authoritative.
 - **DUNG2** = doors, at different sizes and sides (pre-projected per depth). Measured
   2026-11-13 from the decoded bank (raw 32x32, 64 tiles, all ink=1.00 - it is the solid
   ornate wall bank, no transparent background), graded **inferred** (visual read): doors
