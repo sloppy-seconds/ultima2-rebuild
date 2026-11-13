@@ -18,6 +18,10 @@ dungeon — a textured wall, a themed chest sprite — then a theme whose scope 
 dungeons is suddenly telling the truth, the notice has to come back, and this check
 goes red so the decision is revisited rather than inherited.
 
+Since 2026-11-14 the enhanced dungeon draws procedural art (dungeon_assets.c),
+so the scan covers dungeon3d.c and dungeon_assets.c too: the 3D view is
+theme-free by the same rule the wireframe was theme-free by.
+
 --selftest proves the check can fail: it runs the same scan over a synthetic file
 that does consult the atlas, and requires a finding. A gate that has never been
 able to go red is worse than no gate.
@@ -35,7 +39,8 @@ PATTERNS = [
     r"art_index|u2_art_index",   # the theme-mapped art index
 ]
 
-DEFAULT_TARGETS = ["src/game/dungeon.c"]
+DEFAULT_TARGETS = ["src/game/dungeon.c", "src/game/dungeon3d.c",
+                   "src/game/dungeon_assets.c"]
 
 
 def scan(text):

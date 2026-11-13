@@ -1,4 +1,38 @@
-# Enhanced-Mode 3D Dungeon — Plan (not started)
+# Enhanced-Mode 3D Dungeon — procedural route (shipped round 1)
+
+Status: **round 1 shipped 2026-11-14.** Owner ruling that day, on rethinking the
+enhanced build: rather than reuse FM Towns art, the engine draws its **own
+procedurally generated art** with its **own raycaster**. The FM Towns
+faithful-blit decode effort is retired to branch `archive/fmtowns-dungeon-route`
+(kept in case it is ever picked back up); the DUNG1/DUNG2/DUNMON bank decodes
+and the blit tile/rect rules live there, not on main.
+
+What shipped (gated by `make test-cp7`, 30 checks in `tests/dungeon3d_check.c`):
+
+* `engine/src/game/dungeon3d.c` — a DDA raycaster (per-column walls, textured
+  floor/ceiling cast, torch falloff bands, z-buffered billboard sprites) that
+  renders into `u2_frame` like every other pixel the engine makes, so the
+  terminal backends, the demo recorder and the headless tests all still see it.
+  Movement stays instant, like the original.
+* `engine/src/game/dungeon_assets.c/.h` — 32x32 palette-indexed textures and
+  sprites generated at startup from intent, deterministic, Apache-2.0 ours.
+  The generator must never read the forbidden list in `docs/tile-art-spec.md` § 2;
+  that cleanroom wall is what makes this shippable where an FM Towns rip is not.
+* Solidity follows the render-stop rule, not the walk rule: bit 7 draws solid
+  except the open doorway `0xC0`; the fake wall `0xE0` draws exactly like rock,
+  because finding it by walking is the mechanic.
+
+Round 1 art is agent-gated placeholders good enough to explore by. Round 2 is the
+owner's call after exploring in-game: better generators, or commissioned art
+(ComfyUI or similar) dropped behind the same `dungeon_assets` interface.
+
+The rest of this document is the original plan and the FM Towns observations that
+motivated a 3D view; where it discusses the FM Towns banks as the art source,
+read that section as archived context, not current intent.
+
+---
+
+## Old status (superseded 2026-11-14, kept for the reasoning)
 
 Status: **plan only, nothing built.** This is a feature, not a fidelity target: no
 shipped DOS original draws a textured 3D dungeon, so nothing here is byte-proven and

@@ -1,22 +1,26 @@
 /*
- * tests/dungeon3d_check.c — the enhanced dungeon draws a filled perspective corridor,
- * not the CGA wireframe.
+ * tests/dungeon3d_check.c — the enhanced dungeon draws a filled, textured,
+ * raycast 3D view of the grid — not the CGA wireframe, not a flat corridor,
+ * and not any theme's art.
  *
- * This is the gate for docs/enhanced-dungeon-3d.md § 7a step 1 (flat-shaded corridor).
- * It is a unit gate because driving the engine in enhanced mode needs the enhanced
- * layout, and the discriminator (a filled corridor vs a sparse wireframe) is fully
- * exercised by rendering into a frame and measuring it.
+ * Gate for docs/enhanced-dungeon-3d.md after the 2026-11-14 owner ruling:
+ * procedural art (dungeon_assets.c), DDA raycaster into u2_frame, instant
+ * movement. The FM Towns blit route is archived on branch
+ * archive/fmtowns-dungeon-route.
  *
- * Three parts:
- *   1. direct render: build a corridor scan (rock on both sides, an end cap at depth
- *      3) and call u2_dungeon_render3d. Assert the window is filled, the side walls
- *      and the end cap carry the wall colour, the top band is ceiling and the bottom
- *      band is floor, and nothing spills past the map window.
- *   2. dispatch: on an all-open world, u2_dungeon_render with enhanced_layout set must
- *      fill the window (the 3D path); with it clear it must stay sparse (the wireframe).
- *      This is what proves the dispatch actually routes enhanced to the 3D renderer.
- *   3. --selftest: the fill predicate must reject a blank frame and a single-line frame,
- *      so the gate can go red where it enforces (AGENTS.md § 3).
+ * Parts:
+ *   1. direct render of a built room: the window fills, walls are textured
+ *      (several indices), the ceiling band is dark, nothing spills past the
+ *      map window.
+ *   2. the door system renders by the render-stop rule: 0xC0 draws as a
+ *      passage (plank threshold visible), 0xE0 draws exactly like rock —
+ *      a fake wall must not look fake.
+ *   3. sprites: a creature stamp draws its creature (a colour no static
+ *      geometry uses), a chest draws wood, and neither appears when absent.
+ *   4. dispatch: enhanced routes to the 3D path, classic stays the wireframe.
+ *   5. assets: deterministic across re-init, every texture carries more than
+ *      one index, sprites carry both transparent and opaque pixels.
+ *   6. --selftest: the predicates can go red (AGENTS.md § 3).
  */
 #include <stdio.h>
 #include <string.h>
@@ -26,7 +30,9 @@
 #include "core/state.h"
 #include "core/frame.h"
 #include "core/layout.h"
+#include "core/world.h"
 #include "game/dungeon.h"
+#include "game/dungeon_assets.h"
 #include "game/overworld.h"
 
 #define WIN (U2_ENH_MAP_COLS * 32)   /* 448 */
@@ -35,8 +41,8 @@ static int fails, checks;
 #define CHECK(cond, ...) do { checks++; if (!(cond)) { fails++; \
     printf("  FAIL  " __VA_ARGS__); printf("\n"); } } while (0)
 
-/* Fraction of the map window that is non-black. A filled corridor is near 1.0; the
- * wireframe is a handful of lines and sits well under 0.3. */
+/* Fraction of the map window that is non-black. A raycast view is near 1.0;
+ * the wireframe is a handful of lines and sits well under 0.3. */
 static double ink_fraction(const u2_frame *f)
 {
     long ink = 0;
@@ -48,8 +54,6 @@ static double ink_fraction(const u2_frame *f)
 
 static int px(const u2_frame *f, int x, int y) { return f->px[y][x]; }
 
-/* Count distinct palette indices present in a rectangle. A flat fill yields 1; a
- * textured wall yields more. Used to tell a texture-mapped wall from a solid one. */
 static int distinct_in_rect(const u2_frame *f, int x0, int y0, int x1, int y1)
 {
     int seen[256] = {0}, n = 0;
@@ -58,6 +62,16 @@ static int distinct_in_rect(const u2_frame *f, int x0, int y0, int x1, int y1)
             int c = f->px[y][x];
             if (!seen[c]) { seen[c] = 1; n++; }
         }
+    return n;
+}
+
+/* Count pixels of one index in the map window. */
+static long count_index(const u2_frame *f, int colour)
+{
+    long n = 0;
+    for (int y = 0; y < WIN; y++)
+        for (int x = 0; x < WIN; x++)
+            if (f->px[y][x] == colour) n++;
     return n;
 }
 
@@ -80,119 +94,208 @@ static void enh_frame(u2_overworld *ow)
     u2_frame_clear(&ow->frame, U2_CGA_BLACK);
 }
 
-/* ---- 1. direct render of a corridor scan ---------------------------------- */
-static void test_direct(void)
+/* A room the player stands in, facing +x: end wall at x=8, side walls along
+ * y=3 and y=7 from x=5..8. All rock (0x80). The cell at (8,5) is `centre`. */
+static void build_room(u2_overworld *ow, uint8_t centre)
+{
+    for (int y = 3; y <= 7; y++)
+        for (int x = 5; x <= 8; x++)
+            u2_world_dungeon_put(&ow->world, 0, x, y, 0x00);
+    for (int y = 3; y <= 7; y++) u2_world_dungeon_put(&ow->world, 0, 8, y, U2_DG_ROCK);
+    for (int x = 5; x <= 8; x++) {
+        u2_world_dungeon_put(&ow->world, 0, x, 3, U2_DG_ROCK);
+        u2_world_dungeon_put(&ow->world, 0, x, 7, U2_DG_ROCK);
+    }
+    u2_world_dungeon_put(&ow->world, 0, 8, 5, centre);
+}
+
+/* ---- 1. the room renders as a filled, textured view --------------------- */
+static void test_room(void)
 {
     u2_ctx ctx; u2_overworld ow;
     setup(&ctx, &ow, 1);
     enh_frame(&ow);
-
-    u2_dg_scan s;
-    memset(&s, 0, sizeof s);
-    for (int d = 0; d < U2_DG_SAMPLE_DEPTH; d++) {
-        s.left[d] = U2_DG_ROCK;
-        s.right[d] = U2_DG_ROCK;
-        s.ctr[d] = (d >= 3) ? U2_DG_ROCK : 0x00;   /* end cap at depth 3 */
-    }
-    u2_dungeon_render3d(&ctx, &ow, &s);
+    build_room(&ow, U2_DG_ROCK);
+    u2_dungeon_render(&ctx, &ow, 1);
 
     const double ink = ink_fraction(&ow.frame);
-    CHECK(ink > 0.6, "direct: corridor should fill the window (ink=%.3f)", ink);
-    CHECK(px(&ow.frame, 20, 224) == U2_CGA_WHITE,  "direct: left wall should be wall colour");
-    CHECK(px(&ow.frame, 428, 224) == U2_CGA_WHITE, "direct: right wall should be wall colour");
-    CHECK(px(&ow.frame, 224, 224) == U2_CGA_WHITE, "direct: end cap should be wall colour");
-    CHECK(px(&ow.frame, 224, 5) == U2_CGA_CYAN,    "direct: top band should be ceiling colour");
-    CHECK(px(&ow.frame, 224, 440) == U2_CGA_MAGENTA, "direct: bottom band should be floor colour");
+    CHECK(ink > 0.6, "room: view should fill the window (ink=%.3f)", ink);
+
+    /* The end cap is stone, not flat: several indices in the centre band. */
+    const int d = distinct_in_rect(&ow.frame, 180, 150, 270, 300);
+    CHECK(d >= 3, "room: end cap should be textured (distinct=%d)", d);
+
+    /* The ceiling band near the horizon is dark rock: low indices only. */
+    int ceil_ok = 1;
+    for (int x = 100; x < 350; x += 7) {
+        const int c = px(&ow.frame, x, 120);
+        if (c != 0 && c != 7 && c != 8) ceil_ok = 0;
+    }
+    CHECK(ceil_ok, "room: ceiling band should stay dark stone");
 
     /* Nothing drawn past the map window's right edge (the panel starts at 448). */
     int maxx = 0;
     for (int y = 0; y < U2_ENH_H; y++)
         for (int x = 0; x < U2_ENH_W; x++)
             if (ow.frame.px[y][x] != 0 && x > maxx) maxx = x;
-    CHECK(maxx < WIN, "direct: ink must stay inside the map window (maxx=%d)", maxx);
+    CHECK(maxx < WIN, "room: ink must stay inside the map window (maxx=%d)", maxx);
 
     u2_frame_free(&ow.frame);
 }
 
-/* ---- 2. the dispatch routes enhanced to the 3D path ---------------------- */
+/* ---- 2. doors render by the render-stop rule ----------------------------- */
+static void test_doors(void)
+{
+    u2_ctx ctx; u2_overworld ow;
+
+    /* 0xC0 doorway: an opening. The plank threshold under it is the only
+     * brown in the scene, so brown's presence proves the corridor drew
+     * THROUGH the door cell instead of capping it. */
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    build_room(&ow, U2_DG_DOOR);
+    u2_world_dungeon_put(&ow.world, 0, 9, 5, 0x00);   /* passage beyond */
+    u2_dungeon_render(&ctx, &ow, 1);
+    CHECK(count_index(&ow.frame, 6) > 0,
+          "door: 0xC0 should draw as a passage with a plank threshold");
+    u2_frame_free(&ow.frame);
+
+    /* 0xE0 fake wall: must draw EXACTLY like rock — same colours, same cap.
+     * If the renderer ever hints at the secret, this goes red. */
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    build_room(&ow, U2_DG_ROCK);
+    u2_dungeon_render(&ctx, &ow, 1);
+    long rock_brown = count_index(&ow.frame, 6);
+    u2_frame_free(&ow.frame);
+    CHECK(rock_brown == 0, "door: rock should carry no plank brown");
+
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    build_room(&ow, U2_DG_SECRET);
+    u2_dungeon_render(&ctx, &ow, 1);
+    CHECK(count_index(&ow.frame, 6) == 0,
+          "secret: 0xE0 must draw as solid rock, not as a hint");
+    const double ink = ink_fraction(&ow.frame);
+    CHECK(ink > 0.6, "secret: fake wall should still fill the view (ink=%.3f)", ink);
+    u2_frame_free(&ow.frame);
+}
+
+/* ---- 3. sprites ---------------------------------------------------------- */
+static void test_sprites(void)
+{
+    u2_ctx ctx; u2_overworld ow;
+
+    /* Baseline: the room alone uses no light green (10) and no brown (6). */
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    build_room(&ow, U2_DG_ROCK);
+    u2_dungeon_render(&ctx, &ow, 1);
+    const long green0 = count_index(&ow.frame, 10);
+    const long brown0 = count_index(&ow.frame, 6);
+    u2_frame_free(&ow.frame);
+    CHECK(green0 == 0 && brown0 == 0, "sprite: bare room should show no sprite colours");
+
+    /* A stamp-2 creature two cells ahead must appear. */
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    build_room(&ow, U2_DG_ROCK);
+    u2_world_dungeon_put(&ow.world, 0, 7, 5, 0x02);
+    u2_dungeon_render(&ctx, &ow, 1);
+    CHECK(count_index(&ow.frame, 10) > 50, "sprite: creature stamp should draw");
+    u2_frame_free(&ow.frame);
+
+    /* A chest must appear as wood. */
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    build_room(&ow, U2_DG_ROCK);
+    u2_world_dungeon_put(&ow.world, 0, 7, 5, U2_DG_CHEST);
+    u2_dungeon_render(&ctx, &ow, 1);
+    CHECK(count_index(&ow.frame, 6) > 50, "sprite: chest should draw");
+    u2_frame_free(&ow.frame);
+}
+
+/* ---- 4. the dispatch routes enhanced to the 3D path ---------------------- */
 static void test_dispatch(void)
 {
     u2_ctx ctx; u2_overworld ow;
 
     setup(&ctx, &ow, 1);
     enh_frame(&ow);
+    build_room(&ow, U2_DG_ROCK);
     u2_dungeon_render(&ctx, &ow, 1);
     const double enh_ink = ink_fraction(&ow.frame);
     u2_frame_free(&ow.frame);
 
     setup(&ctx, &ow, 0);
     enh_frame(&ow);
+    build_room(&ow, U2_DG_ROCK);
     u2_dungeon_render(&ctx, &ow, 1);
     const double cls_ink = ink_fraction(&ow.frame);
     u2_frame_free(&ow.frame);
 
-    CHECK(enh_ink > 0.6, "dispatch: enhanced render should be a filled corridor (ink=%.3f)", enh_ink);
+    CHECK(enh_ink > 0.6, "dispatch: enhanced render should fill the view (ink=%.3f)", enh_ink);
     CHECK(cls_ink < 0.3, "dispatch: classic render should stay a sparse wireframe (ink=%.3f)", cls_ink);
     CHECK(enh_ink > cls_ink + 0.3, "dispatch: enhanced must fill far more than the wireframe (%.3f vs %.3f)",
           enh_ink, cls_ink);
 }
 
-/* ---- 3. a wall texture is sampled across the wall quads ------------------- */
-static void test_texture(void)
+/* ---- 5. the asset set is sane and deterministic --------------------------- */
+static void test_assets(void)
 {
-    u2_ctx ctx; u2_overworld ow;
-    static uint8_t tex[32 * 32];
-    for (int v = 0; v < 32; v++)
-        for (int u = 0; u < 32; u++)
-            tex[v * 32 + u] = ((u + v) & 1) ? U2_CGA_WHITE : U2_CGA_CYAN;
+    static uint8_t snap[U2_DGA_TEX_COUNT][U2_DGA_TEX_PX];
+    for (int id = 0; id < U2_DGA_TEX_COUNT; id++)
+        memcpy(snap[id], u2_dga_tex(id, 0), U2_DGA_TEX_PX);
 
-    u2_dg_scan s;
-    memset(&s, 0, sizeof s);
-    for (int d = 0; d < U2_DG_SAMPLE_DEPTH; d++) {
-        s.left[d] = U2_DG_ROCK; s.right[d] = U2_DG_ROCK;
-        s.ctr[d] = (d >= 3) ? U2_DG_ROCK : 0x00;
+    /* Re-init must reproduce byte-identical art: the generator is seeded and
+     * integer-only, so a differing byte means a nondeterministic generator. */
+    u2_dga_init();
+    int same = 1;
+    for (int id = 0; id < U2_DGA_TEX_COUNT; id++)
+        if (memcmp(snap[id], u2_dga_tex(id, 0), U2_DGA_TEX_PX) != 0) same = 0;
+    CHECK(same, "assets: re-init must reproduce identical textures");
+
+    /* Every texture carries more than one index (a blank texture is a bug). */
+    for (int id = 0; id < U2_DGA_TEX_COUNT; id++) {
+        int seen[256] = {0}, n = 0;
+        for (int i = 0; i < U2_DGA_TEX_PX; i++)
+            if (!seen[u2_dga_tex(id, 0)[i]]) { seen[u2_dga_tex(id, 0)[i]] = 1; n++; }
+        CHECK(n >= 2, "assets: texture %d should carry >= 2 indices (got %d)", id, n);
     }
 
-    /* Flat (no theme wall): the near left-wall column is one solid colour. */
-    setup(&ctx, &ow, 1); enh_frame(&ow);
-    u2_dungeon_render3d(&ctx, &ow, &s);
-    const int flat = distinct_in_rect(&ow.frame, 18, 60, 24, 380);
-    u2_frame_free(&ow.frame);
+    /* Every sprite has both transparent and opaque pixels. */
+    for (int id = 0; id < U2_DGA_SP_COUNT; id++) {
+        int trans = 0, opaque = 0;
+        for (int i = 0; i < U2_DGA_TEX_PX; i++) {
+            const uint8_t c = u2_dga_sprite(id, 0)[i];
+            if (c == U2_DGA_TRANSPARENT) trans++; else opaque++;
+        }
+        CHECK(trans > 0 && opaque > 0, "assets: sprite %d should mix clear and drawn", id);
+    }
 
-    /* Textured (theme wall copied into ctx): the same column now alternates, so it
-     * carries more than one index. */
-    setup(&ctx, &ow, 1); enh_frame(&ow);
-    ctx.dng_wall_set = 1;
-    memcpy(ctx.dng_wall, tex, sizeof tex);
-    u2_dungeon_render3d(&ctx, &ow, &s);
-    const int texd = distinct_in_rect(&ow.frame, 18, 60, 24, 380);
-    u2_frame_free(&ow.frame);
-
-    CHECK(flat == 1, "texture: flat wall column should be one colour (distinct=%d)", flat);
-    CHECK(texd >= 2, "texture: textured wall column should vary (distinct=%d)", texd);
+    /* Shade levels darken: level 3 must have no index level 0 does not shade to. */
+    int lit_white = 0, dark_white = 0;
+    for (int i = 0; i < U2_DGA_TEX_PX; i++) {
+        if (u2_dga_tex(U2_DGA_WALL_STONE, 0)[i] == 15) lit_white = 1;
+        if (u2_dga_tex(U2_DGA_WALL_STONE, 3)[i] == 15) dark_white = 1;
+    }
+    CHECK(lit_white && !dark_white, "assets: far shade must remove white from the wall");
 }
 
-/* ---- 4. selftest: the fill predicate can go red --------------------------- */
+/* ---- 6. selftest: the predicates can go red -------------------------------- */
 static int selftest(void)
 {
     int bad = 0;
     u2_frame f;
     if (u2_frame_init_size(&f, U2_ENH_W, U2_ENH_H, U2_ENH_SCALE) != 0) return 1;
 
-    /* A blank frame must NOT read as filled. */
     u2_frame_clear(&f, U2_CGA_BLACK);
     if (ink_fraction(&f) > 0.6) { printf("selftest: blank frame passed the fill predicate\n"); bad = 1; }
 
-    /* A single line must NOT read as filled. */
     u2_frame_clear(&f, U2_CGA_BLACK);
     for (int x = 0; x < WIN; x++) f.px[224][x] = U2_CGA_WHITE;
     if (ink_fraction(&f) > 0.6) { printf("selftest: single-line frame passed the fill predicate\n"); bad = 1; }
 
-    /* A uniform rectangle must read as one colour, so the texture predicate (>=2) can
-     * go red: a flat wall would fail it. */
     u2_frame_clear(&f, U2_CGA_WHITE);
     if (distinct_in_rect(&f, 0, 0, 64, 64) != 1) {
         printf("selftest: uniform rect did not read as one colour\n"); bad = 1;
+    }
+    if (count_index(&f, 10) != 0) {
+        printf("selftest: colour predicate found green where there is none\n"); bad = 1;
     }
 
     u2_frame_free(&f);
@@ -208,29 +311,11 @@ int main(int argc, char **argv)
         u2_ctx ctx; u2_overworld ow;
         setup(&ctx, &ow, 1);
         enh_frame(&ow);
-        u2_dg_scan s;
-        memset(&s, 0, sizeof s);
-        for (int d = 0; d < U2_DG_SAMPLE_DEPTH; d++) {
-            s.left[d] = U2_DG_ROCK; s.right[d] = U2_DG_ROCK;
-            s.ctr[d] = (d >= 3) ? U2_DG_ROCK : 0x00;
-        }
-        static uint8_t tex[32 * 32];
-        for (int v = 0; v < 32; v++)
-            for (int u = 0; u < 32; u++)
-                tex[v * 32 + u] = ((u / 4 + v / 4) & 1) ? U2_CGA_WHITE : U2_CGA_CYAN;
-        ctx.dng_wall_set = 1;
-        memcpy(ctx.dng_wall, tex, sizeof tex);
-        /* Optional 3rd arg: a real DNGWALL.TILE (1024 theme-palette indices) to use
-         * instead of the checkerboard, for eyeballing the baked FM Towns brick. */
-        if (argc > 3) {
-            FILE *tf = fopen(argv[3], "rb");
-            if (tf) {
-                size_t n = fread(ctx.dng_wall, 1, U2_DNG_WALL_PX, tf);
-                fclose(tf);
-                if (n == U2_DNG_WALL_PX) printf("dump: loaded wall tile from %s\n", argv[3]);
-            }
-        }
-        u2_dungeon_render3d(&ctx, &ow, &s);
+        build_room(&ow, U2_DG_ROCK);
+        u2_world_dungeon_put(&ow.world, 0, 7, 5, 0x02);          /* creature */
+        u2_world_dungeon_put(&ow.world, 0, 6, 4, U2_DG_CHEST);   /* chest    */
+        u2_world_dungeon_put(&ow.world, 0, 6, 6, U2_DG_DOWN);    /* ladder   */
+        u2_dungeon_render(&ctx, &ow, 1);
         uint8_t pal[16][3]; u2_frame_palette_ega(pal);
         u2_frame_write_bmp16(&ow.frame, argv[2], pal);
         printf("wrote %s\n", argv[2]);
@@ -238,9 +323,11 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    test_direct();
+    test_room();
+    test_doors();
+    test_sprites();
     test_dispatch();
-    test_texture();
+    test_assets();
 
     printf("dungeon3d_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;

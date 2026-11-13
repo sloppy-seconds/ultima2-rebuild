@@ -1,23 +1,34 @@
 /*
- * dungeon3d.c — the enhanced-mode perspective corridor.
+ * dungeon3d.c — the enhanced-mode 3D dungeon: a DDA raycaster over the grid.
  *
- * This is a FEATURE, not a fidelity target: no shipped DOS original draws a textured
- * 3D dungeon, so nothing here is byte-proven and none of it may be cited as evidence
- * about original/ultimaii.exe. See docs/enhanced-dungeon-3d.md for the whole design
- * and the owner rulings (disc-supplied FM Towns art, open-archway doors, pinhole
- * convergence).
+ * This is a FEATURE, not a fidelity target: no shipped DOS original draws a
+ * textured 3D dungeon, so nothing here is byte-proven and none of it may be
+ * cited as evidence about original/ultimaii.exe. See docs/enhanced-dungeon-3d.md
+ * for the design and the owner rulings.
  *
- * This first cut is FLAT-SHADED: it establishes the projection and the dispatch, not
- * the art. The corridor is drawn as nested depth frames converging to the map-window
- * centre, with the regions between consecutive frames filled as ceiling / floor /
- * wall trapezoids and an end cap where the corridor stops. Texture from the FM Towns
- * banks is a later step (§ 7a step 3); the flat palette colours here are placeholders
- * chosen so the geometry is legible and the gate can tell a filled corridor from the
- * sparse CGA wireframe it replaces in enhanced mode.
+ * Ruling 2026-11-14 (owner): the FM Towns art route is retired to branch
+ * archive/fmtowns-dungeon-route; the engine draws its own procedurally
+ * generated art (dungeon_assets.c), movement stays instant like the original,
+ * and the view renders into u2_frame like every other pixel the engine makes —
+ * no SDL in this file, so the terminal backends, the demo recorder and the
+ * headless tests all still see the dungeon.
  *
- * The topology is not re-derived: the caller passes the same u2_dg_scan the wireframe
- * reads (asm/6078's three columns), so the 3D view and the wireframe agree on which
- * faces are solid by construction.
+ * What is engine truth here (dungeon.h):
+ *   * the grid: 16x16 pages of the sector buffer, floor = [DS:25], the same
+ *     u2_world_dungeon_at the wireframe and the walk gates read, with the same
+ *     & 0x3f wrap the scan uses;
+ *   * solidity by the render-stop rule, not the walk rule: bit 7 set draws
+ *     solid EXCEPT 0xC0, the open doorway, which draws as a passage. 0xE0, the
+ *     fake wall, therefore draws exactly like rock — finding it by walking is
+ *     the mechanic, and the renderer must not give it away;
+ *   * the low nibble is the creature stamp (1..7), 0x40 is a chest, 0x10/0x20
+ *     are the ladders, 0xC0 is a doorway: ladders and doors are floor texture
+ *     variants because you walk over them.
+ *
+ * What is design, not evidence (all of the rest): the projection (per-column
+ * DDA, ~74 deg FOV), the torch falloff bands, the texture set, the sprite
+ * shapes, and the ray range of 8 cells (chosen to echo asm/6078's eight sample
+ * depths, not because a raycast was ever observed).
  */
 
 #include "game/dungeon.h"
@@ -28,152 +39,244 @@
 #include "core/ctx.h"
 #include "core/frame.h"
 #include "core/layout.h"
+#include "core/world.h"
+#include "game/dungeon_assets.h"
 #include "game/overworld.h"
 
-/* The map window in the enhanced layout: 14x14 cells of 32 px at (0,0). */
-#define DG3_W  (U2_ENH_MAP_COLS * 32)   /* 448 */
-#define DG3_H  (U2_ENH_MAP_ROWS * 32)   /* 448 */
-#define DG3_CX (DG3_W / 2)              /* 224 — the vanishing point is the window centre */
-#define DG3_CY (DG3_H / 2)
+#define DG3_W     (U2_ENH_MAP_COLS * 32)   /* 448 — the enhanced map window */
+#define DG3_H     (U2_ENH_MAP_ROWS * 32)   /* 448 */
+#define DG3_CX    (DG3_W / 2)
+#define DG3_CY    (DG3_H / 2)
 
-/* Flat placeholder colours, CGA-compatible indices so the corridor is legible with no
- * theme loaded. Ceiling is deliberately non-black so the whole window reads as filled
- * ink (the gate's discriminator against the sparse wireframe); a real ceiling is dark
- * and arrives with the texture step. */
-#define DG3_CEIL   U2_CGA_CYAN      /* 1 */
-#define DG3_FLOOR  U2_CGA_MAGENTA   /* 2 */
-#define DG3_WALL   U2_CGA_WHITE     /* 3 */
-#define DG3_ENDCAP U2_CGA_WHITE     /* 3 */
-#define DG3_SPRITE U2_CGA_BLACK     /* 0 — a silhouette punched into the corridor */
+/* tan(FOV/2). Design choice: ~74 degrees, a touch wider than Wolf3D's 66 so
+ * the near-square 448x448 window shows enough of the side walls to read a
+ * corridor junction when you face down the corridor. */
+#define DG3_PLANE 0.75f
+#define DG3_PROJ  ((float)DG3_W / 2.0f / DG3_PLANE)
+#define DG3_MAX_DIST 8.0f                  /* rays stop here; see header      */
+#define DG3_FAR_Z  1e9f
 
-typedef struct { int x0, y0, x1, y1; } dg3_rect;
+static float f_abs(float v) { return v < 0 ? -v : v; }
+static int f_floor(float v) { int i = (int)v; return i - (v < i); }
 
-/* Depth frame d, d = 0 (nearest, fills the window) .. U2_DG_DRAW_DEPTH (far).
- * Pinhole convergence s(d) = 1/(d+1): the half-extent shrinks as 1/(d+1) toward the
- * vanishing point. This is our design choice (docs/enhanced-dungeon-3d.md § 1b), not
- * a value read from the original. */
-static dg3_rect dg3_frame(int d)
+/* Solid for RENDERING — the wireframe's stop rule, not the walk gate. */
+static int dg3_solid(uint8_t c)
 {
-    const int hw = (DG3_W / 2) / (d + 1);
-    const int hh = (DG3_H / 2) / (d + 1);
-    dg3_rect r = { DG3_CX - hw, DG3_CY - hh, DG3_CX + hw, DG3_CY + hh };
-    return r;
+    const uint8_t t = c & U2_DG_TERRAIN;
+    return (t & U2_DG_ROCK) && t != U2_DG_DOOR;
 }
 
-static void dg3_fill_rect(u2_frame *f, dg3_rect r, uint8_t c)
+static uint8_t dg3_cell(const u2_overworld *ow, int fl, int x, int y)
 {
-    for (int y = r.y0; y < r.y1; y++)
-        for (int x = r.x0; x < r.x1; x++)
-            u2_frame_put(f, x, y, c);   /* put clips out-of-window pixels */
+    return u2_world_dungeon_at(&ow->world, fl, x & 0x3f, y & 0x3f);
 }
 
-/* The four faces of the segment between a (near, larger) and b (far, smaller). Each
- * interpolates the frame width/height linearly across the band, which is exact for a
- * pinhole corridor viewed head-on. u2_frame_put clips, so a band that would spill past
- * the window edge is simply not drawn there. */
-static void dg3_fill_ceiling(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c)
+/* Which floor art a cell gets. 0x30 (both ladder bits) prefers DOWN, matching
+ * the bit-test order of the two ladder gates. */
+static int dg3_floor_tex(uint8_t c)
 {
-    const int y0 = a.y0, y1 = b.y0;          /* near top is higher (smaller y) */
-    if (y1 <= y0) return;
-    const int den = y1 - y0;
-    for (int y = y0; y < y1; y++) {
-        const int t = y - y0;
-        const int xl = a.x0 + (b.x0 - a.x0) * t / den;
-        const int xr = a.x1 + (b.x1 - a.x1) * t / den;
-        for (int x = xl; x < xr; x++) u2_frame_put(f, x, y, c);
-    }
+    const uint8_t t = c & U2_DG_TERRAIN;
+    if (t == U2_DG_DOOR) return U2_DGA_FLOOR_DOOR;
+    if (t & U2_DG_DOWN) return U2_DGA_FLOOR_LADDER_DOWN;
+    if (t & U2_DG_UP) return U2_DGA_FLOOR_LADDER_UP;
+    return U2_DGA_FLOOR_FLAG;
 }
 
-static void dg3_fill_floor(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c)
+/* ---------------------------------------------------------- floor/ceiling */
+/* Classic floor casting: every row below the horizon is one constant distance
+ * row, walked from the leftmost to the rightmost ray; the ceiling mirrors it.
+ * Texture is picked per pixel from the cell being looked at, so ladders, door
+ * thresholds and flagstone appear underfoot exactly where the grid says they
+ * are. */
+static void dg3_floor_ceiling(u2_frame *f, const u2_overworld *ow, int fl,
+                              float px, float py,
+                              float dirX, float dirY,
+                              float planeX, float planeY)
 {
-    const int y0 = b.y1, y1 = a.y1;          /* near bottom is lower (larger y) */
-    if (y1 <= y0) return;
-    const int den = y1 - y0;
-    for (int y = y0; y < y1; y++) {
-        const int t = y1 - y;                /* t=0 at the near edge */
-        const int xl = a.x0 + (b.x0 - a.x0) * t / den;
-        const int xr = a.x1 + (b.x1 - a.x1) * t / den;
-        for (int x = xl; x < xr; x++) u2_frame_put(f, x, y, c);
-    }
-}
+    const float ldx = dirX - planeX, ldy = dirY - planeY;   /* leftmost ray  */
+    const float rdx = dirX + planeX, rdy = dirY + planeY;   /* rightmost ray */
 
-static void dg3_fill_left(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c, const uint8_t *tex)
-{
-    const int x0 = a.x0, x1 = b.x0;          /* near left is further left */
-    if (x1 <= x0) return;
-    const int den = x1 - x0;
-    for (int x = x0; x < x1; x++) {
-        const int t = x - x0;
-        const int yt = a.y0 + (b.y0 - a.y0) * t / den;
-        const int yb = a.y1 + (b.y1 - a.y1) * t / den;
-        const int u = tex ? (t * 32 / den) & 31 : 0;
-        for (int y = yt; y < yb; y++) {
-            if (!tex) { u2_frame_put(f, x, y, c); continue; }
-            const int v = ((y - yt) * 32 / (yb - yt)) & 31;
-            u2_frame_put(f, x, y, tex[v * 32 + u]);
-        }
-    }
-}
+    for (int y = DG3_CY + 1; y < DG3_H; y++) {
+        const float p = (float)y + 0.5f - DG3_CY;
+        const float rowDist = (0.5f * DG3_PROJ) / p;
+        const int lvl = u2_dga_shade(rowDist);
+        const int yTop = DG3_H - 1 - y;                    /* ceiling mirror */
 
-static void dg3_fill_right(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c, const uint8_t *tex)
-{
-    const int x0 = b.x1, x1 = a.x1;          /* near right is further right */
-    if (x1 <= x0) return;
-    const int den = x1 - x0;
-    for (int x = x0; x < x1; x++) {
-        const int t = x1 - x;                /* t=0 at the near edge */
-        const int yt = a.y0 + (b.y0 - a.y0) * t / den;
-        const int yb = a.y1 + (b.y1 - a.y1) * t / den;
-        const int u = tex ? (t * 32 / den) & 31 : 0;
-        for (int y = yt; y < yb; y++) {
-            if (!tex) { u2_frame_put(f, x, y, c); continue; }
-            const int v = ((y - yt) * 32 / (yb - yt)) & 31;
-            u2_frame_put(f, x, y, tex[v * 32 + u]);
-        }
-    }
-}
-
-void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s)
-{
-    u2_frame *f = &ow->frame;
-    /* The wall texture comes from the active theme (baked into it, copied to ctx by
-     * the loader). No theme wall -> NULL -> the flat placeholder fill. */
-    const uint8_t *wall_tex = ctx->dng_wall_set ? ctx->dng_wall : NULL;
-
-    /* Background: the distance is ceiling-coloured dark, so an open corridor that
-     * runs past the draw depth fades to the ceiling tone rather than a hard edge. */
-    for (int y = 0; y < DG3_H; y++)
-        for (int x = 0; x < DG3_W; x++)
-            u2_frame_put(f, x, y, DG3_CEIL);
-
-    /* Painter's algorithm, far to near: nearer segments overwrite the parts of the
-     * farther ones they occlude. A rock-ahead cell is an end cap that fills its frame
-     * and occludes everything beyond it, so that depth draws the cap and skips its
-     * own ring (the corridor does not continue past a wall). */
-    for (int d = U2_DG_DRAW_DEPTH - 1; d >= 0; d--) {
-        const dg3_rect a = dg3_frame(d);
-        const dg3_rect b = dg3_frame(d + 1);
-
-        if (s->ctr[d] & U2_DG_ROCK) {
-            dg3_fill_rect(f, a, DG3_ENDCAP);
+        if (rowDist > DG3_MAX_DIST) {
+            for (int x = 0; x < DG3_W; x++) {
+                u2_frame_put(f, x, y, 0);
+                u2_frame_put(f, x, yTop, 0);
+            }
             continue;
         }
-        dg3_fill_ceiling(f, a, b, DG3_CEIL);
-        dg3_fill_floor(f, a, b, DG3_FLOOR);
-        if (s->left[d] & U2_DG_ROCK)  dg3_fill_left(f, a, b, DG3_WALL, wall_tex);
-        if (s->right[d] & U2_DG_ROCK) dg3_fill_right(f, a, b, DG3_WALL, wall_tex);
+
+        const float stepX = rowDist * (rdx - ldx) / (float)DG3_W;
+        const float stepY = rowDist * (rdy - ldy) / (float)DG3_W;
+        float fx = px + rowDist * ldx;
+        float fy = py + rowDist * ldy;
+
+        const uint8_t *ceil = u2_dga_tex(U2_DGA_CEIL_CAVE, lvl);
+        for (int x = 0; x < DG3_W; x++, fx += stepX, fy += stepY) {
+            const int cx = f_floor(fx), cy = f_floor(fy);
+            const uint8_t *tex = u2_dga_tex(dg3_floor_tex(dg3_cell(ow, fl, cx, cy)), lvl);
+            const int tx = ((int)((fx - (float)cx) * 32.0f)) & 31;
+            const int ty = ((int)((fy - (float)cy) * 32.0f)) & 31;
+            u2_frame_put(f, x, y, tex[ty * 32 + tx]);
+            u2_frame_put(f, x, yTop, ceil[ty * 32 + tx]);
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ walls */
+/* One DDA ray per screen column. Hits are the render-solid rule above; the
+ * perpendicular distance feeds wall height, texture falloff and the z-buffer
+ * the sprites depth-test against. */
+static void dg3_walls(u2_frame *f, const u2_overworld *ow, int fl,
+                      float px, float py,
+                      float dirX, float dirY,
+                      float planeX, float planeY, float *zbuf)
+{
+    for (int x = 0; x < DG3_W; x++) {
+        const float camX = 2.0f * (float)x / (float)DG3_W - 1.0f;
+        const float rdx = dirX + planeX * camX;
+        const float rdy = dirY + planeY * camX;
+
+        int mapX = f_floor(px), mapY = f_floor(py);
+        const float ddx = (rdx == 0.0f) ? 1e30f : f_abs(1.0f / rdx);
+        const float ddy = (rdy == 0.0f) ? 1e30f : f_abs(1.0f / rdy);
+        int stepX, stepY;
+        float sideX, sideY;
+        if (rdx < 0.0f) { stepX = -1; sideX = (px - (float)mapX) * ddx; }
+        else            { stepX =  1; sideX = ((float)mapX + 1.0f - px) * ddx; }
+        if (rdy < 0.0f) { stepY = -1; sideY = (py - (float)mapY) * ddy; }
+        else            { stepY =  1; sideY = ((float)mapY + 1.0f - py) * ddy; }
+
+        int side = 0, hit = 0;
+        for (;;) {
+            if (sideX < sideY) { side = 0; mapX += stepX; sideX += ddx; }
+            else               { side = 1; mapY += stepY; sideY += ddy; }
+            if ((side ? sideY : sideX) > DG3_MAX_DIST) break;
+            if (dg3_solid(dg3_cell(ow, fl, mapX, mapY))) { hit = 1; break; }
+        }
+
+        if (!hit) { zbuf[x] = DG3_FAR_Z; continue; }
+        const float perp = (side == 0) ? (sideX - ddx) : (sideY - ddy);
+        zbuf[x] = perp;
+
+        const int lineH = (int)(DG3_PROJ / (perp < 0.05f ? 0.05f : perp));
+        int y0 = DG3_CY - lineH / 2, y1 = DG3_CY + lineH / 2;
+        if (y0 < 0) y0 = 0;
+        if (y1 > DG3_H) y1 = DG3_H;
+
+        float wallX = (side == 0) ? (py + perp * rdy) : (px + perp * rdx);
+        wallX -= (float)f_floor(wallX);
+        int texX = ((int)(wallX * 32.0f)) & 31;
+        if ((side == 0 && rdx > 0.0f) || (side == 1 && rdy < 0.0f))
+            texX = 31 - texX;                       /* keep brick handedness */
+
+        const uint8_t *tex = u2_dga_tex(U2_DGA_WALL_STONE, u2_dga_shade(perp));
+        const float stepT = 32.0f / (float)lineH;
+        float tpos = (float)(y0 - (DG3_CY - lineH / 2)) * stepT;
+        for (int y = y0; y < y1; y++, tpos += stepT)
+            u2_frame_put(f, x, y, tex[((int)tpos & 31) * 32 + texX]);
+    }
+}
+
+/* --------------------------------------------------------------- sprites */
+/* Billboards for the things that live on a cell you can see: creature stamps
+ * and chests. Collected from the page grid, sorted far-to-near, drawn through
+ * the wall z-buffer so a creature behind a corner is occluded per column. */
+#define DG3_MAX_SPR 128
+
+typedef struct { float sx, sy, d2; int id; int tall; } dg3_spr;
+
+static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
+                        float px, float py,
+                        float dirX, float dirY,
+                        float planeX, float planeY, const float *zbuf)
+{
+    dg3_spr list[DG3_MAX_SPR];
+    int n = 0;
+
+    for (int cy = 0; cy < U2_DG_PAGE_EDGE; cy++)
+        for (int cx = 0; cx < U2_DG_PAGE_EDGE; cx++) {
+            const uint8_t c = u2_world_dungeon_at(&ow->world, fl, cx, cy);
+            const uint8_t stamp = c & 0x07u;
+            int id = -1, tall = 1;
+            if (stamp >= 1 && stamp <= 7) id = U2_DGA_SP_MON1 + stamp - 1;
+            else if ((c & U2_DG_TERRAIN) == U2_DG_CHEST) { id = U2_DGA_SP_CHEST; tall = 0; }
+            if (id < 0 || n >= DG3_MAX_SPR) continue;
+
+            const float sx = (float)cx + 0.5f - px;
+            const float sy = (float)cy + 0.5f - py;
+            const float d2 = sx * sx + sy * sy;
+            if (d2 > DG3_MAX_DIST * DG3_MAX_DIST) continue;
+            list[n].sx = sx; list[n].sy = sy; list[n].d2 = d2;
+            list[n].id = id; list[n].tall = tall;
+            n++;
+        }
+
+    for (int i = 1; i < n; i++) {          /* insertion sort, far first */
+        const dg3_spr k = list[i];
+        int j = i - 1;
+        while (j >= 0 && list[j].d2 < k.d2) { list[j + 1] = list[j]; j--; }
+        list[j + 1] = k;
     }
 
-    /* Placeholder creature: a black silhouette at the nearest depth whose centre cell
-     * carries a stamp. The FM Towns monster sprites (DUNMON banks) replace this in the
-     * texture step; until then a filled block marks that a creature is there. */
-    for (int d = 0; d < U2_DG_DRAW_DEPTH; d++) {
-        if (s->obj[d] == 0) continue;
-        const dg3_rect fr = dg3_frame(d);
-        const int cx = (fr.x0 + fr.x1) / 2, cy = (fr.y0 + fr.y1) / 2;
-        const int hw = (fr.x1 - fr.x0) / 4, hh = (fr.y1 - fr.y0) / 4;
-        dg3_rect sp = { cx - hw, cy - hh, cx + hw, cy + hh };
-        dg3_fill_rect(f, sp, DG3_SPRITE);
-        break;
+    const float invDet = 1.0f / (planeX * dirY - dirX * planeY);
+    for (int i = 0; i < n; i++) {
+        const float tX = invDet * ( dirY * list[i].sx - dirX * list[i].sy);
+        const float tY = invDet * (-planeY * list[i].sx + planeX * list[i].sy);
+        if (tY <= 0.1f) continue;
+
+        const int screenX = (int)(((float)DG3_W / 2.0f) * (1.0f + tX / tY));
+        const int hFull = (int)(DG3_PROJ / tY);
+        const int h = list[i].tall ? (hFull * 9 / 10) : (hFull / 2);
+        const int w = list[i].tall ? h : (hFull / 2);
+        const int floorY = DG3_CY + (int)(DG3_PROJ / (2.0f * tY));
+        const int y0 = floorY - h, y1 = floorY;
+        const int x0 = screenX - w / 2, x1 = screenX + w / 2;
+
+        int lvl = 3;
+        if (list[i].d2 < 6.25f) lvl = 0;
+        else if (list[i].d2 < 16.0f) lvl = 1;
+        else if (list[i].d2 < 36.0f) lvl = 2;
+        const uint8_t *tex = u2_dga_sprite(list[i].id, lvl);
+
+        for (int x = x0; x < x1; x++) {
+            if (x < 0 || x >= DG3_W || tY >= zbuf[x]) continue;
+            const int tx = ((x - x0) * 32) / (w > 0 ? w : 1);
+            for (int y = y0; y < y1; y++) {
+                if (y < 0 || y >= DG3_H) continue;
+                const int ty = ((y - y0) * 32) / (h > 0 ? h : 1);
+                const uint8_t c = tex[ty * 32 + tx];
+                if (c == U2_DGA_TRANSPARENT) continue;
+                u2_frame_put(f, x, y, c);
+            }
+        }
     }
+}
+
+/* ---------------------------------------------------------------- driver */
+void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s)
+{
+    (void)s;   /* the scan is the wireframe's sample; the raycaster reads the
+                * same grid under the same solidity rule instead, so the two
+                * views agree by rule rather than by shared sample. */
+    u2_frame *f = &ow->frame;
+    u2_dga_init();
+
+    int dx, dy;
+    u2_dungeon_facing(ctx, &dx, &dy);
+    const int fl = (int8_t)ctx->state.site_floor;
+    const float px = (float)ow->x + 0.5f;
+    const float py = (float)ow->y + 0.5f;
+    const float dirX = (float)dx, dirY = (float)dy;
+    const float planeX = (float)dy * DG3_PLANE;
+    const float planeY = (float)(-dx) * DG3_PLANE;
+
+    float zbuf[DG3_W];
+    dg3_floor_ceiling(f, ow, fl, px, py, dirX, dirY, planeX, planeY);
+    dg3_walls(f, ow, fl, px, py, dirX, dirY, planeX, planeY, zbuf);
+    dg3_sprites(f, ow, fl, px, py, dirX, dirY, planeX, planeY, zbuf);
 }
