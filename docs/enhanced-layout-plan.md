@@ -373,3 +373,12 @@ Towns dungeon is 3D at all, so that path needs the dungeon art extracted, mapped
 shape verified before it can be assumed. Treat this as its own plan with its own owner
 ruling when someone wants to build it, downstream of the mode-aware dispatch that the EGA
 tier introduces.
+
+**Update, 2026-11-13.** The "is the FM Towns dungeon 3D at all" question is now closed:
+the screenshots on disk under `references/fmtowns-screens/` (see `_CAPTIONS.tsv`, e.g.
+`FMtownsu214.jpg`) show a first-person perspective corridor with textured walls, a
+perspective floor, and sprite monsters. The geometry spike and the full design are written
+up in `docs/enhanced-dungeon-3d.md` (plan only, not started, owner ruling on the art route
+still open). The projection turns out to be the same nested depth rectangles the wireframe
+already draws, halving toward the near-frame centre, so the new work is a textured-trapezoid
+rasteriser and the dungeon-art decode, not a new projection.
