@@ -277,6 +277,34 @@ static void test_assets(void)
 }
 
 /* ---- 6. selftest: the predicates can go red -------------------------------- */
+/* The CGA-on-EGA remap: the enhanced layout always draws on the 16-colour EGA
+ * palette, so when the overworld art fell back to CGA its four indices must land
+ * on the EGA indices of the same colour (black 0, cyan 3, magenta 5, white 15),
+ * and every index above 3 — the dungeon's greys and creature accents — must pass
+ * through untouched. A frame that never sets the flag must be pure identity. */
+static void test_cga_on_ega(void)
+{
+    u2_frame f;
+    if (u2_frame_init_size(&f, 320, 200, 1) != 0) { fails++; return; }
+
+    f.cga_on_ega = 0;
+    for (int c = 0; c < 16; c++)
+        CHECK(u2_frame_cga_idx(&f, c) == c,
+              "cga_on_ega=0: index %d must be identity", c);
+
+    f.cga_on_ega = 1;
+    CHECK(u2_frame_cga_idx(&f, 0) == 0,  "cga_on_ega: CGA black -> EGA black");
+    CHECK(u2_frame_cga_idx(&f, 1) == 3,  "cga_on_ega: CGA cyan -> EGA cyan");
+    CHECK(u2_frame_cga_idx(&f, 2) == 5,  "cga_on_ega: CGA magenta -> EGA magenta");
+    CHECK(u2_frame_cga_idx(&f, 3) == 15, "cga_on_ega: CGA white -> EGA white");
+    /* The dungeon writes these directly and must not be recoloured by the flag. */
+    CHECK(u2_frame_cga_idx(&f, 7) == 7,  "cga_on_ega: EGA lt grey passes through");
+    CHECK(u2_frame_cga_idx(&f, 8) == 8,  "cga_on_ega: EGA dk grey passes through");
+    CHECK(u2_frame_cga_idx(&f, 15) == 15,"cga_on_ega: EGA white passes through");
+
+    u2_frame_free(&f);
+}
+
 static int selftest(void)
 {
     int bad = 0;
@@ -328,6 +356,7 @@ int main(int argc, char **argv)
     test_sprites();
     test_dispatch();
     test_assets();
+    test_cga_on_ega();
 
     printf("dungeon3d_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;

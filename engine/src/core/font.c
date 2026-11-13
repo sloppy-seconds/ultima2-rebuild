@@ -44,7 +44,8 @@ void u2_font_draw_cell(u2_frame *f, int row, int col, uint8_t ch,
              * glyph dot becomes a scale x scale block: a 2x theme keeps the same
              * 80x25 text grid at twice the pixels instead of shrinking into the
              * top-left corner of a window four times the area. */
-            u2_frame_put_logical(f, x0 + x, y0 + y, (bits & (1u << x)) ? fg : bg);
+            u2_frame_put_logical(f, x0 + x, y0 + y,
+                u2_frame_cga_idx(f, (bits & (1u << x)) ? fg : bg));
         }
     }
 }

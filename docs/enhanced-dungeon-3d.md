@@ -464,3 +464,22 @@ the corridor starts consulting the theme atlas.
 This stays its own plan with its own owner ruling, exactly as `enhanced-layout-plan.md`
 § 10 anticipated. The wireframe (CGA) and the scaled wireframe (classic EGA) are
 unaffected; this adds a third renderer behind the existing per-mode dispatch.
+
+## Palette: the enhanced layout always draws on the EGA table
+
+The raycaster's procedural art is 16-colour (the grey ramp 7/8/15, the creature
+accents 1/2/3). When `--enhanced` found no EGA theme installed it fell back to
+`art_mode = CGA`, and the SDL backend zeroed `pal[4..15]`, so every grey the
+corridor drew collapsed to black and the dungeon rendered as a flat field. Owner
+ruling 2026-11-14: the enhanced layout always uses the 16-colour EGA palette,
+because its own art needs it and must not depend on a theme being present.
+
+The one catch is that CGA tile art is authored against the CGA table, whose first
+four entries differ from EGA's (CGA 1/2/3 are cyan/magenta/white; EGA's are
+blue/green/cyan). So when the overworld art is CGA but the palette is EGA, the two
+CGA consumers — the tile blit and the text layer — remap their four indices to the
+EGA indices of the same colour (`0→0, 1→3, 2→5, 3→15`, `u2_frame_cga_idx`), gated
+on `u2_frame::cga_on_ega`. The dungeon writes EGA indices through `u2_frame_put`
+directly and is never remapped, so its greys and creature colours pass through
+untouched. The overworld keeps its CGA look and the dungeon finally has a palette.
+Gate: `dungeon3d_check` `test_cga_on_ega`.

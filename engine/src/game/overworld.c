@@ -1633,6 +1633,11 @@ static int overworld_resume(u2_ctx *ctx, u2_overworld *ow)
             return -1;
         }
         u2_frame_set_text_fg(&ow->frame, ctx->text_fg);
+        /* The enhanced layout always draws on the 16-colour EGA palette (the
+         * dungeon's procedural art needs the greys). If the overworld art fell back
+         * to CGA because no EGA theme is installed, flag the frame so the CGA tile
+         * and text writers remap their four indices to the matching EGA colours. */
+        ow->frame.cga_on_ega = (ctx->art_mode != U2_ART_EGA);
         u2_view_init(&ow->view, U2_ENH_MAP_COLS, U2_ENH_MAP_ROWS,
                      U2_ENH_PLAYER_COL, U2_ENH_PLAYER_ROW);
     } else {

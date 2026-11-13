@@ -214,7 +214,12 @@ static int sdl_init(u2_ctx *ctx)
     }
 
     uint8_t pal[16][3];
-    const int ega = (ctx->art_mode == U2_ART_EGA);
+    /* The enhanced layout always uses the 16-colour EGA palette: its own art (the
+     * dungeon raycaster's greys, the panel) is 16-colour and must not depend on a
+     * theme being installed. When the overworld art fell back to CGA, the frame's
+     * cga_on_ega flag makes the CGA tile/text writers emit the EGA indices of the
+     * same four colours, so nothing is recoloured. */
+    const int ega = (ctx->art_mode == U2_ART_EGA) || ctx->enhanced_layout;
     if (ega) {
         u2_frame_palette_ega(pal);
     } else {
@@ -315,7 +320,7 @@ static void sdl_upload(u2_ctx *ctx, const struct u2_frame *f)
      * screenshot catches and a byte test does not. */
     uint8_t want[16][3];
     if (ctx->theme_palette_set) memcpy(want, ctx->theme_palette, sizeof want);
-    else if (ctx->art_mode == U2_ART_EGA) u2_frame_palette_ega(want);
+    else if (ctx->art_mode == U2_ART_EGA || ctx->enhanced_layout) u2_frame_palette_ega(want);
     else { u2_frame_palette(want);
            for (int i = 4; i < 16; i++) { want[i][0]=want[i][1]=want[i][2]=0; } }
     if (memcmp(want, v->pal_src, sizeof want) != 0) {

@@ -126,6 +126,16 @@ void u2_frame_palette_ega(uint8_t out[16][3])
     memcpy(out, pal, sizeof pal);
 }
 
+/* The four CGA mode-4 colours expressed as EGA palette indices: black, cyan,
+ * magenta, white. See u2_frame::cga_on_ega. */
+static const uint8_t k_cga_to_ega[4] = { 0, 3, 5, 15 };
+
+uint8_t u2_frame_cga_idx(const u2_frame *f, uint8_t c)
+{
+    if (!f || !f->cga_on_ega || c > 3) return c;
+    return k_cga_to_ega[c];
+}
+
 void u2_frame_clear(u2_frame *f, uint8_t colour)
 {
     if (!f || !f->px) return;
@@ -157,7 +167,8 @@ void u2_frame_blit_tile(u2_frame *f, const u2_tiles *t, int tile, int x, int y)
              * `put` would draw. The dungeon and town art is CGA even under a
              * large-tile theme, so this path really does run at scale 2. */
             u2_frame_put_logical(f, dx, dy,
-                                 (uint8_t)((b >> (6 - 2 * (col & 3))) & 3));
+                                 u2_frame_cga_idx(f,
+                                     (uint8_t)((b >> (6 - 2 * (col & 3))) & 3)));
         }
     }
 }

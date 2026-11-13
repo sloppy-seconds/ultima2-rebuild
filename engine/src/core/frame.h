@@ -88,6 +88,14 @@ typedef struct u2_frame {
      * pair is black on black and simply is not there. The theme loader picks the
      * brightest entry of whatever palette is active. */
     uint8_t  text_fg, text_bg;
+    /* When set, CGA art (indices 0..3) is being drawn onto a frame whose backend
+     * palette is the 16-colour EGA table — the enhanced layout with no EGA theme
+     * installed. The four CGA colours already exist in the EGA table at other
+     * indices (black 0, cyan 3, magenta 5, white 15), so the CGA consumers remap
+     * through u2_frame_cga_idx and the overworld keeps its colours while the
+     * dungeon's greys (7/8/15) finally have a palette to resolve against.
+     * Zero by default, so the classic CGA and EGA paths stay byte-identical. */
+    uint8_t  cga_on_ega;
     unsigned presents;      /* frames composited, for tests and diagnostics */
 } u2_frame;
 
@@ -107,6 +115,12 @@ void u2_frame_free(u2_frame *f);
  * overworld re-sized by Ctrl-T. Like init it assumes the struct is zeroed or
  * inited, never uninitialised garbage. */
 int u2_frame_ensure(u2_frame *f, int scale);
+
+/* Map a CGA art index (0..3) to the EGA index of the same colour, when the frame
+ * is drawing CGA art on an EGA palette (see u2_frame::cga_on_ega). Identity
+ * otherwise and for any index above 3, so EGA art and the dungeon pass through
+ * untouched. */
+uint8_t u2_frame_cga_idx(const u2_frame *f, uint8_t c);
 
 /* Point the text layer at the palette's brightest ink. `fg` of 0 means "leave the
  * CGA default", which is what every theme without its own RGB table wants. */
