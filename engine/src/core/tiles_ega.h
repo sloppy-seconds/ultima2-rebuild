@@ -162,6 +162,12 @@ static inline int u2_tile_ega_pixel(const u2_tiles_ega *t, int tile, int x, int 
  * by the same calls. */
 #define U2_EGA_THEME_DEFAULT "default"
 
+/* The theme the engine prefers when nothing is named: the fan pack's "10", which
+ * the owner picked as the best-looking of the four (ruling 2026-11-13). The
+ * autodetect tries this, then "default", then the derived FM Towns theme, then
+ * falls back to CGA. */
+#define U2_EGA_THEME_PREFERRED "10"
+
 /* The directory an installed tree keeps its themes in, when nothing named one.
  * Same literal as U2_INSTALL_THEMES in core/install.h; install.c static-asserts
  * the two so a rename cannot silently split the layout from the lookup. */
@@ -224,7 +230,8 @@ u2_tiles_ega_result u2_tiles_ega_validate(u2_ctx *ctx, char *err, size_t n);
  * Pick the art axis from what is installed when the player named nothing.
  *
  * Sets ctx->art_mode to U2_ART_EGA and, if no theme was named, ctx->ega_theme,
- * preferring the derived FM Towns theme over the fan pack's `default`. Returns 1
+ * preferring the fan pack's `10` theme, then its `default`, then the derived FM
+ * Towns theme. Returns 1
  * on a hit. Returns 0 and leaves the context as it found it when there is nothing
  * to find, which means the run stays on CGA — that is a default being unfilled, not
  * the refusal --ega enforces, because nothing was asked for.

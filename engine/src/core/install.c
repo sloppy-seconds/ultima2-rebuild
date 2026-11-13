@@ -23,7 +23,7 @@
 #include "core/fmtowns.h"
 #include "core/sha256.h"
 #include "core/slot.h"
-#include "core/tiles_ega.h"   /* U2_EGA_THEME_DEFAULT, and the dir-name assert below */
+#include "core/tiles_ega.h"   /* U2_FMTOWNS_THEME, and the dir-name assert below */
 
 #define MAX_ROWS     1024
 #define NAME_LEN     128
@@ -720,18 +720,20 @@ void u2_install_fill_from_config(u2_install_request *rq, const u2_config *cfg, F
 
 /* ------------------------------------------------------------------ config */
 
-/* `theme` is the theme name to record, or NULL to write no [themes] section at all.
- * It is the theme the engine would pick on its own, and it has to be recorded: a
- * config line is an explicit choice as far as auto-detection is concerned, so
- * writing `theme = default` over a fmtowns derivation would pin the fan pack on
- * exactly the installs that went to the trouble of deriving the better art. */
+/* `have_themes` decides whether a [themes] section is written at all; with no
+ * themes on disk there is nothing to point at. The installer does NOT record an
+ * active theme (owner ruling 2026-11-13): the engine auto-picks `10` -> `default`
+ * -> fmtowns -> CGA at launch, and a recorded `theme =` line is an explicit choice
+ * as far as auto-detection is concerned, so it would freeze that order and override
+ * a later Ctrl-T or a changed install. The theme line is left as a commented
+ * example so a player who wants to pin one has the syntax to hand. */
 /* The installer writes `dir = themes`; the engine's auto-detection looks for
  * `themes` when nothing named a directory. Two literals in two files is a drift
  * waiting to happen, so they are tied here rather than left to agreement. */
 _Static_assert(0 == strcmp(U2_INSTALL_THEMES, U2_EGA_THEMES_DIR_NAME),
                "the installed themes directory name must match the engine's default");
 
-static int write_config(const char *to, const char *theme, const u2_install_request *rq)
+static int write_config(const char *to, int have_themes, const u2_install_request *rq)
 {
     char path[1024], tmp[1024];
     char orig[1024], upd[1024], fm[1024], th[U2_INSTALL_MAX_RECORDED][1024];
@@ -752,8 +754,11 @@ static int write_config(const char *to, const char *theme, const u2_install_requ
           "data = .\n"
           "saves = saves\n"
           "\n", f);
-    if (theme)
-        fprintf(f, "[themes]\ndir = %s\ntheme = %s\n", U2_INSTALL_THEMES, theme);
+    if (have_themes)
+        fprintf(f, "[themes]\ndir = %s\n"
+                  "# theme = 10   # uncomment to pin a theme; the engine otherwise\n"
+                  "#              # auto-picks 10, then default, then fmtowns, then CGA\n",
+                U2_INSTALL_THEMES);
 
     /* What --install was given, so running it again from here needs no flags.
      * `to` is this directory by construction; the sources are absolute because
@@ -1008,14 +1013,12 @@ u2_install_result u2_install_apply(const u2_install_request *rq, FILE *out,
         have_fmtowns = 1;
     }
 
-    /* Record the preferred theme, which is the derived one when it exists because
-     * that is the art the player supplied a disc for. Same order the engine's own
-     * auto-detection uses (core/tiles_ega.h), so a tree installed here and a tree
-     * assembled by hand agree on what they start with. */
-    const char *cfg_theme = have_fmtowns ? U2_FMTOWNS_THEME
-                          : (have_themes ? U2_EGA_THEME_DEFAULT : NULL);
-
-    if (write_config(rq->to, cfg_theme, rq) != 0) {
+    /* Do not pin a theme (owner ruling 2026-11-13): the engine auto-picks
+     * `10` -> `default` -> fmtowns -> CGA at launch, so a recorded theme would
+     * freeze that choice and override a later Ctrl-T or a changed install. The
+     * [themes] dir line is still written when themes exist; the theme line is a
+     * commented example. */
+    if (write_config(rq->to, (have_fmtowns || have_themes) ? 1 : 0, rq) != 0) {
         snprintf(err, errsz, "cannot write %s", U2_INSTALL_CONFIG);
         free(rows);
         return U2_INSTALL_ERROR;

@@ -591,18 +591,20 @@ int u2_tiles_ega_autodetect(u2_ctx *ctx, char *chosen, size_t n, int may_change_
     dirs[0] = (ctx->ega_theme_dir && *ctx->ega_theme_dir)
             ? ctx->ega_theme_dir : U2_EGA_THEMES_DIR_NAME;
 
-    /* fmtowns first: it is the only theme anyone has to go and derive from a disc
-     * they own, so its presence is a deliberate act, and it renders at 32x32.
-     * `default` is the fan pack's top-level EGATILES, which the installer also
-     * writes, so ordering the other way would make the derived theme unreachable
-     * by default on every full install. */
-    const char *names[2];
+    /* Owner ruling 2026-11-13: the fan pack's `10` is the preferred default (the
+     * best-looking of the four), then the pack's `default`, then the derived FM
+     * Towns theme, then CGA. This reverses the old fmtowns-first order: on a full
+     * install that has both the fan themes and a derived FM Towns theme the default
+     * is now `10`, and fmtowns is reached by naming it (--ega-theme fmtowns) or by
+     * not installing the fan pack. */
+    const char *names[3];
     int nn = 0;
     if (ctx->ega_theme && *ctx->ega_theme) {
         names[nn++] = ctx->ega_theme;
     } else {
-        names[nn++] = U2_FMTOWNS_THEME;
+        names[nn++] = U2_EGA_THEME_PREFERRED;
         names[nn++] = U2_EGA_THEME_DEFAULT;
+        names[nn++] = U2_FMTOWNS_THEME;
     }
 
     /* The frame scale is derived from the art mode (ega_frame_scale), and a v2

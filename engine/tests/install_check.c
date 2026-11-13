@@ -579,12 +579,13 @@ int main(int argc, char **argv)
         CHECK(!has(files, tn, "themes/README.txt") && !has(files, tn, "themes/u2cfg.exe"),
               "docs and patcher binaries stay out of the themes tree");
 
-        /* The recorded theme is the one the engine would pick on its own. This is
-         * load-bearing rather than cosmetic: config.ini is an explicit choice as far
-         * as auto-detection is concerned, so a `theme = default` written over a
-         * fmtowns derivation pins the fan pack on exactly the installs that went to
-         * the trouble of deriving the better art. No fmtowns media here, so the
-         * answer is `default` — and the point is that it is written at all. */
+        /* The installer does NOT pin a theme (owner ruling 2026-11-13): the engine
+         * auto-picks `10` -> `default` -> fmtowns -> CGA at launch, and a recorded
+         * `theme =` line is an explicit choice as far as auto-detection is
+         * concerned, so it would freeze that order and override a later Ctrl-T or a
+         * changed install. The [themes] dir line is still written; the theme line is
+         * a commented example. Assert both halves: the dir is named, and no active
+         * theme is set (a commented `# theme =` line is allowed). */
         {
             char cpath[1200];
             snprintf(cpath, sizeof cpath, "%.1000s/config.ini", to);
@@ -593,8 +594,10 @@ int main(int argc, char **argv)
             size_t got = cf ? fread(buf, 1, sizeof buf - 1, cf) : 0;
             if (cf) fclose(cf);
             if (got) buf[got] = '\0';
-            CHECK(cf && got && strstr(buf, "theme = default"),
-                  "config.ini records the theme an install with only the fan pack should use");
+            CHECK(cf && got && strstr(buf, "dir = themes"),
+                  "config.ini names the themes directory");
+            CHECK(cf && got && !strstr(buf, "\ntheme = "),
+                  "config.ini pins no active theme (the engine auto-picks)");
         }
 
         /* the atlas landed byte-identical, which is the whole no-re-encode rule */

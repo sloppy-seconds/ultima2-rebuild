@@ -488,7 +488,7 @@ if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/artauto_check" \
    && "$WORK/artauto_check" "$WORK/artauto" >"$WORK/artauto.out" 2>&1; then
     n=$(sed -n 's/^  ok  \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/artauto.out")
     [ "${n:-0}" -gt 0 ] \
-        && ok "art auto-selection: fmtowns preferred, explicit wins, empty stays CGA ($n checks)" \
+        && ok "art auto-selection: 10 preferred, explicit wins, empty stays CGA ($n checks)" \
         || bad "art auto-selection run executed 0 checks — the test is not running"
 else
     bad "art auto-selection check failed:"
@@ -528,6 +528,37 @@ case "$cfg_bare" in
     *cga*) ok "a config naming no theme leaves the run on CGA: $cfg_bare" ;;
     *)     bad "a themeless config should not have selected EGA: '${cfg_bare:-no art-mode line}'" ;;
 esac
+fi
+
+# --- --classic / --cga ------------------------------------------------------
+# --classic forces the original CGA art even when a themes tree is present, and
+# --cga is its alias (owner ruling 2026-11-13: the default now picks the best EGA
+# theme on its own, so this is the only way back to the original art on an install
+# that has themes). The property is the OVERRIDE: in a tree where auto-detection
+# would pick EGA, --classic must push it back to CGA. The control is the same tree
+# with no flag, which must come out EGA -- so the gate can only be green if both
+# halves hold, and it goes red if --classic is unwired or the alias breaks.
+rm -rf "$WORK/classic"; mkdir -p "$WORK/classic/themes/default"
+cp ../themes/default/THEME.INI ../themes/default/TILES "$WORK/classic/themes/default/" 2>/dev/null
+if [ -s "$WORK/classic/themes/default/TILES" ]; then
+    U2_ABS="$PWD/u2"
+    plain=$( (cd "$WORK/classic" && "$U2_ABS" --headless 2>&1 | grep '^u2: art mode' | head -1) )
+    classic=$( (cd "$WORK/classic" && "$U2_ABS" --headless --classic 2>&1 | grep '^u2: art mode' | head -1) )
+    alias_=$( (cd "$WORK/classic" && "$U2_ABS" --headless --cga 2>&1 | grep '^u2: art mode' | head -1) )
+    case "$plain" in
+        *ega*) ok "--classic control: a themes tree with no flag is EGA: $plain" ;;
+        *)     bad "--classic control: themes tree with no flag should be EGA: '${plain:-no art-mode line}'" ;;
+    esac
+    case "$classic" in
+        *cga*) ok "--classic forces CGA over an installed themes tree: $classic" ;;
+        *)     bad "--classic did not force CGA: '${classic:-no art-mode line}'" ;;
+    esac
+    case "$alias_" in
+        *cga*) ok "--cga alias forces CGA too: $alias_" ;;
+        *)     bad "--cga alias did not force CGA: '${alias_:-no art-mode line}'" ;;
+    esac
+else
+    printf '  SKIP  no ../themes/default to build a --classic fixture from\n'
 fi
 
 # --- config.ini -------------------------------------------------------------

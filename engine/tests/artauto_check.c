@@ -2,10 +2,12 @@
  * artauto_check.c — which art axis and which theme a run gets when it says nothing.
  *
  * Opened 2026-11-06. An --install tree holding themes still started in CGA unless
- * the player typed --ega, so the better art sat on disk unused; and where both the
- * derived FM Towns theme and the fan pack's `default` were installed, `default`
- * won, which is backwards — deriving fmtowns means the player pointed the installer
- * at a disc they own.
+ * the player typed --ega, so the better art sat on disk unused.
+ *
+ * The preference order was reversed by the owner on 2026-11-13: the fan pack's `10`
+ * is now the preferred default (best-looking of the four), then the pack's
+ * `default`, then the derived FM Towns theme, then CGA. The earlier rule put
+ * fmtowns first; that is gone. The tests below pin the current order.
  *
  * The two properties that matter most are the ones about NOT firing. Auto-detection
  * must never change what a developer's checkout or the test suite draws, because
@@ -69,12 +71,13 @@ static void reset(u2_ctx *c)
  * themes directory itself (what config.ini's [themes] dir names). */
 static void fixture(char *case_dir, size_t cn, char *th_dir, size_t tn,
                     const char *base, const char *case_name,
-                    int have_default, int have_fmtowns)
+                    int have_default, int have_fmtowns, int have_10)
 {
     snprintf(case_dir, cn, "%s/%s", base, case_name);
     mkpath(case_dir);
     snprintf(th_dir, tn, "%s/themes", case_dir);
     mkpath(th_dir);
+    if (have_10)       mk_theme(th_dir, "EGATHEME.10/EGATILES");
     if (have_default)  mk_theme(th_dir, "EGATILES");
     if (have_fmtowns)  mk_theme(th_dir, "EGATHEME.FMTOWNS/EGATILES");
 }
@@ -92,7 +95,7 @@ int main(int argc, char **argv)
     /* --- the configured-directory path (what config.ini's [themes] dir becomes) --- */
 
     /* 1. empty themes dir: no change, and CGA is not a refusal. */
-    fixture(dir, sizeof dir, th, sizeof th, base, "none", 0, 0);
+    fixture(dir, sizeof dir, th, sizeof th, base, "none", 0, 0, 0);
     reset(&ctx);
     ctx.ega_theme_dir = dirp;
     theme[0] = '\0';
@@ -101,8 +104,8 @@ int main(int argc, char **argv)
     CHECK(ctx.art_mode == U2_ART_CGA,
           "empty themes dir: the run stays CGA, silently and correctly");
 
-    /* 2. only the fan pack: that is what you get. */
-    fixture(dir, sizeof dir, th, sizeof th, base, "only-default", 1, 0);
+    /* 2. only the fan pack's `default`: that is what you get. */
+    fixture(dir, sizeof dir, th, sizeof th, base, "only-default", 1, 0, 0);
     reset(&ctx);
     ctx.ega_theme_dir = dirp;
     theme[0] = '\0';
@@ -111,14 +114,42 @@ int main(int argc, char **argv)
     CHECK(ctx.art_mode == U2_ART_EGA, "finding a theme selects the EGA axis");
     CHECK(strcmp(theme, "default") == 0, "with only `default` installed, that is the theme");
 
-    /* 3. THE PREFERENCE: fmtowns wins when both are there. */
-    fixture(dir, sizeof dir, th, sizeof th, base, "both", 1, 1);
+    /* 3. THE PREFERENCE (owner ruling 2026-11-13): the fan pack beats the derived
+     *    FM Towns theme. With `default` and fmtowns and no `10`, `default` wins. */
+    fixture(dir, sizeof dir, th, sizeof th, base, "both", 1, 1, 0);
     reset(&ctx);
     ctx.ega_theme_dir = dirp;
     theme[0] = '\0';
     CHECK(u2_tiles_ega_autodetect(&ctx, theme, sizeof theme, 1) == 1
-          && strcmp(theme, U2_FMTOWNS_THEME) == 0,
-          "with both installed the derived FM Towns theme is preferred");
+          && strcmp(theme, "default") == 0,
+          "with `default` and fmtowns installed the fan pack's default is preferred");
+
+    /* 3b. `10` is the preferred default when present. */
+    fixture(dir, sizeof dir, th, sizeof th, base, "only-10", 0, 0, 1);
+    reset(&ctx);
+    ctx.ega_theme_dir = dirp;
+    theme[0] = '\0';
+    CHECK(u2_tiles_ega_autodetect(&ctx, theme, sizeof theme, 1) == 1
+          && strcmp(theme, "10") == 0,
+          "with only `10` installed, that is the theme");
+
+    /* 3c. THE HEADLINE: `10` beats the derived FM Towns theme even together. */
+    fixture(dir, sizeof dir, th, sizeof th, base, "10-fmtowns", 0, 1, 1);
+    reset(&ctx);
+    ctx.ega_theme_dir = dirp;
+    theme[0] = '\0';
+    CHECK(u2_tiles_ega_autodetect(&ctx, theme, sizeof theme, 1) == 1
+          && strcmp(theme, "10") == 0,
+          "`10` is preferred over the derived FM Towns theme");
+
+    /* 3d. all three present: `10` still wins (the full-install case). */
+    fixture(dir, sizeof dir, th, sizeof th, base, "all-three", 1, 1, 1);
+    reset(&ctx);
+    ctx.ega_theme_dir = dirp;
+    theme[0] = '\0';
+    CHECK(u2_tiles_ega_autodetect(&ctx, theme, sizeof theme, 1) == 1
+          && strcmp(theme, "10") == 0,
+          "with 10, default and fmtowns all installed, `10` is the default");
 
     /* 4. an explicit theme outranks the preference — it is a choice, not a default. */
     reset(&ctx);
@@ -139,14 +170,16 @@ int main(int argc, char **argv)
           && ctx.art_mode == U2_ART_CGA,
           "CGA with the mode already decided picks no theme");
 
-    /* 6. may_change_mode = 0 on EGA: the mode is the player's, the theme is open. */
+    /* 6. may_change_mode = 0 on EGA: the mode is the player's, the theme is open.
+     *    The active fixture is "all-three" (10 + default + fmtowns), so `10` is the
+     *    preference. */
     reset(&ctx);
     ctx.ega_theme_dir = dirp;
     ctx.art_mode = U2_ART_EGA;
     theme[0] = '\0';
     CHECK(u2_tiles_ega_autodetect(&ctx, theme, sizeof theme, 0) == 1
           && ctx.art_mode == U2_ART_EGA
-          && strcmp(theme, U2_FMTOWNS_THEME) == 0,
+          && strcmp(theme, "10") == 0,
           "--ega with no theme named still gets the preference, and keeps EGA");
 
     /* 7. the directory that worked is recorded, or the strict launch check looks in
@@ -169,7 +202,7 @@ int main(int argc, char **argv)
         reset(&ctx);
         theme[0] = '\0';
         const int hit = u2_tiles_ega_autodetect(&ctx, theme, sizeof theme, 1);
-        CHECK(hit == 1 && strcmp(theme, U2_FMTOWNS_THEME) == 0,
+        CHECK(hit == 1 && strcmp(theme, "default") == 0,
               "themes/ beside the launch directory is found with nothing configured");
         CHECK(ctx.ega_theme_dir && strcmp(ctx.ega_theme_dir, U2_EGA_THEMES_DIR_NAME) == 0,
               "and the relative dir it used is recorded for the later open()");

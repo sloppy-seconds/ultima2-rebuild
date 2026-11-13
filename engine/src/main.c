@@ -129,21 +129,22 @@ static void usage(const char *argv0)
         "                    engine reads the player's own files the way the original\n"
         "                    read them from its default drive (default: .). It is read\n"
         "                    AND written: the original rewrites its own sectors.\n"
-        "  --ega             use the fan pack's 16-colour EGA art (EGATILES tiles and\n"
-        "                    PIC*-E pictures) instead of the original CGA. An art axis\n"
-        "                    only: it changes no rules and is available in both fidelity\n"
-        "                    modes. Strict: if the theme named is not there the run\n"
-        "                    refuses to start rather than quietly drawing CGA.\n"
+        "  --ega             force the fan pack's 16-colour EGA art (EGATILES tiles and\n"
+        "                    PIC*-E pictures). An art axis only: it changes no rules\n"
+        "                    and is available in both fidelity modes. Strict: if the\n"
+        "                    theme named is not there the run refuses to start rather\n"
+        "                    than quietly drawing CGA. Not needed to GET EGA - with no\n"
+        "                    flag the engine already picks the best theme on disk.\n"
         "                    PROVISIONAL: superseded by the graphics-set switch in the\n"
         "                    options menu (docs/options-menu.md).\n"
-        "  --cga             the original 4-colour art, and the way to say so when a\n"
-        "                    themes tree is installed. With neither --ega nor --cga the\n"
-        "                    engine picks from what is on disk: EGA if themes/ (or the\n"
-        "                    configured themes dir) holds a usable theme, preferring the\n"
+        "  --classic         the original 4-colour CGA art, and the way to force it when\n"
+        "                    a themes tree is installed (--cga is an alias). With neither\n"
+        "                    --ega nor --classic the engine picks from what is on disk:\n"
+        "                    the fan pack's `10` theme, then its `default`, then the\n"
         "                    derived FM Towns theme, and CGA if it holds none. Which was\n"
         "                    chosen, and whether it was automatic, is printed at startup.\n"
-        "  --ega-theme NAME  which EGA tile theme to load: default, 10, alt, c64\n"
-        "                    (default: default). PROVISIONAL, as --ega.\n"
+        "  --ega-theme NAME  which EGA tile theme to load: 10, default, alt, c64\n"
+        "                    (default: 10). PROVISIONAL, as --ega.\n"
         "  --ega-theme-dir DIR  where to find EGATILES / EGATHEME.* and the PIC*-E\n"
         "                    files. Default order: this flag, then --data-dir, then\n"
         "                    (developer builds only) references/u2upgrade. A release\n"
@@ -496,12 +497,12 @@ int main(int argc, char **argv)
         } else if (strcmp(a, "--cleanroom") == 0) {
             ctx.cleanroom = 1;
             art_mode_forced = 1;   /* substitute art is a named choice, not a default */
-        } else if (strcmp(a, "--cga") == 0) {
-            /* The opt-out. EGA is now picked automatically when a themes tree is
-             * installed, so without this flag the original 4-colour art would stop
-             * being reachable by anyone whose install has themes — which is the
-             * common case, and was the default until now. Named for the art, not
-             * for the mode it turns off, so it reads the way --ega reads. */
+        } else if (strcmp(a, "--classic") == 0 || strcmp(a, "--cga") == 0) {
+            /* The opt-out: force the original 4-colour CGA art even when a themes
+             * tree is installed. --classic is the name; --cga is kept as an alias
+             * because it names the art and reads the way --ega reads. The default
+             * now picks the best EGA theme on its own, so this is the only way to
+             * get the original art on an install that has themes. */
             art_mode_forced = 1;
             ctx.art_mode = U2_ART_CGA;
         } else if (strcmp(a, "--ega") == 0) {
