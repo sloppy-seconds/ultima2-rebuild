@@ -362,7 +362,24 @@ graphic to key on `0xC0`); convergence = **pinhole `s(d)=1/(d+1)`** as the desig
 
 Build order, gate-first, each step committed green:
 
-1. **Geometry + flat-shaded corridor** (this step). New `engine/src/game/dungeon3d.c`: the
+**Status (2026-11-13): steps 1 and 3 are shipped and gated; step 2 is unblocked by the
+palette finding below; step 4 still needs a known-tower capture.**
+
+**Palette-context finding (resolves the step-2 question).** Under a v2 theme the SDL
+uploader (`renderer_sdl.c` `sdl_upload`) maps every frame index through
+`ctx->theme_palette` when `ctx->theme_palette_set` is true, and for the fmtowns theme that
+palette *is* `k_pal` (PALETTE.RGB). So a DUNG1 tile's indices drop into the dungeon frame
+**verbatim** — no `k_pal`→engine remap — provided the corridor textures only while the
+fmtowns theme is active. The corollary the renderer must honour: its flat ceiling/floor/
+end-cap indices are CGA-semantic today (1/2/3); under the fmtowns theme those same indices
+read as blue/red/black, so the flat fills need to switch to `k_pal`-semantic indices when
+`theme_palette_set`, exactly as the status-text ink already does (`frame.h` note on index 3
+being black in the FM Towns palette). Step 2 is therefore: at startup, when enhanced +
+fmtowns, pick the flat-brick DUNG1 tile, hand it to `u2_dungeon3d_set_wall_tex` (indices
+verbatim), and make the flat fills palette-context-aware. The open pick is *which* DUNG1
+tile is the wall (tiles ~1-9 are flat brick) and which bank is the tower — § 5.
+
+1. **Geometry + flat-shaded corridor** (SHIPPED, `dd1f985`). New `engine/src/game/dungeon3d.c`: the
    viewport-relative frames (VP = map-window centre, 7 depths, `s(d)=1/(d+1)`), fill
    ceiling / floor / wall quads from `dg_scan`, stamp the depth sprite. Flat palette colours
    first (no texture yet) so the geometry and the dispatch are proven before art is wired.
@@ -374,9 +391,12 @@ Build order, gate-first, each step committed green:
 2. **Bank loader.** Extend `fmtowns.c` to read `DUNG1/2`, `CHEST`, `DUNMON1/2/3` into the
    theme pool (the GRAPH decode already exists); grow `fmtowns-crosswalk.tsv` a dungeon
    section. Gate: the banks decode and the tile count matches.
-3. **Texture the quads.** Replace flat fills with the wall/floor/ceiling tiles from the
+3. **Texture the quads.** (SHIPPED, `d78ad75`, Option A) Replace flat fills with the wall/floor/ceiling tiles from the
    loaded banks (vertical-strip column mapping, Wolfenstein-style). Gate: a wall quad shows
-   bank texture, not a flat fill.
+   bank texture, not a flat fill. *Shipped as a texture-mapping rasteriser that samples any
+   32x32 indexed tile via `u2_dungeon3d_set_wall_tex`; the disc loader (step 2) supplies the
+   real DUNG1 brick. Gate proves a checkerboard texture varies the wall column and flat does
+   not.*
 4. **Face set + tower art.** Key wall-art selection on site kind (§ 4, § 5) so `DUNG2` (the
    second set) drops in for towers once a known-tower capture confirms which bank is which.
 
