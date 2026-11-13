@@ -42,56 +42,63 @@ Two things fall out of this that shape the whole plan:
 
 ---
 
-## 1. Geometry spike result
+## 1. Geometry: viewport-driven, not wireframe-driven
 
-The spike asked: can our existing dungeon geometry reproduce the FM Towns perspective,
-or does a 3D renderer need a new projection? **Answer: the projection is already fully
-determined by the wireframe we ship.** The FM Towns renderer fills the same nested depth
-rectangles our wireframe outlines.
+**Correction to an earlier spike.** A first pass derived the projection from the CGA
+wireframe we ship and concluded the geometry was "already determined." That was wrong, and
+the owner caught it. The wireframe's near frame (256x128 inset at origin 16) and its
+off-centre vanishing point (143.5, 79.5) are **CGA artifacts**: the corridor was squeezed
+into the top of the 320x200 screen because the status/message band owns the bottom, so the
+vanishing point drifted up and left and the rings were crammed into a 128px-tall band.
+Enhanced mode has a clean 448x448 map window with nothing inside it, so the corridor should
+fill that window with the vanishing point at its centre. The projection is a design choice
+parameterised by the viewport, not a quantity to inherit from the wireframe.
 
-### 1a. Our wireframe depth frames (measured, not eyeballed)
+### 1a. What the original actually fixes
 
-Captured with the `U2_DG_LINES` diagnostic seam (`engine/src/game/dungeon.c`) on an
-all-open corridor facing east, in 320x200 CGA logical space (origin `DG_ORIGIN` 16):
+Only one geometry constant is inherited from the original: the game draws **7 depth frames**
+(`U2_DG_DRAW_DEPTH = 7`, `engine/src/game/dungeon.h`). How far you can see down a corridor
+is seven cells. Everything else — vanishing point, near-frame size, convergence rate — is
+ours to choose for the viewport.
 
-| depth d | x range | y range | width | height |
-| --- | --- | --- | --- | --- |
-| 0 (near) | 16..271 | 16..143 | 256 | 128 |
-| 1 | 80..207 | 48..111 | 128 | 64 |
-| 2 | 112..175 | 64..95 | 64 | 32 |
-| 3 | 128..159 | 72..87 | 32 | 16 |
-| 4 | 136..151 | 76..83 | 16 | 8 |
-| 5 | 140..147 | 78..81 | 8 | 4 |
-| 6 | 142..145 | 79..80 | 4 | 2 |
+### 1b. The viewport-relative model
 
-Each depth **halves** the frame toward a fixed point. The exact model:
+In the enhanced map window (448x448 physical px at `U2_ENH_MAP_X/Y` = 0,0):
 
 ```
-VP          = centre of the near frame = (143.5, 79.5)
-frame(d)    = VP + (near_frame - VP) * 2^(-d)
+VP        = map-window centre = (224, 224)
+near      = the window inset by a margin m   # m keeps the nearest wall edges off the border
+frame(d)  = VP + (near - VP) * s(d)          # d = 0..6
 ```
 
-Verified: near left x=16, VP.x=143.5 → d1 left = 143.5 + (16-143.5)*0.5 = 79.75 ≈ 80;
-near right x=271 → d1 right = 207.25 ≈ 207. The convergence point the lines approach
-(≈143,80) is the near-frame centre.
+`s(d)` is the depth scale, `s(0)=1` (the near frame fills the window) shrinking to a small
+far frame at `d=6`. Two candidate forms:
 
-Note the near-frame centre (143.5, 79.5) is **not** the screen centre (160, 100): the
-corridor sits high and left because the CGA status/message band owns the bottom of the
-screen. An enhanced renderer must place the vanishing point at the **map-window centre**
-and scale the near frame to the window, not reuse the CGA offset.
+- **Geometric**: `s(d) = r^d`. Simple; `r` is one knob. The CGA wireframe used `r=0.5`, but
+  that value was chosen to fit 7 rings into 128px and is *not* the right value for a 448px
+  window — with a taller window you can afford a gentler `r` (more depth visible at a
+  readable size).
+- **Pinhole**: `s(d) = 1/(d+1)`. A true perspective (linear in 1/z), which recedes more
+  realistically than a fixed ratio and is probably closer to what the FM Towns corridor
+  looks like.
 
-### 1b. The FM Towns view uses the same model
+The convergence rate (`r`, or the pinhole choice) is a **design parameter to fit to the FM
+Towns reference**, not inherited from the wireframe. The screenshots on disk are dithered,
+upscaled JPEGs and are too lossy to measure it reliably — a ceiling/wall-edge line fit on
+`FMtownsu214.jpg` gave an inconsistent vanishing point (the black ceiling and the dark floor
+gaps both read as "black"), so no number is quoted here. Settling `r` needs a cleaner
+reference: a lossless FM Towns capture, or reading the depth spacing straight off the
+decoded dungeon bank (§ 3.2). This is a capture/extract task, not a guess.
 
-Measured on `FMtownsu214.jpg` (640x480): the map-window interior is roughly x[8..448]
-y[30..420], and the ceiling/wall convergence (black-region centroid) lands at ≈(237,222),
-which is within a few percent of the window centre (≈228,225). Same centre-converging
-nested-rectangle projection, at the FM Towns window size, with the trapezoids between
-consecutive depth frames filled with wall texture instead of outlined.
+What the wireframe measurement *does* legitimately confirm (kept as a hint, not a spec):
+the original renders the corridor as **nested rectangles converging to a single point**
+(a geometric perspective), and it does so over 7 rings. That shape is worth keeping; the
+CGA numbers are not.
 
 ### 1c. What this means for the renderer
 
-The corridor geometry does not need inventing. A 3D renderer is the wireframe's depth
-frames with the regions between them **filled**:
+Given the viewport-relative frames, the 3D view is those frames with the regions between
+them **filled**:
 
 - **Wall faces**: the trapezoid between `frame(d)` and `frame(d+1)` on each side, textured
   with a wall pattern. Which side is a wall and which is open comes from the cell scan
@@ -99,8 +106,9 @@ frames with the regions between them **filled**:
 - **Far wall**: the innermost frame filled (the end of the visible corridor).
 - **Floor / ceiling**: the bands below / above the corridor, textured (the FM Towns floor
   is a perspective grid; ceiling is dark).
-- **Sprites**: monster / chest / ladder stamped at the depth frame the object sits in,
-  scaled to that frame. Our `dg_sprite_page` is already depth-aware.
+- **Sprites**: a monster / chest / ladder at depth `d` is stamped at the size of `frame(d)`,
+  centred on that frame's floor line. Our `dg_sprite_page` is already depth-aware; only the
+  placement math changes to the window-relative frames.
 
 The genuinely new code is a **textured-trapezoid rasteriser** (fill a quad between two
 depth frames with a wall pattern, columns scaled by depth — Wolfenstein-style vertical
@@ -132,7 +140,9 @@ feature.
 1. **Evidence (cheap, owner-assisted).** A handful more screenshots to pin the geometry
    and inventory the art: a corner/turn, a T-junction, a ladder, a chest, and the same
    corridor at 2-3 depths so the wall-sprite set and the floor/ceiling treatment are
-   measured, not guessed. The straight-corridor projection is already pinned (§ 1).
+   measured, not guessed. Prefer **lossless** captures if you can get them — the dithered
+   JPEGs on disk are too lossy to measure the convergence rate (§ 1b), and a clean frame
+   would let the depth spacing be read directly.
 2. **Dungeon-art extraction (medium).** Locate and decode the FM Towns dungeon/tower
    GRAPH banks (wall textures, floor, ceiling, monster sprites). The 4bpp decode exists;
    the unknowns are which banks hold dungeon art and the sprite geometry/sizes. The
@@ -140,14 +150,16 @@ feature.
    would grow a dungeon section.
 3. **The renderer (the big piece).** A new enhanced dungeon renderer: per depth, fill the
    wall trapezoids with a textured column rasteriser, fill floor and ceiling, stamp the
-   object sprite at its depth. Reuses `dg_scan` and the depth-frame formula from § 1.
+   object sprite at its depth. Reuses `dg_scan` and the viewport-relative frame model
+   from § 1b (VP at window centre, 7 depths, convergence rate fit to the reference).
 4. **Licensing (a decision, § 6).** FM Towns art is copyrighted and `references/` is
    gitignored, so it cannot ship. Two honest routes, below.
 5. **Gate.** Render into an enhanced frame and assert wall quads and a stamped sprite are
    present and no wireframe lines remain; red-controlled by disabling the 3D path.
 
-Rough size: the rasteriser plus art decode is medium-to-large. The topology, layout, and
-projection are free.
+Rough size: the rasteriser plus art decode is medium-to-large. The topology and layout are
+free; the projection is a small parameterised model but its convergence rate still needs a
+clean reference to fit.
 
 ---
 
@@ -217,10 +229,12 @@ gated on owning a 1990 Japanese disc. This is the owner's call.
 1. Owner rules on § 6 (art route) and confirms scope: enhanced-only, opt-in, feature not
    fidelity.
 2. Owner grabs the § 3.1 screenshots (corner, T-junction, ladder, chest, 2-3 depths, and
-   a known tower if available).
-3. A second spike: extract the dungeon GRAPH banks and confirm the wall-sprite set and
-   the tower-vs-dungeon question (§ 5) against the real art.
-4. Only then write the renderer against § 1's projection and § 4's face set, with the
+   a known tower if available), lossless where possible so the convergence rate can be
+   measured rather than guessed (§ 1b).
+3. A second spike: extract the dungeon GRAPH banks, confirm the wall-sprite set and the
+   tower-vs-dungeon question (§ 5) against the real art, and fit the depth convergence rate
+   (`r` or pinhole) to the reference.
+4. Only then write the renderer against § 1's viewport-relative model and § 4's face set, with the
    § 3.5 gate.
 
 This stays its own plan with its own owner ruling, exactly as `enhanced-layout-plan.md`
