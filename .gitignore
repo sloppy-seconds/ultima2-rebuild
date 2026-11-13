@@ -9,6 +9,11 @@
 original/
 references/
 
+# Runtime-generated fixtures for engine/tests/fmtowns_check.c (synthetic ISOs
+# and theme dirs it writes itself). Regenerable, and the real-theme fixture
+# carries FM Towns-derived art, so it must never be committed.
+engine/fmtowns-gate/
+
 # references/ultima3/ is a third-party clone (MIT code, Lairware art/sound),
 # added by the owner on 2026-10-24 as a reference implementation only. It is
 # covered by the `references/` rule above, but it is NOT part of the pristine

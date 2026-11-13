@@ -1,5 +1,12 @@
 # FM Towns Dungeon Rendering — Problem Brief (input to a decompile effort)
 
+> **RETIRED 2026-11-14 (owner ruling).** The enhanced dungeon takes the
+> procedural route: our own raycaster and our own generated art, shipped in
+> `engine/src/game/dungeon3d.c` and `engine/src/game/dungeon_assets.c` — see
+> `docs/enhanced-dungeon-3d.md`. This brief and the bank decodes it fed are
+> preserved on branch `archive/fmtowns-dungeon-route`. Nothing here is current
+> intent on main.
+
 **Status:** assembled 2026-11-13. This is a *problem statement + evidence pack*, not a
 solution. Its purpose is to hand a focused reverse-engineering effort everything it needs
 to produce the **dungeon rendering codex** — the exact spec of how the FM Towns Ultima II
