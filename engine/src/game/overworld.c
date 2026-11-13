@@ -1799,6 +1799,45 @@ int u2_overworld_init_state(u2_ctx *ctx, u2_overworld *ow)
     return 0;
 }
 
+/* Compose the text layer over the map: the enhanced side panel when the layout is
+ * enhanced, the original bottom text rows otherwise. Shared by the overworld and
+ * the dungeon so both show the same panel. The dungeon once drew the bottom rows
+ * in enhanced mode, which put the command echo at the bottom-left over the
+ * corridor floor instead of in the panel's command box on the right. */
+static void compose_text_layer(u2_ctx *ctx, u2_overworld *ow)
+{
+    if (!ctx->enhanced_layout) {
+        u2_font_draw_vram_rows(&ow->frame, &ctx->vram, U2_MSG_TOP, U2_ROWS - 1);
+        return;
+    }
+    /* The vram grid holds the status block in columns 30..39 of rows 20..23
+     * (asm/50F9 sets the right margin to 0x28 before drawing H.P.=), and the
+     * command echo and message history in the columns to their left. The panel
+     * draws the vitals and the stats from state directly, so copying the whole
+     * row would show the player their gold twice in two formats at once. Cut at
+     * the status column and box 3 carries only what was said. */
+    enum { U2_ENH_MSG_COLS = 30 };
+    static char rowbuf[U2_ROWS - U2_MSG_TOP][U2_COLS + 1];
+    const char *lines[U2_ROWS - U2_MSG_TOP];
+    int n = 0;
+    for (int r = U2_MSG_TOP; r < U2_ROWS; r++, n++) {
+        if (u2_vram_row_text(&ctx->vram, r, rowbuf[n], U2_COLS + 1) <= 0)
+            rowbuf[n][0] = '\0';
+        if ((int)strlen(rowbuf[n]) > U2_ENH_MSG_COLS)
+            rowbuf[n][U2_ENH_MSG_COLS] = '\0';
+        lines[n] = rowbuf[n];
+    }
+    u2_panel_colours pc;
+    uint8_t pal[16][3];
+    if (ctx->theme_palette_set)
+        memcpy(pal, ctx->theme_palette, sizeof pal);
+    else
+        u2_frame_palette_ega(pal);
+    u2_panel_pick_colours(&pc, pal, ctx->text_fg ? ctx->text_fg : U2_CGA_WHITE);
+    u2_panel_draw(&ow->frame, ctx, ow->use_ega ? &ow->tiles_ega : NULL, &pc,
+                  ow->use_ega ? U2_OVERWORLD_PLAYER_ART : -1, lines, n);
+}
+
 void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
 {
     /* Keep the original's own position mirror current. DS:00/01 is the player position in the
@@ -1817,7 +1856,7 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
     if (u2_site_is_dungeon(ctx)) {
         u2_frame_clear(&ow->frame, U2_CGA_BLACK);
         u2_dungeon_render(ctx, ow, ctx->state.moved_flag != 0);
-        u2_font_draw_vram_rows(&ow->frame, &ctx->vram, U2_MSG_TOP, U2_ROWS - 1);
+        compose_text_layer(ctx, ow);
         if (ow->turns != ow->logged_turn) {
             ow->logged_turn = ow->turns;
             u2_turnlog(ctx, &ow->frame, ow->turns);
@@ -1897,32 +1936,7 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
      * histories is two definitions of what the player was told, and the rule that
      * every effect must produce a message is only checkable against one of them. */
     if (ctx->enhanced_layout) {
-        /* The vram grid holds the status block in columns 30..39 of rows 20..23
-         * (asm/50F9 sets the right margin to 0x28 before drawing H.P.=), and the
-         * command echo and message history in the columns to their left. The panel
-         * draws the vitals and the stats from state directly, so copying the whole
-         * row would show the player their gold twice in two formats at once. Cut at
-         * the status column and box 3 carries only what was said. */
-        enum { U2_ENH_MSG_COLS = 30 };
-        static char rowbuf[U2_ROWS - U2_MSG_TOP][U2_COLS + 1];
-        const char *lines[U2_ROWS - U2_MSG_TOP];
-        int n = 0;
-        for (int r = U2_MSG_TOP; r < U2_ROWS; r++, n++) {
-            if (u2_vram_row_text(&ctx->vram, r, rowbuf[n], U2_COLS + 1) <= 0)
-                rowbuf[n][0] = '\0';
-            if ((int)strlen(rowbuf[n]) > U2_ENH_MSG_COLS)
-                rowbuf[n][U2_ENH_MSG_COLS] = '\0';
-            lines[n] = rowbuf[n];
-        }
-        u2_panel_colours pc;
-        uint8_t pal[16][3];
-        if (ctx->theme_palette_set)
-            memcpy(pal, ctx->theme_palette, sizeof pal);
-        else
-            u2_frame_palette_ega(pal);
-        u2_panel_pick_colours(&pc, pal, ctx->text_fg ? ctx->text_fg : U2_CGA_WHITE);
-        u2_panel_draw(&ow->frame, ctx, ow->use_ega ? &ow->tiles_ega : NULL, &pc,
-                      ow->use_ega ? U2_OVERWORLD_PLAYER_ART : -1, lines, n);
+        compose_text_layer(ctx, ow);
     } else {
         u2_font_draw_vram_rows(&ow->frame, &ctx->vram, U2_MSG_TOP, U2_ROWS - 1);
     }
