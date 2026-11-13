@@ -35,8 +35,11 @@ perspective segments:
   per view. The **horizontal mirror** of each is the right-wall tile at that depth.
 - **DUNG2** = doors, at different sizes and sides (pre-projected per depth).
 - **CHEST** = chests and ladders, at different sizes (per depth).
-- **DUNMON1 / DUNMON2 / DUNMON3** = monster sprites (416 / 104 / 26 tiles), presumably
-  indexed by creature type and drawn at a depth-dependent scale.
+- **DUNMON1 / DUNMON2 / DUNMON3** = the **same 26 monster sprites at three level-of-detail
+  tiers**: 128x128 (near), 64x64 (mid), 32x32 (far). Verified 2026-11-13: bank 0 of each is
+  the same knight sprite at 128/64/32. The renderer picks a tier by the monster's on-screen
+  size (depth), so DUNMON3 is the *distant* tier, not poor art. Each bank is 26 sprites,
+  4bpp, TIFF-wrapped (see § 4).
 
 This is corroborated by the lossless FM Towns screenshots (§ 4): first-person corridor,
 textured receding walls, sprite monsters scaled by distance.
@@ -76,8 +79,8 @@ guessing. It must give, for each of the ~3-7 depth steps:
 3. **Door:** which DUNG2 tile per (side, depth, open/closed) — note the FM Towns port has
    closed doors, which the DOS original does not (`docs/enhanced-dungeon-3d.md` § 0c).
 4. **Chest / ladder:** which CHEST tile per (kind, depth).
-5. **Monster:** how a creature type maps to a DUNMON* tile, and the depth→(scale, y-offset)
-   rule for placing it.
+5. **Monster:** how a creature type maps to a sprite index (0..25), and the **depth -> LOD
+   tier** rule (which of DUNMON1/2/3 at which depth), plus the y-offset for placing it.
 6. **Ceiling / floor:** flat colour or tiles? (The screenshots show a dark ceiling and a
    blue floor; whether those are tiles or fills is unresolved.)
 7. **Tower vs dungeon:** the owner's hypothesis is two art sets. DUNG1 (blue brick) vs
@@ -104,10 +107,19 @@ Not the renderer: `DUNGEON.EUP` (9,466 B) is **Euphony music** (magic `EUPHONY`)
 The seven `*.DG3` files (2048 B: DARDIN, FIRE, M, MINE, P, PERINIAN, TIME) are **dungeon
 level data** (the grid the renderer reads), not the renderer. See § 2b.
 
-**GRAPH banks (decode recipe):** 512-byte header, then 32x32 tiles at 4bpp packed, high
-nibble = left pixel, indices already in 0..7. Palette `k_pal` (index 0 = black =
-transparent pen). Counts: DUNG1 64, DUNG2 64, CHEST 64, DUNMON1 416, DUNMON2 104,
-DUNMON3 26.
+**GRAPH banks (decode recipe) — two formats, measured 2026-11-13:**
+
+- **Raw tile banks** (`DUNG1`, `DUNG2`, `CHEST`): header starts `00 00 …`, then 32x32 tiles
+  at 4bpp packed, **high nibble = left pixel**, indices 0..7, palette `k_pal` (index 0 =
+  black = transparent pen). 64 tiles each.
+- **Monster banks** (`DUNMON1/2/3`): header starts `49 49 2a 00` = the **little-endian TIFF
+  magic**. The IFD describes one sprite (BitsPerSample=4, FillOrder=2 = **low nibble = left**,
+  one strip at byte 512), but the file holds **26 sprites** concatenated after it, at
+  128x128 / 64x64 / 32x32 respectively. **`tools/fmtowns_xwalk.py:decode_bank` is wrong for
+  these** — it assumes 32x32 high-nibble tiles, so it mis-slices DUNMON1/2 and reverses the
+  nibble order for all three. Any faithful monster render must special-case the TIFF magic
+  and the per-bank sprite size. (The earlier "DUNMON3 = viper/chest/blobs" tile reading was
+  this bug producing garbage, not real sprites.)
 
 **Bank browser:** `/var/tmp/dng_browser.py` serves labelled, indexed grids of the dungeon
 banks (`--serve --port N`), k_pal palette. Used to produce the owner's tile reading.
@@ -159,3 +171,5 @@ will grow that into a dungeon tile set (walls/doors/chests/ladders/monsters).
   or a denser encoding? Affects whether the depth model transfers.
 - Which `.DG3` is the **tower** (likely `M` or `P`)? Cross-check against the DUNG1-vs-DUNG2
   bank question in § 3.7.
+- The **depth -> LOD tier** rule: at what on-screen size does the renderer switch between
+  DUNMON1 (128), DUNMON2 (64) and DUNMON3 (32)?
