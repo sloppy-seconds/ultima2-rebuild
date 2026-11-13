@@ -203,6 +203,7 @@ static u2_tiles_ega_result try_load_v2(const char *dirpath, const char *theme,
     memset(t->map_n, 0, sizeof t->map_n);
     t->has_map = 0;
     t->has_palette = 0;
+    t->has_dng_wall = 0;
 
     snprintf(path, sizeof path, "%s/%s", dirpath, V2_INI);
     if (slurp(path, &ini_buf, &ini_len) != 0) {
@@ -316,6 +317,26 @@ static u2_tiles_ega_result try_load_v2(const char *dirpath, const char *theme,
         memcpy(t->palette, pb, sizeof t->palette);
         free(pb);
         t->has_palette = 1;
+    }
+
+    /* --- optional dungeon wall texture --- */
+    if (ini_get(ini, "dng_wall", val, sizeof val) == 1 && *val) {
+        char wp[700];
+        snprintf(wp, sizeof wp, "%s/%s", dirpath, val);
+        unsigned char *wb = NULL;
+        if (slurp(wp, &wb, NULL) != 0) {
+            bad_reason(err, errn, "cannot read the dungeon wall tile %s named by %s", val, path);
+            goto done;
+        }
+        if (path_size(wp) < (long)sizeof t->dng_wall) {
+            free(wb);
+            bad_reason(err, errn, "%s is smaller than one 32x32 tile (%d indices)",
+                       wp, U2_DNG_WALL_PX);
+            goto done;
+        }
+        memcpy(t->dng_wall, wb, sizeof t->dng_wall);
+        free(wb);
+        t->has_dng_wall = 1;
     }
 
     /* --- the map --- */
@@ -541,6 +562,15 @@ static void apply_to_ctx(u2_ctx *ctx, const u2_tiles_ega *t)
     } else {
         ctx->theme_palette_set = 0;
         ctx->text_fg = 0;      /* unset: the frame keeps the CGA pair */
+    }
+    /* The dungeon wall texture travels with the theme, and a v1 theme (or a v2 one
+     * that ships no dng_wall) clears it, so cycling back to a plain theme restores
+     * the flat corridor fill rather than keeping the last theme's brick. */
+    if (t->has_dng_wall) {
+        memcpy(ctx->dng_wall, t->dng_wall, sizeof ctx->dng_wall);
+        ctx->dng_wall_set = 1;
+    } else {
+        ctx->dng_wall_set = 0;
     }
 }
 

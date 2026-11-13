@@ -153,6 +153,7 @@ def fmtowns_theme(xwalk_path=None):
         "pixel = nibble-high-left\n"
         "transparent_index = 0\n"
         "palette = PALETTE.RGB\n"
+        "dng_wall = DNGWALL.TILE\n"
         "map = MAP.TSV\n"
         "identity = no\n"
         f"scope = {FMTOWNS_SCOPE}\n"
@@ -188,7 +189,14 @@ def fmtowns_theme(xwalk_path=None):
     for art, idxs, toks in map_lines:
         mtsv += f"{art:02X}\t{','.join(str(i) for i in idxs)}\t{','.join(toks)}\n"
 
+    # The dungeon wall texture: one flat-brick tile from DUNG1, written as raw
+    # palette indices (not packed), decoded exactly as the C builder does. The
+    # corridor samples it across the wall quads; the theme carries it so a player
+    # with the disc gets the wall art from the same derivation as everything else.
+    dngwall = bytes(tile_pixels("DUNG1/1"))
+
     return ({"THEME.INI": ini.encode(), "TILES": tiles, "PALETTE.RGB": bytes(pal),
+             "DNGWALL.TILE": dngwall,
              "MAP.TSV": mtsv.encode()},
             ({"pool": len(order), "art": len(map_lines), "multi": multi}, problems))
 

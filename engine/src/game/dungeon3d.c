@@ -46,19 +46,6 @@
 #define DG3_ENDCAP U2_CGA_WHITE     /* 3 */
 #define DG3_SPRITE U2_CGA_BLACK     /* 0 — a silhouette punched into the corridor */
 
-/* Wall texture: a 32x32 array of palette indices, sampled across the wall quads. When
- * NULL the walls are the flat placeholder colour (the geometry-only path the CP7 gate
- * pins). The FM Towns DUNG1 flat-brick tile is supplied here by the disc loader once it
- * is wired (docs/enhanced-dungeon-3d.md § 7a step 2); until then a caller may set any
- * 32x32 indexed tile. The renderer is palette-agnostic: it puts whatever index the tile
- * holds, so the disc loader owns the k_pal -> engine palette remap. */
-static const uint8_t *g_wall_tex;
-
-void u2_dungeon3d_set_wall_tex(const uint8_t *tex32)
-{
-    g_wall_tex = tex32;
-}
-
 typedef struct { int x0, y0, x1, y1; } dg3_rect;
 
 /* Depth frame d, d = 0 (nearest, fills the window) .. U2_DG_DRAW_DEPTH (far).
@@ -148,8 +135,10 @@ static void dg3_fill_right(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c, const
 
 void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s)
 {
-    (void)ctx;
     u2_frame *f = &ow->frame;
+    /* The wall texture comes from the active theme (baked into it, copied to ctx by
+     * the loader). No theme wall -> NULL -> the flat placeholder fill. */
+    const uint8_t *wall_tex = ctx->dng_wall_set ? ctx->dng_wall : NULL;
 
     /* Background: the distance is ceiling-coloured dark, so an open corridor that
      * runs past the draw depth fades to the ceiling tone rather than a hard edge. */
@@ -171,8 +160,8 @@ void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s)
         }
         dg3_fill_ceiling(f, a, b, DG3_CEIL);
         dg3_fill_floor(f, a, b, DG3_FLOOR);
-        if (s->left[d] & U2_DG_ROCK)  dg3_fill_left(f, a, b, DG3_WALL, g_wall_tex);
-        if (s->right[d] & U2_DG_ROCK) dg3_fill_right(f, a, b, DG3_WALL, g_wall_tex);
+        if (s->left[d] & U2_DG_ROCK)  dg3_fill_left(f, a, b, DG3_WALL, wall_tex);
+        if (s->right[d] & U2_DG_ROCK) dg3_fill_right(f, a, b, DG3_WALL, wall_tex);
     }
 
     /* Placeholder creature: a black silhouette at the nearest depth whose centre cell

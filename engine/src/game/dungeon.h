@@ -139,12 +139,6 @@ void u2_dg_scan_build(const u2_ctx *ctx, const u2_overworld *ow, u2_dg_scan *s);
  * map window. Sprites and texture are later steps. */
 void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s);
 
-/* Supply a 32x32 wall texture (an array of 1024 palette indices) for the corridor's
- * wall quads. NULL restores the flat placeholder fill. The renderer is palette-agnostic
- * and puts the tile's indices verbatim, so the caller owns any palette remap. The FM
- * Towns DUNG1 flat-brick tile is meant to arrive here from the disc loader. */
-void u2_dungeon3d_set_wall_tex(const uint8_t *tex32);
-
 /* True when the resident sector is dungeon-shaped: site kind 4 (tower) or 5. */
 int u2_site_is_dungeon(const u2_ctx *ctx);
 

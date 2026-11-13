@@ -153,25 +153,23 @@ static void test_texture(void)
         s.ctr[d] = (d >= 3) ? U2_DG_ROCK : 0x00;
     }
 
-    /* Flat (no texture): the near left-wall column is one solid colour. */
-    u2_dungeon3d_set_wall_tex(NULL);
+    /* Flat (no theme wall): the near left-wall column is one solid colour. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
     u2_dungeon_render3d(&ctx, &ow, &s);
     const int flat = distinct_in_rect(&ow.frame, 18, 60, 24, 380);
     u2_frame_free(&ow.frame);
 
-    /* Textured: the same column now alternates, so it carries more than one index. */
-    u2_dungeon3d_set_wall_tex(tex);
+    /* Textured (theme wall copied into ctx): the same column now alternates, so it
+     * carries more than one index. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
+    ctx.dng_wall_set = 1;
+    memcpy(ctx.dng_wall, tex, sizeof tex);
     u2_dungeon_render3d(&ctx, &ow, &s);
     const int texd = distinct_in_rect(&ow.frame, 18, 60, 24, 380);
     u2_frame_free(&ow.frame);
 
     CHECK(flat == 1, "texture: flat wall column should be one colour (distinct=%d)", flat);
     CHECK(texd >= 2, "texture: textured wall column should vary (distinct=%d)", texd);
-
-    /* Leave the module state clean for any later caller. */
-    u2_dungeon3d_set_wall_tex(NULL);
 }
 
 /* ---- 4. selftest: the fill predicate can go red --------------------------- */
@@ -220,7 +218,8 @@ int main(int argc, char **argv)
         for (int v = 0; v < 32; v++)
             for (int u = 0; u < 32; u++)
                 tex[v * 32 + u] = ((u / 4 + v / 4) & 1) ? U2_CGA_WHITE : U2_CGA_CYAN;
-        u2_dungeon3d_set_wall_tex(tex);
+        ctx.dng_wall_set = 1;
+        memcpy(ctx.dng_wall, tex, sizeof tex);
         u2_dungeon_render3d(&ctx, &ow, &s);
         uint8_t pal[16][3]; u2_frame_palette_ega(pal);
         u2_frame_write_bmp16(&ow.frame, argv[2], pal);

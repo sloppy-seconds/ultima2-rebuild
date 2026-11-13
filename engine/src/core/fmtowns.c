@@ -39,6 +39,12 @@
 #define TILE_BYTES  512           /* 32x32 at 4bpp */
 #define TILE_PX    1024
 #define MAX_POOL    512
+/* Which DUNG1 tile is baked as the corridor wall texture. Tiles ~1-9 are the flat
+ * blue brick (docs/enhanced-dungeon-3d.md § 0d); tile 1 is a clean brick face. This
+ * is a design pick, not a value read from the FM Towns binary's tile-index table, and
+ * it is a single constant to change once that table is decoded. */
+#define DNG_WALL_BANK "DUNG1"
+#define DNG_WALL_TILE 1
 #define MAX_BANKS    16
 #define MAX_FILES   512
 #define MAX_TOKENS   16
@@ -414,6 +420,36 @@ int u2_fmtowns_build(const char *media, const char *out_dir, FILE *report,
         pack_tile(px, tiles + (size_t)p * TILE_BYTES);
     }
 
+    /* --- the dungeon wall texture, baked from DUNG1 ---
+     * Independent of the crosswalk (which is overworld/towns only): the corridor
+     * needs one flat-brick tile, so read DUNG1 directly and decode tile
+     * DNG_WALL_TILE into the theme's own palette indices. A missing bank is a
+     * refusal, not a silent skip — a theme that quietly lacks the wall art shows
+     * up as a corridor bug rather than a build bug. */
+    unsigned char dngwall[TILE_PX];
+    {
+        char key[32];
+        snprintf(key, sizeof key, "%.15s.TIF", DNG_WALL_BANK);
+        const dentry *f = find_file(files, nf, key);
+        if (!f) {
+            snprintf(err, errsz, "no GRAPH/%s on the FM Towns disc in %s", key, img);
+            goto fail;
+        }
+        unsigned char *blob = read_blob(img, f);
+        if (!blob) {
+            snprintf(err, errsz, "cannot read GRAPH/%s", key);
+            goto fail;
+        }
+        const long ntiles = (f->size - BANK_HDR) / TILE_BYTES;
+        if (DNG_WALL_TILE < 0 || DNG_WALL_TILE >= ntiles) {
+            free(blob);
+            snprintf(err, errsz, "%s has %ld tiles, no tile %d", key, ntiles, DNG_WALL_TILE);
+            goto fail;
+        }
+        tile_indices(blob, ntiles, DNG_WALL_TILE, dngwall);
+        free(blob);
+    }
+
     /* PALETTE.RGB: 16 x 3. Only 0..7 are measured; 8..15 are zero-filled because
      * the art never indexes above 7, and that is stated rather than left to be
      * discovered later as a colour bug. */
@@ -425,7 +461,7 @@ int u2_fmtowns_build(const char *media, const char *out_dir, FILE *report,
         pal[i * 3 + 2] = (unsigned char)k_pal[i][2];
     }
 
-    char ini[1024];
+    char ini[1200];
     snprintf(ini, sizeof ini,
              "[theme]\n"
              "name = " U2_FMTOWNS_THEME "\n"
@@ -435,6 +471,7 @@ int u2_fmtowns_build(const char *media, const char *out_dir, FILE *report,
              "pixel = nibble-high-left\n"
              "transparent_index = 0\n"
              "palette = PALETTE.RGB\n"
+             "dng_wall = DNGWALL.TILE\n"
              "map = MAP.TSV\n"
              "identity = no\n"
              "scope = " U2_FMTOWNS_SCOPE "\n"
@@ -492,6 +529,7 @@ int u2_fmtowns_build(const char *media, const char *out_dir, FILE *report,
         { "THEME.INI",   ini,  strlen(ini) },
         { "TILES",       tiles, (size_t)pool_n * TILE_BYTES },
         { "PALETTE.RGB", pal,  sizeof pal },
+        { "DNGWALL.TILE", dngwall, sizeof dngwall },
         { "MAP.TSV",     mtsv, used },
     };
     for (size_t i = 0; i < sizeof parts / sizeof parts[0]; i++) {

@@ -88,6 +88,11 @@ typedef struct u2_tiles_ega {
     int      scale;
     int      has_palette;
     uint8_t  palette[16][3];        /* only meaningful when has_palette */
+    /* An optional dungeon wall texture the theme bakes (THEME.INI `dng_wall`).
+     * One 32x32 tile of the theme's own palette indices, sampled across the 3D
+     * corridor's wall quads. Absent means the corridor draws its flat fill. */
+    int      has_dng_wall;
+    uint8_t  dng_wall[U2_DNG_WALL_PX];
     int      has_map;
     uint16_t map[U2_TILE_COUNT][U2_TILE_EGA_MAX_FRAMES];
     uint8_t  map_n[U2_TILE_COUNT];

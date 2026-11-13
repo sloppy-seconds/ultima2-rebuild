@@ -50,6 +50,7 @@ static int fails, checks;
  * them, because that is the spelling the builder looks up. */
 static const char *const k_banks[] = {
     "MAP2_1", "MAP2_2", "MAP2_3", "EXTRA", "ENEMY2", "PLAYER",
+    "DUNG1",   /* the corridor wall bake reads this bank directly (index 6) */
 };
 #define NBANKS ((int)(sizeof k_banks / sizeof k_banks[0]))
 
@@ -204,15 +205,17 @@ int main(int argc, char **argv)
     /* Everything that does not depend on the art must match the real derivation
      * exactly. These are the parts a port is most likely to get subtly wrong: the
      * first-appearance pool order, the per-row index lists, the multi-frame count. */
-    char p_ini[700], p_map[700], p_pal[700], p_tiles[700];
+    char p_ini[700], p_map[700], p_pal[700], p_tiles[700], p_dng[700];
     snprintf(p_ini, sizeof p_ini, "%.400s/THEME.INI", out);
     snprintf(p_map, sizeof p_map, "%.400s/MAP.TSV", out);
     snprintf(p_pal, sizeof p_pal, "%.400s/PALETTE.RGB", out);
     snprintf(p_tiles, sizeof p_tiles, "%.400s/TILES", out);
-    CHECK(u2_file_size(p_ini) == 995, "THEME.INI is the expected size");
+    snprintf(p_dng, sizeof p_dng, "%.400s/DNGWALL.TILE", out);
+    CHECK(u2_file_size(p_ini) == 1019, "THEME.INI is the expected size");
     CHECK(u2_file_size(p_map) == 1495, "MAP.TSV is the expected size");
     CHECK(u2_file_size(p_pal) == 48, "PALETTE.RGB is 16 x 3");
     CHECK(u2_file_size(p_tiles) == 80 * 512, "TILES holds 80 tiles of 512 bytes");
+    CHECK(u2_file_size(p_dng) == 1024, "DNGWALL.TILE is one 32x32 tile of indices");
 
     /* The transparent pen has to travel with the derived theme, not be hardcoded in
      * the engine: it is a property of the FM Towns art, and the DOS art does not
@@ -226,6 +229,23 @@ int main(int argc, char **argv)
         ini[n] = '\0';
         CHECK(strstr(ini, "transparent_index = 0") != NULL,
               "derived THEME.INI declares index 0 as the transparent pen");
+        CHECK(strstr(ini, "dng_wall = DNGWALL.TILE") != NULL,
+              "derived THEME.INI names the baked dungeon wall tile");
+    }
+
+    /* The baked wall tile must be DUNG1 tile 1 decoded: the synthetic DUNG1 is bank
+     * index 6, so its tile 1 is filler(6,1) = 0x30, which unpacks to even indices 3
+     * and odd indices 0. This proves the builder read the right bank and tile and
+     * wrote the theme's own palette indices verbatim (no remap). */
+    {
+        unsigned char dng[1024];
+        FILE *f = fopen(p_dng, "rb");
+        size_t n = f ? fread(dng, 1, sizeof dng, f) : 0;
+        if (f) fclose(f);
+        int ok = (n == 1024);
+        for (size_t i = 0; ok && i < n; i++)
+            if (dng[i] != (unsigned char)(i % 2 == 0 ? 3 : 0)) ok = 0;
+        CHECK(ok, "DNGWALL.TILE is DUNG1 tile 1 decoded (even=3, odd=0)");
     }
 
     {
