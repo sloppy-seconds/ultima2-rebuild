@@ -450,4 +450,31 @@ else
     sed 's/^/        /' "$WORK/trap.build"
 fi
 
+# ---- dungeon fills the doubled frame (classic EGA) -----------------------
+# The wireframe is authored in 320x200 CGA space; in classic EGA it must scale by
+# the frame scale to fill the map window, not sit in the top-left quarter. CGA stays
+# CGA-sized. See tests/dungeon_scale_check.c.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/dungeon_scale_check" \
+        tests/dungeon_scale_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/dsc.build"; then
+    if "$WORK/dungeon_scale_check" --selftest >"$WORK/dsc-st.out" 2>&1; then
+        if "$WORK/dungeon_scale_check" >"$WORK/dsc.out" 2>&1; then
+            n=$(sed -n 's/^dungeon_scale_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/dsc.out")
+            if [ "${n:-0}" -eq 0 ]; then
+                bad "CP7 dungeon scale: executed 0 checks — the test is not running"
+            else
+                ok "CP7 dungeon scale: EGA fills the doubled frame, CGA stays CGA-sized ($n checks)"
+            fi
+        else
+            bad "CP7 dungeon scale check failed:"
+            sed 's/^/        /' "$WORK/dsc.out"
+        fi
+    else
+        bad "CP7 dungeon scale gate cannot fail (selftest broke):"
+        sed 's/^/        /' "$WORK/dsc-st.out"
+    fi
+else
+    bad "CP7 dungeon scale harness did not build:"
+    sed 's/^/        /' "$WORK/dsc.build"
+fi
+
 exit $fail

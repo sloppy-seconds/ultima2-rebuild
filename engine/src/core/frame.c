@@ -244,6 +244,54 @@ void u2_frame_line(u2_frame *f, int x0, int y0, int x1, int y1, uint8_t colour)
     }
 }
 
+/* Scale-aware twins of the two primitives above, for content whose coordinates
+ * live in the 320x200 CGA layout but must fill a doubled frame. Each logical
+ * pixel becomes a `scale`x`scale` block, so a wireframe drawn in CGA space fills
+ * the map window of a 640x400 EGA frame instead of sitting in its top-left
+ * quarter. At scale 1 they are byte-for-byte the raw writers, which is what keeps
+ * the CGA path untouched. The colour is masked to the four CGA indices exactly as
+ * u2_frame_pixel does, because the dungeon draws CGA colour indices that the EGA
+ * palette resolves through its first four (CGA-compatible) entries. */
+void u2_frame_pixel_scaled(u2_frame *f, int x, int y, uint8_t colour, int scale)
+{
+    if (!f) return;
+    if (scale < 1) scale = 1;
+    const uint8_t c = (uint8_t)(colour & 3);
+    for (int j = 0; j < scale; j++)
+        for (int i = 0; i < scale; i++)
+            u2_frame_put(f, x * scale + i, y * scale + j, c);
+}
+
+void u2_frame_line_scaled(u2_frame *f, int x0, int y0, int x1, int y1,
+                          uint8_t colour, int scale)
+{
+    if (!f) return;
+    int dx = x1 - x0, dy = y1 - y0;
+    if (dx < 0) dx = -dx;
+    if (dy < 0) dy = -dy;
+    const int sx = x1 > x0 ? 1 : -1;
+    const int sy = y1 > y0 ? 1 : -1;
+
+    int err;
+    if (dx >= dy) {
+        err = -dx;
+        for (int x = x0, y = y0;; x += sx) {
+            u2_frame_pixel_scaled(f, x, y, colour, scale);
+            if (x == x1) break;
+            err += 2 * dy;
+            if (err >= 0) { y += sy; err -= 2 * dx; }
+        }
+    } else {
+        err = -dy;
+        for (int x = x0, y = y0;; y += sy) {
+            u2_frame_pixel_scaled(f, x, y, colour, scale);
+            if (y == y1) break;
+            err += 2 * dx;
+            if (err >= 0) { x += sx; err -= 2 * dy; }
+        }
+    }
+}
+
 void u2_frame_draw_view(u2_frame *f, const u2_view *v, const u2_tiles *t,
                         int overlay_art, int overlay_col, int overlay_row)
 {

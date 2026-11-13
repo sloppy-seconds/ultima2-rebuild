@@ -207,6 +207,14 @@ void u2_frame_blit_tile_ega(u2_frame *f, const u2_tiles_ega *t, int tile, int x,
 void u2_frame_pixel(u2_frame *f, int x, int y, uint8_t colour);
 void u2_frame_line(u2_frame *f, int x0, int y0, int x1, int y1, uint8_t colour);
 
+/* Scale-aware twins: each logical pixel becomes a `scale`x`scale` block, so the
+ * dungeon wireframe (authored in 320x200 CGA space) fills a doubled frame's map
+ * window instead of its top-left quarter. At scale 1 they equal the raw writers.
+ * See the comment at their definition in frame.c. */
+void u2_frame_pixel_scaled(u2_frame *f, int x, int y, uint8_t colour, int scale);
+void u2_frame_line_scaled(u2_frame *f, int x0, int y0, int x1, int y1,
+                          uint8_t colour, int scale);
+
 /*
  * Composite the map window from a filled viewport. This is the engine's
  * equivalent of asm/4ABB's flush loop: walk the 20x10 staging grid, skip the
