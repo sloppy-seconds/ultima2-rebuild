@@ -357,3 +357,19 @@ feel different in play and it is worth seeing in a prototype before committing.
 At 16 px tiles (a v1 theme in enhanced mode) none of this binds: 22 × 29 = 638 cells
 fit beside a 34-column panel, so the v1 case has room to spare and the constraint is
 specific to 32 px art.
+
+## 10. Future enhancement: a real-3D dungeon (enhanced mode only)
+
+The dungeon renderer is being made art-mode aware so that CGA keeps the byte-faithful
+wireframe and EGA draws the same wireframe scaled to fill the map window in the four
+CGA colour indices resolved through the active palette. That same per-mode dispatch seam
+could later carry a third renderer for enhanced mode that draws a real 3D view (textured
+walls, floor and ceiling, with sprite monsters and chests) instead of a wireframe. This is
+a feature and not a fidelity target, no shipped original has it, and it is deliberately not
+scoped here. Its open question is art: a cleanroom-generated set is allowed and is the
+honest default, while the FM Towns route is not ready because `disasm/fmtowns-crosswalk.tsv`
+maps overworld and town tiles only and nothing in this project has confirmed that the FM
+Towns dungeon is 3D at all, so that path needs the dungeon art extracted, mapped, and its
+shape verified before it can be assumed. Treat this as its own plan with its own owner
+ruling when someone wants to build it, downstream of the mode-aware dispatch that the EGA
+tier introduces.
