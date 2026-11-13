@@ -14,6 +14,7 @@
 
 #include "core/state.h"
 #include "core/world.h"
+#include "game/monsters.h"    /* u2_monsters_store: sync creatures before the transit save */
 #include "game/overworld.h"
 
 struct gate_cell { uint8_t x, y; };
@@ -172,6 +173,20 @@ int u2_gate_transit(u2_ctx *ctx, struct u2_overworld *ow)
     int px = 0, py = 0;
     if (!u2_gate_cell(partner, slot, &px, &py))
         return 0;
+
+    /* The original flushes the sector being left on a time-door transit: the player
+     * record plus the outgoing sector's mapx and monx. Measured 2026-11-13
+     * (captures/spice86/g64-timedoor-autosave): an isolated three-point md5 showed the
+     * gate rotation writes nothing and the transit step writes all three. A site edge
+     * writes only the player record (site_state.py); a transit writes the sector too,
+     * so this is NOT gated by keep_site_state -- the original does it in original
+     * fidelity. The write lands in the save-slot overlay (u2_world_store), never the
+     * content dir (docs/save-scoped-worlds.md). Sync the creature table first so the
+     * monx write carries the current creatures, then autosave (player + dirty sector).
+     * This must run BEFORE the era digit moves, or it checkpoints the destination.
+     * Gate: tests/gate_transit_save.py. */
+    u2_monsters_store(ctx, &ow->world);
+    (void)u2_overworld_autosave(ctx, ow);
 
     /* The era digit moves and the world byte does not — that is the whole content of
      * G45, and getting it the other way round would put the player on another planet. */

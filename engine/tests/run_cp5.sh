@@ -918,6 +918,20 @@ else
     bad "CP5 V2: sector persistence on a site transition disagrees with the measurement"
 fi
 
+# --- V2b: a time-door transit DOES flush the outgoing sector -------------------------
+#
+# The mirror of V2. A site edge writes only the player record; a time-door transit writes
+# the player record plus the outgoing sector's mapx and monx (captures/spice86/g64-timedoor-
+# autosave, isolated three-point md5: rotation writes nothing, the transit step writes all
+# three). The engine's u2_gate_transit used to persist nothing about the sector being left.
+# The control ran red first: without the autosave the slot held no monx00.
+if U2_BIN=./u2 python3 tests/gate_transit_save.py > "$WORK/v2b.log" 2>&1; then
+    ok "CP5 V2b: a time-door transit flushes the outgoing sector to the save slot"
+else
+    sed 's/^/        /' "$WORK/v2b.log" | tail -8
+    bad "CP5 V2b: sector persistence on a time-door transit disagrees with the measurement"
+fi
+
 # --- V3: the three Q guards, and enhanced mode dropping them -------------------------
 #
 # cmd_Q's chain, read off the bytes at file 0x3FC7: DS:4A (indoors) -> ONLY OUTDOORS!,

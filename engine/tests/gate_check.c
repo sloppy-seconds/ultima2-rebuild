@@ -19,9 +19,20 @@
 #include "core/ctx.h"
 #include "core/state.h"
 #include "game/gates.h"
+#include "game/monsters.h"
 #include "game/overworld.h"
 
 static int checks, fails;
+
+/* Link stubs. u2_gate_transit now syncs the creature table and autosaves the outgoing
+ * sector before the era digit moves (the G64 save-on-transit fix). This harness links
+ * gates.c + world.c + roots.c + slot.c + state.c only -- not monsters.c or overworld.c --
+ * and every transit leg here returns before that autosave (the refusals at the two
+ * early returns), so these two symbols are never called. They exist to satisfy the
+ * linker, and the sector-write behaviour they stand in for is gated end-to-end by
+ * tests/gate_transit_save.py, not here. */
+void u2_monsters_store(u2_ctx *ctx, u2_world *w) { (void)ctx; (void)w; }
+int u2_overworld_autosave(u2_ctx *ctx, u2_overworld *ow) { (void)ctx; (void)ow; return 0; }
 
 #define CHECK(cond, ...) do {                                  \
         ++checks;                                              \
