@@ -33,7 +33,16 @@ perspective segments:
   through depth steps: tiles **27, 35, 43, 51, 59** (column 3, rows 3-7), then **36, 44**
   (column 4) and **45** (column 5) as further depth pieces — about **3 steps of corridor**
   per view. The **horizontal mirror** of each is the right-wall tile at that depth.
-- **DUNG2** = doors, at different sizes and sides (pre-projected per depth).
+- **DUNG2** = doors, at different sizes and sides (pre-projected per depth). Measured
+  2026-11-13 from the decoded bank (raw 32x32, 64 tiles, all ink=1.00 - it is the solid
+  ornate wall bank, no transparent background), graded **inferred** (visual read): doors
+  are pre-projected for **placement** and **depth**. **Front-facing** archways (symmetric,
+  at corridor's end): #2 (red handle dot), #3, #10, #11, #40, #41, #46, #47. **Side-wall**
+  doors (set into a receding wall, the blue wedge being the perspective-projected side
+  surface, left/right as mirror pairs): #12-15, #22-31, #32-39, #56-63. The same door/arch
+  recurs small->large across the bank (far->near). Extras: #20/#21 framed wall panels, and
+  #18/#19/#49/#54 have a figure in the doorway. The exact `index -> (front/left/right,
+  depth)` table is for the codex to make authoritative.
 - **CHEST** = chests and ladders, at different sizes (per depth). Measured 2026-11-13
   from the decoded bank (raw 32x32, 64 tiles), graded **inferred** (visual read + ink
   coverage, not a decoded table): chests ramp by size across **#1 (tiny) -> #2-10
