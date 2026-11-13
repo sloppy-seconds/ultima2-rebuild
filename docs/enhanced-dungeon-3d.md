@@ -40,6 +40,52 @@ Two things fall out of this that shape the whole plan:
    brick castle), which supports the owner's suspicion that towers and dungeons differ
    (§ 5).
 
+### 0b. Lossless captures (2026-11-13, live FM Towns emulator)
+
+A set of **lossless 1280x960 4-bit-palette PNGs** was captured from the running FM Towns
+build (window grab, exact palette, no JPEG dithering). These are the correct reference for
+the art inventory; they are on disk only (not committed — copyrighted, and `references/`
+is gitignored). Frames seen: a ladder back to the overworld, an orc at a ladder wall, a
+straight corridor with a green door on the left and a thief at depth, a coiled viper at
+depth, a long corridor opening into a chamber, a closed door then the same door opened, a
+bat with a chest, a skeleton, and a cyclops.
+
+**The palette** (4-bit, ~10 entries): 0 black (ceiling), 2/4 blue (wall bricks / border /
+floor), 8 cyan (bright wall bricks), 6 white (text + brick highlights), 3 red, 7 yellow,
+9 green, 5 teal (HEAD box), 1 pale-yellow (title). Walls are blue/cyan brick on a black
+ceiling with a blue floor.
+
+**Monster / object sprites observed** (distinct art per creature, each a full-colour sprite
+scaled to its depth ring and standing on the floor plane): orc, thief, viper, bat, skeleton,
+cyclops. Objects: chest = red/green striped box on the floor plane; ladder = orange runged
+sprite on a dead-end wall; door = green panel (closed) / open frame. (Per-sprite pixel
+footprints were *not* measured: the wall bricks carry white/yellow highlights from the same
+palette, so colour segmentation cannot separate a sprite from wall chrome without a
+transparent-background source. Footprints come from the decoded bank, § 3.2, not from these
+frames.)
+
+### 0c. The FM Towns dungeon has closed doors; the DOS original does not
+
+Frame-proven: after stepping forward into a closed door the message log reads
+`Opened the door!` and then the creature behind it acts (`Cyclops attacked!`). So in the FM
+Towns port a dungeon door is a **closed cell that forward opens** — a two-step: face it,
+forward opens it, forward again walks through.
+
+**This is a port addition, not DOS behaviour.** The DOS dungeon grid (`docs/map-format.md`
+§ 3c) has no closed-door state: `0xC0` is an open doorway the walk gate passes in one step,
+and `0xE0` is a fake wall that also passes (it only *looks* closed). Nothing in
+`original/ultimaii.exe` opens a door inside a dungeon — the only door the DOS game opens is
+the overworld site door `0xA0` via `cmd_O`/UNLOCK (`asm/435E`), which paves it with the
+player's own ground at the cost of a key. The owner's recollection of the original (no
+closed dungeon doors) is correct and matches the bytes.
+
+Consequence for this plan: the closed-door mechanic is a **design choice** for the enhanced
+renderer, not a fidelity requirement. If enhanced mode adopts FM Towns closed doors it must
+add a door-open state the DOS grid does not have; if it stays DOS-faithful it renders `0xC0`
+as an open archway and walks through in one step. This is an owner decision alongside § 6,
+and it is the kind of port-vs-original divergence the plan exists to surface rather than
+absorb silently.
+
 ---
 
 ## 1. Geometry: viewport-driven, not wireframe-driven
@@ -89,6 +135,19 @@ upscaled JPEGs and are too lossy to measure it reliably — a ceiling/wall-edge 
 gaps both read as "black"), so no number is quoted here. Settling `r` needs a cleaner
 reference: a lossless FM Towns capture, or reading the depth spacing straight off the
 decoded dungeon bank (§ 3.2). This is a capture/extract task, not a guess.
+
+**Update (2026-11-13): the lossless captures did not settle `r` either, and no number is
+quoted.** The vanishing point is confirmed at the **map-window centre** (the corridor
+converges to the middle of the box — visually unambiguous, and consistent with the model
+above). But none of the captured frames is a clean empty corridor running to a far wall: the
+chamber shot opens into a room, and the others have a monster, a door, or a chest at the far
+end, so there is no near-frame-plus-far-frame pair to take a ratio from. A wall-edge line fit
+on the lossless frames gave ceiling-fit and floor-fit vanishing points hundreds of pixels
+apart — the signature of a bad fit (the brick texture puts cyan at varying heights, so the
+cyan min/max per column is not the wall/ceiling boundary), not a real number. **`r` stays
+open.** It should come from the decoded dungeon bank's depth spacing (§ 3.2) or a purpose-
+captured empty corridor, not from these frames. A plausible-but-wrong `r` is worse than an
+open parameter.
 
 What the wireframe measurement *does* legitimately confirm (kept as a hint, not a spec):
 the original renders the corridor as **nested rectangles converging to a single point**
@@ -176,6 +235,7 @@ depth, mirroring how the wireframe picks edges:
 | corner (side solid, centre open, next depth side open) | angled corner face |
 | chest (`0x40`) | chest sprite at that depth |
 | ladder bit (`0x20`) | ladder sprite / floor opening |
+| closed door (FM Towns only, § 0c) | green door panel; **no DOS grid byte** — only if enhanced adopts the port's open-on-forward mechanic |
 
 The exact set (straight, left corner, right corner, T-junction, end-cap, doorway) and
 whether FM Towns uses per-depth pre-rendered sprites or a texture-mapped column
@@ -230,10 +290,16 @@ gated on owning a 1990 Japanese disc. This is the owner's call.
    fidelity.
 2. Owner grabs the § 3.1 screenshots (corner, T-junction, ladder, chest, 2-3 depths, and
    a known tower if available), lossless where possible so the convergence rate can be
-   measured rather than guessed (§ 1b).
+   measured rather than guessed (§ 1b). **Partly done 2026-11-13** (§ 0b): ladder, chest,
+   several monster types and a door pair are captured lossless. Still missing: a clean empty
+   corridor to a far wall (for `r`), a corner/T-junction, and a known tower.
+2b. Owner rules on the **closed-door question** (§ 0c): does enhanced mode adopt the FM Towns
+   open-on-forward door (a new state the DOS grid lacks) or stay DOS-faithful (open archway,
+   one-step walk)? This is a port-vs-original divergence, not a fidelity requirement.
 3. A second spike: extract the dungeon GRAPH banks, confirm the wall-sprite set and the
    tower-vs-dungeon question (§ 5) against the real art, and fit the depth convergence rate
-   (`r` or pinhole) to the reference.
+   (`r` or pinhole) to the bank's depth spacing — the lossless frames did not yield `r`
+   (§ 1b update), so the bank is now the primary route to that number.
 4. Only then write the renderer against § 1's viewport-relative model and § 4's face set, with the
    § 3.5 gate.
 
