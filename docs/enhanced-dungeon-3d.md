@@ -122,6 +122,16 @@ off these banks yet (they are flat 32x32 texture tiles, not pre-rendered perspec
 columns), so `r` (§ 1b) is not settled by them either. The renderer will texture-map these
 flat tiles onto the viewport-relative frames rather than blit pre-projected columns.
 
+**Correction after labelling the bank (2026-11-13).** DUNG1 is not all flat tiles. Tiles
+~1-9 are flat brick (blue and bright-cyan variants); tiles ~10-23 are the same brick
+**pre-skewed into perspective** (receding diagonals baked into the tile). So the FM Towns
+renderer may blit pre-projected per-depth wall segments rather than texture-map a flat
+tile. That is a genuine step-3 fork, not settled: (a) texture-map a flat brick tile across
+the wall quads (fits the current trapezoid-fill architecture, Wolfenstein columns), or
+(b) blit the pre-projected tile for each depth/face (matches what the bank seems to carry,
+but reworks the fill into a blit). Confirming which the original does needs the FM Towns
+binary's tile-index table, not a guess. Floor/ceiling tiles in DUNG1 are not yet identified.
+
 ---
 
 ## 1. Geometry: viewport-driven, not wireframe-driven
