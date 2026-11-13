@@ -220,6 +220,16 @@ int main(int argc, char **argv)
                 tex[v * 32 + u] = ((u / 4 + v / 4) & 1) ? U2_CGA_WHITE : U2_CGA_CYAN;
         ctx.dng_wall_set = 1;
         memcpy(ctx.dng_wall, tex, sizeof tex);
+        /* Optional 3rd arg: a real DNGWALL.TILE (1024 theme-palette indices) to use
+         * instead of the checkerboard, for eyeballing the baked FM Towns brick. */
+        if (argc > 3) {
+            FILE *tf = fopen(argv[3], "rb");
+            if (tf) {
+                size_t n = fread(ctx.dng_wall, 1, U2_DNG_WALL_PX, tf);
+                fclose(tf);
+                if (n == U2_DNG_WALL_PX) printf("dump: loaded wall tile from %s\n", argv[3]);
+            }
+        }
         u2_dungeon_render3d(&ctx, &ow, &s);
         uint8_t pal[16][3]; u2_frame_palette_ega(pal);
         u2_frame_write_bmp16(&ow.frame, argv[2], pal);
