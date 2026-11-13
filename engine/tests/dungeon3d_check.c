@@ -149,6 +149,24 @@ int main(int argc, char **argv)
     if (argc > 1 && !strcmp(argv[1], "--selftest"))
         return selftest();
 
+    if (argc > 2 && !strcmp(argv[1], "--dump")) {
+        u2_ctx ctx; u2_overworld ow;
+        setup(&ctx, &ow, 1);
+        enh_frame(&ow);
+        u2_dg_scan s;
+        memset(&s, 0, sizeof s);
+        for (int d = 0; d < U2_DG_SAMPLE_DEPTH; d++) {
+            s.left[d] = U2_DG_ROCK; s.right[d] = U2_DG_ROCK;
+            s.ctr[d] = (d >= 3) ? U2_DG_ROCK : 0x00;
+        }
+        u2_dungeon_render3d(&ctx, &ow, &s);
+        uint8_t pal[16][3]; u2_frame_palette_ega(pal);
+        u2_frame_write_bmp16(&ow.frame, argv[2], pal);
+        printf("wrote %s\n", argv[2]);
+        u2_frame_free(&ow.frame);
+        return 0;
+    }
+
     test_direct();
     test_dispatch();
 
