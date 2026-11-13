@@ -97,6 +97,14 @@
 #           worked `AL=4` at minimum stats and claimed DI=6 -> 0052. The table below puts 52 at
 #           DI=5, and the grocery's AL is the constant 3, which at 0x10/0x10 gives bit length 6
 #           and DI = 3+8-6 = 5 -> 0052. The wiki's number agrees once the caller is the right one.
+#           ARMOUR REPRODUCED AT THREE POINTS, 2026-11-13 (captures/spice86/g68-cha-price-curve):
+#           sector 32 armour shoppe, digit 1 (CLOTH, AL=2), Int held 0x99, only Cha varied, price
+#           read from DS:27/28 and confirmed on the frame: Cha=0x99 -> 0032 (al 0x32, bl 6, DI 4);
+#           Cha=0x10 -> 0012 (al 0xA9, bl 8, DI 2); Cha=0x67 -> 0356 (0x99+0x67=0x100 truncates to
+#           al 0x00, bl 1, DI 9). All three match this routine exactly, including the 8-bit wrap
+#           where the carry out of int+cha is discarded by the rcr loop and the price jumps UP. The
+#           curve is a step function of bitlength(int+cha), NOT the third-party P1 "fall near 40/86,
+#           skyrocket past 160" smooth discount -- that claim's direction is right, its shape is wrong.
 #           Two things this does NOT settle. ~~The DS:4E charisma-vs-wisdom dispute~~ is
 #           CLOSED 2026-10-29 (see the resolution below), so the only thing still open here is
 #           the tavern's observed '0200', still unreproduced and still not in the sequence; G23
