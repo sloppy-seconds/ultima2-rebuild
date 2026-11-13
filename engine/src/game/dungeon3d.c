@@ -46,6 +46,19 @@
 #define DG3_ENDCAP U2_CGA_WHITE     /* 3 */
 #define DG3_SPRITE U2_CGA_BLACK     /* 0 — a silhouette punched into the corridor */
 
+/* Wall texture: a 32x32 array of palette indices, sampled across the wall quads. When
+ * NULL the walls are the flat placeholder colour (the geometry-only path the CP7 gate
+ * pins). The FM Towns DUNG1 flat-brick tile is supplied here by the disc loader once it
+ * is wired (docs/enhanced-dungeon-3d.md § 7a step 2); until then a caller may set any
+ * 32x32 indexed tile. The renderer is palette-agnostic: it puts whatever index the tile
+ * holds, so the disc loader owns the k_pal -> engine palette remap. */
+static const uint8_t *g_wall_tex;
+
+void u2_dungeon3d_set_wall_tex(const uint8_t *tex32)
+{
+    g_wall_tex = tex32;
+}
+
 typedef struct { int x0, y0, x1, y1; } dg3_rect;
 
 /* Depth frame d, d = 0 (nearest, fills the window) .. U2_DG_DRAW_DEPTH (far).
@@ -97,7 +110,7 @@ static void dg3_fill_floor(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c)
     }
 }
 
-static void dg3_fill_left(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c)
+static void dg3_fill_left(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c, const uint8_t *tex)
 {
     const int x0 = a.x0, x1 = b.x0;          /* near left is further left */
     if (x1 <= x0) return;
@@ -106,11 +119,16 @@ static void dg3_fill_left(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c)
         const int t = x - x0;
         const int yt = a.y0 + (b.y0 - a.y0) * t / den;
         const int yb = a.y1 + (b.y1 - a.y1) * t / den;
-        for (int y = yt; y < yb; y++) u2_frame_put(f, x, y, c);
+        const int u = tex ? (t * 32 / den) & 31 : 0;
+        for (int y = yt; y < yb; y++) {
+            if (!tex) { u2_frame_put(f, x, y, c); continue; }
+            const int v = ((y - yt) * 32 / (yb - yt)) & 31;
+            u2_frame_put(f, x, y, tex[v * 32 + u]);
+        }
     }
 }
 
-static void dg3_fill_right(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c)
+static void dg3_fill_right(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c, const uint8_t *tex)
 {
     const int x0 = b.x1, x1 = a.x1;          /* near right is further right */
     if (x1 <= x0) return;
@@ -119,7 +137,12 @@ static void dg3_fill_right(u2_frame *f, dg3_rect a, dg3_rect b, uint8_t c)
         const int t = x1 - x;                /* t=0 at the near edge */
         const int yt = a.y0 + (b.y0 - a.y0) * t / den;
         const int yb = a.y1 + (b.y1 - a.y1) * t / den;
-        for (int y = yt; y < yb; y++) u2_frame_put(f, x, y, c);
+        const int u = tex ? (t * 32 / den) & 31 : 0;
+        for (int y = yt; y < yb; y++) {
+            if (!tex) { u2_frame_put(f, x, y, c); continue; }
+            const int v = ((y - yt) * 32 / (yb - yt)) & 31;
+            u2_frame_put(f, x, y, tex[v * 32 + u]);
+        }
     }
 }
 
@@ -148,8 +171,8 @@ void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s)
         }
         dg3_fill_ceiling(f, a, b, DG3_CEIL);
         dg3_fill_floor(f, a, b, DG3_FLOOR);
-        if (s->left[d] & U2_DG_ROCK)  dg3_fill_left(f, a, b, DG3_WALL);
-        if (s->right[d] & U2_DG_ROCK) dg3_fill_right(f, a, b, DG3_WALL);
+        if (s->left[d] & U2_DG_ROCK)  dg3_fill_left(f, a, b, DG3_WALL, g_wall_tex);
+        if (s->right[d] & U2_DG_ROCK) dg3_fill_right(f, a, b, DG3_WALL, g_wall_tex);
     }
 
     /* Placeholder creature: a black silhouette at the nearest depth whose centre cell

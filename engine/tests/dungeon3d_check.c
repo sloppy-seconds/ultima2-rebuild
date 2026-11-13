@@ -48,6 +48,19 @@ static double ink_fraction(const u2_frame *f)
 
 static int px(const u2_frame *f, int x, int y) { return f->px[y][x]; }
 
+/* Count distinct palette indices present in a rectangle. A flat fill yields 1; a
+ * textured wall yields more. Used to tell a texture-mapped wall from a solid one. */
+static int distinct_in_rect(const u2_frame *f, int x0, int y0, int x1, int y1)
+{
+    int seen[256] = {0}, n = 0;
+    for (int y = y0; y < y1; y++)
+        for (int x = x0; x < x1; x++) {
+            int c = f->px[y][x];
+            if (!seen[c]) { seen[c] = 1; n++; }
+        }
+    return n;
+}
+
 static void setup(u2_ctx *ctx, u2_overworld *ow, int enhanced)
 {
     memset(ctx, 0, sizeof *ctx);
@@ -124,7 +137,44 @@ static void test_dispatch(void)
           enh_ink, cls_ink);
 }
 
-/* ---- 3. selftest: the fill predicate can go red --------------------------- */
+/* ---- 3. a wall texture is sampled across the wall quads ------------------- */
+static void test_texture(void)
+{
+    u2_ctx ctx; u2_overworld ow;
+    static uint8_t tex[32 * 32];
+    for (int v = 0; v < 32; v++)
+        for (int u = 0; u < 32; u++)
+            tex[v * 32 + u] = ((u + v) & 1) ? U2_CGA_WHITE : U2_CGA_CYAN;
+
+    u2_dg_scan s;
+    memset(&s, 0, sizeof s);
+    for (int d = 0; d < U2_DG_SAMPLE_DEPTH; d++) {
+        s.left[d] = U2_DG_ROCK; s.right[d] = U2_DG_ROCK;
+        s.ctr[d] = (d >= 3) ? U2_DG_ROCK : 0x00;
+    }
+
+    /* Flat (no texture): the near left-wall column is one solid colour. */
+    u2_dungeon3d_set_wall_tex(NULL);
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    u2_dungeon_render3d(&ctx, &ow, &s);
+    const int flat = distinct_in_rect(&ow.frame, 18, 60, 24, 380);
+    u2_frame_free(&ow.frame);
+
+    /* Textured: the same column now alternates, so it carries more than one index. */
+    u2_dungeon3d_set_wall_tex(tex);
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    u2_dungeon_render3d(&ctx, &ow, &s);
+    const int texd = distinct_in_rect(&ow.frame, 18, 60, 24, 380);
+    u2_frame_free(&ow.frame);
+
+    CHECK(flat == 1, "texture: flat wall column should be one colour (distinct=%d)", flat);
+    CHECK(texd >= 2, "texture: textured wall column should vary (distinct=%d)", texd);
+
+    /* Leave the module state clean for any later caller. */
+    u2_dungeon3d_set_wall_tex(NULL);
+}
+
+/* ---- 4. selftest: the fill predicate can go red --------------------------- */
 static int selftest(void)
 {
     int bad = 0;
@@ -139,6 +189,13 @@ static int selftest(void)
     u2_frame_clear(&f, U2_CGA_BLACK);
     for (int x = 0; x < WIN; x++) f.px[224][x] = U2_CGA_WHITE;
     if (ink_fraction(&f) > 0.6) { printf("selftest: single-line frame passed the fill predicate\n"); bad = 1; }
+
+    /* A uniform rectangle must read as one colour, so the texture predicate (>=2) can
+     * go red: a flat wall would fail it. */
+    u2_frame_clear(&f, U2_CGA_WHITE);
+    if (distinct_in_rect(&f, 0, 0, 64, 64) != 1) {
+        printf("selftest: uniform rect did not read as one colour\n"); bad = 1;
+    }
 
     u2_frame_free(&f);
     return bad;
@@ -159,6 +216,11 @@ int main(int argc, char **argv)
             s.left[d] = U2_DG_ROCK; s.right[d] = U2_DG_ROCK;
             s.ctr[d] = (d >= 3) ? U2_DG_ROCK : 0x00;
         }
+        static uint8_t tex[32 * 32];
+        for (int v = 0; v < 32; v++)
+            for (int u = 0; u < 32; u++)
+                tex[v * 32 + u] = ((u / 4 + v / 4) & 1) ? U2_CGA_WHITE : U2_CGA_CYAN;
+        u2_dungeon3d_set_wall_tex(tex);
         u2_dungeon_render3d(&ctx, &ow, &s);
         uint8_t pal[16][3]; u2_frame_palette_ega(pal);
         u2_frame_write_bmp16(&ow.frame, argv[2], pal);
@@ -169,6 +231,7 @@ int main(int argc, char **argv)
 
     test_direct();
     test_dispatch();
+    test_texture();
 
     printf("dungeon3d_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
