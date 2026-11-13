@@ -362,8 +362,8 @@ graphic to key on `0xC0`); convergence = **pinhole `s(d)=1/(d+1)`** as the desig
 
 Build order, gate-first, each step committed green:
 
-**Status (2026-11-13): steps 1 and 3 are shipped and gated; step 2 is unblocked by the
-palette finding below; step 4 still needs a known-tower capture.**
+**Status (2026-11-13): steps 1, 2 and 3 are shipped and gated; step 4 still needs a
+known-tower capture.**
 
 **Palette-context finding (resolves the step-2 question).** Under a v2 theme the SDL
 uploader (`renderer_sdl.c` `sdl_upload`) maps every frame index through
@@ -388,9 +388,16 @@ tile is the wall (tiles ~1-9 are flat brick) and which bank is the tower — § 
    frame and assert large filled regions (ceiling + floor + at least one wall quad), the
    corridor converges toward the centre, and ink stays inside the map window (x < 448).
    Red-controlled by disabling the 3D path (falls back to wireframe → sparse lines → fails).
-2. **Bank loader.** Extend `fmtowns.c` to read `DUNG1/2`, `CHEST`, `DUNMON1/2/3` into the
-   theme pool (the GRAPH decode already exists); grow `fmtowns-crosswalk.tsv` a dungeon
-   section. Gate: the banks decode and the tile count matches.
+2. **Bank loader.** (SHIPPED, `63f645f`) Bake the wall tile into the theme at build time
+   (owner ruling: bake, not a runtime ISO read). `fmtowns.c` reads `DUNG1` directly and
+   decodes tile 1 (a flat brick) into `DNGWALL.TILE` (1024 k_pal indices) and adds
+   `dng_wall = DNGWALL.TILE` to THEME.INI; `tiles_ega.c` parses the key and copies the
+   tile into `ctx->dng_wall`; `dungeon3d.c` samples it verbatim (no remap — the uploader
+   already maps frame indices through `theme_palette`). `fmtowns_theme.py` emits the
+   identical bytes so the C<->Python byte-identity check stays green. Gate:
+   `fmtowns_check` carries `DUNG1` in the synthetic ISO and asserts `DNGWALL.TILE` is
+   DUNG1 tile 1 decoded. The floor/ceiling tiles and the tower-vs-dungeon bank choice
+   (§ 5) are still open — step 4.
 3. **Texture the quads.** (SHIPPED, `d78ad75`, Option A) Replace flat fills with the wall/floor/ceiling tiles from the
    loaded banks (vertical-strip column mapping, Wolfenstein-style). Gate: a wall quad shows
    bank texture, not a flat fill. *Shipped as a texture-mapping rasteriser that samples any

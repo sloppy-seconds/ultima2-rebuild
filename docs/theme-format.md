@@ -81,6 +81,7 @@ breaking an older engine.
 | `bpp` | yes | bits per pixel. **Only 4 is implemented**, packed, high nibble = left pixel |
 | `pixel` | no | only `nibble-high-left`; any other value is refused rather than guessed at |
 | `palette` | no | filename of a `PALETTE.RGB` beside the manifest |
+| `dng_wall` | no | filename of a `DNGWALL.TILE` beside the manifest — one 32x32 dungeon wall texture (see below) |
 | `map` | no | filename of a `MAP.TSV` beside the manifest. **Absent means identity**, which is what keeps every v1 theme valid |
 | `identity` | no | documentation only; the presence of `map` is what the loader reads || `scope` | no | comma list from `overworld`, `towns`, `dungeon`, `tower`. An unrecognised word is a refusal |
 | `source`, `tiles_pool`, `art_count`, `art_with_multiple_frames`, `crosswalk`, `frames` | no | provenance and policy notes; the loader reads `frames` as nothing and the builder writes it as a record |
@@ -92,6 +93,17 @@ size must be an exact multiple of that. At most 128 tiles.
 EGA table in `core/frame.c`. When present the renderer uses it instead, and
 re-reads it when a Ctrl-T cycle changes the theme, so a cycle from a themed palette
 back to `c64` restores the EGA table rather than keeping the wrong colours.
+
+**`DNGWALL.TILE`** (named by `dng_wall`) is exactly 1024 bytes — one 32x32 tile of
+palette indices, one byte each, in the theme's own palette space (for the FM Towns
+theme, `k_pal`). The enhanced-mode 3D dungeon samples it across the wall quads with
+perspective foreshortening. It is **not** 4bpp-packed like `TILES`; it is raw indices,
+because the corridor reads it as an index lookup, not a blit. The indices need no remap:
+under a v2 theme the uploader already maps frame indices through the theme palette, so a
+wall index lands on the same colour the theme's terrain tiles use. Absent means the
+corridor draws its flat placeholder fill. The FM Towns derivation bakes it from `DUNG1`
+tile 1 (a flat brick); which tile, and whether towers use a different bank, is open
+(`docs/enhanced-dungeon-3d.md` § 5).
 
 **`MAP.TSV`** is tab-separated, `#` comments, one row per art index:
 

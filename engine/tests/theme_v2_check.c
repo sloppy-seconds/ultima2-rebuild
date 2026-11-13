@@ -84,7 +84,7 @@ static void make_good_theme(void)
     snprintf(p, sizeof p, "%s/good/THEME.INI", root);
     FILE *f = fopen(p, "wb");
     fputs("[theme]\nname = good\ntile_w = 32\ntile_h = 32\nbpp = 4\n"
-          "pixel = nibble-high-left\npalette = PALETTE.RGB\nmap = MAP.TSV\n"
+          "pixel = nibble-high-left\npalette = PALETTE.RGB\ndng_wall = DNGWALL.TILE\nmap = MAP.TSV\n"
           "identity = no\nscope = overworld,towns\n", f);
     fclose(f);
 
@@ -113,6 +113,13 @@ static void make_good_theme(void)
     fputs("# art\ttiles\tsource\n", f);
     fputs("05\t1\tFAKE/1\n", f);
     fputs("06\t0,1\tFAKE/0,FAKE/1\n", f);
+    fclose(f);
+
+    /* A dungeon wall tile: 1024 raw indices, a known ramp so the loader test can
+     * prove the bytes reach ctx verbatim. */
+    snprintf(p, sizeof p, "%s/good/DNGWALL.TILE", root);
+    f = fopen(p, "wb");
+    { unsigned char w[1024]; for (int i = 0; i < 1024; i++) w[i] = (unsigned char)(i % 8); fwrite(w, 1, sizeof w, f); }
     fclose(f);
 }
 
@@ -204,6 +211,12 @@ int main(void)
           U2_EGA_FRAME_SCALE, gctx.frame_scale);
     CHECK(t.has_palette && t.palette[1][1] == 255 && t.palette[1][0] == 0,
           "PALETTE.RGB is read and entry 1 is the green the fixture wrote");
+    CHECK(gctx.dng_wall_set == 1, "the theme's dng_wall reaches ctx (dng_wall_set=%d)", gctx.dng_wall_set);
+    {
+        int ok = gctx.dng_wall_set == 1;
+        for (int i = 0; ok && i < 1024; i++) if (gctx.dng_wall[i] != (i % 8)) ok = 0;
+        CHECK(ok, "the wall tile bytes reach ctx verbatim (the i%%8 ramp)");
+    }
     CHECK(t.has_map, "MAP.TSV is present so the atlas is not identity");
     CHECK(u2_tiles_ega_tile(&t, 5) == 1, "art 05 maps to pool tile 1");
     CHECK(u2_tiles_ega_tile(&t, 6) == 0, "art 06 maps to the FIRST of its two frames");
