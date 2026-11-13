@@ -122,6 +122,20 @@ off these banks yet (they are flat 32x32 texture tiles, not pre-rendered perspec
 columns), so `r` (§ 1b) is not settled by them either. The renderer will texture-map these
 flat tiles onto the viewport-relative frames rather than blit pre-projected columns.
 
+**Model correction (owner, 2026-11-13, browsing the banks).** The line above is wrong. The
+FM Towns dungeon does **not** texture-map a flat tile. It blits **pre-projected wall
+segments, one per depth step**, and mirrors them for the right wall. Reading DUNG1: a
+vertical column (tiles 27,35,43,51,59) is the left wall receding through depth steps, then
+36,44 and 45 are further depth pieces; ~3 steps of corridor per view. DUNG2 is **doors**
+at different sizes and sides (pre-projected per depth). CHEST is **chests and ladders** at
+different sizes (per depth). So a faithful renderer blits a per-(side,depth) tile table, it
+does not fill trapezoids with a sampled texture. The flat texture-map shipped in step 3
+(`d78ad75`) is therefore **our design**, not FM Towns-faithful — it stays valid as a
+look, but it is not what the port does. Pinning the exact tile->(side,depth,position) table
+needs either the FM Towns binary's dungeon renderer (Z8000, a large decode) or an empirical
+capture: walk the live FM Towns dungeon to known depths, screenshot, and match bank tiles to
+screen rectangles.
+
 **Correction after labelling the bank (2026-11-13).** DUNG1 is not all flat tiles. Tiles
 ~1-9 are flat brick (blue and bright-cyan variants); tiles ~10-23 are the same brick
 **pre-skewed into perspective** (receding diagonals baked into the tile). So the FM Towns
