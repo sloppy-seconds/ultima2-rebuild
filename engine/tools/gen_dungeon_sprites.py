@@ -125,6 +125,12 @@ def load_sprite(src_dir, stem):
     path = os.path.join(src_dir, f"{stem}_00001_.png")
     work = Image.open(path).convert('RGB').resize((WORK, WORK), Image.LANCZOS)
     alpha = matte_rembg(work) if HAVE_REMBG else matte_flood(work)
+    # rembg marks some background as fully opaque where it shows through concave
+    # gaps in the silhouette (a notch at the shoulder, fur edges). Those pixels
+    # are the background colour, so key them out by colour regardless of alpha.
+    warr = np.asarray(work).astype(np.int32)
+    bg = warr[0, 0]
+    alpha &= (np.abs(warr - bg).sum(-1) >= 60)
     alpha = _drop_small_components(alpha)
     if not HAVE_REMBG:
         # the flood matte leaves a blended fringe; erode 1px to eat the halo
