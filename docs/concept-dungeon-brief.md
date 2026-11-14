@@ -10,24 +10,29 @@ The overworld shot list deliberately excluded the dungeon — `concept-shot-list
 
 ---
 
-## 0. What this covers, and the one thing that changed
+## 0. Two stages — and the palette is NOT decided here
 
-The dungeon is **not** the top-down grid the overworld brief is drawn for. In the
-enhanced build it is a **first-person 3D view**: you look down a corridor, and a
-creature is a **front-facing billboard standing on the floor at some distance,
-lit by a torch that falls off with range.** That single fact changes every rule
-below, and it is why this is a separate brief rather than more shots bolted onto
-the overworld list.
+Read this first, because it governs every prompt below.
 
-Covers:
+**Stage 1 — CONCEPT (this brief).** Make the **strongest possible creature and
+object art you can.** Full colour, rich, dramatic, detailed — whatever style
+reads best. Do **not** restrict the palette, do not flatten the lighting, do not
+force a pixel grid. The job of a concept is to nail *identity*: silhouette,
+character, mood, colour direction. A timid, palette-starved concept tells you
+nothing.
 
-- the **seven dungeon creatures** (Family C),
-- the **chest** and the **loot it yields** (Family D),
-- the **structural objects** — ladders, the door, the secret door (Family E,
-  lower priority; these are already drawn procedurally).
+**Stage 2 — SPRITE (separate, not specified here).** The final dungeon sprite is
+a 32×32 billboard on a small shared palette, seen down a corridor under torch
+falloff. img2img from an approved concept is a good way to **seed** that stage,
+but the sprite is *finished* at target size and palette — it is not a raw
+downscale of the concept. A full-colour concept quantised straight down goes
+muddy and a silhouette that read at 512px collapses at 32px; the read has to be
+designed at target size, not discovered afterwards. (This is the overworld
+brief's § 5 lesson, and it is the one place "downsample it" is a trap.)
 
-Does **not** cover: the corridor walls, floor and ceiling textures (already
-procedural in `dungeon_assets.c`), or the overworld, which is the other brief.
+So the palette question is **deliberately open.** § 6 makes it empirical: count
+the colours the finished concepts actually need, and *that* is the 16-vs-more
+decision, made from evidence rather than argument.
 
 **The cleanroom rule is unchanged and absolute.** These prompts carry genre and
 technical properties only — no game title, no artist, no franchise, and no
@@ -94,50 +99,47 @@ to be distinct and to fit a dark dungeon.
 
 ---
 
-## 2. Family C — the rules for a dungeon creature sprite
+## 2. Family C — what a dungeon creature concept must achieve
 
-Paste-ready stem (every creature prompt below is self-contained; this is the
-shared part, kept here so the *why* is written down once):
+The dungeon is **first-person 3D**: a creature is a front-facing figure standing
+on the floor at a distance down a torch-lit corridor. That shapes what a *good
+concept* has to deliver, even at full colour and full detail:
+
+- **A silhouette that survives being small.** The final sprite is tiny and dim.
+  The concept can be lush, but the *idea* must be readable as an outline alone —
+  if it only works because of surface detail, it will not survive to 32px.
+- **One high-contrast read.** A pale face, a glowing eye, a bright weapon, a
+  cold aura — one element that pops. At runtime the renderer darkens the sprite
+  through four torch-falloff bands; a design whose only contrast is mid-tone
+  greys vanishes at range. Bake that "one bright thing" into the concept now.
+- **Distinct from the other six.** No two of the seven may be confusable when
+  shrunk. The legless snake and the low carrion-creeper must never read as an
+  upright humanoid.
+- **It reads against dark stone, not a void.** The corridor wall is mottled
+  grey-brown. A dark creature on a dark wall disappears, so give each one a
+  light rim, a pale core, or a luminous accent.
+
+Paste-ready stem (every prompt below is self-contained; this is the shared part,
+written down once so the *why* is here):
 
 ```text
-front-facing game sprite, full figure standing upright on the ground and filling
-the frame, strong readable silhouette, hand-drawn early-90s pixel art, dark
-fantasy dungeon, limited 16-colour palette, flat even lighting, plain near-black
-background, no anti-aliasing, no ground shadow
+detailed dark-fantasy video-game creature concept art, full figure standing on
+the ground and filling the frame, strong readable silhouette, full colour,
+dramatic torchlight against a dark dungeon, plain near-black background, single
+figure, no text, no watermark
 ```
 
-What makes the dungeon different from the overworld figures, and what each shot
-must therefore survive:
-
-- **It is seen against a dark stone corridor, not a plain background.** The
-  silhouette must hold against mottled grey-brown rock. A dark creature on a dark
-  wall disappears — give every creature a light rim, a pale core, or a bright
-  accent so it separates from the wall at a glance.
-- **It is seen at a distance and under torch falloff.** The renderer darkens a
-  sprite through four shade bands as it recedes. A sprite whose only contrast is
-  mid-tone greys goes to mud at range. Build each one around **one high-contrast
-  read** (a pale face, a glowing eye, a bright weapon) that survives being
-  darkened.
-- **Two sizes only.** Creatures are **tall** — they stand on the floor and fill
-  most of the cell height. The chest is **low** — it sits on the floor and is
-  squat. Do not draw a creature that floats or that is half the height of a
-  companion; the renderer scales them to a common cell.
-- **16 colours, shared.** Everything in the dungeon draws from one EGA palette.
-  A creature that needs forty colours will not survive quantisation.
-
-**The test that matters for the whole family:** shrink the line-up until each
-figure is a few dozen pixels tall and squint. No two of the seven may be
-confusable. If two read the same small, the set has failed and nothing else here
-rescues it.
+> If you want a concept that is a closer starting point for the pixel sprite, add
+> `chunky pixel art, limited palette` to a prompt — but that is a *style choice
+> for the concept*, not a requirement, and it trades away some of the "strong."
 
 ---
 
 ## 3. The seven creatures
 
 Each shot: the third-party name, what it must communicate (with the proven
-special, if any, woven in), and a paste-ready prompt. Embellishment is welcome —
-this is concept art, not a sprite sheet — but keep each one identifiable by
-outline alone.
+special, if any, woven in), and a paste-ready prompt. Embellish freely — this is
+concept art — but keep each one identifiable by outline alone.
 
 ### C1 — Orc  *(the common brute; stamp 1, no proven special)*
 The rank and file. There are more of them than anything else, so it is the face
@@ -146,13 +148,13 @@ forward, a crude notched blade or club. It should read as *cheap and numerous*
 — dangerous in a corridor only because there is always another one behind it.
 
 ```text
-front-facing game sprite, full figure standing upright on the ground and filling
-the frame, strong readable silhouette, hand-drawn early-90s pixel art, dark
-fantasy dungeon, limited 16-colour palette, flat even lighting, plain near-black
-background, no anti-aliasing, no ground shadow — a green-skinned humanoid brute,
-heavy brow, jutting jaw, hunched forward, gripping a crude notched blade. Cheap
-and numerous, the rank and file of a dungeon. A pale highlight on the face and
-blade so it separates from a dark stone wall.
+detailed dark-fantasy video-game creature concept art, full figure standing on
+the ground and filling the frame, strong readable silhouette, full colour,
+dramatic torchlight against a dark dungeon, plain near-black background, single
+figure, no text, no watermark — a green-skinned humanoid brute, heavy brow,
+jutting jaw, hunched forward, gripping a crude notched blade. Cheap and numerous,
+the rank and file of a dungeon. A pale highlight on the face and blade so it
+separates from a dark stone wall.
 ```
 
 ### C2 — Ghost  *(stamp 2 — PROVEN: blows out your torch)*
@@ -164,14 +166,13 @@ one figure that seems to give off its own dim cold glow rather than reflect the
 torch.
 
 ```text
-front-facing game sprite, full figure filling the frame, strong readable
-silhouette, hand-drawn early-90s pixel art, dark fantasy dungeon, limited
-16-colour palette, flat even lighting, plain near-black background, no
-anti-aliasing, no ground shadow — the hooded, robed shape of a ghost that is
-almost but not quite a body, its lower half fading into nothing, two points of
-cold pale light where a face should be. It gives off its own dim cold glow
-rather than reflecting light. Immaterial, silent, the thing that snuffs out your
-torch. Pale enough to read against dark stone.
+detailed dark-fantasy video-game creature concept art, full figure filling the
+frame, strong readable silhouette, full colour, dramatic torchlight against a
+dark dungeon, plain near-black background, single figure, no text, no watermark
+— the hooded, robed shape of a ghost that is almost but not quite a body, its
+lower half fading into nothing, two points of cold pale light where a face should
+be. It gives off its own dim cold glow rather than reflecting light. Immaterial,
+silent, the thing that snuffs out your torch.
 ```
 
 ### C3 — Carrion creeper  *(stamp 3, no proven special)*
@@ -181,13 +182,13 @@ of thing that scuttles and that you would rather not touch. It should read as
 its silhouette is clearly different from the upright humanoids around it.
 
 ```text
-front-facing game sprite, full figure filling the frame, strong readable
-silhouette, hand-drawn early-90s pixel art, dark fantasy dungeon, limited
-16-colour palette, flat even lighting, plain near-black background, no
-anti-aliasing, no ground shadow — a low, wide, many-legged vermin-creature: a
-bloated or segmented body on too many legs, something that scuttles. Vermin and
-rot given form. A wide low stance so its outline is unmistakably unlike an
-upright figure. A pale or sickly accent so it reads against dark stone.
+detailed dark-fantasy video-game creature concept art, full figure filling the
+frame, strong readable silhouette, full colour, dramatic torchlight against a
+dark dungeon, plain near-black background, single figure, no text, no watermark
+— a low, wide, many-legged vermin-creature: a bloated or segmented body on too
+many legs, something that scuttles. Vermin and rot given form. A wide low stance
+so its outline is unmistakably unlike an upright figure. A sickly pale accent so
+it reads against dark stone.
 ```
 
 ### C4 — Viper  *(stamp 4, no proven special)*
@@ -197,13 +198,12 @@ strike* and, above all, as a shape with no legs, so it never confuses a human
 silhouette at a distance.
 
 ```text
-front-facing game sprite, full figure filling the frame, strong readable
-silhouette, hand-drawn early-90s pixel art, dark fantasy dungeon, limited
-16-colour palette, flat even lighting, plain near-black background, no
-anti-aliasing, no ground shadow — a snake reared to strike, coiled body, head
-raised with a hood or a wedge of a head, tongue or fangs suggested. No legs, a
-purely sinuous outline. Venom and a quick strike. A pale marking on the head so
-it reads against dark stone.
+detailed dark-fantasy video-game creature concept art, full figure filling the
+frame, strong readable silhouette, full colour, dramatic torchlight against a
+dark dungeon, plain near-black background, single figure, no text, no watermark
+— a snake reared to strike, coiled body, head raised with a hood or a wedge of a
+head, tongue or fangs suggested. No legs, a purely sinuous outline. Venom and a
+quick strike. A pale marking on the head so it reads against dark stone.
 ```
 
 ### C5 — Gremlin  *(stamp 5 — PROVEN: steals your food)*
@@ -214,13 +214,13 @@ your pack while you look past it. Give it a bright, busy hand or a stolen
 bundle so the thieving reads even small.
 
 ```text
-front-facing game sprite, full figure filling the frame, strong readable
-silhouette, hand-drawn early-90s pixel art, dark fantasy dungeon, limited
-16-colour palette, flat even lighting, plain near-black background, no
-anti-aliasing, no ground shadow — a small, slight, wiry creature crouched and in
-motion, reaching forward with busy hands, a snout or pointed ears, mean and
-quick. A scavenger and a thief, not a brute. One bright hand or a small stolen
-bundle so the thieving reads at a glance.
+detailed dark-fantasy video-game creature concept art, full figure filling the
+frame, strong readable silhouette, full colour, dramatic torchlight against a
+dark dungeon, plain near-black background, single figure, no text, no watermark
+— a small, slight, wiry creature crouched and in motion, reaching forward with
+busy hands, a snout or pointed ears, mean and quick. A scavenger and a thief, not
+a brute. One bright hand or a small stolen bundle so the thieving reads at a
+glance.
 ```
 
 ### C6 — Daemon / Minotaur  *(stamp 6, no proven special)*
@@ -230,13 +230,13 @@ you are glad the ghost is not. Where the balron (C7) is a mind, this one is
 it the largest, heaviest silhouette in the set so the deep floors feel heavier.
 
 ```text
-front-facing game sprite, full figure standing upright and filling the frame,
-strong readable silhouette, hand-drawn early-90s pixel art, dark fantasy
-dungeon, limited 16-colour palette, flat even lighting, plain near-black
-background, no anti-aliasing, no ground shadow — a hulking horned brute, broad
-shoulders, immense and heavy, a heavy weapon held low. The most physically
-imposing thing in the set, power in the arm and shoulder. The largest silhouette
-of the seven. A pale highlight on the horns so it reads against dark stone.
+detailed dark-fantasy video-game creature concept art, full figure standing on
+the ground and filling the frame, strong readable silhouette, full colour,
+dramatic torchlight against a dark dungeon, plain near-black background, single
+figure, no text, no watermark — a hulking horned brute, broad shoulders, immense
+and heavy, a heavy weapon held low. The most physically imposing thing in the
+set, power in the arm and shoulder. The largest silhouette of the seven. A pale
+highlight on the horns so it reads against dark stone.
 ```
 
 ### C7 — Balron  *(stamp 7 — PROVEN: puts you to sleep with magic)*
@@ -248,29 +248,29 @@ than gripping a weapon. The most dangerous thing in the dungeon, and it never
 touches you.
 
 ```text
-front-facing game sprite, full figure standing upright and filling the frame,
-strong readable silhouette, hand-drawn early-90s pixel art, dark fantasy
-dungeon, limited 16-colour palette, flat even lighting, plain near-black
-background, no anti-aliasing, no ground shadow — a horned demonic figure whose
-menace is of the mind, not the arm: a dominating glowing gaze or an arcane head
-motif, arms raised in a casting gesture rather than gripping a weapon. The most
-dangerous creature in the dungeon and it never touches you. A bright eye or crest
-so the "mind" read survives distance and darkness.
+detailed dark-fantasy video-game creature concept art, full figure standing on
+the ground and filling the frame, strong readable silhouette, full colour,
+dramatic torchlight against a dark dungeon, plain near-black background, single
+figure, no text, no watermark — a horned demonic figure whose menace is of the
+mind, not the arm: a dominating glowing gaze or an arcane head motif, arms raised
+in a casting gesture rather than gripping a weapon. The most dangerous creature
+in the dungeon and it never touches you. A bright eye or crest so the "mind" read
+survives distance and darkness.
 ```
 
 ### C8 — The line-up  *(silhouette test — run this as one image)*
 All seven standing together, so the distinctness test is one glance.
 
 ```text
-front-facing game sprites in a single row, seven full figures standing upright
-and filling the frame, strong readable silhouettes, hand-drawn early-90s pixel
-art, dark fantasy dungeon, limited 16-colour palette, flat even lighting, plain
-near-black background, no anti-aliasing, no ground shadow — left to right: a
-green-skinned hunched brute with a crude blade; a pale hooded shape fading at the
-bottom with two cold lights for eyes; a low wide many-legged vermin; a reared
-snake with no legs; a small wiry crouching thief with busy hands; a hulking
-horned brute with a heavy weapon; a horned demonic caster with raised arms and a
-glowing gaze. Each identifiable by outline alone at very small size.
+detailed dark-fantasy video-game creature concept art, seven full figures
+standing in a row on the ground, each filling its own space, strong readable
+silhouettes, full colour, dramatic torchlight against a dark dungeon, plain
+near-black background, no text, no watermark — left to right: a green-skinned
+hunched brute with a crude blade; a pale hooded shape fading at the bottom with
+two cold lights for eyes; a low wide many-legged vermin; a reared snake with no
+legs; a small wiry crouching thief with busy hands; a hulking horned brute with a
+heavy weapon; a horned demonic caster with raised arms and a glowing gaze. Each
+identifiable by outline alone at very small size.
 ```
 
 ---
@@ -286,9 +286,9 @@ items that "appear in the dungeon," and they are what this family draws.
 Paste-ready stem for objects:
 
 ```text
-front-facing game sprite, a single object filling its frame, hand-drawn early-90s
-pixel art, dark fantasy dungeon, limited 16-colour palette, flat even lighting,
-plain near-black background, no anti-aliasing, no ground shadow
+detailed dark-fantasy video-game prop concept art, a single object filling its
+frame, full colour, dramatic torchlight against a dark dungeon, plain near-black
+background, no text, no watermark
 ```
 
 ### D1 — The chest  *(closed, and open)*
@@ -299,12 +299,12 @@ the chest read as an entrance). Draw it **closed** and **open** (lid up, faint
 inner glow) as one shot, so the open/closed pair is decided together.
 
 ```text
-front-facing game sprite, a single squat object filling its frame, hand-drawn
-early-90s pixel art, dark fantasy dungeon, limited 16-colour palette, flat even
-lighting, plain near-black background, no anti-aliasing, no ground shadow — a
-treasure chest shown twice, closed and open: an iron-banded wooden strongbox with
-a hasp and a lock, squat and clearly a container you open, not a doorway and not
-a wall feature. The open one has its lid raised and a faint warm glow inside.
+detailed dark-fantasy video-game prop concept art, a single squat object filling
+its frame, full colour, dramatic torchlight against a dark dungeon, plain
+near-black background, no text, no watermark — a treasure chest shown twice,
+closed and open: an iron-banded wooden strongbox with a hasp and a lock, squat
+and clearly a container you open, not a doorway and not a wall feature. The open
+one has its lid raised and a faint warm glow inside.
 ```
 
 ### D2 — Gold
@@ -312,11 +312,11 @@ The common reward. A small hoard — a few coins and a short stack — that read
 *pile of coins*, warm and bright, unmistakable at a glance and at a distance.
 
 ```text
-front-facing game sprite, a single object filling its frame, hand-drawn early-90s
-pixel art, dark fantasy dungeon, limited 16-colour palette, flat even lighting,
-plain near-black background, no anti-aliasing, no ground shadow — a small hoard
-of gold coins, a loose pile with one short stack, warm and bright, unmistakable
-as money at a glance and from a distance.
+detailed dark-fantasy video-game prop concept art, a single object filling its
+frame, full colour, dramatic torchlight against a dark dungeon, plain near-black
+background, no text, no watermark — a small hoard of gold coins, a loose pile
+with one short stack, warm and bright, unmistakable as money at a glance and from
+a distance.
 ```
 
 ### D3 — TRI-LITHIUM  *(the deepest-floor prize)*
@@ -327,12 +327,12 @@ unusual hue, cut like nothing else in the set. It is a quest object, and it
 should look like one.
 
 ```text
-front-facing game sprite, a single object filling its frame, hand-drawn early-90s
-pixel art, dark fantasy dungeon, limited 16-colour palette, flat even lighting,
-plain near-black background, no anti-aliasing, no ground shadow — a single
-crystalline gem or shard, faintly self-lit in an unusual hue, cut like nothing
-else, clearly a rare and singular object rather than a coin or an ordinary jewel.
-The prize found only at the very bottom of a dungeon.
+detailed dark-fantasy video-game prop concept art, a single object filling its
+frame, full colour, dramatic torchlight against a dark dungeon, plain near-black
+background, no text, no watermark — a single crystalline gem or shard, faintly
+self-lit in an unusual hue, cut like nothing else, clearly a rare and singular
+object rather than a coin or an ordinary jewel. The prize found only at the very
+bottom of a dungeon.
 ```
 
 ### D4 — The weapons  *(line-up)*
@@ -343,13 +343,12 @@ exist in the game's weapon list but are not chest drops; include them only if a
 wider weapon set is wanted later.
 
 ```text
-front-facing game sprites in a single row, each a single object filling its own
-frame, hand-drawn early-90s pixel art, dark fantasy dungeon, limited 16-colour
-palette, flat even lighting, plain near-black background, no anti-aliasing, no
-ground shadow — a line-up of hand weapons, left to right: a short dagger, a
-studded mace, a broad axe, a simple bow, a straight sword, an oversized great
-sword, and a slender glowing light-sword. Each unmistakable as itself at small
-size and clearly held in one hand.
+detailed dark-fantasy video-game prop concept art, a row of objects each filling
+its own frame, full colour, dramatic torchlight against a dark dungeon, plain
+near-black background, no text, no watermark — a line-up of hand weapons, left to
+right: a short dagger, a studded mace, a broad axe, a simple bow, a straight
+sword, an oversized great sword, and a slender glowing light-sword. Each
+unmistakable as itself at small size and clearly held in one hand.
 ```
 
 ### D5 — The armour  *(line-up)*
@@ -359,12 +358,12 @@ read as a visible ladder of protection (flimsy → sturdy → metal), so a playe
 instantly ranks them.
 
 ```text
-front-facing game sprites in a single row, each a single object filling its own
-frame, hand-drawn early-90s pixel art, dark fantasy dungeon, limited 16-colour
-palette, flat even lighting, plain near-black background, no anti-aliasing, no
-ground shadow — a line-up of body armour shown as wearable pieces, left to right:
-a rough cloth shirt, a boiled-leather cuirass, and a ringed mail hauberk. A clear
-ladder of protection from flimsy to metal, each readable as something you put on.
+detailed dark-fantasy video-game prop concept art, a row of objects each filling
+its own frame, full colour, dramatic torchlight against a dark dungeon, plain
+near-black background, no text, no watermark — a line-up of body armour shown as
+wearable pieces, left to right: a rough cloth shirt, a boiled-leather cuirass,
+and a ringed mail hauberk. A clear ladder of protection from flimsy to metal,
+each readable as something you put on.
 ```
 
 ---
@@ -373,8 +372,8 @@ ladder of protection from flimsy to metal, each readable as something you put on
 
 These already render in the enhanced build (procedural textures/sprites in
 `dungeon_assets.c`), so concept art here is an *upgrade*, not a gap. Lower
-priority than Families C and D. If run, keep the same front-facing, dark-wall,
-falloff-safe rules.
+priority than Families C and D. If run, keep the same full-colour concept rules
+and the same "reads against dark stone, one high-contrast element" goals.
 
 - **E1 — The ladders.** An up-ladder (climb out through a hole in the ceiling)
   and a down-ladder (descend through a hole in the floor): wooden rails, pale
@@ -392,21 +391,23 @@ falloff-safe rules.
 
 ## 6. What each shot must produce, and how to review
 
-Not just an image — three extractable decisions, same discipline as the
-overworld list:
+Not just an image — three extractable decisions:
 
-1. **A palette.** Pull the colours the finished dungeon shots actually use and
-   count them. The dungeon draws on the 16-colour EGA palette; if the creatures
-   need materially more to survive falloff, that is a real finding, not a
-   suggestion.
+1. **A palette, measured.** Pull the colours the finished concepts actually use
+   and count them. This is the empirical answer to the palette question from
+   § 0 — if the creatures need ~40 colours to keep their read, the small-palette
+   plan is wrong and the loader work is justified; if 16 survive, it is not.
+   Decide from the shots, not before them.
 2. **Silhouette tests.** C8 (the line-up) is the test: shrink it and confirm no
    two of the seven are confusable, and that the legless snake and the low
    carrion-creeper never read as an upright humanoid. Record the failures — they
    are the brief for the sprite stage.
-3. **Falloff tests.** Darken each creature through four steps toward black (the
-   renderer's four shade bands). Any creature whose *only* read is mid-tone grey
-   has failed: it must keep one high-contrast element (pale face, glowing eye,
-   bright weapon) all the way down.
+3. **The "small and dim" test.** Shrink each creature and darken it toward black
+   (the renderer's four falloff bands). Any creature whose *only* read is mid-tone
+   grey has failed: it must keep one high-contrast element (pale face, glowing
+   eye, bright weapon) all the way down. This is a test of the *design*, run on
+   the concept, even though the falloff itself is applied later at the sprite
+   stage.
 
 **Provenance.** Save the prompt text, date, model and seed beside the outputs (a
 `PROMPTS.md`). Once the prompt is the provenance, it is evidence, and it is what
@@ -431,6 +432,8 @@ known creature from any game gets rejected, whatever prompt produced it.
 - **The FM Towns and EGA rips are not the reference.** They are copyrighted
   traces. This brief is intent-only by design; the moment a prompt or a review
   starts pointing at a ripped sprite, it has left the cleanroom.
-- **Concept is not the sprite.** Same as the overworld list: do not downscale
-  these into 32×32 dungeon sprites. The sprite stage is separate and must be
-  designed at target size, under the falloff and dark-wall constraints in § 2.
+- **Concept is not the sprite.** Same as the overworld list: img2img from an
+  approved concept is a fine way to *seed* the 32×32 sprite, but the sprite is
+  finished at target size and palette under the falloff and dark-wall
+  constraints — not shipped as a raw downscale. That stage is separate and is
+  specified elsewhere.
