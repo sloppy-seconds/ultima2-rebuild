@@ -745,9 +745,10 @@ static void dg_inspect_setup(u2_ctx *ctx, u2_overworld *ow)
         for (int x = 0; x < 16; x++)
             u2_world_dungeon_put(&ow->world, fl, x, y,
                                  (x == 0 || x == 15 || y == 0 || y == 15) ? 0x80 : 0x00);
-    /* one creature of each stamp, in a column across the east-facing view */
-    for (int s = 1; s <= 7; s++)
-        u2_world_dungeon_put(&ow->world, fl, 6, 1 + s, (uint8_t)s);
+    /* The orc one cell dead ahead for a hero shot; stamps 2..7 in a back row. */
+    u2_world_dungeon_put(&ow->world, fl, 3, 5, 1);
+    for (int s = 2; s <= 7; s++)
+        u2_world_dungeon_put(&ow->world, fl, 8, s, (uint8_t)s);
     u2_world_dungeon_put(&ow->world, fl, 10, 5, 0x40);   /* chest   */
     u2_world_dungeon_put(&ow->world, fl, 13, 3, 0x10);   /* up ladder   */
     u2_world_dungeon_put(&ow->world, fl, 13, 7, 0x20);   /* down ladder */

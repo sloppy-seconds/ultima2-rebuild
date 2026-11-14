@@ -54,10 +54,35 @@ def matte(im, tol=40):
     return ~seen     # True = opaque
 
 def load_sprite(src_dir, stem):
+    """Matte at high resolution (before any downscale, so the background is not
+    blended into the figure's edge), erode a 1px fringe, tight-crop to the
+    figure, then fit it to fill the EDGE square anchored to the floor. Filling
+    the square is what makes a close creature read as close: a figure that only
+    occupies the middle of the sprite looks far away no matter the distance."""
     path = os.path.join(src_dir, f"{stem}_00001_.png")
-    im = Image.open(path).convert('RGB').resize((EDGE, EDGE), Image.LANCZOS)
-    alpha = matte(im)
-    return np.asarray(im), alpha
+    work = Image.open(path).convert('RGB').resize((512, 512), Image.LANCZOS)
+    alpha = matte(work)
+    # erode 1px: drop opaque pixels touching a transparent one, to eat the halo
+    a = alpha.copy()
+    a[1:-1, 1:-1] &= (alpha[:-2, 1:-1] & alpha[2:, 1:-1] &
+                      alpha[1:-1, :-2] & alpha[1:-1, 2:])
+    alpha = a
+    ys, xs = np.where(alpha)
+    if len(ys) == 0:
+        return np.zeros((EDGE, EDGE, 3), 'uint8'), np.zeros((EDGE, EDGE), bool)
+    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    crop = work.crop((int(x0), int(y0), int(x1), int(y1))).convert('RGBA')
+    carr = np.asarray(crop).copy()
+    carr[..., 3] = np.where(alpha[y0:y1, x0:x1], 255, 0)
+    crop = Image.fromarray(carr)
+    cw, ch = crop.size
+    scale = EDGE / float(max(cw, ch))
+    nw, nh = max(1, int(round(cw * scale))), max(1, int(round(ch * scale)))
+    crop = crop.resize((nw, nh), Image.LANCZOS)
+    canvas = Image.new('RGBA', (EDGE, EDGE), (0, 0, 0, 0))
+    canvas.paste(crop, ((EDGE - nw) // 2, EDGE - nh), crop)   # bottom-centre
+    out = np.asarray(canvas)
+    return out[..., :3].copy(), out[..., 3] > 128
 
 def build_palette(sprites):
     """Adaptive palette over the union of all sprites' opaque pixels."""
