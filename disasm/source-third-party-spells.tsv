@@ -1,0 +1,32 @@
+# third-party spell table, owner-supplied 2026-11-15 (no URL on record; the same class/spell
+# write-up cited as the THIRD-PARTY CROSS-CHECK in asm/3139_cast_spell_flow.asm, which arrived
+# 2026-10-29 without its price column). Vendored here the way disasm/source-gamercorner-locations.csv
+# is, so a later re-fetch diffs against what was actually joined rather than against memory.
+#
+# Columns follow the AGENTS.md § 3 rule that bytes decide identity and third parties decide
+# names: `claim` is what the source says, `verdict` is what our own bytes and captures say about
+# that claim, and `grade` is the grade of the verdict, not of the claim.
+#
+# The slot column is the ready number used by cmd_M and the index into DS:B6, which is OUR axis,
+# not the shop menu's. The wizard shoppe menu numbers 4/5/6 are remapped to slots 7/8/9 by
+# asm/19D7_magic_shop_menu at L_001c4f, so a wizard buying "6-KILL" gets slot 9.
+slot	name	class	claim	price_gold	verdict	grade
+1	LIGHT	General	Same as Ignite (does not require a torch)	20	MATCHES. Writes 0x96 (150) into DS:26, the dungeon light counter, with no darkness precondition, and always spends. asm/3139, filmed twice.	observed
+2	DOWN LADDER	General	Transport to the same spot on the next lower floor if the square behind your destination is open	32	MATCHES, including the odd clause. The gate is asm/1451 testing DS:23/DS:24 on the candidate floor for exactly zero, and DS:23/DS:24 is player minus facing, so "behind" is literal and relative to facing. Measured three ways in one session.	observed
+3	UP LADDER	General	Transport to the same spot on the next higher floor if the square behind your destination is open	52	MATCHES, plus an undocumented clause: at floor 0 the arm branches into the SURFACE tail and exits the site to the world map.	observed
+4	PASSWALL	Cleric	Remove the wall immediately in front of you (does not work on outer edge walls)	84	PARTLY. The removal is proven: facing a rock cell, (4,5) went 0x80 -> 0x00 with the charge spent. The outer-edge exclusion was NOT tested. Unresolved: one opened cell read 0x01 rather than 0x00, so clear-bit versus zero-byte is not settled.	observed in part
+5	SURFACE	Cleric	Immediately exit the current dungeon or tower	136	MATCHES, and depth is irrelevant: cast from floor 1 it returned the player to the world cell entered by, not a cell derived from the cast position.	observed
+6	PRAYER	Cleric	50% chance to destroy the enemy in front of you	220	MATCHES, and now with a mechanism. The arm is call rand_byte ; js FAILED ; jmp the KILL target, so it is KILL behind a coin flip. The flip is bit 7 of the generator's new byte, measured at 50.0% of 200000 simulated draws from a live state. asm/3139 previously recorded this claim as NOT FOUND; that is retracted.	observed and measured
+7	MAGIC MISSILE	Wizard	Deals 31 + twice your level damage to an enemy in front of you	356	SHAPE MATCHES, INPUT DOES NOT. The amount is 2*DS:56 + 0x1e + 1, so 31 + 2x is right as arithmetic, but DS:56 is the high BCD byte of experience, not a level, and doubling a BCD digit is not monotone: DS:56 = 0x99 yields 82 damage and 0x01 yields 33. Measured at both points.	observed, claim wrong in shape
+8	BLINK	Wizard	Teleports you to a random spot on the current floor (successful only if spot is open)	576	MATCHES EXACTLY. Two rand_byte draws, each and $0xf or $0x1 (random odd 1..15), written to DS:23/DS:24, gated by the same asm/1451 validity call the ladders use, then copied over the player position. Both exits filmed in a dungeon: (2,11) -> (7,1).	observed
+9	KILL	Wizard	Destroys the enemy in front of you (always succeeds)	932	MATCHES. No dice in front of the shared target scan; two casts, two kills, no refusal. The award pays out from the victim's own entry.	observed
+#
+# NOT ESTABLISHED BY THIS TABLE
+# The price column is unverified and is the interesting disagreement. asm/20AB_bcd_price_from_stats
+# derives a BCD quote from the caller's index and the bit length of [DS:50] + [DS:4E] (int plus
+# charisma), so a fixed per-spell cost cannot exist and a high-int buyer is quoted less for the
+# same spell. A maxout character (int 99, cha 99) should therefore be quoted BELOW these numbers.
+# Nobody has quoted a spell shoppe live. That is the open test.
+# The class column matches the two shop catalogues exactly (asm/1869 cleric shrine sells 1-6,
+# asm/19D7 magic shoppe sells 1,2,3,7,8,9), which is corroborating, and note the CAST path itself
+# tests no class byte at all: the shop gate is the entire restriction.
