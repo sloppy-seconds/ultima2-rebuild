@@ -164,8 +164,3 @@ engine/build-sdlstatic/
 # playthrough of copyrighted content exactly as a save file does, so it is user data
 # and never a repo artefact. The gate records its own fixture instead.
 demos/
-
-# Concept art outputs (docs/concept-dungeon-brief.md, docs/concept-shot-list.md).
-# Generated working material for the art-review stage: bulky full-colour PNGs that
-# seed the separate sprite stage, not shipped assets. Kept on disk, out of git.
-concepts/
