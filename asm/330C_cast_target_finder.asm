@@ -58,12 +58,27 @@
 #           means anything on a multi-floor dungeon should read the kind array at the kill, not
 #           after it.
 #
+# DECODED 2026-11-15 — what mon_kind means HERE, which was the last low-confidence part of this
+#           file. In a dungeon the byte at DI+0x1B7 is not a kind index at all: asm/147F writes
+#           `slot >> 1` into it, which across 32 slots is exactly floor 0..15, and asm/143C refuses
+#           a creature's move unless it equals [DS:25]. That is the SAME test this routine does at
+#           L_003522, so the CAST target scan and the dungeon AI are both asking "is this creature
+#           on the player's floor", by the same byte, for the same reason. It also explains the
+#           sector-24 measurement above exactly rather than approximately: slots 0 and 1 are the
+#           only two with slot>>1 == 0, which is why at DS:25 = 0 the kind test admitted precisely
+#           those two and nothing else. The overworld meaning is unchanged and is not a floor; the
+#           byte is mode-dependent, same as DS:25 itself and DS:4A.
+#           Consequence for a port: the scan's floor test is not a filter to be "fixed" into a
+#           kind match, and a dungeon creature on another floor is genuinely untargetable rather
+#           than hidden by a bug.
+#
 # provenance: live:cmd-c-magic-missile; entry stopped at runtime 0x330C with
 #           tools/bp_read.py four times and the arrays dumped at the stop, which is
 #           the only way this was settled — a poke-then-press race against the site
 #           tick lost three times before that (recipe: docs/spice86-capture.md).
 # confidence: high for the three tests and the facing semantics (bytes plus live
-#           confirmation at both return exits); low for what mon_kind means.
+#           confirmation at both return exits); high for the dungeon reading of mon_kind
+#           (asm/147F and asm/143C agree with this routine's own numbers).
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 sub_330c:
 L_00350c:

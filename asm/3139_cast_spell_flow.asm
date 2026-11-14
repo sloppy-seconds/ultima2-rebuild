@@ -116,11 +116,13 @@
 #           `KILLED--GOLD+3--EXP.+00`, the gold awarded in BCD and wrapping: a 9999-gold
 #           character went to 0002 on +3. EXP.+00 because the synthetic slot used for the
 #           test carried no kind table entry.
-#           THE AWARD IS PER-CREATURE, not a constant — corrected 2026-10-29 by
-#           captures/spice86/mm-owner-play, the first natural owner-play kill: same spell,
-#           same tower floor, and the frame reads `KILLED--GOLD+13--EXP.+03` with GOLD
-#           0004 -> 0017 and EXP 0000 -> 0003 to match. So both numbers come from the victim's
-#           own entry. How they are selected is still NOT decoded.
+#           RETRACTED 2026-11-15: "THE AWARD IS PER-CREATURE, not a constant", and the same
+#           retraction applies to the 2026-11-15 claim below that the award comes from the victim.
+#           Both numbers come from the RNG, not the victim: asm/2E3D's reward block, already
+#           transcribed in engine/src/game/combat.c, is gold = (rand_byte & 0x17) | 1 and
+#           exp = rand_byte & 7. `GOLD+13--EXP.+03` and `GOLD+3--EXP.+00` are two draws, not two
+#           creatures, and EXP.+00 is a 1-in-8 roll rather than a missing kind-table entry. How
+#           they are selected IS decoded; the note that it was not is what was wrong.
 #             The `jb` after the second `cmc` is taken when the creature SURVIVED, the
 #           opposite of how the idiom reads at a glance; invert it and the death path
 #           looks like the survival path.
@@ -171,11 +173,22 @@
 #           was 0x80 and the cast failed; turned east it was 0x00 and the cast moved the floor.
 #           KILL (slot 9) refused twice in a row on nothing: two casts, two kills, no -FAILED!,
 #           which is the no-dice difference from PRAYER.
-#           THE AWARD IS FROM THE VICTIM, now proven rather than inferred. Five kills through the
-#           one shared death path paid +13/+03, +11/+05, +17/+02, +13/+07, +17/+04. Two different
-#           spells converge on L_0030d1, so identical code produced five different EXP values and
-#           the only variable was the creature. Which field of the victim's record supplies the
-#           pair is still not decoded.
+#           RETRACTED THE SAME DAY, and it is worth reading as a method failure rather than a
+#           wrong answer: the paragraph below claimed "the award is from the victim, now proven
+#           rather than inferred". It is not. The reward was decoded years into this project's
+#           life and lives in asm/2E3D's own reward block, transcribed in
+#           engine/src/game/combat.c: gold = (rand_byte & 0x17) | 1 and exp = rand_byte & 7, two
+#           draws off the same generator this file's PRAYER arm uses. Nothing about the victim
+#           supplies the pair. The five distinct awards are what a random award looks like, and
+#           they sit inside the formula's range exactly: every gold observed (13, 11, 17, 13, 17)
+#           is odd and at most 0x17 = 23, and every exp (3, 5, 2, 7, 4, 6) is at most 7. Reading
+#           five values and concluding per-victim without looking up the reward block first is the
+#           look-up-before-you-derive rule in AGENTS.md section 3 failing in the exact shape it was
+#           written to prevent — a confident wrong answer from a hand-derivation of a fact the
+#           tree already held.
+#           What the five kills DO prove is narrower and still useful: KILL, PRAYER and MAGIC
+#           MISSILE all reach the same death path at L_0030d1, because one code path paid out
+#           three different spells' kills.
 #           A timing trap for anyone repeating this: a DS read taken immediately after the key send
 #           returns can show a charge unspent, because the handler finishes after the send returns.
 #           Twice in this session a spent spell read as unspent until re-read a beat later.

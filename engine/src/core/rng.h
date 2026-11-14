@@ -4,7 +4,9 @@
 /*
  * Random byte — the shift-register PRNG.
  *
- * spec: asm/5217_rand_byte.asm + asm/522B_sub_522b.asm + asm/5236_sub_5236.asm.
+ * spec: asm/5217_rand_byte.asm + asm/522B_rand_byte_shift.asm + asm/5236_rand_byte_tail.asm.
+ *   (Those last two were sub_522b and sub_5236 until 2026-11-15, when the split was named; the
+ *   spec line above is the reason the rename had to touch this header in the same commit.)
  * Phase 3 split this routine across three "function" boundaries; read together
  * (runtime 0x5217..0x523D) it is:
  *
@@ -22,6 +24,13 @@
  *   al = DS:0x23F
  *   or al, al                 callers branch on the zero flag
  *   ret
+ *
+ * ...and "the zero flag" is only half the story, which cost a decode. The same `or` sets SF from
+ * bit 7 of the returned byte, and the PRAYER arm of asm/3139 branches on the SIGN (`js`), not on
+ * zero. So a caller testing "is the roll zero" and a caller testing "is the high bit set" are
+ * reading different properties of one return value, and u2_rand_byte() returns the byte itself so
+ * both are expressible. Bit 7 measured fair: 50.0% of 200000 draws from a live register state
+ * (captures/spice86/magic-casts-2026-11-15), which is what makes PRAYER's 50% a measured fact.
  *
  * So the state is the six bytes DS:0x23F..0x244 and it is rewritten on every
  * call: a feedback shift register, not a clock sampler. docs/phase4-plan.md §1
