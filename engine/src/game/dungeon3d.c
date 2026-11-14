@@ -315,7 +315,12 @@ static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
             else                                   { y0 = floorY - reach; y1 = floorY; }
             h = y1 - y0; w = hFull / 3;
         } else {
-            h = list[i].tall ? (hFull * 9 / 10) : (hFull / 2);
+            /* A tall sprite is a creature standing on the floor. The camera eye
+             * sits half a cell above the floor, so a 0.9-cell-tall billboard
+             * barely clears the horizon and an adjacent monster reads as several
+             * metres away. Monsters are bigger than the viewer: scale the tall
+             * billboard so a creature one cell ahead fills most of the frame. */
+            h = list[i].tall ? (hFull * 8 / 5) : (hFull / 2);
             w = list[i].tall ? h : (hFull / 2);
             y0 = floorY - h; y1 = floorY;
         }
