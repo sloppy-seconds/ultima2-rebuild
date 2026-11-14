@@ -41,6 +41,7 @@
  * lines up with the hole. */
 typedef enum {
     U2_DGA_WALL_STONE = 0,   /* brick courses with mortar — rock and fake wall */
+    U2_DGA_WALL_DOOR,        /* same stone with a framed opening; opening is transparent */
     U2_DGA_FLOOR_FLAG,       /* flagstone */
     U2_DGA_FLOOR_DOOR,       /* plank threshold under a 0xC0 doorway */
     U2_DGA_FLOOR_HOLE,       /* flagstone + black square hole — a down-ladder cell */

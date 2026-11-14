@@ -242,4 +242,10 @@ void u2_dungeon_enter(u2_ctx *ctx, u2_overworld *ow);
 /* The wireframe. Draws nothing when `lit` is 0, which is the darkness. */
 void u2_dungeon_render(u2_ctx *ctx, u2_overworld *ow, int lit);
 
+/* Dev-only side-by-side (U2_DG_DUAL): true when the original CGA wireframe should
+ * also be drawn into the enhanced panel next to the 3D view. */
+int u2_dg_dual_mode(void);
+void u2_dungeon_render_classic_view(u2_ctx *ctx, u2_overworld *ow,
+                                    int ox, int oy, int clear_bottom);
+
 #endif /* U2_GAME_DUNGEON_H */

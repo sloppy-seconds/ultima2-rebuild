@@ -85,9 +85,8 @@ static uint8_t dg3_cell(const u2_overworld *ow, int fl, int x, int y)
 static int dg3_floor_tex(uint8_t c)
 {
     const uint8_t t = c & U2_DG_TERRAIN;
-    if (t == U2_DG_DOOR) return U2_DGA_FLOOR_DOOR;
     if (t & U2_DG_DOWN) return U2_DGA_FLOOR_HOLE;   /* descend through the floor */
-    return U2_DGA_FLOOR_FLAG;                        /* an up-ladder's floor is plain */
+    return U2_DGA_FLOOR_FLAG;   /* doorways and up-ladders share the plain floor */
 }
 
 /* The ceiling picks its texture the same way: an up-ladder punches a hole in
@@ -171,33 +170,81 @@ static void dg3_walls(u2_frame *f, const u2_overworld *ow, int fl,
         else            { stepY =  1; sideY = ((float)mapY + 1.0f - py) * ddy; }
 
         int side = 0, hit = 0;
+        float doorPerp = -1.0f; int doorSide = 0;
+        /* Walls are a full cell thick, so a doorway is a one-cell tunnel. The
+         * frame belongs on whichever face of the door cell is in front of the
+         * camera: the near face when approached from outside, the far face when
+         * the player is standing inside the passage. That is the first boundary
+         * where the cell changes between a door and open space; a door meeting a
+         * solid wall is not a doorway, so solidity gates both sides of it. */
+        const uint8_t sc0 = dg3_cell(ow, fl, mapX, mapY);
+        int prevDoor = (sc0 & U2_DG_TERRAIN) == U2_DG_DOOR;
+        int prevSolid = dg3_solid(sc0);
         for (;;) {
-            if (sideX < sideY) { side = 0; mapX += stepX; sideX += ddx; }
-            else               { side = 1; mapY += stepY; sideY += ddy; }
+            float cross; int cside;
+            if (sideX < sideY) { cside = 0; cross = sideX; mapX += stepX; sideX += ddx; }
+            else               { cside = 1; cross = sideY; mapY += stepY; sideY += ddy; }
+            side = cside;
             if ((side ? sideY : sideX) > DG3_MAX_DIST) break;
-            if (dg3_solid(dg3_cell(ow, fl, mapX, mapY))) { hit = 1; break; }
+            const uint8_t c = dg3_cell(ow, fl, mapX, mapY);
+            const int nowDoor = (c & U2_DG_TERRAIN) == U2_DG_DOOR;
+            const int nowSolid = dg3_solid(c);
+            if (doorPerp < 0.0f && (nowDoor != prevDoor) && !nowSolid && !prevSolid) {
+                doorPerp = cross; doorSide = cside;
+            }
+            prevDoor = nowDoor; prevSolid = nowSolid;
+            if (nowSolid) { hit = 1; break; }
         }
 
-        if (!hit) { zbuf[x] = DG3_FAR_Z; continue; }
-        const float perp = (side == 0) ? (sideX - ddx) : (sideY - ddy);
-        zbuf[x] = perp;
+        if (hit) {
+            const float perp = (side == 0) ? (sideX - ddx) : (sideY - ddy);
+            zbuf[x] = perp;
+            const int lineH = (int)(DG3_PROJ / (perp < 0.05f ? 0.05f : perp));
+            int y0 = DG3_CY - lineH / 2, y1 = DG3_CY + lineH / 2;
+            if (y0 < 0) y0 = 0;
+            if (y1 > DG3_H) y1 = DG3_H;
+            float wallX = (side == 0) ? (py + perp * rdy) : (px + perp * rdx);
+            wallX -= (float)f_floor(wallX);
+            int texX = ((int)(wallX * 32.0f)) & 31;
+            if ((side == 0 && rdx > 0.0f) || (side == 1 && rdy < 0.0f))
+                texX = 31 - texX;                   /* keep brick handedness */
+            const uint8_t *tex = u2_dga_tex(U2_DGA_WALL_STONE, u2_dga_shade(perp));
+            const float stepT = 32.0f / (float)lineH;
+            float tpos = (float)(y0 - (DG3_CY - lineH / 2)) * stepT;
+            for (int y = y0; y < y1; y++, tpos += stepT)
+                u2_frame_put(f, x, y, tex[((int)tpos & 31) * 32 + texX]);
+        } else {
+            zbuf[x] = DG3_FAR_Z;
+        }
 
-        const int lineH = (int)(DG3_PROJ / (perp < 0.05f ? 0.05f : perp));
-        int y0 = DG3_CY - lineH / 2, y1 = DG3_CY + lineH / 2;
-        if (y0 < 0) y0 = 0;
-        if (y1 > DG3_H) y1 = DG3_H;
-
-        float wallX = (side == 0) ? (py + perp * rdy) : (px + perp * rdx);
-        wallX -= (float)f_floor(wallX);
-        int texX = ((int)(wallX * 32.0f)) & 31;
-        if ((side == 0 && rdx > 0.0f) || (side == 1 && rdy < 0.0f))
-            texX = 31 - texX;                       /* keep brick handedness */
-
-        const uint8_t *tex = u2_dga_tex(U2_DGA_WALL_STONE, u2_dga_shade(perp));
-        const float stepT = 32.0f / (float)lineH;
-        float tpos = (float)(y0 - (DG3_CY - lineH / 2)) * stepT;
-        for (int y = y0; y < y1; y++, tpos += stepT)
-            u2_frame_put(f, x, y, tex[((int)tpos & 31) * 32 + texX]);
+        /* Doorway face: draw the stone-with-framed-opening at the door's depth,
+         * on top of whatever the ray reached beyond it. The opening pixels are
+         * transparent and skipped, so the room behind shows through (and its
+         * creatures stay visible). The door is nearer than anything behind it,
+         * so no z-test is needed; on the stone-side columns we pull the z-buffer
+         * in to the door so a creature beside the opening does not bleed through
+         * the wall. */
+        if (doorPerp >= 0.0f) {
+            const float dperp = doorPerp < 0.05f ? 0.05f : doorPerp;
+            const int lineH = (int)(DG3_PROJ / dperp);
+            int y0 = DG3_CY - lineH / 2, y1 = DG3_CY + lineH / 2;
+            if (y0 < 0) y0 = 0;
+            if (y1 > DG3_H) y1 = DG3_H;
+            float wallX = (doorSide == 0) ? (py + dperp * rdy) : (px + dperp * rdx);
+            wallX -= (float)f_floor(wallX);
+            int texX = ((int)(wallX * 32.0f)) & 31;
+            if ((doorSide == 0 && rdx > 0.0f) || (doorSide == 1 && rdy < 0.0f))
+                texX = 31 - texX;
+            if (texX < 9 || texX > 22) zbuf[x] = dperp;   /* stone side, not the gap */
+            const uint8_t *tex = u2_dga_tex(U2_DGA_WALL_DOOR, u2_dga_shade(dperp));
+            const float stepT = 32.0f / (float)lineH;
+            float tpos = (float)(y0 - (DG3_CY - lineH / 2)) * stepT;
+            for (int y = y0; y < y1; y++, tpos += stepT) {
+                const uint8_t c = tex[((int)tpos & 31) * 32 + texX];
+                if (c == U2_DGA_TRANSPARENT) continue;   /* the opening */
+                u2_frame_put(f, x, y, c);
+            }
+        }
     }
 }
 
@@ -315,8 +362,13 @@ void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s)
     const float px = (float)ow->x + 0.5f - DG3_BACK * (float)dx;
     const float py = (float)ow->y + 0.5f - DG3_BACK * (float)dy;
     const float dirX = (float)dx, dirY = (float)dy;
-    const float planeX = (float)dy * DG3_PLANE;
-    const float planeY = (float)(-dx) * DG3_PLANE;
+    /* The camera plane is the facing turned to the player's RIGHT. The original
+     * wireframe is the reference here: with the plane set the other way our view
+     * came out left-right mirrored (a door on the player's left drew on the
+     * screen's right). Flipping the plane sign mirrors walls, floor/ceiling and
+     * sprites together, so the three stay consistent with each other. */
+    const float planeX = (float)(-dy) * DG3_PLANE;
+    const float planeY = (float)dx * DG3_PLANE;
 
     float zbuf[DG3_W];
     dg3_floor_ceiling(f, ow, fl, px, py, dirX, dirY, planeX, planeY);

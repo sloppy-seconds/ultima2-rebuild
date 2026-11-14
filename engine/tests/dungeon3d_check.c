@@ -144,37 +144,57 @@ static void test_room(void)
 }
 
 /* ---- 2. doors render by the render-stop rule ----------------------------- */
+static void build_doorwall(u2_overworld *ow, uint8_t centre)
+{
+    /* A corridor at x=5, a wall at x=6 whose gap at (6,5) is `centre`, and an
+     * open room beyond at x=7. The player stands at (5,5) facing east, so the
+     * centre tile is one cell ahead — close enough that the wood frame stays at
+     * shade level 0 and its brown survives to be counted. */
+    for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++)
+        u2_world_dungeon_put(&ow->world, 0, x, y, U2_DG_ROCK);
+    for (int y = 4; y <= 6; y++) {
+        u2_world_dungeon_put(&ow->world, 0, 5, y, 0x00);
+        u2_world_dungeon_put(&ow->world, 0, 7, y, 0x00);
+    }
+    u2_world_dungeon_put(&ow->world, 0, 6, 5, centre);
+}
+
 static void test_doors(void)
 {
     u2_ctx ctx; u2_overworld ow;
 
-    /* 0xC0 doorway: an opening. The plank threshold under it is the only red
-     * in the scene (the door texture's board gaps), so red's presence proves
-     * the corridor drew THROUGH the door cell instead of capping it. Red is the
-     * stable signal: the plank brown shades to black with distance, but the red
-     * gaps survive every shade level, so this holds at any projection. */
+    /* 0xC0 doorway one cell ahead: draws as a stone wall with a framed wooden
+     * opening. The frame's wood (index 6) is the marker; rock carries none. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
-    build_room(&ow, U2_DG_DOOR);
-    u2_world_dungeon_put(&ow.world, 0, 9, 5, 0x00);   /* passage beyond */
+    build_doorwall(&ow, U2_DG_DOOR);
     u2_dungeon_render(&ctx, &ow, 1);
-    CHECK(count_index(&ow.frame, 4) > 0,
-          "door: 0xC0 should draw as a passage with a plank threshold");
+    CHECK(count_index(&ow.frame, 6) > 0,
+          "door: 0xC0 should draw a framed wooden opening");
     u2_frame_free(&ow.frame);
 
-    /* 0xE0 fake wall: must draw EXACTLY like rock — same colours, same cap.
-     * If the renderer ever hints at the secret, this goes red. */
+    /* Standing INSIDE the doorway: the wall is a full cell thick, so the framed
+     * opening reappears on the far face one cell ahead. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
-    build_room(&ow, U2_DG_ROCK);
+    build_doorwall(&ow, U2_DG_DOOR);
+    ow.x = 6; ow.y = 5;   /* stand in the door cell */
     u2_dungeon_render(&ctx, &ow, 1);
-    long rock_thresh = count_index(&ow.frame, 4);
+    CHECK(count_index(&ow.frame, 6) > 0,
+          "door: standing in the doorway should show the frame on the far face");
     u2_frame_free(&ow.frame);
-    CHECK(rock_thresh == 0, "door: rock should carry no plank threshold");
 
+    /* rock one cell ahead: a plain wall, no wood frame. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
-    build_room(&ow, U2_DG_SECRET);
+    build_doorwall(&ow, U2_DG_ROCK);
     u2_dungeon_render(&ctx, &ow, 1);
-    CHECK(count_index(&ow.frame, 4) == 0,
-          "secret: 0xE0 must draw as solid rock, not as a hint");
+    CHECK(count_index(&ow.frame, 6) == 0, "door: rock should carry no wood frame");
+    u2_frame_free(&ow.frame);
+
+    /* 0xE0 fake wall: must draw EXACTLY like rock — solid, no frame, fills view. */
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    build_doorwall(&ow, U2_DG_SECRET);
+    u2_dungeon_render(&ctx, &ow, 1);
+    CHECK(count_index(&ow.frame, 6) == 0,
+          "secret: 0xE0 must draw as solid rock, not a framed door");
     const double ink = ink_fraction(&ow.frame);
     CHECK(ink > 0.6, "secret: fake wall should still fill the view (ink=%.3f)", ink);
     u2_frame_free(&ow.frame);

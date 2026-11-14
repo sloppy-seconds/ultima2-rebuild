@@ -608,6 +608,57 @@ void u2_dungeon_render(u2_ctx *ctx, u2_overworld *ow, int lit)
     u2_dungeon_sprites(ctx, ow, &s);
 }
 
+/* Dev-only side-by-side comparison. When U2_DG_DUAL is set, the enhanced dungeon
+ * screen also shows the original CGA wireframe (the classic path: wireframe plus
+ * creature sprites, at native 320x200) blitted into the right-hand panel, so the
+ * new 3D renderer and the original can be watched live from the same game state.
+ * It runs after the text layer and clears the stats boxes out of the way; the CMD
+ * box below is left intact. This is a development aid, not a shipped layout. */
+int u2_dg_dual_mode(void)
+{
+    const char *e = getenv("U2_DG_DUAL");
+    return e && e[0] && e[0] != '0';
+}
+
+void u2_dungeon_render_classic_view(u2_ctx *ctx, u2_overworld *ow,
+                                    int ox, int oy, int clear_bottom)
+{
+    if (!ctx->state.moved_flag) return;   /* the darkness, same gate as the render */
+    u2_dg_scan s;
+    u2_dg_scan_build(ctx, ow, &s);
+
+    u2_frame tf;
+    if (u2_frame_init(&tf, 1) != 0) return;
+    u2_frame_clear(&tf, U2_CGA_BLACK);
+
+    /* Run the classic path verbatim into the temp frame: point the overworld frame
+     * at it and clear enhanced_layout so dg_set_transform picks block scale 1. */
+    u2_frame saved = ow->frame;
+    ow->frame = tf;
+    int enh = ctx->enhanced_layout;
+    ctx->enhanced_layout = 0;
+    dg_view v;
+    memset(&v, 0, sizeof v);
+    v.f = &ow->frame;
+    dg_set_transform(&v, ctx, &ow->frame);
+    v.d = 0;
+    dg_draw(&v, &s);
+    u2_dungeon_sprites(ctx, ow, &s);
+    ctx->enhanced_layout = enh;
+    ow->frame = saved;
+
+    /* Block the stats boxes, then blit the CGA view into the panel. The wireframe
+     * is CGA index 3; cga_idx maps it to EGA white when the frame is CGA-on-EGA. */
+    for (int y = oy; y < clear_bottom && y < ow->frame.h; y++)
+        for (int x = ox; x < ow->frame.w; x++)
+            u2_frame_put(&ow->frame, x, y, U2_CGA_BLACK);
+    for (int y = 0; y < tf.h; y++)
+        for (int x = 0; x < tf.w; x++)
+            u2_frame_put(&ow->frame, ox + x, oy + y,
+                         u2_frame_cga_idx(&ow->frame, tf.px[y][x]));
+    u2_frame_free(&tf);
+}
+
 int u2_dungeon_key(u2_ctx *ctx, u2_overworld *ow, uint8_t ch)
 {
     switch (ch) {

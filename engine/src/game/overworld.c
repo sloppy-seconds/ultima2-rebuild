@@ -1857,6 +1857,9 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
         u2_frame_clear(&ow->frame, U2_CGA_BLACK);
         u2_dungeon_render(ctx, ow, ctx->state.moved_flag != 0);
         compose_text_layer(ctx, ow);
+        if (u2_dg_dual_mode())
+            u2_dungeon_render_classic_view(ctx, ow, U2_ENH_MAP_COLS * 32, 0,
+                                           U2_ENH_CMD_Y);
         if (ow->turns != ow->logged_turn) {
             ow->logged_turn = ow->turns;
             u2_turnlog(ctx, &ow->frame, ow->turns);

@@ -72,6 +72,23 @@ static void gen_wall_stone(uint8_t *t)
     }
 }
 
+static void gen_wall_door(uint8_t *t)
+{
+    gen_wall_stone(t);
+    const int jl0 = 7, jl1 = 8;     /* left jamb  */
+    const int jr0 = 23, jr1 = 24;    /* right jamb */
+    const int top = 5;               /* lintel top row */
+    for (int y = top; y < 32; y++)
+        for (int x = jl0; x <= jr1; x++) {
+            uint8_t c = U2_DGA_TRANSPARENT;
+            if ((x <= jl1 || x >= jr0) || y <= top + 1) c = 6;   /* wood frame */
+            put(t, x, y, c);
+        }
+    /* dark outline on the frame's outer edge so it reads against the stone */
+    for (int y = top; y < 32; y++) { put(t, jl0 - 1, y, 0); put(t, jr1 + 1, y, 0); }
+    for (int x = jl0 - 1; x <= jr1 + 1; x++) put(t, x, top - 1, 0);
+}
+
 /* Flagstone floor: 16 px slabs, dark seams, light-grey faces with sparse
  * dark and pale chips. Light base on purpose: the shade levels darken it, so
  * a dark base would crush to black one band out. */
@@ -214,14 +231,17 @@ void u2_dga_init(void)
     xs_state = 0x5EEDD15Bu;
 
     static void (*const texgen[U2_DGA_TEX_COUNT])(uint8_t *) = {
-        gen_wall_stone, gen_floor_flag, gen_floor_door,
+        gen_wall_stone, gen_wall_door, gen_floor_flag, gen_floor_door,
         gen_floor_hole, gen_ceil_cave, gen_ceil_hole
     };
     for (int id = 0; id < U2_DGA_TEX_COUNT; id++) {
         texgen[id](s_tex[id][0]);
         for (int lv = 1; lv < U2_DGA_SHADE_LEVELS; lv++)
-            for (int i = 0; i < U2_DGA_TEX_PX; i++)
-                s_tex[id][lv][i] = k_shade[s_tex[id][lv - 1][i]];
+            for (int i = 0; i < U2_DGA_TEX_PX; i++) {
+                const uint8_t p = s_tex[id][lv - 1][i];
+                s_tex[id][lv][i] = (p == U2_DGA_TRANSPARENT)
+                                 ? U2_DGA_TRANSPARENT : k_shade[p];
+            }
     }
 
     xs_state = 0x0D1CEA57u;   /* sprites get their own stream */
