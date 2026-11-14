@@ -710,16 +710,52 @@ int u2_dungeon_key(u2_ctx *ctx, u2_overworld *ow, uint8_t ch)
  * asm/12DB's whole body is `mov [DS:20],al` and a packed-decimal subtract of that
  * from the food triple DS:53/54/55, so a dungeon turn costs ten food and a
  * starvation borrow falls into the same death tail the overworld uses. */
+static int dg_inspect(void);
+
 void u2_dungeon_tick(u2_ctx *ctx, u2_overworld *ow)
 {
     /* asm/1151 runs the spawner at runtime 0x1360 and the sweep immediately after it,
      * both before the light tail at 0x1491, so an emptied slot is refilled on the
      * following turn rather than only on entry. That is what the bytes do and it is
      * why a dungeon cannot be cleared permanently by fighting. */
-    u2_dungeon_creatures(ctx, ow);
+    if (!dg_inspect()) u2_dungeon_creatures(ctx, ow);
     u2_dungeon_light_step(ctx);
     (void)u2_overworld_spend_food(ctx, 0x10u);
     u2_dungeon_probe(ctx, ow);
+}
+
+/* Dev affordance (U2_DG_INSPECT=1): build a big open hall with one creature of
+ * each stamp 1..7 lined up across the view, plus a chest and both ladders, so
+ * every piece of dungeon art can be eyeballed in a single frame. It overwrites
+ * the loaded floor in memory only — nothing is saved — and the creature sweep is
+ * suppressed while it is on so the subjects hold still. Not game behaviour. */
+static int dg_inspect(void)
+{
+    static int cached = -1;
+    if (cached < 0) cached = getenv("U2_DG_INSPECT") ? 1 : 0;
+    return cached;
+}
+
+int u2_dungeon_inspect(void) { return dg_inspect(); }
+
+static void dg_inspect_setup(u2_ctx *ctx, u2_overworld *ow)
+{
+    const int fl = 0;
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 16; x++)
+            u2_world_dungeon_put(&ow->world, fl, x, y,
+                                 (x == 0 || x == 15 || y == 0 || y == 15) ? 0x80 : 0x00);
+    /* one creature of each stamp, in a column across the east-facing view */
+    for (int s = 1; s <= 7; s++)
+        u2_world_dungeon_put(&ow->world, fl, 6, 1 + s, (uint8_t)s);
+    u2_world_dungeon_put(&ow->world, fl, 10, 5, 0x40);   /* chest   */
+    u2_world_dungeon_put(&ow->world, fl, 13, 3, 0x10);   /* up ladder   */
+    u2_world_dungeon_put(&ow->world, fl, 13, 7, 0x20);   /* down ladder */
+    ow->x = 2; ow->y = 5;
+    ctx->state.site_floor = 0;
+    ctx->state.face_dx = 1; ctx->state.face_dy = 0;
+    ctx->state.moved_flag = 0x96;   /* a full torch (the aliased light counter), so the
+                                     * entry light_step decrement leaves it lit */
 }
 
 void u2_dungeon_enter(u2_ctx *ctx, u2_overworld *ow)
@@ -760,6 +796,7 @@ void u2_dungeon_enter(u2_ctx *ctx, u2_overworld *ow)
                              ctx->state.mon_type[i]);
     }
     u2_dungeon_spawn(ctx, ow);
+    if (dg_inspect()) dg_inspect_setup(ctx, ow);
     /* The entry frame is dark, and asm/1151 says so on the turn that follows the
      * load: captures/spice86/dungeon-35-live and tower-34 both record IT'S DARK!
      * on entry with [DS:26] at zero. */

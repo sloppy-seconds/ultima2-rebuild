@@ -1795,6 +1795,10 @@ int u2_overworld_init_state(u2_ctx *ctx, u2_overworld *ow)
                 ow->tiles_ega.name[0] ? ow->tiles_ega.name : ow->ega_theme);
     }
 
+    /* Dev inspection (U2_DG_INSPECT=1): boot straight into the dungeon so the
+     * inspection hall is up without walking to a mouth. Forces the site to read
+     * as a dungeon; u2_dungeon_enter then builds the hall over whatever loaded. */
+    if (u2_dungeon_inspect()) ctx->state.sector_second = 4;
     if (u2_site_is_dungeon(ctx)) u2_dungeon_enter(ctx, ow);
     return 0;
 }

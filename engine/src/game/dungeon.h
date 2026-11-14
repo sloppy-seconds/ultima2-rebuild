@@ -142,6 +142,10 @@ void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s);
 /* True when the resident sector is dungeon-shaped: site kind 4 (tower) or 5. */
 int u2_site_is_dungeon(const u2_ctx *ctx);
 
+/* Non-zero when the dev inspection hall is requested (U2_DG_INSPECT set). Used
+ * by the overworld boot to enter the dungeon directly for art review. */
+int u2_dungeon_inspect(void);
+
 /* The facing vector at [DS:02]/[DS:03], as the signed pair the original keeps it. */
 void u2_dungeon_facing(const u2_ctx *ctx, int *dx, int *dy);
 

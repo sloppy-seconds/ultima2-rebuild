@@ -61,6 +61,7 @@ while [ $# -gt 0 ]; do
         --load-save) LOADSAVE=1; shift ;;
         --enhanced)  ENHANCED=1; shift ;;
         --dual)      DUAL=1; shift ;;
+        --inspect)   INSPECT=1; shift ;;
         --down)      DOWN=1; shift ;;
         --status)    STATUS=1; shift ;;
         --shot)      if [ $# -gt 1 ] && [ "${2:0:1}" != "-" ]; then
@@ -287,6 +288,7 @@ podman run -d --name "$CONTAINER" -p "$HOST_PORT:6081" \
     -e U2_ARGS="$U2_ARGS" \
     -e GEOMETRY="$GEOM" \
     -e U2_DG_DUAL="${DUAL:-0}" \
+    -e U2_DG_INSPECT="${INSPECT:-0}" \
     -v "$ROOT/original:/content:ro,z" \
     -v "$SAVES_HOST:/saves:z" \
     "$IMAGE:latest" >/dev/null
