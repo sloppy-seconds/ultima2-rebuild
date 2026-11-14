@@ -96,6 +96,27 @@ def matte_flood(im, tol=40):
     return ~seen     # True = opaque
 
 
+def _drop_small_components(alpha, frac=0.02, floor_px=24):
+    """rembg's matte sometimes keeps stray background islands (small floating
+    specks near the feet or edges). The subject is one connected figure, so drop
+    connected components much smaller than the main one. Keeps substantial parts
+    (a held weapon, a raised arm) and intended white that touches the body."""
+    try:
+        from scipy import ndimage
+    except Exception:
+        return alpha
+    lbl, n = ndimage.label(alpha)
+    if n <= 1:
+        return alpha
+    sizes = ndimage.sum(alpha, lbl, index=range(1, n + 1))
+    keep = sizes >= max(floor_px, frac * sizes.max())
+    out = np.zeros_like(alpha)
+    for i, k in enumerate(keep, start=1):
+        if k:
+            out |= (lbl == i)
+    return out
+
+
 def load_sprite(src_dir, stem):
     """Matte at working resolution, tight-crop to the figure, then fit it to fill
     the EDGE square anchored to the floor. Filling the square is what makes a
@@ -104,6 +125,7 @@ def load_sprite(src_dir, stem):
     path = os.path.join(src_dir, f"{stem}_00001_.png")
     work = Image.open(path).convert('RGB').resize((WORK, WORK), Image.LANCZOS)
     alpha = matte_rembg(work) if HAVE_REMBG else matte_flood(work)
+    alpha = _drop_small_components(alpha)
     if not HAVE_REMBG:
         # the flood matte leaves a blended fringe; erode 1px to eat the halo
         a = alpha.copy()
