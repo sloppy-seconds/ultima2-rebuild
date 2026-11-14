@@ -1,0 +1,57 @@
+# u2 art-pipeline — the concept -> sprite toolchain, containerised.
+#
+# Why a container: the good tools for this job (a real background remover, a real
+# palette quantiser) are heavy and pull large ML runtimes. Installing them on the
+# host would mean onnxruntime, opencv and a ~170 MB segmentation model living in
+# Paul's system Python forever. Baking them into an image instead keeps the host
+# clean and makes the whole pipeline a versioned, shareable artifact: `podman
+# build` reproduces the exact tool set, and anyone can run the pipeline without
+# installing anything.
+#
+# Base is python:3.11-slim, NOT the Fedora base the runtime images use. Those
+# images pin Fedora to match the host glibc because they exec the engine binary
+# and the vendored Spice86 apphost. This image runs no host binary — it is pure
+# tooling — so the glibc-match constraint does not apply, and a Debian slim base
+# is smaller and has the best wheel coverage for onnxruntime/rembg on 3.11.
+#
+# Build from the PROJECT ROOT (the context is trimmed by .dockerignore; nothing
+# is COPYied in — the repo is bind-mounted at run time by run.sh):
+#   podman build -t u2-art-pipeline -f deploy/art-pipeline/Containerfile .
+# Use deploy/art-pipeline/run.sh, which builds if needed and mounts the repo.
+
+FROM python:3.11-slim
+
+# ImageMagick: trim / resize / gravity-fit / general pixel work.
+# pngquant: perceptual palette quantisation with alpha and dithering, and a
+#   shared-palette mode — the right tool for the 240-colour dungeon palette.
+# optipng: lossless PNG shrink for the committed concept/source art.
+# ffmpeg is pulled in by rembg's video helpers; --no-install-recommends keeps the
+#   rest of the apt set minimal.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      imagemagick \
+      pngquant \
+      optipng \
+ && rm -rf /var/lib/apt/lists/*
+
+# rembg[cpu] pulls onnxruntime, opencv-python-headless, scikit-image, scipy,
+# numpy and pillow as dependencies, so the whole imaging stack arrives here.
+# Pinned loosely; the image is the lockfile (rebuild = reproducible).
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir \
+      numpy \
+      pillow \
+      "rembg[cpu]"
+
+# Bake the u2net segmentation model into the image. rembg downloads it to
+# U2NET_HOME on first use; doing it at build time means the container runs the
+# pipeline with no network and no first-run stall, which is the point of a
+# reusable artifact.
+ENV U2NET_HOME=/opt/u2net
+RUN mkdir -p "$U2NET_HOME" \
+ && python -c "from rembg import new_session; new_session('u2net'); print('u2net model cached')"
+
+# The pipeline scripts live in the repo (mounted at /work), not in the image, so
+# a tool change is a git commit, not a rebuild. Default to a shell in /work.
+WORKDIR /work
+CMD ["bash"]
