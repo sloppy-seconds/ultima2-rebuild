@@ -257,6 +257,8 @@ static int read_yes(u2_ctx *ctx)
 
 /* ---- the two catalogues that share one shape ------------------------------- */
 
+static u2_transact_result sell_spell(u2_ctx *ctx, int wizard);
+
 /*
  * asm/1D1D (armour) and asm/1E4F (weapons) are the same routine twice:
  *
@@ -653,26 +655,20 @@ u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, i
         return U2_TRANSACT_NO_DEALER;
     }
 
-    switch (u2_commerce_shop_for(ow->x, ow->y, st->sector_second)) {
+    const u2_shop shop = u2_commerce_shop_for(ow->x, ow->y, st->sector_second);
+    switch (shop) {
     case U2_SHOP_ARMOUR:    return shop_armour(ctx);
     case U2_SHOP_WEAPONS:   return shop_weapons(ctx);
     case U2_SHOP_GROCERY:   return shop_grocery(ctx);
     case U2_SHOP_TRANSPORT: return shop_transport(ctx);
     case U2_SHOP_CLERIC:
     case U2_SHOP_WIZARD:
-        /* GAP — both spell shops are reached and gated in the original (asm/1841 tests
-         * [DS:47] == 1 for the cleric and asm/19AF tests [DS:47] == 2 for the wizard, so
-         * the class byte the handoff listed as unnamed is DS:47, already state.h's
-         * `pclass`), and both quote through asm/20AB with the menu digit as the index.
-         * What is not established is where a bought spell LANDS: the wizard menu offers
-         * 4-M.M., 5-BLINK, 6-KILL while those names sit at pool slots 7/8/9, so the menu
-         * number and the ready number may be different axes, and asm/19D7's "FIVE "/"S FOR "
-         * framing is unread. Writing spell_counts[digit] would be a guess wearing a
-         * citation.
-         * Not silent: see engine_gap. A shop that is decoded but unimplemented still has to
-         * say so, or the player reads a working refusal out of a missing feature. */
-        engine_gap(ctx, "spell shop not implemented -> DS:B6 slot");
-        return U2_TRANSACT_NO_DEALER;
+        /* Both gated on class upstream (asm/184C tests [DS:47] == 1, asm/19BA tests
+         * [DS:47] == 2) and both wired 2026-11-15. What was blocking this was the question the
+         * previous draft of this branch refused to guess, and the answer is that the axes really
+         * are different: asm/19D7's `cmp $0x4 ; jb ; adc $0x3` moves the wizard's menu digits
+         * 4/5/6 onto pool slots 7/8/9, and the price is quoted on the SLOT. See sell_spell. */
+        return sell_spell(ctx, shop == U2_SHOP_WIZARD);
     case U2_SHOP_CLUE:
         /* GAP — the clue seller takes digit x 100 by byte placement (the digit goes into
          * the hundreds byte and the low byte is zeroed; there is no multiply), but the clue
@@ -689,6 +685,168 @@ u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, i
     }
     seam_str_out(ctx, U2_S_NO_RESPONSE);
     return U2_TRANSACT_NO_DEALER;
+}
+
+/* ---- the two shoppes that sell spells -------------------------------------- */
+
+#ifdef U2_T_SPELLS_N
+#  define SPELL_AT(i) (((i) >= 0 && (i) < U2_T_SPELLS_N) ? U2_T_SPELLS[(i)] : "")
+#else
+#  define SPELL_AT(i) ""
+#endif
+
+/* asm/1869 (the cleric shrine) and asm/19D7 (the magic shoppe) are one routine wearing two
+ * vocabularies. Both:
+ *
+ *   greet, print a six-item menu, read a digit
+ *   0 or >= 7 -> the shoppe's own farewell, and nothing else happens
+ *   "FIVE " + the spell NAME from pool[0x24 + slot] + "S FOR " + the price, then ask
+ *   anything other than 'Y' is a refusal
+ *   'Y' -> the shoppe's yes line, charge, then ADD FIVE to DS:B6[slot] in packed decimal
+ *
+ * Four things the bytes insist on that a rewrite would lose.
+ *
+ * The price is asm/20AB called with the SLOT, not the menu digit, so both shoppes price the
+ * same spell identically and the wizard's remap moves the price along with the spell.
+ *
+ * The quantity is five, not one, and it is `clc ; adc $0x5,%al ; daa` with no ceiling: 99 plus
+ * five is 04. The cleric says the number out loud -- "I WILL TAKE 5!" -- which is the only
+ * place in the game five is spoken, and it is about the QUANTITY, not the gold. A per-unit
+ * price read out of that line is a misreading of it, and it is the shape of the disagreement
+ * the price column in disasm/source-third-party-spells.tsv is still carrying.
+ *
+ * The wizard's menu digit is not the slot. asm/19D7's `cmp $0x4 ; jb ; adc $0x3` maps 4/5/6
+ * onto 7/8/9, because the three spells only the wizard sells sit at pool slots 7/8/9. The
+ * cleric needs no remap for the same reason in reverse: its three extras are PASSWALL,
+ * SURFACE and PRAYER, which are slots 4/5/6. One +3, and its cause is the pool's layout
+ * rather than anything about classes.
+ *
+ * Neither shoppe tests a class here. The gate is upstream -- asm/184C refuses a non-cleric at
+ * the shrine and asm/19BA refuses a non-wizard at the shoppe -- and by the time this runs the
+ * class question is settled. Adding a second test would be a new bug, exactly as it would in
+ * cmd_C.
+ */
+static u2_transact_result sell_spell(u2_ctx *ctx, int wizard)
+{
+    u2_state *st = &ctx->state;
+
+    if (wizard) {
+        seam_str_out(ctx, U2_S_SHOP_WIZ_WELCOME);
+        seam_char_print(ctx, '\r');
+        seam_str_out(ctx, U2_S_SHOP_MENU_LADDERS);
+        seam_char_print(ctx, '\r');
+        seam_str_out(ctx, U2_S_SHOP_WIZ_LINE2);
+        seam_char_print(ctx, '\r');
+        seam_str_out(ctx, U2_S_SHOP_WIZ_PROMPT);
+    } else {
+        seam_str_out(ctx, U2_S_SHOP_CLERIC_WELC);
+        /* asm/1869: `mov 0x46,%al ; cmp $0x1,%al ; je SISTER`. [DS:46] is the sex byte, and
+         * the byte the create flow leaves there is the typed character -- 'M' or 'F' -- which
+         * is what the Z screen compares against and what the API reports. An immediate 1 is
+         * therefore never equal, and read literally the shrine calls every visitor BROTHER.
+         * INFERRED, not observed: no capture has stood a female cleric at a shrine. The
+         * comparison is written against the value the bytes test rather than against 'F',
+         * because making it say what the greeting is expected to mean would be the invention;
+         * if a capture ever shows SISTER, the thing that was wrong is [DS:46]'s meaning and
+         * this line changes with it. See docs/needs-gameplay.md. */
+        seam_str_out(ctx, st->sex == 1 ? U2_S_SHOP_CLERIC_SIS : U2_S_SHOP_CLERIC_BRO);
+        /* asm/1869 then calls L_00527a, and asm/507A is a one-instruction stub in this tree,
+         * so what it emits is not reconstructed. The engine prints the character's name, which
+         * is what "BROTHER " reads as and is the only thing in the record that fits. Graded
+         * inferred and named here rather than left as an unremarked gap in the greeting. */
+        seam_str_out(ctx, (const char *)st->name);
+        seam_char_print(ctx, '\r');
+        seam_str_out(ctx, U2_S_SHOP_MENU_LADDERS);
+        seam_char_print(ctx, '\r');
+        seam_str_out(ctx, U2_S_SHOP_CLERIC_LINE2);
+        seam_char_print(ctx, '\r');
+        seam_str_out(ctx, U2_S_SHOP_CLERIC_PROMPT);
+    }
+
+    const int digit = read_digit(ctx);
+    /* `call L_002228 ; je bye` then `cmp $0x7,%al ; jae bye`: the emitter's zero test and the
+     * bound together mean the accepted set is 1..6 and nothing else. */
+    if (digit <= 0 || digit > 6) {
+        seam_str_out(ctx, wizard ? U2_S_SHOP_WIZ_BYE : U2_S_SHOP_CLERIC_BYE);
+        return U2_TRANSACT_REFUSED;
+    }
+
+    int slot = digit;
+    if (wizard)
+        slot = u2_shop_wizard_slot(digit);
+
+    seam_str_out(ctx, U2_S_SHOP_FIVE);
+    seam_str_out(ctx, SPELL_AT(slot));
+    seam_str_out(ctx, U2_S_SHOP_S_FOR);
+
+    uint8_t price[2];
+    u2_price_from_stats((uint8_t)slot, st->stat_int, st->stat_cha, price);
+    print_price(ctx, price);
+
+    seam_char_print(ctx, '\r');
+    seam_str_out(ctx, wizard ? U2_S_SHOP_WIZ_YESQ : U2_S_SHOP_CLERIC_YESQ);
+    if (!read_yes(ctx)) {
+        if (wizard) {
+            /* The wizard's refusal is two lines: "NO!" and then the same farewell the
+             * out-of-range digit gets, because the not-Y arm jumps back to it. */
+            seam_str_out(ctx, U2_S_SHOP_WIZ_NO);
+            seam_str_out(ctx, U2_S_SHOP_WIZ_BYE);
+        } else {
+            seam_str_out(ctx, U2_S_SHOP_CLERIC_NO_A);
+            seam_char_print(ctx, '\r');
+            seam_str_out(ctx, U2_S_SHOP_CLERIC_NO_B);
+        }
+        return U2_TRANSACT_REFUSED;
+    }
+
+    if (wizard) {
+        seam_str_out(ctx, U2_S_SHOP_WIZ_YES);
+    } else {
+        seam_str_out(ctx, U2_S_SHOP_CLERIC_YES_A);
+        seam_char_print(ctx, '\r');
+        seam_str_out(ctx, U2_S_SHOP_CLERIC_YES_B);
+    }
+
+    /* asm/2252, the same charge asm/2052 uses everywhere else, and it runs BEFORE the count
+     * moves. Whether the original underflows gold when there is none is not what this models;
+     * the engine refuses, and the yes line has already printed, which is the original's order
+     * and the original's cosmetic consequence. */
+    if (!u2_spend_price(ctx, price))
+        return U2_TRANSACT_REFUSED;
+
+    if (slot >= 0 && slot < (int)(sizeof st->spell_counts / sizeof st->spell_counts[0]))
+        st->spell_counts[slot] = u2_bcd_add_five(st->spell_counts[slot]);
+    return U2_TRANSACT_OPEN;
+}
+
+/* asm/19D7's menu remap, split out so it can be gated: `cmp $0x4,%al ; jb keep ; clc ;
+ * adc $0x3,%al`.
+ *
+ * The wizard's menu offers 1-LIGHT, 2-L.D., 3-L.U., 4-M.M., 5-BLINK, 6-KILL, and the spell
+ * pool holds MAGIC MISSILE, BLINK and KILL at slots 7, 8 and 9. So the menu digit and the
+ * ready number are different axes for 4/5/6 and the same axis for 1/2/3, and the +3 is a
+ * fact about the pool's layout rather than about wizards. The cleric needs no remap because
+ * its three extras -- PASSWALL, SURFACE, PRAYER -- are slots 4/5/6 and already line up.
+ *
+ * This is the rule a rewrite silently gets wrong in the interesting direction: buying 6-KILL
+ * and storing it at slot 6 leaves the player holding a spell that `M 6` reads as PRAYER and
+ * `M 9` reads as empty, which is not a crash and not even visible in the shop. */
+int u2_shop_wizard_slot(int menu_digit)
+{
+    return menu_digit < 4 ? menu_digit : menu_digit + 3;
+}
+
+/* asm/1869 and asm/19D7 both finish a sale with `clc ; mov 0x1f,%bl ; mov %bx,%di ;
+ * mov 0xb6(%di),%al ; adc $0x5,%al ; daa ; mov %al,0xb6(%di)`: five charges, packed decimal,
+ * and no ceiling anywhere in the sequence. 99 plus five is 04.
+ *
+ * Deliberately NOT routed through u2_bcd_inc_sat. The saturation policy exists for the
+ * counters the owner ruled cap; this one demonstrably does not, and a spell count that
+ * saturates would be a quieter divergence than any of the ones this project has caught. */
+uint8_t u2_bcd_add_five(uint8_t count)
+{
+    int cf = 0;
+    return daa_add(count, 0x05, 0, &cf);
 }
 
 /* asm/3FAB..asm/3FDD's branch structure, with the rolls taken out. The quadrant tests in the

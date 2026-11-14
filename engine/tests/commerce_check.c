@@ -548,6 +548,35 @@ int main(void)
         CHECK(ctx.state.items_held[0] == 1, "chain: the ring is in the inventory at the end");
     }
 
+    /* ---- the spell shoppes: the two rules a rewrite loses ---------------------
+     *
+     * Both are byte-transcribed in commerce.c and both fail silently in the direction that
+     * matters, so they are pinned here rather than left to a playthrough that would only
+     * notice a spell that will not cast.
+     *
+     * The remap: asm/19D7's `cmp $0x4 ; jb ; clc ; adc $0x3`. Buying 6-KILL and storing it at
+     * slot 6 leaves the player holding a spell that M 6 reads as PRAYER and M 9 reads as
+     * empty, in a shop that printed everything correctly the whole time.
+     *
+     * The quantity: `clc ; adc $0x5,%al ; daa`, five charges, no ceiling. The cleric says
+     * "I WILL TAKE 5!", which is about the quantity and not the gold, and a per-unit price
+     * read off that line is the disagreement the third-party table still carries. */
+    CHECK(u2_shop_wizard_slot(1) == 1 && u2_shop_wizard_slot(2) == 2 &&
+          u2_shop_wizard_slot(3) == 3,
+          "wizard menu: 1/2/3 are already the slots (LIGHT, L.D., L.U.)");
+    CHECK(u2_shop_wizard_slot(4) == 7 && u2_shop_wizard_slot(5) == 8 &&
+          u2_shop_wizard_slot(6) == 9,
+          "wizard menu: 4/5/6 map to 7/8/9 (M.M., BLINK, KILL)");
+    /* The control that makes the row above able to fail: the identity map is the wrong answer
+     * a plain `spell_counts[digit]` produces, and it is the one that looks plausible. */
+    CHECK(u2_shop_wizard_slot(6) != 6, "wizard menu: KILL must not land in the PRAYER slot");
+
+    CHECK(u2_bcd_add_five(0x00) == 0x05 && u2_bcd_add_five(0x05) == 0x10,
+          "spell sale: five charges, packed decimal (00->05, 05->10)");
+    CHECK(u2_bcd_add_five(0x94) == 0x99, "spell sale: 94 + 5 reaches 99 exactly");
+    CHECK(u2_bcd_add_five(0x99) == 0x04,
+          "spell sale: 99 + 5 is 04 -- the original has no ceiling and must not saturate");
+
     printf("commerce_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
 }

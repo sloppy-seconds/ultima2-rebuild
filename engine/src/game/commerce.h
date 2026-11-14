@@ -108,6 +108,16 @@ uint8_t u2_tribute_raise_for(uint8_t hp_high);
 void u2_price_from_stats(uint8_t index, uint8_t stat_int, uint8_t stat_cha,
                          uint8_t price[2]);
 
+/* asm/19D7: the magic shoppe's menu digit is not the pool slot. Digits 4/5/6 become 7/8/9
+ * because MAGIC MISSILE, BLINK and KILL sit at pool slots 7/8/9; 1/2/3 pass through. The
+ * cleric shrine needs no such map, because PASSWALL, SURFACE and PRAYER are slots 4/5/6.
+ * Exposed so a gate can pin it -- buying 6-KILL into slot 6 is silent and looks fine. */
+int u2_shop_wizard_slot(int menu_digit);
+
+/* asm/1869 / asm/19D7: a completed spell sale adds FIVE charges in packed decimal, with no
+ * ceiling, so 99 becomes 04. Not the saturating helper, on purpose. */
+uint8_t u2_bcd_add_five(uint8_t count);
+
 /* asm/2052_gold_spend_price: subtract the price pair from gold. Returns 1 when the gold
  * moved and 0 when the player could not pay, in which case the refusal has been printed and
  * the original abandons the shop entirely (asm/2052's failure arm pops its own return

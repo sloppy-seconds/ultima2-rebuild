@@ -254,6 +254,48 @@
 #define U2_S_CAST_NO_SPELL "NO SPELL!"
 /* exe@0x3435 */
 #define U2_S_CAST_FAILED "-FAILED!"
+/* exe@0x1A6D */
+#define U2_S_SHOP_CLERIC_WELC "WELCOME "
+/* exe@0x1A80 */
+#define U2_S_SHOP_CLERIC_BRO "BROTHER "
+/* exe@0x1A8F */
+#define U2_S_SHOP_CLERIC_SIS "SISTER "
+/* exe@0x1A9E */
+#define U2_S_SHOP_MENU_LADDERS "1-LIGHT, 2-L.D., 3-L.U.,"
+/* exe@0x1AB7 */
+#define U2_S_SHOP_CLERIC_LINE2 "4-PASS 5-SURFACE, 6-PRAYER."
+/* exe@0x1AD3 */
+#define U2_S_SHOP_CLERIC_PROMPT "YOUR INTEREST? "
+/* exe@0x1AF2 */
+#define U2_S_SHOP_CLERIC_BYE "FOLLOW THE LIGHT, FRIEND!"
+/* exe@0x1B15 */
+#define U2_S_SHOP_FIVE "FIVE "
+/* exe@0x1B27 */
+#define U2_S_SHOP_S_FOR "S FOR "
+/* exe@0x1B46 */
+#define U2_S_SHOP_CLERIC_YESQ "YES, FRIEND? "
+/* exe@0x1B63 */
+#define U2_S_SHOP_CLERIC_NO_A "NO"
+/* exe@0x1B66 */
+#define U2_S_SHOP_CLERIC_NO_B "I'M SORRY, GOOD DAY."
+/* exe@0x1B81 */
+#define U2_S_SHOP_CLERIC_YES_A "YES,"
+/* exe@0x1B86 */
+#define U2_S_SHOP_CLERIC_YES_B "I WILL TAKE 5!"
+/* exe@0x1BDB */
+#define U2_S_SHOP_WIZ_WELCOME " MUSERREF OLDUM!"
+/* exe@0x1C05 */
+#define U2_S_SHOP_WIZ_LINE2 "4-M.M., 5-BLINK, 6-KILL,"
+/* exe@0x1C1E */
+#define U2_S_SHOP_WIZ_PROMPT "BIR IKI UC...? "
+/* exe@0x1C3E */
+#define U2_S_SHOP_WIZ_BYE "UGURLA OLSUN!"
+/* exe@0x1C8D */
+#define U2_S_SHOP_WIZ_YESQ "LUTFEN EVET? "
+/* exe@0x1CAA */
+#define U2_S_SHOP_WIZ_NO "NO!"
+/* exe@0x1CB3 */
+#define U2_S_SHOP_WIZ_YES "YES"
 /* exe@0x2A65 */
 #define U2_S_ADVANCE "ADVANCE"
 /* exe@0x2A77 */

@@ -321,6 +321,42 @@ MANIFEST = [
     ("U2_S_CAST_NEED_WAND",    "3139_cast_spell_flow.asm",  ("run", 0x336B, 19, "NEED WAND OR STAFF!")),
     ("U2_S_CAST_NO_SPELL",     "3139_cast_spell_flow.asm",  ("run", 0x33A0,  9, "NO SPELL!")),
     ("U2_S_CAST_FAILED",       "3139_cast_spell_flow.asm",  ("run", 0x3435,  8, "-FAILED!")),
+    # The two spell shoppes, added 2026-11-15 when the cleric shrine and the magic shoppe were
+    # wired. Located the same way as the four above -- file offsets, each verified against the
+    # executable to sit immediately after a near `call`, and against the asm listing for text.
+    #
+    # One constant per QUOTED LITERAL the asm tree has, not one per message the shop prints.
+    # Both menus reach the player as a single blob whose line breaks are the game's in-band 0x8D
+    # (`db 0x8d,"1-LIGHT, 2-L.D., 3-L.U.,",0x8d,"4-PASS..."`), and the asm-fallback proof below
+    # needs the fourth element to appear as one quoted literal, so a blob cannot be one constant.
+    # Splitting at the breaks is not a compromise: seam_char_print masks bit 7 and turns 0x0D into
+    # a newline, so the engine printing CR then the fragment is the same observable line the
+    # emitter produces from the blob. What would have been lost is a constant nobody can prove.
+    #
+    # "1-LIGHT, 2-L.D., 3-L.U.," is offered by BOTH shoppes and is byte-identical in both, so it
+    # is one constant proven against the cleric file. "FIVE " and "S FOR " likewise exist once
+    # per shoppe (the cleric's at 0x1B15 / 0x1B27, the wizard's at 0x1C5C / 0x1C6B).
+    ("U2_S_SHOP_CLERIC_WELC",   "1869_cleric_shrine.asm",   ("run", 0x1A6D,  8, "WELCOME ")),
+    ("U2_S_SHOP_CLERIC_BRO",    "1869_cleric_shrine.asm",   ("run", 0x1A80,  8, "BROTHER ")),
+    ("U2_S_SHOP_CLERIC_SIS",    "1869_cleric_shrine.asm",   ("run", 0x1A8F,  7, "SISTER ")),
+    ("U2_S_SHOP_MENU_LADDERS",  "1869_cleric_shrine.asm",   ("run", 0x1A9E, 24, "1-LIGHT, 2-L.D., 3-L.U.,")),
+    ("U2_S_SHOP_CLERIC_LINE2",  "1869_cleric_shrine.asm",   ("run", 0x1AB7, 27, "4-PASS 5-SURFACE, 6-PRAYER.")),
+    ("U2_S_SHOP_CLERIC_PROMPT", "1869_cleric_shrine.asm",   ("run", 0x1AD3, 15, "YOUR INTEREST? ")),
+    ("U2_S_SHOP_CLERIC_BYE",    "1869_cleric_shrine.asm",   ("run", 0x1AF2, 25, "FOLLOW THE LIGHT, FRIEND!")),
+    ("U2_S_SHOP_FIVE",          "1869_cleric_shrine.asm",   ("run", 0x1B15,  5, "FIVE ")),
+    ("U2_S_SHOP_S_FOR",         "1869_cleric_shrine.asm",   ("run", 0x1B27,  6, "S FOR ")),
+    ("U2_S_SHOP_CLERIC_YESQ",   "1869_cleric_shrine.asm",   ("run", 0x1B46, 13, "YES, FRIEND? ")),
+    ("U2_S_SHOP_CLERIC_NO_A",   "1869_cleric_shrine.asm",   ("run", 0x1B63,  2, "NO")),
+    ("U2_S_SHOP_CLERIC_NO_B",   "1869_cleric_shrine.asm",   ("run", 0x1B66, 20, "I'M SORRY, GOOD DAY.")),
+    ("U2_S_SHOP_CLERIC_YES_A",  "1869_cleric_shrine.asm",   ("run", 0x1B81,  4, "YES,")),
+    ("U2_S_SHOP_CLERIC_YES_B",  "1869_cleric_shrine.asm",   ("run", 0x1B86, 14, "I WILL TAKE 5!")),
+    ("U2_S_SHOP_WIZ_WELCOME",   "19D7_magic_shop_menu.asm", ("run", 0x1BDB, 16, " MUSERREF OLDUM!")),
+    ("U2_S_SHOP_WIZ_LINE2",     "19D7_magic_shop_menu.asm", ("run", 0x1C05, 24, "4-M.M., 5-BLINK, 6-KILL,")),
+    ("U2_S_SHOP_WIZ_PROMPT",    "19D7_magic_shop_menu.asm", ("run", 0x1C1E, 15, "BIR IKI UC...? ")),
+    ("U2_S_SHOP_WIZ_BYE",       "19D7_magic_shop_menu.asm", ("run", 0x1C3E, 13, "UGURLA OLSUN!")),
+    ("U2_S_SHOP_WIZ_YESQ",      "19D7_magic_shop_menu.asm", ("run", 0x1C8D, 13, "LUTFEN EVET? ")),
+    ("U2_S_SHOP_WIZ_NO",        "19D7_magic_shop_menu.asm", ("run", 0x1CAA,  3, "NO!")),
+    ("U2_S_SHOP_WIZ_YES",       "19D7_magic_shop_menu.asm", ("run", 0x1CB3,  3, "YES")),
     # CP7: the dungeon-side command set. asm/277B is the fragment that holds ADVANCE,
     # RETREAT, TURN LEFT, TURN RIGHT and the trap, and it is one of the bulk-wave files
     # whose strings Phase 3 rendered as db lines rather than instructions, so every one of
