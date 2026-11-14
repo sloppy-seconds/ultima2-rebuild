@@ -53,12 +53,16 @@ typedef struct sdl_video {
                                    * overflow that only shows up when a frame is
                                    * really presented, so every headless path passes
                                    * and the windowed build segfaults. */
-    Uint32        pal[16];    /* CGA fills 0..3 (rest black); EGA fills all 16.
-                               * The upload indexes with & 15, so a CGA frame
-                               * (values 0..3) reads the same four entries. */
-    uint8_t       pal_src[16][3];  /* the RGB table v->pal was built from, so a
-                                    * Ctrl-T cycle into a themed palette is
-                                    * noticed and the mapping is rebuilt */
+    Uint32        pal[256];   /* CGA fills 0..3, EGA fills 0..15, and the enhanced
+                               * layout fills all 256 (EGA in 0..15, dungeon sprite
+                               * art in 16..255). The upload indexes with
+                               * & (pal_n-1), so a 16-colour frame reads the same
+                               * entries it always did. */
+    uint8_t       pal_src[256][3]; /* the RGB table v->pal was built from, so a
+                                    * Ctrl-T cycle into a themed palette, or the
+                                    * dungeon palette arriving, is noticed and the
+                                    * mapping is rebuilt */
+    int           pal_n;      /* 16 or 256: how many pal[] entries are live */
     int           pal_from_theme;
     unsigned      frames;
     const struct u2_frame *last;  /* last frame uploaded, so a window resize can
@@ -131,6 +135,34 @@ static void sdl_note_available_drivers(void)
         fprintf(stderr, "u2: no display backend was compiled in — this binary was built"
                         " from an SDL3 configured without X11 or Wayland dev packages."
                         " It can only render headlessly.\n");
+}
+
+/* Build the live palette table for the current ctx into out[256][3] and return
+ * how many entries are meaningful (16, or 256 for the enhanced layout). The base
+ * 16-colour table is produced exactly as before (CGA / EGA / theme); the enhanced
+ * layout then extends it with the dungeon's sprite palette in 16..255 so the
+ * status panel keeps its EGA colours while high-resolution dungeon art gets 240
+ * more. Shared by sdl_init and sdl_upload so the two can never drift. */
+static int sdl_build_palette(const u2_ctx *ctx, uint8_t out[256][3])
+{
+    uint8_t base[16][3];
+    const int ega = (ctx->art_mode == U2_ART_EGA) || ctx->enhanced_layout;
+    if (ega) {
+        u2_frame_palette_ega(base);
+    } else {
+        u2_frame_palette(base);
+        for (int i = 4; i < 16; i++)
+            { base[i][0] = base[i][1] = base[i][2] = 0; }
+    }
+    if (ctx->theme_palette_set)
+        memcpy(base, ctx->theme_palette, sizeof base);
+    memset(out, 0, 256 * 3);
+    memcpy(out, base, sizeof base);
+    if (!ctx->enhanced_layout) return 16;
+    if (ctx->dungeon_pal_set)
+        for (int i = 0; i < 240; i++)
+            memcpy(out[16 + i], ctx->dungeon_pal[i], 3);
+    return 256;
 }
 
 static int sdl_init(u2_ctx *ctx)
@@ -213,30 +245,10 @@ static int sdl_init(u2_ctx *ctx)
         return -1;
     }
 
-    uint8_t pal[16][3];
-    /* The enhanced layout always uses the 16-colour EGA palette: its own art (the
-     * dungeon raycaster's greys, the panel) is 16-colour and must not depend on a
-     * theme being installed. When the overworld art fell back to CGA, the frame's
-     * cga_on_ega flag makes the CGA tile/text writers emit the EGA indices of the
-     * same four colours, so nothing is recoloured. */
-    const int ega = (ctx->art_mode == U2_ART_EGA) || ctx->enhanced_layout;
-    if (ega) {
-        u2_frame_palette_ega(pal);
-    } else {
-        u2_frame_palette(pal);          /* fills pal[0..3] */
-        for (int i = 4; i < 16; i++)    /* CGA never indexes past 3; keep the
-                                         * rest defined so & 15 is well-formed */
-            { pal[i][0] = pal[i][1] = pal[i][2] = 0; }
-    }
-    /* A v2 theme may bring its own RGB table (docs/handoff-themes-builder.md
-     * § 4.1). The FM Towns palette is not an EGA palette — index 3 is black there
-     * — and drawing that art through the EGA table makes it read as noise while
-     * every byte-level check passes, which is the failure this whole thread
-     * started from. The theme's table wins whenever it exists. */
-    if (ctx->theme_palette_set) {
-        memcpy(pal, ctx->theme_palette, sizeof pal);
-        v->pal_from_theme = 1;
-    }
+    uint8_t pal[256][3];
+    int pal_n = sdl_build_palette(ctx, pal);
+    v->pal_n = pal_n;
+    v->pal_from_theme = ctx->theme_palette_set;
     memcpy(v->pal_src, pal, sizeof v->pal_src);
     /* SDL3 replaced SDL_AllocFormat with a read-only details struct, and MapRGBA
      * now takes that plus an explicit palette (NULL: RGBA8888 has none). The
@@ -248,7 +260,7 @@ static int sdl_init(u2_ctx *ctx)
             SDL_DestroyRenderer(v->ren); SDL_DestroyWindow(v->win); free(v);
             return -1;
         }
-        for (int i = 0; i < 16; i++)
+        for (int i = 0; i < pal_n; i++)
             v->pal[i] = SDL_MapRGBA(f, NULL, pal[i][0], pal[i][1], pal[i][2], 255);
     }
 
@@ -318,17 +330,15 @@ static void sdl_upload(u2_ctx *ctx, const struct u2_frame *f)
      * on a v2 theme from a v1 one mid-run, and a stale mapping would draw FM Towns
      * indices through the EGA table: legal, silent, and wrong in exactly the way a
      * screenshot catches and a byte test does not. */
-    uint8_t want[16][3];
-    if (ctx->theme_palette_set) memcpy(want, ctx->theme_palette, sizeof want);
-    else if (ctx->art_mode == U2_ART_EGA || ctx->enhanced_layout) u2_frame_palette_ega(want);
-    else { u2_frame_palette(want);
-           for (int i = 4; i < 16; i++) { want[i][0]=want[i][1]=want[i][2]=0; } }
-    if (memcmp(want, v->pal_src, sizeof want) != 0) {
+    uint8_t want[256][3];
+    int pal_n = sdl_build_palette(ctx, want);
+    if (pal_n != v->pal_n || memcmp(want, v->pal_src, sizeof want) != 0) {
         const SDL_PixelFormatDetails *fd = SDL_GetPixelFormatDetails(SDL_PIXELFORMAT_RGBA8888);
         if (fd) {
-            for (int i = 0; i < 16; i++)
+            for (int i = 0; i < pal_n; i++)
                 v->pal[i] = SDL_MapRGBA(fd, NULL, want[i][0], want[i][1], want[i][2], 255);
             memcpy(v->pal_src, want, sizeof v->pal_src);
+            v->pal_n = pal_n;
             v->pal_from_theme = ctx->theme_palette_set;
         }
     }
@@ -338,7 +348,7 @@ static void sdl_upload(u2_ctx *ctx, const struct u2_frame *f)
     for (int y = 0; y < fr->h; y++) {
         const uint8_t *src = fr->px[y];
         uint32_t *dst = v->staging + (size_t)y * (size_t)fr->w;
-        for (int x = 0; x < fr->w; x++) dst[x] = v->pal[src[x] & 15];
+        for (int x = 0; x < fr->w; x++) dst[x] = v->pal[src[x] & (v->pal_n - 1)];
     }
     /* Destination is computed, not NULL. NULL means "fill the output rect", which
      * does scale, but it stretches 320x200 to whatever aspect the window happens

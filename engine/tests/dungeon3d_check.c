@@ -312,15 +312,30 @@ static void test_assets(void)
         CHECK(n >= 2, "assets: texture %d should carry >= 2 indices (got %d)", id, n);
     }
 
-    /* Every sprite has both transparent and opaque pixels. */
+    /* Every sprite has both transparent and opaque pixels, sampled at its own
+     * edge (32 for procedural art, 128 for a concept-derived sprite). */
     for (int id = 0; id < U2_DGA_SP_COUNT; id++) {
         int trans = 0, opaque = 0;
-        for (int i = 0; i < U2_DGA_TEX_PX; i++) {
+        const int edge = u2_dga_sprite_edge(id);
+        for (int i = 0; i < edge * edge; i++) {
             const uint8_t c = u2_dga_sprite(id, 0)[i];
             if (c == U2_DGA_TRANSPARENT) trans++; else opaque++;
         }
         CHECK(trans > 0 && opaque > 0, "assets: sprite %d should mix clear and drawn", id);
     }
+
+    /* The concept-derived sprite (stamp 1) is high-resolution and draws from the
+     * expanded palette (frame indices 16..255), not the EGA 0..15. This is the
+     * pipeline the owner locked in 2026-11-14: 256-colour + 128px source. */
+    CHECK(u2_dga_sprite_edge(U2_DGA_SP_MON1) == 128,
+          "assets: the concept sprite is 128px");
+    CHECK(u2_dga_palette_ready(), "assets: the concept sub-palette is loaded");
+    int hi = 0;
+    for (int i = 0; i < 128 * 128; i++) {
+        uint8_t c = u2_dga_sprite(U2_DGA_SP_MON1, 0)[i];
+        if (c != U2_DGA_TRANSPARENT && c >= 16) hi++;
+    }
+    CHECK(hi > 1000, "assets: the concept sprite draws expanded-palette indices");
 
     /* Shade levels darken: level 3 must have no index level 0 does not shade to. */
     int lit_white = 0, dark_white = 0;

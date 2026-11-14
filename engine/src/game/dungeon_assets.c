@@ -15,6 +15,8 @@
 
 #include <stddef.h>
 
+#include "game/dungeon_sprites_gen.h"
+
 /* ---------------------------------------------------------------- rng ---- */
 static uint32_t xs_state = 0x5EEDD15Bu;
 static uint32_t rnd_u32(void)
@@ -41,6 +43,12 @@ static const uint8_t k_shade[16] = {
 static uint8_t s_tex[U2_DGA_TEX_COUNT][U2_DGA_SHADE_LEVELS][U2_DGA_TEX_PX];
 static uint8_t s_spr[U2_DGA_SP_COUNT][U2_DGA_SHADE_LEVELS][U2_DGA_TEX_PX];
 static int s_ready;
+/* High-resolution (concept-derived) sprites, expanded from the generated header
+ * at init. s_spr_edge[id] is 32 for the procedural art and DG_SPR_EDGE for a
+ * sprite that has concept art loaded; the renderer samples at that edge. */
+static uint8_t s_hi[U2_DGA_SP_COUNT][U2_DGA_SHADE_LEVELS][DG_SPR_EDGE * DG_SPR_EDGE];
+static int s_spr_edge[U2_DGA_SP_COUNT];
+static int s_pal_ready;
 
 static void put(uint8_t *t, int x, int y, uint8_t c)
 {
@@ -274,6 +282,22 @@ void u2_dga_init(void)
                                  ? U2_DGA_TRANSPARENT : k_shade[c];
             }
 
+    /* Concept-derived high-resolution sprites (dungeon_sprites_gen.h). The base
+     * image carries frame indices 16..255 (or transparent); the four falloff
+     * levels are the base run through the generated shade map, so falloff stays
+     * an index swap in the draw loop. For now only the orc is loaded, into the
+     * stamp-1 slot. */
+    for (int i = 0; i < U2_DGA_SP_COUNT; i++) s_spr_edge[i] = U2_DGA_TEX_EDGE;
+    for (int lv = 0; lv < U2_DGA_SHADE_LEVELS; lv++)
+        for (int i = 0; i < DG_SPR_EDGE * DG_SPR_EDGE; i++) {
+            const uint8_t b = dg_spr_orc[i];
+            s_hi[U2_DGA_SP_MON1][lv][i] = (b == DG_SPR_TRANSPARENT)
+                ? U2_DGA_TRANSPARENT
+                : (uint8_t)(16 + dg_sprite_shade[lv][b - 16]);
+        }
+    s_spr_edge[U2_DGA_SP_MON1] = DG_SPR_EDGE;
+    s_pal_ready = 1;
+
     s_ready = 1;
 }
 
@@ -290,7 +314,26 @@ const uint8_t *u2_dga_sprite(int id, int level)
     if (id < 0 || id >= U2_DGA_SP_COUNT) return s_spr[0][0];
     if (level < 0) level = 0;
     if (level >= U2_DGA_SHADE_LEVELS) level = U2_DGA_SHADE_LEVELS - 1;
+    if (s_spr_edge[id] == DG_SPR_EDGE) return s_hi[id][level];
     return s_spr[id][level];
+}
+
+int u2_dga_sprite_edge(int id)
+{
+    if (id < 0 || id >= U2_DGA_SP_COUNT) return U2_DGA_TEX_EDGE;
+    return s_spr_edge[id] ? s_spr_edge[id] : U2_DGA_TEX_EDGE;
+}
+
+int u2_dga_palette_ready(void) { return s_pal_ready; }
+
+void u2_dga_palette(uint8_t out[240][3])
+{
+    const int n = DG_SPR_PAL_N < 240 ? DG_SPR_PAL_N : 240;
+    for (int i = 0; i < n; i++) {
+        out[i][0] = dg_sprite_pal[i][0];
+        out[i][1] = dg_sprite_pal[i][1];
+        out[i][2] = dg_sprite_pal[i][2];
+    }
 }
 
 int u2_dga_shade(float d)

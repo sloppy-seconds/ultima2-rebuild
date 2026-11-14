@@ -107,6 +107,14 @@ typedef struct u2_ctx {
      * exact failure the frame-scale rule exists to prevent.
      * core/layout.h holds the geometry; docs/enhanced-layout-plan.md the reasoning. */
     int enhanced_layout;
+    /* The dungeon's expanded colour set for the enhanced layout. The frame is a
+     * byte-per-pixel index buffer, so a 256-colour dungeon needs only a wider
+     * backend palette, not a wider frame: indices 0..15 stay the EGA table (so the
+     * status panel and any CGA-on-EGA art are untouched) and 16..255 carry the
+     * high-resolution sprite art. Filled by the dungeon asset layer at init; when
+     * unset the renderer leaves 16..255 black, which nothing writes. */
+    uint8_t dungeon_pal[240][3];   /* palette indices 16..255 */
+    int     dungeon_pal_set;
     /* Where the player's own cell sits inside the view window, in view cells.
      * The classic layout's (9,5) is asm/5AE1's, and the enhanced layout's comes
      * from core/layout.h. It lives on ctx rather than being read off the view so

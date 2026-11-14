@@ -77,6 +77,19 @@ void u2_dga_init(void);
 const uint8_t *u2_dga_tex(int id, int level);
 const uint8_t *u2_dga_sprite(int id, int level);
 
+/* The edge length (32 or 128) of a sprite's texture. Most sprites are the
+ * procedural 32; a concept-derived one (see dungeon_sprites_gen.h) is 128 and
+ * the renderer must sample it at its own edge. Returns 32 for any sprite with no
+ * high-resolution art. */
+int u2_dga_sprite_edge(int id);
+
+/* Copy the high-resolution sprite sub-palette (frame indices 16..255) into
+ * out[240][3]. Valid only when u2_dga_palette_ready() is non-zero. The renderer
+ * places these above the EGA 0..15 so the status panel keeps its colours while
+ * the concept sprites get 240 more. */
+int u2_dga_palette_ready(void);
+void u2_dga_palette(uint8_t out[240][3]);
+
 /* Shade band for a distance in cells. Design choice, not a decoded value: the
  * torch is drawn as fully lit to ~2.5 cells and fades to the darkest band
  * past 6. */

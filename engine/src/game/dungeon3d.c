@@ -326,14 +326,15 @@ static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
         else if (list[i].d2 < 16.0f) lvl = 1;
         else if (list[i].d2 < 36.0f) lvl = 2;
         const uint8_t *tex = u2_dga_sprite(list[i].id, lvl);
+        const int edge = u2_dga_sprite_edge(list[i].id);
 
         for (int x = x0; x < x1; x++) {
             if (x < 0 || x >= DG3_W || tY >= zbuf[x]) continue;
-            const int tx = ((x - x0) * 32) / (w > 0 ? w : 1);
+            const int tx = ((x - x0) * edge) / (w > 0 ? w : 1);
             for (int y = y0; y < y1; y++) {
                 if (y < 0 || y >= DG3_H) continue;
-                const int ty = ((y - y0) * 32) / (h > 0 ? h : 1);
-                const uint8_t c = tex[ty * 32 + tx];
+                const int ty = ((y - y0) * edge) / (h > 0 ? h : 1);
+                const uint8_t c = tex[ty * edge + tx];
                 if (c == U2_DGA_TRANSPARENT) continue;
                 u2_frame_put(f, x, y, c);
             }
@@ -355,6 +356,14 @@ void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s)
                 * views agree by rule rather than by shared sample. */
     u2_frame *f = &ow->frame;
     u2_dga_init();
+    /* The concept sprites live in frame indices 16..255, so the enhanced backend
+     * needs the dungeon's sub-palette installed once. The renderer reads it on
+     * each present and widens its palette to 256; the status panel keeps EGA
+     * 0..15, so nothing else on the frame changes colour. */
+    if (!ctx->dungeon_pal_set && u2_dga_palette_ready()) {
+        u2_dga_palette(ctx->dungeon_pal);
+        ctx->dungeon_pal_set = 1;
+    }
 
     int dx, dy;
     u2_dungeon_facing(ctx, &dx, &dy);
