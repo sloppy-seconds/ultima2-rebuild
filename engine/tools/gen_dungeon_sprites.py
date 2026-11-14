@@ -3,20 +3,30 @@
 
 Pipeline per concept (docs/concept-dungeon-brief.md stage 2, owner ruling
 2026-11-14: 256-colour dungeon palette + 128px sprite source):
-  matte the near-uniform background to transparent (flood from the border),
-  resize to the sprite edge with LANCZOS,
+  matte the background to transparent,
+  tight-crop to the figure and fit it to the sprite square anchored to the floor,
   quantize the opaque pixels to a shared sub-palette of N colours, which become
   frame indices 16..15+N (0..15 stay the EGA table so the status panel is intact),
   bake 4 torch-falloff shade levels as a palette index map (darken each palette
   colour, re-find the nearest in-palette index) rather than 4 full copies.
 
-The header is small: one base index image per sprite plus a [4][N] shade map.
-dungeon_assets expands the shade map into 4 levels at init.
+The two steps that have proper tools use them, when present (they are in the
+art-pipeline container, deploy/art-pipeline/):
+  * background removal -> rembg (u2net subject segmentation). A colour flood-fill
+    cannot remove *enclosed* background (the white between a creature's legs, the
+    pocket above a raised weapon); a segmentation model can.
+  * the shared palette -> pngquant (libimagequant), a perceptual quantiser.
+    This pngquant build cannot apply an external palette, so pngquant builds the
+    palette from a montage of every sprite's opaque pixels and the per-sprite
+    index map is a nearest-map into it (at 240 colours dithering is negligible).
+Both fall back to the older in-file implementations when the tool is absent, so
+the generator still runs on a bare host; run it in the container to get the good
+tools. See deploy/art-pipeline/README.md.
 
 Cleanroom: reads only concepts/ (our own generated art). Never original/,
 references/, bestiary/cache/, or any screenshot.
 """
-import os, sys, glob
+import os, sys, shutil, subprocess, tempfile
 from collections import deque
 from PIL import Image
 import numpy as np
@@ -25,13 +35,38 @@ EDGE = 128
 PAL_N = 240            # frame indices 16..255
 TRANSPARENT = 0xFF
 SHADES = [1.0, 0.62, 0.40, 0.24]   # level 0 = full bright, then falloff
+WORK = 512             # matte working resolution (rembg's net is 320; 512 keeps edges crisp)
 
 # concept file stem -> C symbol emitted (SP_MON slot mapping lives in dungeon_assets)
 SPRITES = [
     ("orc", "orc"),
 ]
 
-def matte(im, tol=40):
+# ------------------------------------------------- optional proper tools ----
+try:
+    import rembg
+    _REMBG = None
+    def _rembg_session():
+        global _REMBG
+        if _REMBG is None:
+            _REMBG = rembg.new_session("u2net")
+        return _REMBG
+    HAVE_REMBG = True
+except Exception:
+    HAVE_REMBG = False
+
+HAVE_PNGQUANT = shutil.which("pngquant") is not None
+
+
+def matte_rembg(im):
+    """Subject-segmentation matte: True = opaque. Removes enclosed background."""
+    rgba = rembg.remove(im.convert("RGB"), session=_rembg_session())
+    return np.asarray(rgba)[..., 3] > 128
+
+
+def matte_flood(im, tol=40):
+    """Fallback: flood the near-uniform background in from the border. Cannot
+    remove enclosed background, so it is strictly worse than rembg."""
     arr = np.asarray(im.convert('RGB')).astype(np.int32)
     H, W, _ = arr.shape
     corner = arr[0, 0]
@@ -53,20 +88,21 @@ def matte(im, tol=40):
                 seen[ny, nx] = True; dq.append((ny, nx))
     return ~seen     # True = opaque
 
+
 def load_sprite(src_dir, stem):
-    """Matte at high resolution (before any downscale, so the background is not
-    blended into the figure's edge), erode a 1px fringe, tight-crop to the
-    figure, then fit it to fill the EDGE square anchored to the floor. Filling
-    the square is what makes a close creature read as close: a figure that only
-    occupies the middle of the sprite looks far away no matter the distance."""
+    """Matte at working resolution, tight-crop to the figure, then fit it to fill
+    the EDGE square anchored to the floor. Filling the square is what makes a
+    close creature read as close: a figure that only occupies the middle of the
+    sprite looks far away no matter the distance."""
     path = os.path.join(src_dir, f"{stem}_00001_.png")
-    work = Image.open(path).convert('RGB').resize((512, 512), Image.LANCZOS)
-    alpha = matte(work)
-    # erode 1px: drop opaque pixels touching a transparent one, to eat the halo
-    a = alpha.copy()
-    a[1:-1, 1:-1] &= (alpha[:-2, 1:-1] & alpha[2:, 1:-1] &
-                      alpha[1:-1, :-2] & alpha[1:-1, 2:])
-    alpha = a
+    work = Image.open(path).convert('RGB').resize((WORK, WORK), Image.LANCZOS)
+    alpha = matte_rembg(work) if HAVE_REMBG else matte_flood(work)
+    if not HAVE_REMBG:
+        # the flood matte leaves a blended fringe; erode 1px to eat the halo
+        a = alpha.copy()
+        a[1:-1, 1:-1] &= (alpha[:-2, 1:-1] & alpha[2:, 1:-1] &
+                          alpha[1:-1, :-2] & alpha[1:-1, 2:])
+        alpha = a
     ys, xs = np.where(alpha)
     if len(ys) == 0:
         return np.zeros((EDGE, EDGE, 3), 'uint8'), np.zeros((EDGE, EDGE), bool)
@@ -84,25 +120,52 @@ def load_sprite(src_dir, stem):
     out = np.asarray(canvas)
     return out[..., :3].copy(), out[..., 3] > 128
 
-def build_palette(sprites):
-    """Adaptive palette over the union of all sprites' opaque pixels."""
-    pts = [rgb[alpha] for rgb, alpha in sprites]
-    allpx = np.concatenate(pts, 0).astype('uint8')
-    M = len(allpx)
+
+def _montage(pts):
+    """Lay a flat array of RGB pixels into a square image (padded with the mean
+    colour) so a quantiser can see them all at once."""
+    M = len(pts)
     side = int(np.ceil(np.sqrt(M)))
-    pad = np.tile(allpx[0], (side * side, 1))   # pad with a real pixel, not black
-    pad[:M] = allpx
-    img = Image.fromarray(pad.reshape(side, side, 3), 'RGB')
+    pad = np.tile(pts.mean(0).astype('uint8'), (side * side, 1))
+    pad[:M] = pts
+    return Image.fromarray(pad.reshape(side, side, 3), 'RGB')
+
+
+def _palette_pngquant(pts):
+    """Build the shared palette with libimagequant. This pngquant build cannot
+    apply an external palette, so we take only its palette and map into it."""
+    with tempfile.TemporaryDirectory() as d:
+        src = os.path.join(d, 'montage.png')
+        out = os.path.join(d, 'pal.png')
+        _montage(pts).save(src)
+        subprocess.run(["pngquant", "--force", "--speed", "1", str(PAL_N),
+                        "--output", out, src], check=True)
+        pal = np.array(Image.open(out).getpalette(), dtype=np.int32)
+    if len(pal) < PAL_N * 3:
+        pal = np.concatenate([pal, np.zeros(PAL_N * 3 - len(pal), np.int32)])
+    return pal[:PAL_N * 3].reshape(PAL_N, 3)
+
+
+def _palette_pil(pts):
+    """Fallback palette: PIL median-cut over the union of all sprites."""
+    img = _montage(pts)
     palimg = img.quantize(colors=PAL_N, method=Image.Quantize.MEDIANCUT,
                           dither=Image.Dither.NONE)
     pal = np.array(palimg.getpalette(), dtype=np.int32)
-    if len(pal) < PAL_N * 3:                    # pad a short palette with black
+    if len(pal) < PAL_N * 3:
         pal = np.concatenate([pal, np.zeros(PAL_N * 3 - len(pal), np.int32)])
     return pal[:PAL_N * 3].reshape(PAL_N, 3)
+
+
+def build_palette(sprites):
+    pts = np.concatenate([rgb[alpha] for rgb, alpha in sprites], 0).astype('uint8')
+    return _palette_pngquant(pts) if HAVE_PNGQUANT else _palette_pil(pts)
+
 
 def nearest_idx(arr, pal):
     d = ((arr[:, None, :] - pal[None, :, :]) ** 2).sum(-1)
     return d.argmin(1)
+
 
 def shade_map(pal):
     sm = np.zeros((4, PAL_N), dtype=np.uint8)
@@ -110,6 +173,7 @@ def shade_map(pal):
         dark = np.clip(pal * f, 0, 255).astype(np.int32)
         sm[L] = nearest_idx(dark, pal).astype(np.uint8)
     return sm
+
 
 def emit_header(out_path, names, sprites, pal, sm):
     lines = []
@@ -153,24 +217,29 @@ def emit_header(out_path, names, sprites, pal, sm):
     with open(out_path, "w") as f:
         f.write("\n".join(lines) + "\n")
 
+
 def main():
     src_dir = sys.argv[1] if len(sys.argv) > 1 else 'concepts/dungeon2'
     out_path = sys.argv[2] if len(sys.argv) > 2 else 'engine/src/game/dungeon_sprites_gen.h'
+    prev_dir = os.environ.get("DG_PREVIEW_DIR", "tmp")
+    print(f"matte: {'rembg' if HAVE_REMBG else 'flood (fallback)'}"
+          f"   palette: {'pngquant' if HAVE_PNGQUANT else 'PIL median-cut (fallback)'}")
     names = [n for n, _ in SPRITES]
     sprites = [load_sprite(src_dir, s) for _, s in SPRITES]
     pal = build_palette(sprites)
     sm = shade_map(pal)
     emit_header(out_path, names, sprites, pal, sm)
     # preview: composite each base sprite on a dark wall for eyeballing
-    os.makedirs('/var/tmp/dgcolor/out', exist_ok=True)
+    os.makedirs(prev_dir, exist_ok=True)
     for name, (rgb, alpha) in zip(names, sprites):
         idx = np.full((EDGE, EDGE), TRANSPARENT, dtype=np.uint8)
         idx[alpha] = (nearest_idx(rgb[alpha], pal) + 16).astype(np.uint8)
         canvas = np.full((EDGE, EDGE, 3), 52, np.uint8)
         opaque = idx != TRANSPARENT
         canvas[opaque] = pal[idx[opaque] - 16]
-        Image.fromarray(canvas).save(f'/var/tmp/dgcolor/out/gen_{name}.png')
+        Image.fromarray(canvas).save(f'{prev_dir}/gen_{name}.png')
     print(f"wrote {out_path}  ({len(names)} sprites, palette {PAL_N}, edge {EDGE})")
+
 
 if __name__ == '__main__':
     main()
