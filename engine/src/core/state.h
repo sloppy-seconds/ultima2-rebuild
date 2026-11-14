@@ -724,6 +724,11 @@ uint8_t u2_bcd_inc1(uint8_t v);
 uint8_t u2_bcd_inc_sat(uint8_t v, int saturate);
 uint8_t u2_bcd_add_sat(uint8_t cur, uint8_t amount, int saturate);
 
+/* Add a small amount to a two-byte packed-decimal field (low byte first), the
+ * carry out of the pair discarded, matching asm/2DC1 / asm/2DEE / asm/363B. Pass
+ * the address-ordered bytes: &gold_lo, &gold_hi. See core/state.c. */
+void u2_bcd_adc2(uint8_t *hi, uint8_t *lo, uint8_t amount, int saturate);
+
 void u2_state_init(u2_state *s);
 
 /* Resume the DS mirror from a checkpoint file: whitespace-separated hex bytes starting at

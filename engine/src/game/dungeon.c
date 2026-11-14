@@ -221,18 +221,52 @@ u2_cmd_result u2_dungeon_get(u2_ctx *ctx, u2_overworld *ow)
     u2_world_dungeon_terrain_put(&ow->world, (int8_t)ctx->state.site_floor,
                                  ow->x, ow->y, 0);
 
-    const uint8_t roll = (uint8_t)seam_rand_byte(ctx);
-    if (roll < 0x40) {
-        seam_str_out(ctx, U2_S_GOLD_EXCL);
-        unsigned amount = (roll & 0x1fu) + 2u * (uint8_t)ctx->state.site_floor;
-        amount &= 0x7fu;
-        (void)amount;
-        /* The BCD add onto the gold odometer is asm/363B's tail and the same
-         * packed-decimal increment the overworld loot path already uses; wiring
-         * it is a CP7 follow-up and is NOT silently skipped: the message above is
-         * the player's notice, and the missing credit is the gap. */
-    } else {
+    /* asm/363B_cmd_G.asm L_00396a..L_0038d8. The loot is NOT a flat roll.
+       TRI-LITHIUM is gated on the site floor being 0xf — the deepest floor of a
+       dungeon — and that gate is the ONLY way to obtain it, so it must never come
+       out of a random roll on a shallow floor. Otherwise a roll >= 0x40 is gold
+       (75%) and a roll < 0x40 is an item (25%), and the item is a weapon on an
+       even floor or armour on an odd one. */
+    const uint8_t floor = ctx->state.site_floor;
+    if (floor == 0xf) {
+        /* asm/363B L_00396a: "TRI-LITHIUM!" and items_held[15] (DS:e5) += 1. */
         seam_str_out(ctx, U2_S_TRI_LITHIUM);
+        ctx->state.items_held[15] =
+            u2_bcd_inc_sat(ctx->state.items_held[15], U2_SATURATE(ctx));
+    } else if (seam_rand_byte(ctx) >= 0x40) {
+        /* asm/363B L_003922: "GOLD!". amount = ((rand & 0x1f) + 2*floor) & 0x77,
+           added to the gold odometer with the same adc/daa pair asm/2DC1 uses. */
+        seam_str_out(ctx, U2_S_GOLD_EXCL);
+        const uint8_t amount =
+            (uint8_t)((((uint8_t)seam_rand_byte(ctx) & 0x1fu) + 2u * floor) & 0x77u);
+        u2_bcd_adc2(&ctx->state.gold_lo, &ctx->state.gold_hi, amount,
+                    U2_SATURATE(ctx));
+    } else if ((floor & 1u) == 0) {
+        /* asm/363B L_003951: even floor -> "A  WEAPON". A second roll picks the
+           slot: weapons_owned[rand & 7] (DS:76+idx); slot 0 is "EMPTY!". */
+        seam_char_print(ctx, 'A');
+        seam_char_print(ctx, ' ');
+        seam_str_out(ctx, U2_S_GET_WEAPON);
+        const uint8_t idx = (uint8_t)seam_rand_byte(ctx) & 0x7u;
+        if (idx == 0) {
+            seam_str_out(ctx, U2_S_GET_EMPTY);
+            seam_char_print(ctx, '!');
+        } else {
+            ctx->state.weapons_owned[idx] =
+                u2_bcd_inc_sat(ctx->state.weapons_owned[idx], U2_SATURATE(ctx));
+        }
+    } else {
+        /* asm/363B L_00389b: odd floor -> " ARMOUR". armour_owned[(rand & 3) - 1]
+           (DS:96+idx, armour_owned starts at DS:97); slot 0 is "EMPTY!". */
+        seam_str_out(ctx, U2_S_GET_ARMOUR);
+        const uint8_t idx = (uint8_t)seam_rand_byte(ctx) & 0x3u;
+        if (idx == 0) {
+            seam_str_out(ctx, U2_S_GET_EMPTY);
+            seam_char_print(ctx, '!');
+        } else {
+            ctx->state.armour_owned[idx - 1] =
+                u2_bcd_inc_sat(ctx->state.armour_owned[idx - 1], U2_SATURATE(ctx));
+        }
     }
     u2_cmd_done(ctx);
     return U2_CMD_DONE;

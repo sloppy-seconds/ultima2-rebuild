@@ -450,6 +450,30 @@ else
     sed 's/^/        /' "$WORK/trap.build"
 fi
 
+# ---- chest: the loot decision, made deterministic (unit gate) --------------
+# asm/363B_cmd_G. TRI-LITHIUM is gated on floor==0xf (the ONLY way to get it), gold
+# on roll>=0x40 with amount ((r&0x1f)+2*floor)&0x77, and an item (weapon on even /
+# armour on odd floor) on roll<0x40. The register is a feedback shift register, so a
+# seeded state replays byte for byte and the first roll is the decision roll. See
+# tests/chest_check.c.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/chest_check" \
+        tests/chest_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/chest.build"; then
+    if "$WORK/chest_check" > "$WORK/chest.out" 2>&1; then
+        n=$(sed -n 's/^chest_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/chest.out")
+        if [ "${n:-0}" -eq 0 ]; then
+            bad "CP7 chest loot run executed 0 checks — the test is not running"
+        else
+            ok "CP7 chest loot: TRI-LITHIUM gated on floor 0xf, gold/item split by roll ($n checks)"
+        fi
+    else
+        bad "CP7 chest loot check failed:"
+        sed 's/^/        /' "$WORK/chest.out"
+    fi
+else
+    bad "CP7 chest loot harness did not build:"
+    sed 's/^/        /' "$WORK/chest.build"
+fi
+
 # ---- dungeon fills the doubled frame (classic EGA) -----------------------
 # The wireframe is authored in 320x200 CGA space; in classic EGA it must scale by
 # the frame scale to fill the map window, not sit in the top-left quarter. CGA stays

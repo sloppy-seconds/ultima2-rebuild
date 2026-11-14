@@ -131,6 +131,54 @@ uint8_t u2_bcd_add_sat(uint8_t cur, uint8_t amount, int saturate)
     return n;
 }
 
+/* DAA for the ADD case: the caller has already done the binary add and passes
+ * the raw 16-bit result plus the carry and auxiliary-carry it produced. Kept
+ * separate from overworld.c's bcd_sbb (the `das` half) so the pair reads as the
+ * deliberate mirror the B1 ticket asks for. */
+static uint8_t daa_add(unsigned raw, int cf, int af, int *carry_out)
+{
+    unsigned v = raw & 0xFFu;
+    if ((v & 0x0Fu) > 9u || af) v += 6u;
+    if (v > 0x9Fu || cf)        v += 0x60u;
+    *carry_out = (v > 0xFFu) ? 1 : 0;
+    return (uint8_t)(v & 0xFFu);
+}
+
+/*
+ * Add a small amount to a two-byte packed-decimal field, low byte first, with
+ * the carry out of the pair DISCARDED. asm/2DC1 (combat gold), asm/2DEE (exp)
+ * and asm/363B (the dungeon chest's gold) all use this shape:
+ *   al = [lo]; adc amount,al ; daa ; [lo] = al
+ *   al = [hi]; adc $0,al     ; daa ; [hi] = al
+ * No carry escapes the pair, which is why 9999 + 15 lands on 14 instead of
+ * faulting or saturating — the B1 ticket's measured value, and the same wrap
+ * seen live when a +2 exp on a 9999 character displayed 0001.
+ *
+ * `hi` and `lo` are the address-ordered bytes (state.h's gold_lo is DS:58, the
+ * high byte), so callers pass &gold_lo, &gold_hi and the inversion stays local.
+ */
+void u2_bcd_adc2(uint8_t *hi, uint8_t *lo, uint8_t amount, int saturate)
+{
+    const uint8_t hi_was = *hi, lo_was = *lo;
+    int c = 0, af = 0;
+    unsigned raw = (unsigned)(*lo) + amount;
+    af = (((*lo & 0x0Fu) + (amount & 0x0Fu)) > 9u) ? 1 : 0;
+    *lo = daa_add(raw, raw > 0xFFu, af, &c);
+
+    raw = (unsigned)(*hi) + (unsigned)c;
+    af = (((*hi & 0x0Fu) + (unsigned)c) > 9u) ? 1 : 0;
+    *hi = daa_add(raw, raw > 0xFFu, af, &c);   /* this carry is dropped on purpose */
+
+    /* Enhanced mode stops at 9999 instead of rolling to 0001. The pair going DOWN is the
+     * wrap — a BCD add that does not overflow can only raise the value — and comparing the
+     * pair with the same helper on both sides keeps the byte-order inversion of state.h out
+     * of the test. */
+    if (saturate && u2_bcd16(*hi, *lo) < u2_bcd16(hi_was, lo_was)) {
+        *hi = hi_was;
+        *lo = lo_was;
+    }
+}
+
 int u2_bcd16(uint8_t lo, uint8_t hi)
 {
     return (((lo >> 4) * 10 + (lo & 0x0F)) * 100) +
