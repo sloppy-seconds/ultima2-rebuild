@@ -329,6 +329,24 @@ Verification, in two independent layers:
 
 ## 3. Working Rules
 
+* **Look up before you derive.** The moment you want a value the project already knows — a
+  byte at a coordinate, a sector's name, a tile's meaning, an address's behaviour — the first
+  action is a lookup, not a calculation. Compute it yourself only after you have named, in the
+  reply, the source you checked and why it did not answer. A `python3 -c` that re-reads a file
+  the engine already parses is the same failure as a new tool, and more dangerous because it
+  looks like nothing: it produced a confident wrong answer here (a dungeon cell read at a 64-wide
+  stride when the grid is a 16-wide paged view, a fact already written in `dungeon.h` and
+  `docs/phase4-state.md` § CP7). "Look first" is not enough without "look *where*", so use the
+  index below.
+
+  | Want | Use |
+  | --- | --- |
+  | a dungeon or sector cell's byte | `tools/map_render.py`, or `u2_world_dungeon_at` / `u2_world_tile_at` — **never a raw file slice** |
+  | what a byte means | `engine/src/game/dungeon.h` (dungeon grid), the tile notes in `docs/` (sector map) |
+  | a place / sector / creature name | `tools/census.py` |
+  | address → behaviour | the `asm/` filename + header |
+  | which tool for a capture job | `docs/spice86-capture.md` "Which tool for which job" |
+
 * **Command-loop scope is ruled (owner, 2026-10-28e): implement all 26 handlers, and the
   project is NOT code-complete while any unproven one stands.** The list of which letters are
   unproven is **not written here**, because a hand-maintained copy of a derived fact drifts and
@@ -530,8 +548,9 @@ Verification, in two independent layers:
   Known violations and their evidence live in `docs/phase4-state.md`, section "Silent player
   effects". Adding a mutation without a message and without a citation is a review failure.
 
-* **Never write a probe, reader or driver that duplicates an existing tool. Look first.**
-  The recurring failure in this project is not a wrong answer, it is an agent building
+* **Never hand-derive or re-tool a fact the tree already holds. Look first.**
+  This covers a one-off `python3 -c` as much as a new script — see "Look up before you derive"
+  at the head of this section. The recurring failure in this project is not a wrong answer, it is an agent building
   something that already exists and getting a *plausible* result from it — a hand-rolled
   `dotnet` launch that silently skips the harvest, a text-mode screen decoder that returns
   confident box-drawing noise, a key injector that is rejected as an illegal command. The
