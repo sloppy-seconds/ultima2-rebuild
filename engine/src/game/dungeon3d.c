@@ -256,6 +256,66 @@ static void dg3_walls(u2_frame *f, const u2_overworld *ow, int fl,
 
 typedef struct { float sx, sy, d2; int id; int tall; int anchor; } dg3_spr;
 
+/* RGB -> nearest palette index (16..255) lookup, 5 bits per channel. Built once
+ * from the 240-colour dungeon palette so bilinear blending (which produces
+ * colours between palette entries) can be snapped back to a valid index cheaply,
+ * instead of a 240-way nearest search per pixel. */
+static uint8_t g_rgb_lut[32][32][32];
+static int g_lut_ready = 0;
+
+static void dg3_build_rgb_lut(void)
+{
+    uint8_t pal[240][3];
+    u2_dga_palette(pal);
+    for (int r = 0; r < 32; r++)
+        for (int g = 0; g < 32; g++)
+            for (int b = 0; b < 32; b++) {
+                const int R = r * 8 + 4, G = g * 8 + 4, B = b * 8 + 4;
+                int best = 0, bestd = 1 << 30;
+                for (int i = 0; i < 240; i++) {
+                    const int dr = R - pal[i][0], dg = G - pal[i][1], db = B - pal[i][2];
+                    const int d = dr * dr + dg * dg + db * db;
+                    if (d < bestd) { bestd = d; best = i; }
+                }
+                g_rgb_lut[r][g][b] = (uint8_t)(16 + best);
+            }
+    g_lut_ready = 1;
+}
+
+/* Alpha-weighted bilinear sample of an indexed sprite. u,v are texture coords in
+ * [0,edge]. Transparent texels carry zero weight, so edges blend against the
+ * opaque neighbours instead of a black halo. Returns 0 if the footprint is fully
+ * transparent (caller skips), else writes the snapped index to *out. */
+static int dg3_sample_bilinear(const uint8_t *tex, int edge, const uint8_t pal[240][3],
+                               float u, float v, uint8_t *out)
+{
+    if (u < 0) u = 0;
+    if (u > edge - 1) u = edge - 1;
+    if (v < 0) v = 0;
+    if (v > edge - 1) v = edge - 1;
+    const int x0 = (int)u, y0 = (int)v;
+    const int x1 = x0 + 1 > edge - 1 ? edge - 1 : x0 + 1;
+    const int y1 = y0 + 1 > edge - 1 ? edge - 1 : y0 + 1;
+    const float fx = u - x0, fy = v - y0;
+    const uint8_t c00 = tex[y0 * edge + x0], c10 = tex[y0 * edge + x1];
+    const uint8_t c01 = tex[y1 * edge + x0], c11 = tex[y1 * edge + x1];
+    const float a00 = (c00 == U2_DGA_TRANSPARENT) ? 0.f : 1.f;
+    const float a10 = (c10 == U2_DGA_TRANSPARENT) ? 0.f : 1.f;
+    const float a01 = (c01 == U2_DGA_TRANSPARENT) ? 0.f : 1.f;
+    const float a11 = (c11 == U2_DGA_TRANSPARENT) ? 0.f : 1.f;
+    const float w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy);
+    const float w01 = (1 - fx) * fy,       w11 = fx * fy;
+    const float A = a00 * w00 + a10 * w10 + a01 * w01 + a11 * w11;
+    if (A <= 0.004f) return 0;
+    float R = 0, G = 0, B = 0;
+    if (a00) { const uint8_t *p = pal[c00 - 16]; R += w00*p[0]; G += w00*p[1]; B += w00*p[2]; }
+    if (a10) { const uint8_t *p = pal[c10 - 16]; R += w10*p[0]; G += w10*p[1]; B += w10*p[2]; }
+    if (a01) { const uint8_t *p = pal[c01 - 16]; R += w01*p[0]; G += w01*p[1]; B += w01*p[2]; }
+    if (a11) { const uint8_t *p = pal[c11 - 16]; R += w11*p[0]; G += w11*p[1]; B += w11*p[2]; }
+    *out = g_rgb_lut[(int)(R / A) >> 3][(int)(G / A) >> 3][(int)(B / A) >> 3];
+    return 1;
+}
+
 static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
                         float px, float py,
                         float dirX, float dirY,
@@ -263,6 +323,12 @@ static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
 {
     dg3_spr list[DG3_MAX_SPR];
     int n = 0;
+
+    /* Bilinear needs the palette (to blend RGB) and the RGB->index LUT. Both are
+     * fixed once the dungeon art is installed, so build the LUT once. */
+    if (!g_lut_ready && u2_dga_palette_ready()) dg3_build_rgb_lut();
+    uint8_t pal[240][3];
+    u2_dga_palette(pal);
 
     for (int cy = 0; cy < U2_DG_PAGE_EDGE; cy++)
         for (int cx = 0; cx < U2_DG_PAGE_EDGE; cx++) {
@@ -333,15 +399,33 @@ static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
         const uint8_t *tex = u2_dga_sprite(list[i].id, lvl);
         const int edge = u2_dga_sprite_edge(list[i].id);
 
-        for (int x = x0; x < x1; x++) {
-            if (x < 0 || x >= DG3_W || tY >= zbuf[x]) continue;
-            const int tx = ((x - x0) * edge) / (w > 0 ? w : 1);
-            for (int y = y0; y < y1; y++) {
-                if (y < 0 || y >= DG3_H) continue;
-                const int ty = ((y - y0) * edge) / (h > 0 ? h : 1);
-                const uint8_t c = tex[ty * edge + tx];
-                if (c == U2_DGA_TRANSPARENT) continue;
-                u2_frame_put(f, x, y, c);
+        if (edge != U2_DGA_TEX_EDGE) {
+            /* Concept sprite: full-colour (indices 16..255), bilinear in RGB. */
+            const float su = (float)edge / (float)(w > 0 ? w : 1);
+            const float sv = (float)edge / (float)(h > 0 ? h : 1);
+            for (int x = x0; x < x1; x++) {
+                if (x < 0 || x >= DG3_W || tY >= zbuf[x]) continue;
+                const float u = ((float)(x - x0) + 0.5f) * su - 0.5f;
+                for (int y = y0; y < y1; y++) {
+                    if (y < 0 || y >= DG3_H) continue;
+                    const float v = ((float)(y - y0) + 0.5f) * sv - 0.5f;
+                    uint8_t idx;
+                    if (dg3_sample_bilinear(tex, edge, pal, u, v, &idx))
+                        u2_frame_put(f, x, y, idx);
+                }
+            }
+        } else {
+            /* Procedural sprite (chest, ladders): 32px EGA indices, nearest. */
+            for (int x = x0; x < x1; x++) {
+                if (x < 0 || x >= DG3_W || tY >= zbuf[x]) continue;
+                const int tx = ((x - x0) * edge) / (w > 0 ? w : 1);
+                for (int y = y0; y < y1; y++) {
+                    if (y < 0 || y >= DG3_H) continue;
+                    const int ty = ((y - y0) * edge) / (h > 0 ? h : 1);
+                    const uint8_t c = tex[ty * edge + tx];
+                    if (c == U2_DGA_TRANSPARENT) continue;
+                    u2_frame_put(f, x, y, c);
+                }
             }
         }
     }
