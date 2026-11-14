@@ -118,6 +118,10 @@ concept* has to deliver, even at full colour and full detail:
 - **It reads against dark stone, not a void.** The corridor wall is mottled
   grey-brown. A dark creature on a dark wall disappears, so give each one a
   light rim, a pale core, or a luminous accent.
+- **One subject per image.** Generate a single figure (or single object) per
+  prompt. Asked to draw a row, a model averages faces, fuses silhouettes, and
+  botches spacing — a group prompt is asking for weird output. Any comparison
+  line-up is assembled afterward in an editor, never generated.
 
 Paste-ready stem (every prompt below is self-contained; this is the shared part,
 written down once so the *why* is here):
@@ -258,20 +262,12 @@ in the dungeon and it never touches you. A bright eye or crest so the "mind" rea
 survives distance and darkness.
 ```
 
-### C8 — The line-up  *(silhouette test — run this as one image)*
-All seven standing together, so the distinctness test is one glance.
-
-```text
-detailed dark-fantasy video-game creature concept art, seven full figures
-standing in a row on the ground, each filling its own space, strong readable
-silhouettes, full colour, dramatic torchlight against a dark dungeon, plain
-near-black background, no text, no watermark — left to right: a green-skinned
-hunched brute with a crude blade; a pale hooded shape fading at the bottom with
-two cold lights for eyes; a low wide many-legged vermin; a reared snake with no
-legs; a small wiry crouching thief with busy hands; a hulking horned brute with a
-heavy weapon; a horned demonic caster with raised arms and a glowing gaze. Each
-identifiable by outline alone at very small size.
-```
+### C8 — Compose the seven  *(review step, not a prompt)*
+Do **not** ask the model for a group shot — it averages faces, fuses silhouettes,
+and botches spacing. Generate C1–C7 one at a time (each prompt above is a single
+figure), then drop the seven cut-outs side by side in an editor and shrink the
+row. That composite is the silhouette test in § 6; it is assembled afterward,
+never generated.
 
 ---
 
@@ -335,35 +331,37 @@ object rather than a coin or an ordinary jewel. The prize found only at the very
 bottom of a dungeon.
 ```
 
-### D4 — The weapons  *(line-up)*
+### D4 — The weapons  *(one per image)*
 The chest's weapon arm draws from this set (the game's own names): **dagger,
-mace, axe, bow, sword, great sword, light sword**. Each must read as itself at
-small size and as *something you hold in a hand*. A phaser and a quick sword also
-exist in the game's weapon list but are not chest drops; include them only if a
-wider weapon set is wanted later.
+mace, axe, bow, sword, great sword, light sword**. Generate **one weapon per
+image** — a single hand weapon, unmistakable as itself at small size. A phaser
+and a quick sword also exist in the game's weapon list but are not chest drops;
+add them only if a wider set is wanted later. Compose the comparison row
+afterward if you want it.
+
+Per-weapon prompt (substitute the weapon):
 
 ```text
-detailed dark-fantasy video-game prop concept art, a row of objects each filling
-its own frame, full colour, dramatic torchlight against a dark dungeon, plain
-near-black background, no text, no watermark — a line-up of hand weapons, left to
-right: a short dagger, a studded mace, a broad axe, a simple bow, a straight
-sword, an oversized great sword, and a slender glowing light-sword. Each
-unmistakable as itself at small size and clearly held in one hand.
+detailed dark-fantasy video-game prop concept art, a single <WEAPON> filling its
+frame, full colour, dramatic torchlight against a dark dungeon, plain near-black
+background, no text, no watermark — clearly a hand weapon held in one hand,
+unmistakable as itself at small size.
 ```
 
-### D5 — The armour  *(line-up)*
+### D5 — The armour  *(one per image)*
 The chest's armour arm yields the low tiers (the game's own names): **cloth,
-leather, chain**. Each should read as *a thing you wear*, and the three should
-read as a visible ladder of protection (flimsy → sturdy → metal), so a player
-instantly ranks them.
+leather, chain**. Generate **one piece per image**, each a wearable thing you put
+on; laid side by side afterward they should read as a visible ladder of
+protection (flimsy → sturdy → metal) so a player instantly ranks them.
+
+Per-piece prompt (substitute the piece):
 
 ```text
-detailed dark-fantasy video-game prop concept art, a row of objects each filling
-its own frame, full colour, dramatic torchlight against a dark dungeon, plain
-near-black background, no text, no watermark — a line-up of body armour shown as
-wearable pieces, left to right: a rough cloth shirt, a boiled-leather cuirass,
-and a ringed mail hauberk. A clear ladder of protection from flimsy to metal,
-each readable as something you put on.
+detailed dark-fantasy video-game prop concept art, a single piece of body armour
+filling its frame, full colour, dramatic torchlight against a dark dungeon, plain
+near-black background, no text, no watermark — a wearable torso piece (a rough
+cloth shirt / a boiled-leather cuirass / a ringed mail hauberk), readable as
+something you put on.
 ```
 
 ---
@@ -398,8 +396,9 @@ Not just an image — three extractable decisions:
    § 0 — if the creatures need ~40 colours to keep their read, the small-palette
    plan is wrong and the loader work is justified; if 16 survive, it is not.
    Decide from the shots, not before them.
-2. **Silhouette tests.** C8 (the line-up) is the test: shrink it and confirm no
-   two of the seven are confusable, and that the legless snake and the low
+2. **Silhouette tests.** Composite the individual C1–C7 outputs side by side
+   (per C8 — assembled in an editor, never generated) and shrink the row: confirm
+   no two of the seven are confusable, and that the legless snake and the low
    carrion-creeper never read as an upright humanoid. Record the failures — they
    are the brief for the sprite stage.
 3. **The "small and dim" test.** Shrink each creature and darken it toward black
