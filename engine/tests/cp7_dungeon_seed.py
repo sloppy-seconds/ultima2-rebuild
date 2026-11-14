@@ -96,7 +96,7 @@ def world() -> bytes:
     return bytes(g) + bytes(128)
 
 
-def player() -> bytes:
+def player(cast: bool = False) -> bytes:
     p = bytearray(384)
     p[0:7] = b"DGTST01"
     # The record is DS:36..DS:135, so file byte i is DS:(0x36 + i).
@@ -125,6 +125,15 @@ def player() -> bytes:
     p[0x64 - 0x36] = 0x50                    # fifty torches
     p[0x65 - 0x36] = 0x05                    # keys
     p[0x66 - 0x36] = 0x05                    # tools, so the trap's escape arm is reachable
+    if cast:
+        # The CAST cases need a caster, and one flag carries both halves because the gate
+        # order is what most of those cases assert: the wand test runs before the stock test,
+        # so a seed with spells and no wand proves the refusal order, and a seed with both
+        # proves everything after it. A staff rather than a wand, because asm/3139 sums the
+        # two bytes and the gate should not be able to pass only for the item it is named on.
+        p[0xD8 - 0x36] = 0x01                # DS:D8, the STAFF slot
+        for i in range(1, 10):
+            p[(0xB6 + i) - 0x36] = 0x01      # one charge each, packed decimal
     return bytes(p)
 
 
@@ -175,7 +184,7 @@ def monx() -> bytes:
     return bytes(m)
 
 
-def main(out_dir: str) -> int:
+def main(out_dir: str, cast: bool = False) -> int:
     content = os.path.join(out_dir, "content")
     save = os.path.join(out_dir, "save")
     os.makedirs(content, exist_ok=True)
@@ -199,12 +208,15 @@ def main(out_dir: str) -> int:
     rec = os.path.join(save, "PLAYER", "PLAYER")   # saves/<slot>/PLAYER; core/slot.h
     os.makedirs(os.path.dirname(rec), exist_ok=True)
     with open(rec, "wb") as f:
-        f.write(player())
+        f.write(player(cast))
     return 0
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("usage: cp7_dungeon_seed.py DIR", file=sys.stderr)
+    argv = sys.argv[1:]
+    cast = "--cast" in argv
+    argv = [a for a in argv if a != "--cast"]
+    if len(argv) != 1:
+        print("usage: cp7_dungeon_seed.py [--cast] DIR", file=sys.stderr)
         raise SystemExit(2)
-    raise SystemExit(main(sys.argv[1]))
+    raise SystemExit(main(argv[0], cast))

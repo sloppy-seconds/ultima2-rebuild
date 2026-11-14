@@ -299,6 +299,28 @@ MANIFEST = [
     ("U2_S_IGNITE_NONE_OWNED", "37AE_ignite_torch_burn.asm", ("run", 0x39B9, 11, "NONE OWNED!")),
     ("U2_S_KLIMB",             "37F2_klimb_msg.asm",        ("run", 0x39F4, 5, "KLIMB")),
     ("U2_S_TO_LEVEL",          "3823_site_floor_down.asm",  ("run", 0x3A2E, 9, "TO LEVEL ")),
+    # CP7 CAST: the four literals on the cast path, added 2026-11-15 when cmd_C was wired.
+    # The spell NAME is not one of them -- it comes from the indexed pool (U2_T_SPELLS) via the
+    # printer at L_00528c, the same route cmd_M uses, so only the frame and the three refusals
+    # are literals here.
+    #
+    # These are FILE offsets, which is what a `run` locator has always meant here despite its
+    # name -- the first draft of these four used runtime addresses and the extractor read them as
+    # file offsets, which produced "GOLD+" where "CAST-" belonged and nothing else. The asm
+    # label base is also file-relative (see asm/310B_cmd_C.asm on why that matters), so the two
+    # agree and only the name misleads.
+    #
+    # "-FAILED!" exists twice in the file: file 0x33D3 is the location gate (DS:4A < 4) and
+    # 0x3435 is the shared arm refusal every spell arm jumps to. The engine prints one literal
+    # for both, so the locator names the arm copy and the second call site is recorded in
+    # asm/3139_cast_spell_flow.asm rather than as a second symbol.
+    #
+    # "NEED WAND OR STAFF!" and "NO SPELL!" both carry the leading 0x8d line marker, so their
+    # offsets start after it, per the convention above.
+    ("U2_S_CAST",              "310B_cmd_C.asm",            ("run", 0x330E,  5, "CAST-")),
+    ("U2_S_CAST_NEED_WAND",    "3139_cast_spell_flow.asm",  ("run", 0x336B, 19, "NEED WAND OR STAFF!")),
+    ("U2_S_CAST_NO_SPELL",     "3139_cast_spell_flow.asm",  ("run", 0x33A0,  9, "NO SPELL!")),
+    ("U2_S_CAST_FAILED",       "3139_cast_spell_flow.asm",  ("run", 0x3435,  8, "-FAILED!")),
     # CP7: the dungeon-side command set. asm/277B is the fragment that holds ADVANCE,
     # RETREAT, TURN LEFT, TURN RIGHT and the trap, and it is one of the bulk-wave files
     # whose strings Phase 3 rendered as db lines rather than instructions, so every one of

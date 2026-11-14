@@ -235,11 +235,15 @@ int u2_combat_force_field(u2_ctx *ctx)
  * the three-space range, attacking from the deck, and now the reward — and each time the
  * listing was read correctly and the *reach* of a branch was read wrong or the behaviour was
  * assumed to be absent because the game is silent about it. */
-static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *out)
+static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *out,
+                                int force_kill)
 {
     u2_attack r;
     memset(&r, 0, sizeof r);
-    r.damage = (uint8_t)dmg;
+    /* A forced kill (KILL, PRAYER) reaches the death path without a damage step at all, so it
+     * reports no damage rather than inventing a number nobody rolled. asm/3139's slot 9 arm is
+     * `call target_scan ; jmp L_0030d1` — no subtract on the way. */
+    r.damage = force_kill ? 0u : (uint8_t)dmg;
 
     /* asm/2E3D file 0x30BC: stc; cmc (clear CF); sbb [DS:20],al; cmc; jae -> the
      * DEATH branch. Note the inverted sense, and that hp == damage falls through
@@ -258,8 +262,9 @@ static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *
      * Enhanced mode kills on equality. Nothing else changes: the reward, the record clear and
      * the message are the same path either way.
      */
-    const int lethal = (ctx->fidelity == U2_FIDELITY_ENHANCED)
-                     ? (dmg >= hp) : (dmg > hp);
+    const int lethal = force_kill
+                     || ((ctx->fidelity == U2_FIDELITY_ENHANCED)
+                         ? (dmg >= hp) : (dmg > hp));
     const uint8_t dead_type = ctx->state.mon_type[slot];
     if (lethal) {
         /* Death clears hp, type and kind — and NOT x/y (file 0x30D2..0x30DC). */
@@ -341,7 +346,32 @@ int u2_combat_attack(u2_ctx *ctx, int slot, u2_attack *out)
     unsigned dmg = (((unsigned)ctx->state.readied_weapon * 8u)
                     + (unsigned)ctx->state.stat_str) >> 2;
     r.damage = (uint8_t)dmg;
-    return apply_damage_to_slot(ctx, slot, dmg, out);
+    return apply_damage_to_slot(ctx, slot, dmg, out, 0);
+}
+
+/* asm/3139 slot 7: MAGIC MISSILE. The caller computes the amount; this applies it.
+ * The amount is NOT this function's business, and that is deliberate — see cmd_C for why the
+ * formula belongs to the spell and not to the arithmetic. */
+int u2_combat_cast_damage(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *out)
+{
+    if (slot < 0 || slot >= U2_MON_SLOTS) {
+        if (out) memset(out, 0, sizeof *out);
+        return 0;
+    }
+    return apply_damage_to_slot(ctx, slot, dmg, out, 0);
+}
+
+/* asm/3139 slots 6 and 9: PRAYER (behind the coin flip) and KILL. Both reach asm/30D1 with no
+ * damage step, so the creature dies whatever its HP and the reward is the same block melee and
+ * the cannon reach. Returns 2 (killed) always; a caller that found no target must not call this
+ * at all, which is what the target scan's zero flag is for. */
+int u2_combat_cast_kill(u2_ctx *ctx, int slot, u2_attack *out)
+{
+    if (slot < 0 || slot >= U2_MON_SLOTS) {
+        if (out) memset(out, 0, sizeof *out);
+        return 0;
+    }
+    return apply_damage_to_slot(ctx, slot, 0u, out, 1);
 }
 
 /* asm/35ED..asm/3611: the FRIGATE'S CANNON.
@@ -419,5 +449,5 @@ int u2_combat_cannon(u2_ctx *ctx, int cx, int cy, u2_attack *out)
      * whatever rand_byte produced, so this is a floor of 32 and not a range of 32..63. */
     const unsigned dmg = (unsigned)(u2_rand_byte(ctx) | 0x20u);
     r.damage = (uint8_t)dmg;
-    return apply_damage_to_slot(ctx, slot, dmg, out);
+    return apply_damage_to_slot(ctx, slot, dmg, out, 0);
 }

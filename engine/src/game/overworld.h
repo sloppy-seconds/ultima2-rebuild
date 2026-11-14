@@ -17,6 +17,7 @@
 #include "core/tiles_ega.h"
 #include "core/view.h"
 #include "core/world.h"
+#include "game/combat.h"   /* u2_attack, for u2_announce_kill */
 
 /* The probe start state. These are the values read out of the live data-segment
  * capture (captures/spice86/live-ds-4f4d.bin: sector digits 3 and 0, position
@@ -256,6 +257,14 @@ int u2_site_for_tile(uint8_t tile, const char **label, int *ax, int *ay);
 #define U2_ITEM_BLUE_TASSLE  12u  /* DS:E2 — gates SHIP boarding     (asm/2FF6) */
 #define U2_ITEM_TRI_LITHIUM  15u  /* DS:E5 — gates ROCKET launch     (asm/38B0) */
 
+/* The two the CAST gate reads, asm/3139 L_00335d: `mov DS:D7,al ; adc DS:D8,al ; jne` — a
+ * sum, so a wand and a staff are interchangeable and there is no power difference between
+ * them. Filmed 2026-11-15 (captures/spice86/magic-casts-2026-11-15): with both at zero the
+ * whole command is NEED WAND OR STAFF!, and the refusal comes BEFORE the stock check, so an
+ * empty-handed caster never learns which spell they had readied. */
+#define U2_ITEM_WAND          1u  /* DS:D7 */
+#define U2_ITEM_STAFF         2u  /* DS:D8 */
+
 /*
  * The passability verdict for a travel mode — asm/2423's mode dispatch at
  * asm/253B, which is the first thing the routine does after storing its AL argument
@@ -330,6 +339,18 @@ void u2_overworld_enter(u2_ctx *ctx, u2_overworld *ow);
  * two routes out of a site and which the original routes through the same block.
  */
 void u2_overworld_site_leave(u2_ctx *ctx, u2_overworld *ow);
+
+
+/*
+ * The kill tail: asm/2D8C's reward block, which prints `KILLED--GOLD+n--EXP.+m`, restamps,
+ * stores the cleared creature block and repaints the status band. Public because CAST reaches
+ * it too — KILL, PRAYER and a MAGIC MISSILE that finishes a creature all land on asm/30D1,
+ * which is the same death path the melee swing and the cannon reach, so the announcement has
+ * to be the same one. Filmed 2026-11-15 (captures/spice86/magic-casts-2026-11-15): a KILL and
+ * a MAGIC MISSILE kill print identically, and a MAGIC MISSILE that does NOT kill prints nothing
+ * at all, which is why the caller decides whether to call this rather than the reward block.
+ */
+void u2_announce_kill(u2_ctx *ctx, u2_overworld *ow, const u2_attack *a);
 
 
 /*

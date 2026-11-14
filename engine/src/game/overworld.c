@@ -2023,7 +2023,7 @@ int u2_overworld_run(u2_ctx *ctx, u2_overworld *ow)
  * The cleared record has to reach the sector buffer too: asm/2305 carries both FCB names —
  * MAPXFF at file 0x2538 and MONXFF at 0x2548 — so the original rewrites the creature block
  * as well as the map (docs/phase4-implementation.md, the asm/2305 row). */
-static void announce_kill(u2_ctx *ctx, u2_overworld *ow, const u2_attack *a)
+void u2_announce_kill(u2_ctx *ctx, u2_overworld *ow, const u2_attack *a)
 {
     char num[8];
     u2_monsters_restamp(ctx, &ow->world);
@@ -2156,7 +2156,7 @@ void u2_overworld_attack_dir(u2_ctx *ctx, u2_overworld *ow, const char *word, in
     seam_char_print(ctx, '\r');
     seam_str_out(ctx, U2_S_CMD_PROMPT);
     if (r == 2)
-        announce_kill(ctx, ow, &a);
+        u2_announce_kill(ctx, ow, &a);
 }
 
 /* Composites and presents a whole game frame on demand.
@@ -2633,7 +2633,7 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
                  * `CMD: FIRE DIRECT-EAST` / `KILLED--GOLD+13--EXP.+03` / `CMD:`
                  * (captures/spice86/cannon-kill-live). */
                 seam_str_out(ctx, U2_S_CMD_PROMPT);
-                announce_kill(ctx, ow, &at);
+                u2_announce_kill(ctx, ow, &at);
                 creature_turn(ctx, ow);
                 continue;
             }

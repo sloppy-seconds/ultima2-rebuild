@@ -68,6 +68,17 @@ int u2_combat_attack(u2_ctx *ctx, int slot, u2_attack *out);
 int u2_combat_cannon(u2_ctx *ctx, int cx, int cy, u2_attack *out);
 
 
+/* asm/3139 slot 7: MAGIC MISSILE applies a caller-computed amount to one slot.
+ * Same three return codes as u2_combat_attack. The amount is computed by the spell, not here:
+ * DS:20 = 2*DS:56 + 0x1e + CF and the `cmc ; sbb` idiom then subtracts DS:20 + 1, which is
+ * arithmetic with a shape worth reading in cmd_C before trusting it. */
+int u2_combat_cast_damage(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *out);
+
+/* asm/3139 slots 6 and 9: PRAYER and KILL reach asm/30D1 with no damage step, so the creature
+ * dies at any HP and the reward block runs as it does for melee. Always returns 2. */
+int u2_combat_cast_kill(u2_ctx *ctx, int slot, u2_attack *out);
+
+
 /* asm/2CE5..2D8B: which item a kill grants, keyed on the TYPE of the creature that died.
  * Split out and public so the distribution is testable without driving a whole fight; the
  * three arms are the only sources in the binary for most of the item array. */

@@ -246,6 +246,14 @@
 #define U2_S_KLIMB "KLIMB"
 /* exe@0x3A2E */
 #define U2_S_TO_LEVEL "TO LEVEL "
+/* exe@0x330E */
+#define U2_S_CAST "CAST-"
+/* exe@0x336B */
+#define U2_S_CAST_NEED_WAND "NEED WAND OR STAFF!"
+/* exe@0x33A0 */
+#define U2_S_CAST_NO_SPELL "NO SPELL!"
+/* exe@0x3435 */
+#define U2_S_CAST_FAILED "-FAILED!"
 /* exe@0x2A65 */
 #define U2_S_ADVANCE "ADVANCE"
 /* exe@0x2A77 */

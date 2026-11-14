@@ -21,6 +21,9 @@
 #include "game/status.h"
 #include "game/overworld.h"
 #include "game/dungeon.h"
+#include "game/combat.h"
+#include "game/monsters.h"
+#include "core/state.h"
 #include "game/space.h"
 #include "game/space_view.h"
 
@@ -1975,6 +1978,293 @@ static u2_cmd_result cmd_D(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
 
 
 
+/* asm/330C: the CAST target scan, shared by MAGIC MISSILE, PRAYER and KILL.
+ *
+ * Slots 31 down to 1. Slot 0 is never offered: the loop is `mov $0x1f,%bl` then
+ * `dec %di ; jne`, so it stops when the index reaches zero instead of testing it, and a
+ * creature parked in slot 0 is untargetable by CAST while remaining perfectly attackable
+ * by cmd_A, which has its own scan.
+ *
+ * Three tests, in the order the bytes run them: a type of zero is an empty slot; the kind
+ * byte must equal [DS:25]; and the position must be exactly the player's cell plus the
+ * facing vector. ONE cell — no ray, no range, no line of sight. A creature three squares
+ * away down a lit corridor is out of reach of every damaging spell in the game.
+ *
+ * The kind test is a same-floor test inside a site, not a species match: asm/147F writes
+ * `slot >> 1` into that byte for a dungeon creature and asm/143C refuses its move unless it
+ * equals [DS:25]. Same byte, same meaning, two routines that had never been read against
+ * each other. See asm/330C_cast_target_finder.asm.
+ */
+static int cast_target(u2_ctx *ctx, const u2_overworld *ow)
+{
+    int dx, dy;
+    u2_dungeon_facing(ctx, &dx, &dy);
+    const uint8_t tx = (uint8_t)(ow->x + dx);
+    const uint8_t ty = (uint8_t)(ow->y + dy);
+    for (int i = U2_MON_SLOTS - 1; i >= 1; --i) {
+        if (ctx->state.mon_type[i] == 0) continue;
+        if (ctx->state.mon_kind[i] != ctx->state.site_floor) continue;
+        if (ctx->state.mon_x[i] != tx) continue;
+        if (ctx->state.mon_y[i] != ty) continue;
+        return i;
+    }
+    return -1;
+}
+
+/* Every spell arm's refusal is the same three instructions at asm/3139 L_003432: print
+ * `-FAILED!` and return. The charge is already gone by the time any arm can reach this, which
+ * is the point — see the ordering note in cmd_C. */
+static u2_cmd_result cast_failed(u2_ctx *ctx)
+{
+    seam_str_out(ctx, U2_S_CAST_FAILED);
+    cmd_done(ctx);
+    return U2_CMD_DONE;
+}
+
+/* asm/1451, the way the ladder arms use it: the cell at the BEHIND position on the CANDIDATE
+ * floor must be exactly zero. "Behind" is literal and facing-relative — [DS:23]/[DS:24] is
+ * player minus facing, measured three ways in one session (facing north gave (5,6), west
+ * (6,5), east (4,5)), and the third-party rule "if the square behind your destination is
+ * open" turned out to be the bytes speaking literally rather than loosely.
+ *
+ * The engine keeps no [DS:23] mirror, so the pair is computed here from the same two inputs
+ * the original does it from. */
+static bool cast_ladder_open(u2_ctx *ctx, const u2_overworld *ow, int floor)
+{
+    int dx, dy;
+    u2_dungeon_facing(ctx, &dx, &dy);
+    return u2_world_dungeon_at(&ow->world, floor,
+                               (ow->x - dx) & 0xff, (ow->y - dy) & 0xff) == 0;
+}
+
+/* asm/3A2A, the tail both ladder arms jump to when the move is allowed: CR, then
+ * `TO LEVEL ` and the new floor in packed decimal. Same block cmd_D and cmd_K reach. */
+static void cast_to_level(u2_ctx *ctx)
+{
+    char d[3];
+    daa_bcd2(ctx->state.site_floor, d);
+    seam_char_print(ctx, '\r');
+    seam_str_out(ctx, U2_S_TO_LEVEL);
+    seam_str_out(ctx, d);
+}
+
+/* One ladder spell. `decrement` names which way the byte moves, and which way it moves is
+ * decided by the site kind, not by the spell: asm/3139's slot 2 takes the decrement path only
+ * when [DS:4A] == 4 and slot 3 takes the increment path only when it does, so in a tower the
+ * two are inverted relative to a dungeon.
+ *
+ * That is a second floor ORIENTATION on one byte, not two spells that do the opposite of
+ * their names. Entering a dungeon puts the player on floor 0 and DOWN LADDER took [DS:25]
+ * 0 -> 1 -> 2 with UP LADDER taking it back (captures/spice86/magic-casts-2026-11-15), so
+ * [DS:25] is depth below the entrance and in a dungeon both spells do exactly what they say.
+ * An earlier header read the same branch as "tower and dungeon are SWAPPED" and retracted it
+ * the day the dungeon half was filmed. */
+static u2_cmd_result cast_ladder(u2_ctx *ctx, u2_overworld *ow, bool decrement)
+{
+    int cand;
+    if (decrement) {
+        if (ctx->state.site_floor == 0) {
+            /* UP LADDER at the entrance floor IS SURFACE. The arm opens `or %al,%al ;
+             * je L_0034a2` and L_0034a2 is the slot-5 target, so at floor 0 "up" falls into
+             * the way out. Filmed: bare `CAST-UP LADDER`, charge spent, player back on the
+             * world map at the cell entered by. There is no -FAILED! on this path, which is
+             * how it differs from every other refusal. */
+            u2_overworld_site_leave(ctx, ow);
+            cmd_done(ctx);
+            return U2_CMD_DONE;
+        }
+        cand = ctx->state.site_floor - 1;
+    } else {
+        /* `cmp $0xf,%al ; jb` — the bound is 15 pages, and it is tested before the cell, so a
+         * cast at the bottom of a 16-floor site fails on the bound rather than on the map. */
+        if (ctx->state.site_floor >= 0xf) return cast_failed(ctx);
+        cand = ctx->state.site_floor + 1;
+    }
+    if (!cast_ladder_open(ctx, ow, cand)) return cast_failed(ctx);
+    ctx->state.site_floor = (uint8_t)cand;
+    cast_to_level(ctx);
+    cmd_done(ctx);
+    return U2_CMD_DONE;
+}
+
+/* asm/310B + asm/3139: CAST, all of it.
+ *
+ * The handler itself is three instructions — print `CAST-`, jump into the flow at runtime
+ * 0x3153 — and the flow is five gates and a nine-way dispatch. Everything below is transcribed
+ * in the original's order, because the order is observable and two of the five gates are in
+ * the place an implementer would not put them.
+ *
+ * The gates, in byte order:
+ *   1. print the readied spell's NAME from the pool (pool[0x24 + DS:63]) — before any test,
+ *      so the band always names the spell that is about to fail;
+ *   2. DS:D7 + DS:D8 non-zero, else NEED WAND OR STAFF!. A SUM on the raw packed-decimal
+ *      bytes, so a wand and a staff are interchangeable and neither is stronger;
+ *   3. DS:63 == 0 casts nothing, silently, after printing CAST-NONE;
+ *   4. DS:B6[pick] non-zero, else NO SPELL!; then SPEND it, in packed decimal;
+ *   5. DS:4A >= 4, else -FAILED!.
+ *
+ * Gate 5 after gate 4 is the one to get wrong. The natural implementation checks the location
+ * first and spends after, and the original does not: a wizard who casts in the middle of a
+ * field loses the spell and gets `-FAILED!`. Observed twice, and it is the kind of thing no
+ * test that only checks the success path will ever notice.
+ *
+ * There is no class test anywhere on this path. A Fighter holding a staff with a non-zero
+ * count casts, and the shop gate (asm/184C, asm/19BA) is the entire class restriction. Adding
+ * a class gate here would be a new bug, not a missing one.
+ */
+static u2_cmd_result cmd_C(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
+{
+    (void)letter;
+    u2_state *st = &ctx->state;
+
+    seam_str_out(ctx, U2_S_CAST);
+    const int pick = st->spell_pick;
+    seam_str_out(ctx, SPELL_NAME(pick));
+
+    if (st->items_held[U2_ITEM_WAND] + st->items_held[U2_ITEM_STAFF] == 0) {
+        seam_str_out(ctx, U2_S_CAST_NEED_WAND);
+        cmd_done(ctx);
+        return U2_CMD_DONE;
+    }
+    if (pick == 0) { cmd_done(ctx); return U2_CMD_DONE; }
+    if (pick < 0 || pick >= (int)(sizeof st->spell_counts / sizeof st->spell_counts[0]))
+        return cast_failed(ctx);
+    if (st->spell_counts[pick] == 0) {
+        seam_str_out(ctx, U2_S_CAST_NO_SPELL);
+        cmd_done(ctx);
+        return U2_CMD_DONE;
+    }
+    /* `stc ; mov DS:B6[pick],al ; cmc ; sbb $0x1,al ; das ; cmc` — a packed-decimal minus one.
+     * Spent here, before the location gate. See the header. */
+    st->spell_counts[pick] = u2_bcd_dec1(st->spell_counts[pick]);
+
+    if (st->sector_second < 4) return cast_failed(ctx);
+
+    switch (pick) {
+    case 1: /* LIGHT. Not a parallel light source: it refills the counter a torch burns down,
+             * so casting it in a lit corridor spends a spell to top up a running count. */
+        st->moved_flag = U2_DG_LIGHT_FULL;
+        cmd_done(ctx);
+        return U2_CMD_DONE;
+
+    case 2: /* DOWN LADDER: deeper in a dungeon, down a floor in a tower. */
+        return cast_ladder(ctx, ow, st->sector_second == 4);
+
+    case 3: /* UP LADDER: the mirror, including the floor-0 exit. */
+        return cast_ladder(ctx, ow, st->sector_second != 4);
+
+    case 4: { /* PASSWALL. */
+        int dx, dy;
+        u2_dungeon_facing(ctx, &dx, &dy);
+        const int tx = (ow->x + dx) & 0xf;
+        const int ty = (ow->y + dy) & 0xf;
+        /* The mask is a WRAP, not a bounds check, and that is a bug in the original rather
+         * than a rule about edges. Standing at x = 0 facing west gives (0 - 1) & 0xf = 15, and
+         * the cell on the far side of the map is then a perfectly ordinary target: filmed
+         * twice, at (0,8) clearing (15,8) from 0x80 and at (0,2) clearing (15,2) from 0xc0
+         * (captures/spice86/passwall-wrap-2026-11-15). The third-party "does not work on outer
+         * edge walls" is this mask approximating a bounds check for the three quarters of
+         * cases where the arithmetic does not wrap. Reproduced rather than fixed, in both
+         * modes, because a fixed version would be a game the original is not.
+         *
+         * A coordinate that masks to zero is refused, which is the half of the edge rule that
+         * does hold: an attempt from (0,0) spent the charge and cleared nothing, because the
+         * y term masked to zero before the cell was ever read. */
+        if (tx == 0 || ty == 0) return cast_failed(ctx);
+        /* The precondition the flag test hides. asm/1451 returns the cell in AL and does
+         * `or %al,%al ; ret`, and where the ladder arms test that with `jne` — proceed only if
+         * the cell is open — PASSWALL tests it with `jns`, so it proceeds only when BIT 7 IS
+         * SET. Casting at open floor refuses and spends. Note that 0xC0 and 0xE0, the door and
+         * the fake wall, both pass this test, so PASSWALL clears a doorway too. */
+        if ((u2_world_dungeon_at(&ow->world, st->site_floor, tx, ty) & 0x80) == 0)
+            return cast_failed(ctx);
+        /* `mov $0x0,%al ; mov 0x8,%bx ; mov %al,(%bx,%si)` — bx and si are the address the
+         * validity callee left behind, so the write lands exactly on the cell that was tested,
+         * and it writes zero rather than clearing the rock bit. terrain_put rather than put
+         * because the change has to survive the next stamp pass, which is the same reason an
+         * emptied chest uses it; whether it then reaches the sector file on a save is inferred
+         * from the game's own write-back and has not been observed. */
+        u2_world_dungeon_terrain_put(&ow->world, st->site_floor, tx, ty, 0);
+        cmd_done(ctx);
+        return U2_CMD_DONE;
+    }
+
+    case 5: /* SURFACE. Depth is irrelevant: cast from floor 1 it returned the player to the
+             * world cell entered by, not to a cell derived from where the cast happened. */
+        u2_overworld_site_leave(ctx, ow);
+        cmd_done(ctx);
+        return U2_CMD_DONE;
+
+    case 6: /* PRAYER is KILL behind a coin: `call rand_byte ; js L_003432 ; jmp L_003501`.
+             * The flag is bit 7 of the generator's new byte, set in the tail of the routine
+             * rather than its body, which is why the third-party 50% sat marked NOT FOUND for
+             * as long as it did. Measured fair at 50.0% of 200000 draws. */
+        if (u2_rand_byte(ctx) & 0x80u) return cast_failed(ctx);
+        /* falls through into the kill arm, exactly as the bytes do */
+        /* FALLTHROUGH */
+
+    case 9: { /* KILL, and PRAYER's success arm. No damage step: asm/30D1 is reached directly,
+               * so the creature dies at any HP and the reward block runs as it does for melee. */
+        const int slot = cast_target(ctx, ow);
+        if (slot < 0) return cast_failed(ctx);
+        u2_attack a;
+        u2_combat_cast_kill(ctx, slot, &a);
+        u2_announce_kill(ctx, ow, &a);
+        return U2_CMD_DONE;
+    }
+
+    case 7: { /* MAGIC MISSILE.
+             *
+             * The amount is `2*DS:56 + 0x1e + CF`, and the `cmc ; sbb` idiom then subtracts
+             * that plus one. DS:56 is the HIGH packed-decimal byte of total experience, not a
+             * level, and doubling a BCD byte with no DAA is not a scale — it is a sawtooth.
+             * Computed from the bytes and validated at the two live-measured points (0x99 -> 82,
+             * 0x01 -> 33): the curve peaks at 255 for 0x70 and collapses to 1 at 0x71, so a
+             * character who earns enough to carry that byte up watches their best attack drop
+             * to a point of damage.
+             *
+             * That is the shape the third-party "31 + twice your level" was reaching for, and
+             * it is the single most likely place for a well-meaning rewrite to diverge, because
+             * it looks like a bug rather than a fidelity. Port it literally. */
+        const int slot = cast_target(ctx, ow);
+        if (slot < 0) return cast_failed(ctx);
+        const unsigned hi = (unsigned)st->exp_lo;   /* DS:56 — the field is named exp_lo and is the HIGH byte; see the naming wart in state.h */
+        const unsigned dbl = hi * 2u;
+        const unsigned amount = ((dbl & 0xffu) + 0x1eu + (dbl > 0xffu ? 1u : 0u)) & 0xffu;
+        u2_attack a;
+        const int r = u2_combat_cast_damage(ctx, slot, amount + 1u, &a);
+        /* Survived: the slot keeps the reduced HP and NOTHING prints. That silence is the
+         * original's, cited to asm/3139 L_0034ca, where the `jb` after the second `cmc` is
+         * taken on survival — the opposite of how the idiom reads at a glance. */
+        if (r == 2) u2_announce_kill(ctx, ow, &a);
+        cmd_done(ctx);
+        return U2_CMD_DONE;
+    }
+
+    case 8: { /* BLINK: two draws, each masked to a nibble and forced odd, then the same
+               * asm/1451 gate the ladders use, then a direct overwrite of the position. */
+        const int nx = (int)((u2_rand_byte(ctx) & 0xfu) | 1u);
+        const int ny = (int)((u2_rand_byte(ctx) & 0xfu) | 1u);
+        if (u2_world_dungeon_at(&ow->world, st->site_floor, nx, ny) != 0)
+            return cast_failed(ctx);
+        ow->x = nx;
+        ow->y = ny;
+        cmd_done(ctx);
+        return U2_CMD_DONE;
+    }
+
+    default:
+        /* Slot 0 is handled above and the pool holds ten names, so this is unreachable for
+         * anything the ready command can select. The original has no default either: its
+         * dispatch is a chain of compares that falls through to the KILL arm, so an
+         * out-of-range DS:63 would reach KILL rather than refuse. Refusing is the safer
+         * engine behaviour and is named here rather than left as a silent fall-through. */
+        return cast_failed(ctx);
+    }
+}
+
+
+
 /* ---- the table ----------------------------------------------------------- */
 
 /*
@@ -1988,16 +2278,18 @@ static u2_cmd_result cmd_D(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
  * stops each one below is a missing engine subsystem, not a missing capture. Listed in letter
  * order, because a list that drifts out of order is how entries get duplicated.
  *
- *   C  the gates are decoded and cheap (see asm/3139_cast_spell_flow.asm: spell name from
- *      pool[0x24+DS:63], the DS:D7+DS:D8 wand/staff test, the DS:B6[pick] count and its
- *      packed-decimal decrement, and the DS:4A >= 4 rule that makes casting a tower-and-
- *      dungeon thing). What is missing is every EFFECT, and every effect is dungeon-side in
- *      a subsystem AGENTS.md § 3 parks. DS:D7/DS:D8 are not even in state.h yet. TODO once
- *      dungeons open: wire the gates, then the LIGHT / DOWN LADDER / UP LADDER branches.
- *      CAPTURE-CONFIRMED 2026-10-29 (captures/spice86/cmd-c-cast-tower), and one ordering rule
- *      there is easy to get wrong: the count is decremented BEFORE the location gate, so a cast
- *      that fails with -FAILED! outside a tower or dungeon still spends the spell. Check the
- *      stock, spend, then fail — not check, fail, spend.
+ *   C  implemented 2026-11-15, off captures/spice86/magic-casts-2026-11-15, where all nine arms
+ *      were filmed working in the original. The gates and all nine arms are in cmd_C above and
+ *      each carries its own citation. What is still NOT modelled, named rather than left as a
+ *      gap: the PASSWALL write's route to the sector file on a save (the live cell change is
+ *      filmed, the persistence is inferred from the game's own write-back); the tower-side floor
+ *      orientation, which the capture only ever saw move 0 -> 1; and the low-nibble stamp that
+ *      reappears in a cell PASSWALL cleared, which the engine does not model at all because it
+ *      draws creatures from the arrays rather than stamping them.
+ *      One ordering rule there is easy to get wrong and is now gated: the count is decremented
+ *      BEFORE the location gate, so a cast that fails with -FAILED! outside a tower or dungeon
+ *      still spends the spell. Check the stock, spend, then fail — not check, fail, spend. The
+ *      control for that assertion is recorded in tests/run_cp7.sh section 9.
  *   D  implemented 2026-10-29, and this entry used to say its key-code test was unresolved -- it
  *      is not. [DS:4A] is the site kind, not a key, and DESCEND and KLIMB are exact mirrors: the
  *      same 4-or-5 gate, the same cell-feature gate (0x20 down, 0x10 up), and the same two floor
@@ -2052,7 +2344,8 @@ static u2_cmd_result cmd_D(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
 static const cmd_fn cmd_table[CMD_COUNT] = {
     cmd_A, /* A  attack aim: asm/2B8F, prints ATTACK-- and awaits a direction */
     cmd_B, /* B  board vehicle: asm/2F6F -> asm/2FAD, gated on the item the refusal names */
-    NULL,  /* C  see the note above */
+    cmd_C, /* C  cast: asm/310B prints CAST- and asm/3139 is the gates and the nine arms.
+              Wired 2026-11-15 off captures/spice86/magic-casts-2026-11-15. */
     cmd_D, /* D  descend: asm/334D, the mirror of K, gated on site kind and the cell feature */
     cmd_E, /* E  enter site: asm/3389, body in u2_overworld_enter() */
     cmd_F, /* F  fire: asm/35C1, the frigate's cannon, gated on the ship stamp */

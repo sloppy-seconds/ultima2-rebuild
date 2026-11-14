@@ -28,7 +28,7 @@ skip() { printf '  SKIP  %s\n' "$1"; }
 WORK=$(mktemp -d "${TMPDIR:-/var/tmp}/u2-cp7.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
 
-NEED="U2_S_ITS_DARK U2_S_IGNITE_TORCH U2_S_ADVANCE U2_S_RETREAT U2_S_TURN_LEFT U2_S_TURN_RIGHT U2_S_CHEST U2_S_DESCEND U2_S_TO_LEVEL"
+NEED="U2_S_ITS_DARK U2_S_IGNITE_TORCH U2_S_ADVANCE U2_S_RETREAT U2_S_TURN_LEFT U2_S_TURN_RIGHT U2_S_CHEST U2_S_DESCEND U2_S_TO_LEVEL U2_S_CAST U2_S_CAST_NEED_WAND U2_S_CAST_NO_SPELL U2_S_CAST_FAILED"
 EMPTY=""
 for sym in $NEED; do
     if grep -q "^#define ${sym} \"\"" content/gen_content.h 2>/dev/null; then
@@ -43,9 +43,10 @@ elif [ ! -x ./u2 ]; then
 else
     # run_case LABEL KEYS OUTFILE — seed a fresh dungeon, drive it, flatten the transcript.
     run_case() {
-        local label="$1" keys="$2" out="$3"
+        local label="$1" keys="$2" out="$3" seedargs="${4:-}"
         rm -rf "$WORK/$label"
-        python3 tests/cp7_dungeon_seed.py "$WORK/$label" >/dev/null 2>&1 || return 1
+        # shellcheck disable=SC2086
+        python3 tests/cp7_dungeon_seed.py $seedargs "$WORK/$label" >/dev/null 2>&1 || return 1
         printf "$keys" > "$WORK/$label.keys"
         ./u2 --headless --play-map --cleanroom --data-dir "$WORK/$label/content" \
              --save-dir "$WORK/$label/save" --script "$WORK/$label.keys" \
@@ -423,6 +424,82 @@ PY
             "49 9"*) ok "CP7 burn: the counter ticks down from 0x96 with the steps ($l)" ;;
         *) bad "CP7 burn: light pair '$l' did not tick down" ;;
         esac
+    fi
+
+    # ---- 9. CAST: the gates, in the order the bytes run them -----------------
+    # asm/310B is three instructions and asm/3139 is five gates and nine arms. What is
+    # asserted here is mostly the ORDER, because that is the part an implementer gets wrong by
+    # instinct and the part a success-path-only test cannot see:
+    #
+    #   the wand test runs before the stock test, so an empty-handed caster is never told which
+    #   spell they had readied; and the charge is SPENT before the location gate, so a cast that
+    #   then prints -FAILED! still costs the spell.
+    #
+    # Both were filmed in the original (captures/spice86/magic-casts-2026-11-15) and both are
+    # reproduced here as text, because the second one is observable without reading memory: cast
+    # twice with one charge and the second cast answers NO SPELL! rather than -FAILED!.
+    if run_case cast_nowand 'M\n1\nC\n' "$WORK/cnw.out"; then
+        if said "$WORK/cnw.out" "NEED WAND OR STAFF!"; then
+            if said "$WORK/cnw.out" "NO SPELL!"; then
+                bad "CP7 cast: the empty-handed refusal must come before the stock refusal"
+            else
+                ok "CP7 cast: NEED WAND OR STAFF! precedes NO SPELL!, so the gate order is asm/3139's"
+            fi
+        else
+            bad "CP7 cast: expected NEED WAND OR STAFF! with no wand and no staff"
+        fi
+    fi
+
+    if run_case cast_world 'M\n1\nC\n' "$WORK/cw.out" "--cast"; then
+        if said "$WORK/cw.out" "CAST-LIGHT" && said "$WORK/cw.out" "-FAILED!"; then
+            ok "CP7 cast: on the world map the spell is named and then refused (DS:4A >= 4)"
+        else
+            bad "CP7 cast: expected CAST-LIGHT then -FAILED! outside a site"
+        fi
+    fi
+
+    # The ordering proof. One charge, two casts, and the second one must be refused by the
+    # stock gate rather than the location gate — which is only possible if the first spent it.
+    if run_case cast_spend 'M\n1\nC\nC\n' "$WORK/csp.out" "--cast"; then
+        if said "$WORK/csp.out" "NO SPELL!"; then
+            ok "CP7 cast: a cast that fails on location still spent the charge (second cast: NO SPELL!)"
+        else
+            bad "CP7 cast: a failed cast did not spend the charge — the decrement must precede the location gate"
+        fi
+    fi
+
+    if run_case cast_slot0 'M\n0\nC\n' "$WORK/cs0.out" "--cast"; then
+        if said "$WORK/cs0.out" "CAST-NONE" && ! said "$WORK/cs0.out" "-FAILED!"; then
+            ok "CP7 cast: slot 0 prints CAST-NONE and declines silently, as asm/3139 L_00338b does"
+        else
+            bad "CP7 cast: slot 0 must print CAST-NONE and then nothing"
+        fi
+    fi
+
+    if run_case cast_light 'E\nM\n1\nC\n' "$WORK/cl.out" "--cast"; then
+        if said "$WORK/cl.out" "CAST-LIGHT" && ! said "$WORK/cl.out" "-FAILED!"; then
+            ok "CP7 cast: LIGHT lands inside the dungeon"
+        else
+            bad "CP7 cast: expected CAST-LIGHT with no refusal inside the dungeon"
+        fi
+    fi
+
+    if run_case cast_surface 'E\nM\n5\nC\n' "$WORK/csf.out" "--cast"; then
+        s=$(field_of "$WORK/csf.out" sector)
+        [ "$s" = "20" ] && ok "CP7 cast: SURFACE returns the player to the world sector" \
+                         || bad "CP7 cast: SURFACE left sector '$s', expected 20"
+    fi
+
+    # UP LADDER at the entrance floor is not a refusal and not a floor move: the arm's
+    # `or %al,%al ; je` lands on the SURFACE target, so at floor 0 "up" is the way out. The
+    # third-party table does not mention this and the original was filmed doing it.
+    if run_case cast_up0 'E\nM\n3\nC\n' "$WORK/cu0.out" "--cast"; then
+        s=$(field_of "$WORK/cu0.out" sector)
+        if [ "$s" = "20" ] && ! said "$WORK/cu0.out" "-FAILED!"; then
+            ok "CP7 cast: UP LADDER at floor 0 is SURFACE, not a failure"
+        else
+            bad "CP7 cast: UP LADDER at floor 0 should exit to the world (sector was '$s')"
+        fi
     fi
 fi
 
