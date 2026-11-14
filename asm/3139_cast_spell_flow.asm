@@ -37,13 +37,23 @@
 #              allowed only when that byte is ZERO (open). That is why UP LADDER printed
 #              -FAILED! at the sector-24 tower entry cell (floor 1 there is 0x80, a wall) and
 #              succeeded at a cell where floor 1 is open.
-#           3. Tower and dungeon are SWAPPED. Slot 2 (DOWN LADDER) takes the decrement path only
-#              when DS:4A == 4 and otherwise falls into the increment path; slot 3 (UP LADDER)
-#              jumps to the increment path when DS:4A == 4 and otherwise decrements. So in a
-#              dungeon the two spells do the opposite of what they do in a tower. Observed in a
-#              tower only: UP took DS:25 0 -> 1, DOWN took it back 1 -> 0, UP again 0 -> 1.
-#           Also observed: at DS:25 == 0 the DOWN LADDER arm branches away (L_0034a2) instead of
-#           decrementing, and cmd_D (pressing D on a 0x20 down-ladder cell) left the site to the
+#           3. RETRACTED 2026-11-15, and this file's own claim: "Tower and dungeon are SWAPPED,
+#              so in a dungeon the two spells do the opposite of what they do in a tower." The
+#              branch is real — slot 2 takes the decrement path only when DS:4A == 4, slot 3 the
+#              increment path only when DS:4A == 4 — but the conclusion drawn from it was wrong,
+#              because it assumed DS:25 counts the same direction in both site kinds. Owner play
+#              in a dungeon (captures/spice86/magic-casts-2026-11-15) settles the direction: the
+#              player ENTERS on floor 0, DOWN LADDER took DS:25 0 -> 1 -> 2 and UP LADDER took it
+#              back, so DS:25 is depth below the entrance and in a dungeon both spells do exactly
+#              what they are named. What the cmp on DS:4A is really doing is using the opposite
+#              floor orientation in a tower, which is one byte with two orientations, the same
+#              hazard already recorded for DS:4A itself. The tower half is still only known to the
+#              direction the byte moves (0 -> 1 on UP), never which way is up in a tower.
+#           Also corrected: "at DS:25 == 0 the DOWN LADDER arm branches away (L_0034a2)". That
+#              branch is the entry to the decrement path (L_00345a), which a dungeon reaches from
+#              slot 3 and a tower from slot 2. So in a dungeon it is UP LADDER at floor 0 that
+#              branches away, and L_0034a2 is the SURFACE arm — see the 2026-11-15 section below.
+#           Also observed: cmd_D (pressing D on a 0x20 down-ladder cell) left the site to the
 #           world map and left DS:25 at 0xFF — a decrement with no guard at the bottom.
 #           There is no key read, no direction and no cursor anywhere in steps 1-7. CAST aims
 #           at nothing; the spells that need a position are dungeon-side.
@@ -68,10 +78,15 @@
 #           DOWN LADDER, UP LADDER), three are cleric-only (PASSWALL, SURFACE, PRAYER) and three
 #           wizard-only (MAGIC MISSILE, BLINK, KILL). The class gate is the pair of refusals
 #           asm/184C (` YOU ARE NOT A CLERIC!`) and asm/19BA (` YOU ARE NOT A WIZARD!`).
-#           INFERRED, and cheap to settle: the cleric menu numbers land on slots 1..6 exactly, but
-#           the wizard's 4/5/6 name spells that live at pool[43..45], i.e. slots 7/8/9. If that is
-#           right, a wizard who buys "6-KILL" must ready it with M 9, not M 6. One capture settles
-#           it: buy a spell at the magic shoppe and read DS:B6[1..9] before and after.
+#           CLOSED 2026-11-15 without a capture, because the answer was in the bytes the whole
+#           time and had been marked INFERRED for want of anyone reading asm/19D7 far enough. The
+#           wizard menu remaps its own digits before it touches anything: at L_001c4f it runs
+#           `cmp $0x4,%al ; jb L_001c56 ; clc ; adc $0x3,%al`, so choices 1,2,3 stay 1,2,3 and
+#           choices 4,5,6 become 7,8,9. The remapped value is what the name print, the price call
+#           and the DS:B6 increment all use, so buying "6-KILL" lands in DS:B6[9] and must be
+#           readied with M 9. The cleric shrine has no such adjustment: its digits land on 1..6.
+#           Both shops add five charges (`adc $0x5,%al ; daa`), which makes the quote readable as
+#           `FIVE <NAME>S FOR <price>`.
 #           Class values themselves come from pool[72..75] = FIGHTER, CLERIC, WIZARD, THIEF — not
 #           "mage"/"paladin", which is corrected in asm/080D_sub_080d.asm and tools/u2_edit.py.
 #           Also learned the hard way from this capture: the 3D view does not redraw on a move that
@@ -122,10 +137,48 @@
 #           (5,5) -> (7,15) — both odd, inside 1..15, exactly the `and $0xf ; or $0x1`
 #           shape. So "BLINK can fail" is confirmed and the gate is the same asm/1451
 #           site-cell validity call the ladder spells use, not a separate rule.
-#           Still unobserved in this file: PASSWALL (4), SURFACE (5) and PRAYER (6).
-#           NOT FOUND: a 50%-shaped test for PRAYER, a grid write for PASSWALL, an exit-to-surface
-#           path for SURFACE. Absence in this header is not absence in the binary — the branches
-#           from 4..9 run on into the rest of the range and dungeons are parked (AGENTS.md § 3).
+#           SUPERSEDED 2026-11-15: this block read "Still unobserved in this file: PASSWALL (4),
+#           SURFACE (5) and PRAYER (6)" and "NOT FOUND: a 50%-shaped test for PRAYER, a grid write
+#           for PASSWALL, an exit-to-surface path for SURFACE". All three arms are now filmed, and
+#           the 50% test was there all along — it is the `js` after `call rand_byte`, whose flag
+#           comes from the tail of the generator in asm/5236, not from rand_byte's own body. See
+#           the 2026-11-15 section below.
+# 2026-11-15, ALL NINE SPELLS FILMED — captures/spice86/magic-casts-2026-11-15, owner play in a
+#           browser (noVNC) with host-side memory reads, maxout WIZARD `MAGUS` seeded with all
+#           nine slots at 99, dungeon sector 25 entered from sector 20 cell (25,5).
+#           PASSWALL (slot 4) clears the cell in front. Facing west at a rock cell, live grid read
+#           before and after one cast: (4,5) went 0x80 -> 0x00, the charge was spent, and the band
+#           read `CAST-PASSWALL` with no -FAILED!. The third-party "remove the wall immediately in
+#           front of you" is the rule. Unresolved detail: one owner cast left the opened cell
+#           reading 0x01 rather than 0x00, so whether the arm clears the rock bit or zeroes the
+#           byte, and whether a stamp layer is re-applied afterwards, is not settled.
+#           PRAYER (slot 6) is KILL behind a coin: `call rand_byte ; js L_003432 ; jmp L_003501`,
+#           so a clear sign bit runs the same target scan and the same death path as slot 9. Two
+#           successes filmed, after four and one failures. The flip is fair — measured at 50.0% of
+#           200000 draws simulated from the live generator state — so the third-party "50% chance
+#           to destroy the enemy in front of you" is right and the earlier NOT FOUND was wrong.
+#           SURFACE (slot 5) ignores depth: cast from floor 1 it returned the player to (25,5),
+#           the world cell entered by, not a cell derived from the cast position. DS:25 is left at
+#           its dungeon value on exit, which is harmless because entering sets it to 0.
+#           UP LADDER at floor 0 IS SURFACE. The slot-3 arm opens `or %al,%al ; je L_0034a2` and
+#           L_0034a2 is the slot-5 target, so at the entrance floor "up" falls into the exit. Cast
+#           there it printed bare `CAST-UP LADDER`, spent the charge, and put the player on the
+#           world map at (25,5).
+#           The ladder gate the third-party table states as "if the square behind your destination
+#           is open" is literal. asm/1451 tests DS:23/DS:24 on the candidate floor for exactly
+#           zero, and DS:23/DS:24 is player minus facing, measured three ways in one session:
+#           facing north (5,6), west (6,5), east (4,5). Facing west the candidate cell on floor 1
+#           was 0x80 and the cast failed; turned east it was 0x00 and the cast moved the floor.
+#           KILL (slot 9) refused twice in a row on nothing: two casts, two kills, no -FAILED!,
+#           which is the no-dice difference from PRAYER.
+#           THE AWARD IS FROM THE VICTIM, now proven rather than inferred. Five kills through the
+#           one shared death path paid +13/+03, +11/+05, +17/+02, +13/+07, +17/+04. Two different
+#           spells converge on L_0030d1, so identical code produced five different EXP values and
+#           the only variable was the creature. Which field of the victim's record supplies the
+#           pair is still not decoded.
+#           A timing trap for anyone repeating this: a DS read taken immediately after the key send
+#           returns can show a charge unspent, because the handler finishes after the send returns.
+#           Twice in this session a spent spell read as unspent until re-read a beat later.
 #           CORROBORATED ELSEWHERE: the class bonuses are exact (CLERIC +10 WIS at file 0x5AD5,
 #           WIZARD +10 INT at 0x5B04, FIGHTER +15 STR, THIEF +10 AGI, and STAMINA gets no bonus
 #           from sex, race or class at all) — see engine/src/game/creation.c. And shop price is

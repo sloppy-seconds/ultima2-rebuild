@@ -48,6 +48,16 @@
 #           test; the one natural success (frame d) was slot 1 wandering into the
 #           facing cell.
 #
+# RECONFIRMED IN A REAL DUNGEON 2026-11-15 (captures/spice86/magic-casts-2026-11-15). Owner play
+#           in sector 25, which has at least four floors, on floor 1: MAGIC MISSILE, PRAYER and
+#           KILL each destroyed a creature the owner could see in the corridor ahead, with no
+#           scripted pokes at all, so the one-cell facing rule is not a tower artefact. What is
+#           still NOT measured is the kind test on a floor above 0 — mon_kind was not read at the
+#           moment of any of those kills, so "the casts succeeded, therefore the kind test admitted
+#           them" is an inference, not an observation. Whoever settles whether mon_kind == DS:25
+#           means anything on a multi-floor dungeon should read the kind array at the kill, not
+#           after it.
+#
 # provenance: live:cmd-c-magic-missile; entry stopped at runtime 0x330C with
 #           tools/bp_read.py four times and the arrays dumped at the stop, which is
 #           the only way this was settled — a poke-then-press race against the site
