@@ -48,10 +48,19 @@
 #define DG3_CX    (DG3_W / 2)
 #define DG3_CY    (DG3_H / 2)
 
-/* tan(FOV/2). Design choice: ~74 degrees, a touch wider than Wolf3D's 66 so
- * the near-square 448x448 window shows enough of the side walls to read a
- * corridor junction when you face down the corridor. */
-#define DG3_PLANE 0.75f
+/* tan(FOV/2). Widened from 0.75 (~74 deg) to ~90 deg so a wall one cell ahead
+ * no longer overflows the 448x448 window and reads as "pressed against it":
+ * at 1.0 the near wall fits with floor and ceiling margin and the side walls
+ * recede, matching how the FM Towns view sits you back in the cell. The camera
+ * stays at the cell centre, so turning does not shift the view. */
+#define DG3_PLANE 1.0f
+/* Pull the camera back from the cell centre toward the trailing edge, so the
+ * wall one cell ahead sits a full cell out instead of half a cell and reads
+ * with floor/ceiling depth instead of filling the frame. 0.5 = stand at the
+ * trailing edge (adjacent wall exactly 1 cell away). Set to 0 to sit at the
+ * cell centre. Trade-off: the camera lands on a different cell edge per facing,
+ * so the view shifts a little when you turn. */
+#define DG3_BACK 0.5f
 #define DG3_PROJ  ((float)DG3_W / 2.0f / DG3_PLANE)
 #define DG3_MAX_DIST 8.0f                  /* rays stop here; see header      */
 #define DG3_FAR_Z  1e9f
@@ -77,9 +86,18 @@ static int dg3_floor_tex(uint8_t c)
 {
     const uint8_t t = c & U2_DG_TERRAIN;
     if (t == U2_DG_DOOR) return U2_DGA_FLOOR_DOOR;
-    if (t & U2_DG_DOWN) return U2_DGA_FLOOR_LADDER_DOWN;
-    if (t & U2_DG_UP) return U2_DGA_FLOOR_LADDER_UP;
-    return U2_DGA_FLOOR_FLAG;
+    if (t & U2_DG_DOWN) return U2_DGA_FLOOR_HOLE;   /* descend through the floor */
+    return U2_DGA_FLOOR_FLAG;                        /* an up-ladder's floor is plain */
+}
+
+/* The ceiling picks its texture the same way: an up-ladder punches a hole in
+ * the ceiling you climb out through. A 0x30 cell (both bits) punches both, so
+ * the floor gets the down hole and the ceiling the up hole. */
+static int dg3_ceil_tex(uint8_t c)
+{
+    const uint8_t t = c & U2_DG_TERRAIN;
+    if (t & U2_DG_UP) return U2_DGA_CEIL_HOLE;
+    return U2_DGA_CEIL_CAVE;
 }
 
 /* ---------------------------------------------------------- floor/ceiling */
@@ -115,10 +133,11 @@ static void dg3_floor_ceiling(u2_frame *f, const u2_overworld *ow, int fl,
         float fx = px + rowDist * ldx;
         float fy = py + rowDist * ldy;
 
-        const uint8_t *ceil = u2_dga_tex(U2_DGA_CEIL_CAVE, lvl);
         for (int x = 0; x < DG3_W; x++, fx += stepX, fy += stepY) {
             const int cx = f_floor(fx), cy = f_floor(fy);
-            const uint8_t *tex = u2_dga_tex(dg3_floor_tex(dg3_cell(ow, fl, cx, cy)), lvl);
+            const uint8_t cell = dg3_cell(ow, fl, cx, cy);
+            const uint8_t *tex = u2_dga_tex(dg3_floor_tex(cell), lvl);
+            const uint8_t *ceil = u2_dga_tex(dg3_ceil_tex(cell), lvl);
             const int tx = ((int)((fx - (float)cx) * 32.0f)) & 31;
             const int ty = ((int)((fy - (float)cy) * 32.0f)) & 31;
             u2_frame_put(f, x, y, tex[ty * 32 + tx]);
@@ -188,7 +207,7 @@ static void dg3_walls(u2_frame *f, const u2_overworld *ow, int fl,
  * the wall z-buffer so a creature behind a corner is occluded per column. */
 #define DG3_MAX_SPR 128
 
-typedef struct { float sx, sy, d2; int id; int tall; } dg3_spr;
+typedef struct { float sx, sy, d2; int id; int tall; int anchor; } dg3_spr;
 
 static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
                         float px, float py,
@@ -202,9 +221,15 @@ static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
         for (int cx = 0; cx < U2_DG_PAGE_EDGE; cx++) {
             const uint8_t c = u2_world_dungeon_at(&ow->world, fl, cx, cy);
             const uint8_t stamp = c & 0x07u;
-            int id = -1, tall = 1;
+            const uint8_t t = c & U2_DG_TERRAIN;
+            int id = -1, tall = 1, anchor = 0;
             if (stamp >= 1 && stamp <= 7) id = U2_DGA_SP_MON1 + stamp - 1;
-            else if ((c & U2_DG_TERRAIN) == U2_DG_CHEST) { id = U2_DGA_SP_CHEST; tall = 0; }
+            else if (t == U2_DG_CHEST) { id = U2_DGA_SP_CHEST; tall = 0; }
+            /* A ladder hangs on the far wall, so it is anchored to the ceiling
+             * rather than standing on the floor. 0x30 (both bits) prefers DOWN,
+             * matching the two ladder gates' bit-test order. */
+            else if (t & U2_DG_DOWN) { id = U2_DGA_SP_LADDER_DOWN; anchor = 1; }
+            else if (t & U2_DG_UP)   { id = U2_DGA_SP_LADDER_UP;   anchor = 1; }
             if (id < 0 || n >= DG3_MAX_SPR) continue;
 
             const float sx = (float)cx + 0.5f - px;
@@ -212,7 +237,7 @@ static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
             const float d2 = sx * sx + sy * sy;
             if (d2 > DG3_MAX_DIST * DG3_MAX_DIST) continue;
             list[n].sx = sx; list[n].sy = sy; list[n].d2 = d2;
-            list[n].id = id; list[n].tall = tall;
+            list[n].id = id; list[n].tall = tall; list[n].anchor = anchor;
             n++;
         }
 
@@ -231,10 +256,22 @@ static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
 
         const int screenX = (int)(((float)DG3_W / 2.0f) * (1.0f + tX / tY));
         const int hFull = (int)(DG3_PROJ / tY);
-        const int h = list[i].tall ? (hFull * 9 / 10) : (hFull / 2);
-        const int w = list[i].tall ? h : (hFull / 2);
         const int floorY = DG3_CY + (int)(DG3_PROJ / (2.0f * tY));
-        const int y0 = floorY - h, y1 = floorY;
+        int h, w, y0, y1;
+        if (list[i].anchor) {
+            /* A ladder pokes a few rungs out of the hole it lines up with: an
+             * up-ladder hangs from the ceiling, a down-ladder stands on the
+             * floor. Just enough to read as a ladder, not the whole wall. */
+            const int ceilY = DG3_CY - (int)(DG3_PROJ / (2.0f * tY));
+            const int reach = (floorY - ceilY) / 3;
+            if (list[i].id == U2_DGA_SP_LADDER_UP) { y0 = ceilY; y1 = ceilY + reach; }
+            else                                   { y0 = floorY - reach; y1 = floorY; }
+            h = y1 - y0; w = hFull / 3;
+        } else {
+            h = list[i].tall ? (hFull * 9 / 10) : (hFull / 2);
+            w = list[i].tall ? h : (hFull / 2);
+            y0 = floorY - h; y1 = floorY;
+        }
         const int x0 = screenX - w / 2, x1 = screenX + w / 2;
 
         int lvl = 3;
@@ -255,6 +292,12 @@ static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
             }
         }
     }
+
+    /* No special case for standing ON a ladder: the camera pull-back (DG3_BACK)
+     * already puts the ladder tile under the player about half a cell ahead, so
+     * the normal sprite pass above draws it hanging from the ceiling hole (or
+     * standing on the floor) at the right depth. A second explicit draw here
+     * would duplicate it. */
 }
 
 /* ---------------------------------------------------------------- driver */
@@ -269,8 +312,8 @@ void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s)
     int dx, dy;
     u2_dungeon_facing(ctx, &dx, &dy);
     const int fl = (int8_t)ctx->state.site_floor;
-    const float px = (float)ow->x + 0.5f;
-    const float py = (float)ow->y + 0.5f;
+    const float px = (float)ow->x + 0.5f - DG3_BACK * (float)dx;
+    const float py = (float)ow->y + 0.5f - DG3_BACK * (float)dy;
     const float dirX = (float)dx, dirY = (float)dy;
     const float planeX = (float)dy * DG3_PLANE;
     const float planeY = (float)(-dx) * DG3_PLANE;

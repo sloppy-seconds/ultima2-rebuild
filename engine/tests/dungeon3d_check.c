@@ -148,14 +148,16 @@ static void test_doors(void)
 {
     u2_ctx ctx; u2_overworld ow;
 
-    /* 0xC0 doorway: an opening. The plank threshold under it is the only
-     * brown in the scene, so brown's presence proves the corridor drew
-     * THROUGH the door cell instead of capping it. */
+    /* 0xC0 doorway: an opening. The plank threshold under it is the only red
+     * in the scene (the door texture's board gaps), so red's presence proves
+     * the corridor drew THROUGH the door cell instead of capping it. Red is the
+     * stable signal: the plank brown shades to black with distance, but the red
+     * gaps survive every shade level, so this holds at any projection. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
     build_room(&ow, U2_DG_DOOR);
     u2_world_dungeon_put(&ow.world, 0, 9, 5, 0x00);   /* passage beyond */
     u2_dungeon_render(&ctx, &ow, 1);
-    CHECK(count_index(&ow.frame, 6) > 0,
+    CHECK(count_index(&ow.frame, 4) > 0,
           "door: 0xC0 should draw as a passage with a plank threshold");
     u2_frame_free(&ow.frame);
 
@@ -164,14 +166,14 @@ static void test_doors(void)
     setup(&ctx, &ow, 1); enh_frame(&ow);
     build_room(&ow, U2_DG_ROCK);
     u2_dungeon_render(&ctx, &ow, 1);
-    long rock_brown = count_index(&ow.frame, 6);
+    long rock_thresh = count_index(&ow.frame, 4);
     u2_frame_free(&ow.frame);
-    CHECK(rock_brown == 0, "door: rock should carry no plank brown");
+    CHECK(rock_thresh == 0, "door: rock should carry no plank threshold");
 
     setup(&ctx, &ow, 1); enh_frame(&ow);
     build_room(&ow, U2_DG_SECRET);
     u2_dungeon_render(&ctx, &ow, 1);
-    CHECK(count_index(&ow.frame, 6) == 0,
+    CHECK(count_index(&ow.frame, 4) == 0,
           "secret: 0xE0 must draw as solid rock, not as a hint");
     const double ink = ink_fraction(&ow.frame);
     CHECK(ink > 0.6, "secret: fake wall should still fill the view (ink=%.3f)", ink);
@@ -192,10 +194,12 @@ static void test_sprites(void)
     u2_frame_free(&ow.frame);
     CHECK(green0 == 0 && brown0 == 0, "sprite: bare room should show no sprite colours");
 
-    /* A stamp-2 creature two cells ahead must appear. */
+    /* A stamp-2 creature one cell ahead must appear. One cell (not two) keeps
+     * it inside shade level 0 now that the camera pull-back adds half a cell of
+     * distance, so the sprite shows its bright base colours. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
     build_room(&ow, U2_DG_ROCK);
-    u2_world_dungeon_put(&ow.world, 0, 7, 5, 0x02);
+    u2_world_dungeon_put(&ow.world, 0, 6, 5, 0x02);
     u2_dungeon_render(&ctx, &ow, 1);
     CHECK(count_index(&ow.frame, 10) > 50, "sprite: creature stamp should draw");
     u2_frame_free(&ow.frame);
@@ -203,9 +207,40 @@ static void test_sprites(void)
     /* A chest must appear as wood. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
     build_room(&ow, U2_DG_ROCK);
-    u2_world_dungeon_put(&ow.world, 0, 7, 5, U2_DG_CHEST);
+    u2_world_dungeon_put(&ow.world, 0, 6, 5, U2_DG_CHEST);
     u2_dungeon_render(&ctx, &ow, 1);
     CHECK(count_index(&ow.frame, 6) > 50, "sprite: chest should draw");
+    u2_frame_free(&ow.frame);
+}
+
+/* ---- 3b. ladders hang on the far wall ------------------------------------ */
+/* The ladder's rungs are pale yellow (14), a colour a bare rock room carries
+ * nowhere, so yellow's presence proves the ladder drew — and its absence in the
+ * control proves the check can fail. Both ladder bits must draw it. */
+static void test_ladders(void)
+{
+    u2_ctx ctx; u2_overworld ow;
+
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    build_room(&ow, U2_DG_ROCK);
+    u2_dungeon_render(&ctx, &ow, 1);
+    CHECK(count_index(&ow.frame, 14) == 0, "ladder: bare room should show no rung yellow");
+    u2_frame_free(&ow.frame);
+
+    /* Up-ladder one cell ahead (rock end cap behind it) must draw its rungs. */
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    build_room(&ow, U2_DG_ROCK);
+    u2_world_dungeon_put(&ow.world, 0, 6, 5, U2_DG_UP);
+    u2_dungeon_render(&ctx, &ow, 1);
+    CHECK(count_index(&ow.frame, 14) > 20, "ladder: up-ladder should draw rungs");
+    u2_frame_free(&ow.frame);
+
+    /* Down-ladder likewise. */
+    setup(&ctx, &ow, 1); enh_frame(&ow);
+    build_room(&ow, U2_DG_ROCK);
+    u2_world_dungeon_put(&ow.world, 0, 6, 5, U2_DG_DOWN);
+    u2_dungeon_render(&ctx, &ow, 1);
+    CHECK(count_index(&ow.frame, 14) > 20, "ladder: down-ladder should draw rungs");
     u2_frame_free(&ow.frame);
 }
 
@@ -354,6 +389,7 @@ int main(int argc, char **argv)
     test_room();
     test_doors();
     test_sprites();
+    test_ladders();
     test_dispatch();
     test_assets();
     test_cga_on_ega();

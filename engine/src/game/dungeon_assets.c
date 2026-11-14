@@ -100,27 +100,16 @@ static void gen_floor_door(uint8_t *t)
         }
 }
 
-/* Ladder up: flagstone with a rung ladder standing in the cell. */
-static void gen_floor_ladder_up(uint8_t *t)
+/* Down-ladder floor: flagstone with a black square hole in the centre, the
+ * shaft you descend through. The hole is centred so it lands under the ladder
+ * billboard, which the renderer anchors to the same cell centre. */
+static void gen_floor_hole(uint8_t *t)
 {
     gen_floor_flag(t);
-    for (int y = 0; y < 32; y++)
-        for (int x = 6; x <= 25; x++) {
-            if (x == 6 || x == 25) put(t, x, y, 7);        /* rails      */
-            else if (y % 6 == 2) put(t, x, y, 15);         /* rungs      */
-        }
-}
-
-/* Ladder down: flagstone with a dark square shaft and a lit rim. */
-static void gen_floor_ladder_down(uint8_t *t)
-{
-    gen_floor_flag(t);
-    for (int y = 0; y < 32; y++)
-        for (int x = 0; x < 32; x++) {
-            const int d = (x < 16 ? 16 - x : x - 16) + (y < 16 ? 16 - y : y - 16);
-            if (d < 9) put(t, x, y, 0);
-            else if (d < 11) put(t, x, y, 7);
-        }
+    for (int y = 10; y <= 21; y++)
+        for (int x = 10; x <= 21; x++)
+            put(t, x, y, 0);                               /* black shaft */
+    for (int x = 10; x <= 21; x++) put(t, x, 22, 7);       /* lit near rim */
 }
 
 /* Cavern ceiling: rocky grey, darker than the floor, with dark pits and a
@@ -135,6 +124,16 @@ static void gen_ceil_cave(uint8_t *t)
             else if (r == 1) c = 0;
             put(t, x, y, c);
         }
+}
+
+/* Up-ladder ceiling: the cave ceiling with a black square hole in the centre,
+ * the shaft you climb out through. Centred to line up with the ladder sprite. */
+static void gen_ceil_hole(uint8_t *t)
+{
+    gen_ceil_cave(t);
+    for (int y = 10; y <= 21; y++)
+        for (int x = 10; x <= 21; x++)
+            put(t, x, y, 0);                               /* black shaft */
 }
 
 /* ------------------------------------------------------------- sprites --- */
@@ -152,6 +151,26 @@ static void gen_spr_chest(uint8_t *t)
             put(t, x, y, c);
         }
     for (int x = 5; x <= 26; x++) put(t, x, 28, 0);               /* shadow  */
+}
+
+/* A wooden ladder hung vertically: two brown rails with pale rungs. This is the
+ * FM Towns dungeon look (a wooden ladder on the far wall, not a rope), drawn
+ * from primitives here rather than copied from its pixels. Both the up- and
+ * down-ladder use it; the entry-vs-descent distinction is the cell's bit, not
+ * the art. */
+static void gen_spr_ladder(uint8_t *t)
+{
+    const int railL = 9, railR = 20;
+    for (int y = 0; y < 32; y++) {
+        for (int x = railL; x <= railL + 2; x++) put(t, x, y, 6);   /* left rail  */
+        for (int x = railR; x <= railR + 2; x++) put(t, x, y, 6);   /* right rail */
+    }
+    for (int ry = 2; ry < 32; ry += 6) {                           /* rungs      */
+        for (int x = railL; x <= railR + 2; x++) {
+            put(t, x, ry, 14);                                     /* pale wood  */
+            if (ry + 1 < 32) put(t, x, ry + 1, 6);                 /* shadow     */
+        }
+    }
 }
 
 /* A generic dungeon creature: head, torso, two legs, two eyes. The per-type
@@ -196,7 +215,7 @@ void u2_dga_init(void)
 
     static void (*const texgen[U2_DGA_TEX_COUNT])(uint8_t *) = {
         gen_wall_stone, gen_floor_flag, gen_floor_door,
-        gen_floor_ladder_up, gen_floor_ladder_down, gen_ceil_cave
+        gen_floor_hole, gen_ceil_cave, gen_ceil_hole
     };
     for (int id = 0; id < U2_DGA_TEX_COUNT; id++) {
         texgen[id](s_tex[id][0]);
@@ -210,6 +229,8 @@ void u2_dga_init(void)
         for (int i = 0; i < U2_DGA_TEX_PX; i++)
             s_spr[id][0][i] = U2_DGA_TRANSPARENT;   /* static zero is black, not clear */
     gen_spr_chest(s_spr[U2_DGA_SP_CHEST][0]);
+    gen_spr_ladder(s_spr[U2_DGA_SP_LADDER_UP][0]);
+    gen_spr_ladder(s_spr[U2_DGA_SP_LADDER_DOWN][0]);
     /* stamp 1..7 -> (body, accent, bulk). Colours are chosen so no monster
      * reuses the grey/brown set of the static geometry: a test can prove a
      * creature actually drew by looking for its colour alone. */

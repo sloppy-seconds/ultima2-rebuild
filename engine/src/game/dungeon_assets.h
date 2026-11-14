@@ -33,16 +33,19 @@
 #define U2_DGA_SHADE_LEVELS 4
 #define U2_DGA_TRANSPARENT  0xFFu
 
-/* Wall / floor / ceiling texture ids. Floor ids are picked per cell by the
- * renderer: ladder and door cells are FLOOR variants because all three are
- * walkable ground features, not obstacles. */
+/* Wall / floor / ceiling texture ids. Floor and ceiling ids are picked per cell
+ * by the renderer. A ladder cell is a walkable ground feature, and the hole it
+ * climbs through is on the horizontal plane: an up-ladder punches a black hole
+ * in the CEILING (you climb out through it), a down-ladder punches one in the
+ * FLOOR (you descend through it). The vertical ladder sprite is half-height and
+ * lines up with the hole. */
 typedef enum {
     U2_DGA_WALL_STONE = 0,   /* brick courses with mortar — rock and fake wall */
     U2_DGA_FLOOR_FLAG,       /* flagstone */
     U2_DGA_FLOOR_DOOR,       /* plank threshold under a 0xC0 doorway */
-    U2_DGA_FLOOR_LADDER_UP,  /* flagstone + rungs */
-    U2_DGA_FLOOR_LADDER_DOWN,/* flagstone + dark shaft */
+    U2_DGA_FLOOR_HOLE,       /* flagstone + black square hole — a down-ladder cell */
     U2_DGA_CEIL_CAVE,        /* dark rocky ceiling */
+    U2_DGA_CEIL_HOLE,        /* rocky ceiling + black square hole — an up-ladder cell */
     U2_DGA_TEX_COUNT
 } u2_dga_tex_id;
 
@@ -55,6 +58,12 @@ typedef enum {
     U2_DGA_SP_CHEST = 0,
     U2_DGA_SP_MON1 = 1, U2_DGA_SP_MON2, U2_DGA_SP_MON3, U2_DGA_SP_MON4,
     U2_DGA_SP_MON5, U2_DGA_SP_MON6, U2_DGA_SP_MON7,
+    /* Ladders: terrain 0x10 (up) and 0x20 (down). The up-ladder is the rope
+     * you climb out by and sits on the entry cell (measured: dungeon 35 entry
+     * (5,5) is 0x10); the down-ladder descends to the next floor. Both draw as
+     * a wooden ladder hung vertically on the far wall, the FM Towns look, drawn
+     * procedurally here rather than copied. */
+    U2_DGA_SP_LADDER_UP, U2_DGA_SP_LADDER_DOWN,
     U2_DGA_SP_COUNT
 } u2_dga_sprite_id;
 
