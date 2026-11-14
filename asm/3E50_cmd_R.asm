@@ -3,7 +3,7 @@
 #           9-QU, WHICH? \0" then reads the choice.
 # func 3E50..3E9E  len 004F B  evidence: seed+reko (jump table cs:0730 entry R)
 # provenance: live:baseline-fight (+2 other harvests), static
-#           entry executed in 8 of 258 harvests; derived by tools/provenance_from_traces.py
+#           entry executed in 8 of 259 harvests; derived by tools/provenance_from_traces.py
 # confidence: medium (flow + messages proven by bytes; NPC/quest semantics inferred)
 # notes: re-decoded with tools/decode_str.py (str_out-aware); gas re-encode diffs
 #        kept as .byte (disp8/disp16 and reg-op form choices)
