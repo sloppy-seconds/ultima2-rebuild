@@ -47,6 +47,10 @@ SPRITES = [
     ("gremlin",         "gremlin"),
     ("daemon-minotaur", "daemon_minotaur"),
     ("balron",          "balron"),
+    # The chest concept is a 3-chest sheet (two closed + one open-with-gold).
+    # Crop to the top closed chest — the billboard state before the player opens
+    # it. The box is in source pixels (measured from the matte's component bbox).
+    ("chest",           "chest", (240, 140, 650, 460)),
 ]
 
 # ------------------------------------------------- optional proper tools ----
@@ -117,13 +121,17 @@ def _drop_small_components(alpha, frac=0.02, floor_px=24):
     return out
 
 
-def load_sprite(src_dir, stem):
+def load_sprite(src_dir, stem, crop=None):
     """Matte at working resolution, tight-crop to the figure, then fit it to fill
     the EDGE square anchored to the floor. Filling the square is what makes a
     close creature read as close: a figure that only occupies the middle of the
-    sprite looks far away no matter the distance."""
+    sprite looks far away no matter the distance. `crop` (source pixels) selects
+    one subject out of a multi-subject sheet before the matte runs."""
     path = os.path.join(src_dir, f"{stem}_00001_.png")
-    work = Image.open(path).convert('RGB').resize((WORK, WORK), Image.LANCZOS)
+    src = Image.open(path).convert('RGB')
+    if crop:
+        src = src.crop(crop)
+    work = src.resize((WORK, WORK), Image.LANCZOS)
     alpha = matte_rembg(work) if HAVE_REMBG else matte_flood(work)
     # rembg marks some background as fully opaque where it shows through concave
     # gaps in the silhouette (a notch at the shoulder, fur edges). Those pixels
@@ -259,9 +267,9 @@ def main():
     prev_dir = os.environ.get("DG_PREVIEW_DIR", "tmp")
     print(f"matte: {'rembg' if HAVE_REMBG else 'flood (fallback)'}"
           f"   palette: {'pngquant' if HAVE_PNGQUANT else 'PIL median-cut (fallback)'}")
-    names = [sym for _, sym in SPRITES]        # emitted C symbol suffix
-    stems = [stem for stem, _ in SPRITES]      # concept filename stem
-    sprites = [load_sprite(src_dir, stem) for stem in stems]
+    names = [e[1] for e in SPRITES]            # emitted C symbol suffix
+    sprites = [load_sprite(src_dir, e[0], e[2] if len(e) > 2 else None)
+               for e in SPRITES]
     pal = build_palette(sprites)
     sm = shade_map(pal)
     emit_header(out_path, names, sprites, pal, sm)

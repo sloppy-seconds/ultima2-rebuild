@@ -238,13 +238,13 @@ static void test_sprites(void)
     CHECK(count_index_ge(&ow.frame, 16) > 50, "sprite: creature stamp should draw");
     u2_frame_free(&ow.frame);
 
-    /* A chest stays procedural wood (brown 6): the chest concept is a multi-chest
-     * sheet, so the billboard is still the procedural chest. */
+    /* A chest is now concept art too (indices 16..255), cropped from the
+     * multi-chest sheet to the single closed chest. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
     build_room(&ow, U2_DG_ROCK);
     u2_world_dungeon_put(&ow.world, 0, 6, 5, U2_DG_CHEST);
     u2_dungeon_render(&ctx, &ow, 1);
-    CHECK(count_index(&ow.frame, 6) > 50, "sprite: chest should draw");
+    CHECK(count_index_ge(&ow.frame, 16) > 50, "sprite: chest should draw");
     u2_frame_free(&ow.frame);
 }
 

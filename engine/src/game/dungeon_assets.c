@@ -310,9 +310,7 @@ void u2_dga_init(void)
     load_gen(U2_DGA_SP_MON5, dg_spr_gremlin);
     load_gen(U2_DGA_SP_MON6, dg_spr_daemon_minotaur);
     load_gen(U2_DGA_SP_MON7, dg_spr_balron);
-    /* The chest stays procedural: the chest concept is a multi-chest sheet, not
-     * a single billboard, so it is not a valid sprite source until a single-chest
-     * shot exists. */
+    load_gen(U2_DGA_SP_CHEST, dg_spr_chest);
     s_pal_ready = 1;
 
     s_ready = 1;
