@@ -230,6 +230,21 @@ static void gen_spr_mon(uint8_t *t, uint8_t body, uint8_t accent, int bulk)
 }
 
 /* --------------------------------------------------------------- init ---- */
+/* Copy a generated concept sprite (base frame indices 16..255 or transparent)
+ * into a hi-res slot, expanding the four falloff levels through the generated
+ * shade map so distance darkening stays an index swap in the draw loop. */
+static void load_gen(int slot, const uint8_t *base)
+{
+    for (int lv = 0; lv < U2_DGA_SHADE_LEVELS; lv++)
+        for (int i = 0; i < DG_SPR_EDGE * DG_SPR_EDGE; i++) {
+            const uint8_t b = base[i];
+            s_hi[slot][lv][i] = (b == DG_SPR_TRANSPARENT)
+                ? U2_DGA_TRANSPARENT
+                : (uint8_t)(16 + dg_sprite_shade[lv][b - 16]);
+        }
+    s_spr_edge[slot] = DG_SPR_EDGE;
+}
+
 void u2_dga_init(void)
 {
     if (s_ready) return;
@@ -285,17 +300,19 @@ void u2_dga_init(void)
     /* Concept-derived high-resolution sprites (dungeon_sprites_gen.h). The base
      * image carries frame indices 16..255 (or transparent); the four falloff
      * levels are the base run through the generated shade map, so falloff stays
-     * an index swap in the draw loop. For now only the orc is loaded, into the
-     * stamp-1 slot. */
+     * an index swap in the draw loop. The seven creature stamps and the chest
+     * come from concept art; the ladders stay procedural (no concept). */
     for (int i = 0; i < U2_DGA_SP_COUNT; i++) s_spr_edge[i] = U2_DGA_TEX_EDGE;
-    for (int lv = 0; lv < U2_DGA_SHADE_LEVELS; lv++)
-        for (int i = 0; i < DG_SPR_EDGE * DG_SPR_EDGE; i++) {
-            const uint8_t b = dg_spr_orc[i];
-            s_hi[U2_DGA_SP_MON1][lv][i] = (b == DG_SPR_TRANSPARENT)
-                ? U2_DGA_TRANSPARENT
-                : (uint8_t)(16 + dg_sprite_shade[lv][b - 16]);
-        }
-    s_spr_edge[U2_DGA_SP_MON1] = DG_SPR_EDGE;
+    load_gen(U2_DGA_SP_MON1, dg_spr_orc);
+    load_gen(U2_DGA_SP_MON2, dg_spr_ghost);
+    load_gen(U2_DGA_SP_MON3, dg_spr_carrion_creeper);
+    load_gen(U2_DGA_SP_MON4, dg_spr_viper_emerald);
+    load_gen(U2_DGA_SP_MON5, dg_spr_gremlin);
+    load_gen(U2_DGA_SP_MON6, dg_spr_daemon_minotaur);
+    load_gen(U2_DGA_SP_MON7, dg_spr_balron);
+    /* The chest stays procedural: the chest concept is a multi-chest sheet, not
+     * a single billboard, so it is not a valid sprite source until a single-chest
+     * shot exists. */
     s_pal_ready = 1;
 
     s_ready = 1;

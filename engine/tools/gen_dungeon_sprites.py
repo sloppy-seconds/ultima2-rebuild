@@ -37,9 +37,16 @@ TRANSPARENT = 0xFF
 SHADES = [1.0, 0.62, 0.40, 0.24]   # level 0 = full bright, then falloff
 WORK = 512             # matte working resolution (rembg's net is 320; 512 keeps edges crisp)
 
-# concept file stem -> C symbol emitted (SP_MON slot mapping lives in dungeon_assets)
+# concept file stem -> C symbol emitted (SP_MON slot mapping lives in dungeon_assets).
+# The symbol must be a valid C identifier, so hyphenated stems get underscores.
 SPRITES = [
-    ("orc", "orc"),
+    ("orc",             "orc"),
+    ("ghost",           "ghost"),
+    ("carrion-creeper", "carrion_creeper"),
+    ("viper-emerald",   "viper_emerald"),
+    ("gremlin",         "gremlin"),
+    ("daemon-minotaur", "daemon_minotaur"),
+    ("balron",          "balron"),
 ]
 
 # ------------------------------------------------- optional proper tools ----
@@ -224,8 +231,9 @@ def main():
     prev_dir = os.environ.get("DG_PREVIEW_DIR", "tmp")
     print(f"matte: {'rembg' if HAVE_REMBG else 'flood (fallback)'}"
           f"   palette: {'pngquant' if HAVE_PNGQUANT else 'PIL median-cut (fallback)'}")
-    names = [n for n, _ in SPRITES]
-    sprites = [load_sprite(src_dir, s) for _, s in SPRITES]
+    names = [sym for _, sym in SPRITES]        # emitted C symbol suffix
+    stems = [stem for stem, _ in SPRITES]      # concept filename stem
+    sprites = [load_sprite(src_dir, stem) for stem in stems]
     pal = build_palette(sprites)
     sm = shade_map(pal)
     emit_header(out_path, names, sprites, pal, sm)

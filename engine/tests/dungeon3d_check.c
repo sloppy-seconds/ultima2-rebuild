@@ -75,6 +75,18 @@ static long count_index(const u2_frame *f, int colour)
     return n;
 }
 
+/* Count pixels whose palette index is >= lo. Concept sprite art lives in the
+ * 16..255 sub-palette; the procedural geometry and EGA panel stay in 0..15, so
+ * this distinguishes "a concept sprite drew" from "only static geometry drew". */
+static long count_index_ge(const u2_frame *f, int lo)
+{
+    long n = 0;
+    for (int y = 0; y < WIN; y++)
+        for (int x = 0; x < WIN; x++)
+            if (f->px[y][x] >= lo) n++;
+    return n;
+}
+
 static void setup(u2_ctx *ctx, u2_overworld *ow, int enhanced)
 {
     memset(ctx, 0, sizeof *ctx);
@@ -205,26 +217,29 @@ static void test_sprites(void)
 {
     u2_ctx ctx; u2_overworld ow;
 
-    /* Baseline: the room alone uses no light green (10) and no brown (6). */
+    /* Baseline: the bare rock room draws only EGA indices (0..15). Concept
+     * creature art lives in the 16..255 sub-palette, so none of that range
+     * appears until a creature is present. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
     build_room(&ow, U2_DG_ROCK);
     u2_dungeon_render(&ctx, &ow, 1);
-    const long green0 = count_index(&ow.frame, 10);
-    const long brown0 = count_index(&ow.frame, 6);
+    CHECK(count_index_ge(&ow.frame, 16) == 0,
+          "sprite: bare room should show no concept-sprite colours");
     u2_frame_free(&ow.frame);
-    CHECK(green0 == 0 && brown0 == 0, "sprite: bare room should show no sprite colours");
 
-    /* A stamp-2 creature one cell ahead must appear. One cell (not two) keeps
-     * it inside shade level 0 now that the camera pull-back adds half a cell of
-     * distance, so the sprite shows its bright base colours. */
+    /* A stamp-2 creature one cell ahead must appear as concept art (indices
+     * 16..255), a range nothing else in the room produces. One cell (not two)
+     * keeps it inside shade level 0 now that the camera pull-back adds half a
+     * cell of distance, so the sprite shows its bright base colours. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
     build_room(&ow, U2_DG_ROCK);
     u2_world_dungeon_put(&ow.world, 0, 6, 5, 0x02);
     u2_dungeon_render(&ctx, &ow, 1);
-    CHECK(count_index(&ow.frame, 10) > 50, "sprite: creature stamp should draw");
+    CHECK(count_index_ge(&ow.frame, 16) > 50, "sprite: creature stamp should draw");
     u2_frame_free(&ow.frame);
 
-    /* A chest must appear as wood. */
+    /* A chest stays procedural wood (brown 6): the chest concept is a multi-chest
+     * sheet, so the billboard is still the procedural chest. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
     build_room(&ow, U2_DG_ROCK);
     u2_world_dungeon_put(&ow.world, 0, 6, 5, U2_DG_CHEST);
