@@ -53,6 +53,33 @@ else
     echo "  ok    unknown mutant refuses instead of passing"
 fi
 
+# The space_view_gate.py legs, wired 2026-11-15. That gate runs in CP4, but its control
+# lived only as prose in the gate's own header — and a control nobody executes is a comment,
+# which is the exact defect docs/outstanding.md § 2 named. So: the clean gate must pass, and
+# the same gate run against a commands.c with the dive wait deleted must go red.
+total=$((total+1))
+if python3 tests/space_view_gate.py >/dev/null 2>&1; then
+    echo "  ok    space_view_gate clean run passes"
+else
+    echo "  BAD   space_view_gate clean run FAILED — the gate is broken, not the mutant"
+    fails=$((fails+1))
+fi
+
+total=$((total+1))
+grep -v 'seam_wait_ms(ctx, U2_DIVE_STEP_MS);' src/game/commands.c > "$WORK/commands_nowait.c"
+# A mutation that fails to mutate is the classic false green, so the deletion is proved
+# before the mutant is trusted.
+if [ "$(wc -l < "$WORK/commands_nowait.c")" -ge "$(wc -l < src/game/commands.c)" ]; then
+    echo "  BAD   the nowait mutant is identical to the source — it proves nothing"
+    fails=$((fails+1))
+elif U2_DIVE_GATE_SRC="$WORK/commands_nowait.c" python3 tests/space_view_gate.py \
+        >/dev/null 2>&1; then
+    echo "  BAD   the dive-wait mutant was not caught — the pacing leg cannot fail"
+    fails=$((fails+1))
+else
+    echo "  ok    dive-wait mutant caught by space_view_gate"
+fi
+
 if [ "$fails" -ne 0 ]; then
     echo "SPACE SELFTEST: FAIL ($fails of $total)"
     exit 1
