@@ -438,9 +438,11 @@ static void site_enter(u2_ctx *ctx, u2_overworld *ow, int digit,
      * 30, the one the character came FROM, not 31 where they arrived. So the ordering
      * below is load-bearing: autosave BEFORE the sector digit is swapped, or the
      * engine checkpoints the indoor state and dying in a town stops putting the player
-     * back outside. Unlike Q there is no location guard on this path, because the bytes
-     * have none — so it fires off-Earth too, which is what makes a bad planetary trip
-     * permanent rather than merely inconvenient. */
+     * back outside. Unlike Q there is no location guard at THIS call site, because the
+     * entry-arm bytes have none — but the store behind it is Earth-gated (asm/22FD), so
+     * off Earth this call writes nothing. Corrected 2026-11-15: this comment used to say
+     * the autosave "fires off-Earth too, which is what makes a bad planetary trip
+     * permanent", and a real Planet X playthrough refuted it — nothing writes off Earth. */
     (void)u2_overworld_autosave(ctx, ow);
 
     /* Sync the creature table into the world buffer so a later save sees current state.
@@ -763,12 +765,24 @@ static int save_body(u2_ctx *ctx, u2_overworld *ow)
 
 int u2_overworld_autosave(u2_ctx *ctx, u2_overworld *ow)
 {
-    /* Deliberately silent. The original prints nothing when it saves on its own
-     * initiative: asm/38B0 goes `mov %al,0x69 ; call L_0024fd` with no str_out
-     * between, and asm/343F goes `mov %al,0x5a ; mov %al,0x5b ; call L_0024fd`
-     * likewise. The owner rule is that a silent mutation must cite the routine that
-     * proves the silence, and those are it. If enhanced mode ever gains multi-slot or
-     * a visible checkpoint, that surfaces here rather than in the callers. */
+    /* The Earth gate belongs HERE, not at the callers, because the original's gate belongs
+     * to the store: asm/22FD_sector_store_gate is `mov DS:6D,%al ; or %al,%al ; je store`
+     * and every silent save path reaches the store through it. So off Earth no silent path
+     * writes anything at all. Measured on a genuine Planet X, captures/spice86/g82-planet-x-live:
+     * castle entry, castle exit, launch, landing, two hyperjumps and a death, ten transitions
+     * across 91 files at one-second resolution, zero writes, with a `Q` control that fired
+     * `player` + `mapx40` + `monx40` in the same session. An earlier version of this function
+     * let the entry path through off Earth, on the reading that the entry arms carry no guard;
+     * they do not, and that is not the same as the store carrying none.
+     *
+     * Deliberately silent otherwise. The original prints nothing when it saves on its own
+     * initiative: asm/38B0 goes `mov %al,0x69 ; call L_0024fd` with no str_out between, and
+     * asm/343F goes `mov %al,0x5a ; mov %al,0x5b ; call L_0024fd` likewise. The owner rule is
+     * that a silent mutation must cite the routine that proves the silence, and those are it.
+     * If enhanced mode ever gains multi-slot or a visible checkpoint, that surfaces here
+     * rather than in the callers. */
+    if (ctx->state.world != 0)
+        return 0;
     return save_body(ctx, ow);
 }
 

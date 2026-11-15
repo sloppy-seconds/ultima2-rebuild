@@ -261,19 +261,25 @@ int main(int argc, char **argv)
          * assertion below uses a value that differs from that, or the test would pass
          * vacuously on a save_body that wrote nothing at all. */
 
-        /* A state Q refuses three ways over: indoors, off-Earth, in a vehicle.
-         * The auto-save is not gated, so it must still write. */
+        /* A state Q refuses on two of its three guards: indoors, and aboard a vehicle.
+         * The auto-save is NOT gated on those two axes, so it must still write here.
+         * It IS gated on Earth, because that gate lives in the store (asm/22FD) and not
+         * in Q — that half is asserted below with world = 0x09. This half has to hold
+         * world at 0, or the two properties cannot be told apart by the test. (An earlier
+         * version of this block set world to 0x0A deep space and asserted the write still
+         * happened, which is the claim captures/spice86/g82-planet-x-live refuted.) */
         u2_overworld bad = ow;
         bad.sector_lo = 2;
         bad.x = 34;
         bad.y = 20;
-        a.state.world = 0x0A;                 /* deep space */
+        a.state.world = 0;
         a.state.player_stamp = 0x28;          /* rocket */
         ok(u2_overworld_save(&a, &bad, &U2_SAVE_POLICY_ORIGINAL) == 1,
            "Q still refuses that state (its guards are unchanged)");
 
         u2_vram_init(&a.vram);
-        ok(u2_overworld_autosave(&a, &bad) == 0, "the auto-save is not gated like Q");
+        ok(u2_overworld_autosave(&a, &bad) == 0,
+           "the auto-save is not gated on location or vehicle the way Q is");
         ok(!vram_contains(&a, U2_S_Q_MOMENT) && !vram_contains(&a, U2_S_Q_PROMPT),
            "the auto-save prints nothing (asm/38B0 has no str_out before the call)");
 
@@ -285,7 +291,6 @@ int main(int argc, char **argv)
         ok(got && rec[0x24] == 34 && rec[0x25] == 20,
            "and the return cell, so the caller's state is what gets checkpointed");
 
-        a.state.world = 0;
         a.state.player_stamp = 0x78;
 
         /* Ordering, the load-bearing part. site_enter() calls this BEFORE swapping the
@@ -303,6 +308,29 @@ int main(int argc, char **argv)
         if (rf) fclose(rf);
         ok(got && rec[0x24] == 12 && rec[0x25] == 13,
            "and the caller's cell, so the outdoor state is what gets checkpointed");
+
+        /* Off Earth the store is gated out by asm/22FD, so the identical call must write
+         * nothing. The control that keeps this assertion able to fail is the one directly
+         * above it: same call, same buffers, world byte 0x00, and the record DOES move.
+         * Measured on a genuine Planet X in captures/spice86/g82-planet-x-live — ten
+         * transitions, 91 files, one-second md5 resolution, zero writes. */
+        unsigned char before[256];
+        rf = fopen(saves_path, "rb");
+        got = rf && fread(before, 1, 256, rf) == 256;
+        if (rf) fclose(rf);
+        ok(got, "the on-Earth auto-save left a record to compare against");
+
+        a.state.world = 0x09;                 /* Planet X */
+        out.x = 77;
+        out.y = 78;
+        ok(u2_overworld_autosave(&a, &out) == 0,
+           "off Earth the auto-save reports no failure — refusing is not an error");
+        rf = fopen(saves_path, "rb");
+        got = rf && fread(rec, 1, 256, rf) == 256;
+        if (rf) fclose(rf);
+        ok(got && memcmp(rec, before, 256) == 0,
+           "and off Earth it wrote nothing, so the cell stayed at the Earth value");
+        a.state.world = 0;
         /* The sector mechanism is proven by the discriminating assertion above (a
          * handed-down 2 lands on disk where the previous record held 0). Asserting 0
          * here too would pass against a mutant that hardcodes 0, so it is left out on
