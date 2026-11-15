@@ -594,6 +594,21 @@ Verification, in two independent layers:
   harvest must come from `monitor dumpAll`, never from a signal. When a capture seems
   to need walking somewhere, seed state instead — `--player` with `tools/u2_edit.py
   setpos` is the only way to change sector, and `--seed-map` installs a synthetic one.
+* **Read `docs/tooling-procedures.md` § "Build, play, seed" before building an artifact, launching
+  either binary, or writing anything that seeds a save.** Same rule and same reason as the bullet
+  above, for the three jobs that never had a table: the container build, the browser bring-up and the
+  save seed were each re-derived by hand more than once, including by the session that finally wrote
+  the section. Three things to know cold. **The host builds only the terminal binary** — `make sdl`
+  failing for want of SDL3 headers is the design working, not a defect, and
+  `./deploy/linuxbuild/build.sh` produces the static-SDL player in a container in about a minute, so
+  a red `engine build fresh` gate is a dirty tree and `make -C engine clean` is the fix. **Always
+  `up.sh`, never a hand-run `make`/`cp`/`podman` chain**, because that chain is how a player ended up
+  with art they had not asked for. **Never hand-roll a save struct** — `tools/u2_edit.py` for the
+  original, `engine/tests/cp6_commerce_seed.py` for a synthetic engine scenario. All three jobs are
+  also in-repo skills (`.agents/skills/u2-build`, `u2-play`, `u2-character`), so they load on a
+  matching task without anyone remembering to look. `tools/doc_command_gate.py` is the gate that
+  keeps every command in those pages and skills real — it names the docs and skills it checks, and it
+  caught two drifts on its first run.
 * **Dungeons are open now (CP7, 2026-10-29), and the 3D view is still not evidence about
   the 2D world.** The park was the owner's call on 2026-10-28 and it was lifted on
   2026-10-29 to build `engine/src/game/dungeon.c`; the engine enters, lights, walks,
