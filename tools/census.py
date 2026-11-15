@@ -48,6 +48,20 @@ a hand-kept list of coordinates drifts and then looks authoritative. `--verify` 
 doors that lead to a missing sector and site sectors with no door at all; both are real
 findings from the damaged root mapx set, not formatting problems.
 
+THE VENDOR TABLE, added 2026-11-15. One row per 0x68 vendor marker in a site map: its cell,
+the quadrant it sits in, the shop that quadrant means, and the sign spelled out in alphabet
+tiles beside it. `cmd_T` (asm/4050) is a two-cell ray -- near cell a sign letter or 0x7C, far
+cell the 0x68 marker -- and on success it jumps to asm/1590, which picks the shop from the
+player's quadrant and whether the site kind is 2. So a vendor is a placed tile rather than a
+creature, and what it sells is a property of where it stands. The shop column comes from that
+rule; the sign column comes from the map bytes and is derived by no rule at all, which is what
+makes the two worth printing side by side. They agree everywhere: every town gets WEAPONS,
+ARMOURY, TRANSPORT and a pub, every village gets SEER or ORACLE, a cook, CLERGY and WIZARDRY,
+and no sign word appears under two shops. This exists because "which town has the clue seller"
+was being answered by reasoning about geometry when it is a lookup, and because the answer is
+not the one intuition gives: the clue seller is a village vendor and the pub is a town vendor,
+so no site has both.
+
 USAGE
     python3 tools/census.py                       # build
     python3 tools/census.py --verify              # build and assert the invariants
@@ -56,6 +70,7 @@ USAGE
 """
 
 import argparse
+import collections
 import csv
 import glob
 import io
@@ -70,6 +85,18 @@ import tempfile
 # from both the repo root and engine/, so a relative 'asm' would silently find nothing when
 # invoked from the wrong place -- the same class of failure as a gate with no files to read.
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# The map byte -> capital letter rule is place_index.py's, and it is pinned there by a table of
+# directly-verified bytes (0x80 -> A, 0xCC -> T, ...) plus the no-Q proof. Importing it is the
+# only correct option here: a second hand-written copy of a glyph mapping is exactly the drifted
+# duplicate AGENTS.md § 3 forbids, and a wrong letter would invent shop names.
+sys.path.insert(0, os.path.join(ROOT, 'tools'))
+_SIGN_IMPORT_ERROR = ''
+try:
+    from place_index import art_to_letter as _art_to_letter
+except Exception as _e:                       # noqa: BLE001 - degrade loudly, never guess
+    _art_to_letter = None
+    _SIGN_IMPORT_ERROR = str(_e)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 D = lambda *p: os.path.join(ROOT, *p)
@@ -109,6 +136,63 @@ GUIDE_WORLD = {
 }
 GUIDE_TYPE = {'Village': 'village', 'Town': 'town', 'Castle': 'castle',
               'Tower': 'tower', 'Dungeon': 'dungeon'}
+
+# ---- vendors: the 0x68 marker, and what the quadrant says it sells -------------------------
+#
+# `cmd_T` (asm/4050) aims a two-cell ray: the near cell must be a sign letter (high bit set)
+# or the 0x7C stand-in, the far cell must be 0x68, and on success it jumps to asm/1590 -- which
+# picks the shop from the QUADRANT the player is standing in and whether the site kind is 2.
+# So a vendor is a placed tile, not a creature, and what it sells is a property of where it
+# stands. This is the same rule asm/1590 encodes, restated rather than re-guessed.
+VENDOR_MARKER = 0x68
+VENDOR_STANDIN = 0x7C
+VENDOR_SHOPS = {
+    True:  {('w', 'n'): 'weapons', ('e', 'n'): 'armour',
+            ('e', 's'): 'transport', ('w', 's'): 'pub'},        # asm/1E4F 1D1D 1F75 15E4
+    False: {('w', 'n'): 'clue',    ('e', 'n'): 'grocery',
+            ('e', 's'): 'cleric',  ('w', 's'): 'wizard'},       # asm/1AE0 1799 1841 19AF
+}
+
+
+def vendor_quadrant(x, y):
+    return ('e' if x >= 0x20 else 'w') + ('s' if y >= 0x20 else 'n')
+
+
+def sign_run(tiles, mx, my):
+    """Decode the sign beside a vendor marker: (side, word) or (None, '').
+
+    The word runs PERPENDICULAR to the marker->sign direction, which is what the live captures
+    show: sector 22's marker is at (51,51) and its TRANSPORT row is the whole of y=52, running
+    east-west, with the player standing south of it. So a letter found N or S of the marker is
+    read along its row, and one found E or W along its column. The sign row is transparent to
+    cmd_T's ray by design -- it is the accepted near cell, not an obstacle (asm/4050).
+    """
+    for side, dx, dy in (('N', 0, -1), ('S', 0, 1), ('E', 1, 0), ('W', -1, 0)):
+        cx, cy = mx + dx, my + dy
+        if not (0 <= cx < GRID and 0 <= cy < GRID):
+            continue
+        b = tiles[cy * GRID + cx]
+        if b == VENDOR_STANDIN:
+            return side, ''
+        centre = _art_to_letter(b)
+        if centre is None:
+            continue
+        rx, ry = (1, 0) if dy else (0, 1)
+        halves = []
+        for sgn in (-1, 1):
+            step, px, py = [], cx + sgn * rx, cy + sgn * ry
+            while 0 <= px < GRID and 0 <= py < GRID:
+                c = _art_to_letter(tiles[py * GRID + px])
+                if c is None:
+                    break
+                step.append(c)
+                px, py = px + sgn * rx, py + sgn * ry
+                if len(step) > 14:
+                    break
+            halves.append(step[::-1] if sgn < 0 else step)
+        return side, ''.join(halves[0] + [centre] + halves[1])
+    return None, ''
+
 
 
 def read_tsv(path, skip_comments=1):
@@ -417,8 +501,45 @@ def build():
                 'grade': 'observed',
             })
 
+    # ---- vendor: every 0x68 marker, its quadrant, and what that quadrant sells --------------
+    #
+    # One row per vendor marker found in a site map. Two independent facts are recorded side by
+    # side and neither is derived from the other: the SHOP, which asm/1590 picks from the
+    # quadrant and the site kind, and the SIGN, which is spelled out in alphabet tiles beside the
+    # marker by whoever authored the map. Where both are present they agree everywhere in the
+    # corpus (armour at 32, transport at 22, and every decoded sign since), which is the
+    # strongest independent confirmation of the quadrant rule this project has.
+    #
+    # This exists because "which town has the clue seller" was being answered by reasoning about
+    # geometry, and the answer is a lookup. It is generated for the usual reason: a hand-kept
+    # list of shop coordinates drifts, and a drifted coordinate looks authoritative.
+    varows = []
+    for (layer, sec), data in sorted(maps.items()):
+        srow = sec_by_key.get((layer, sec))
+        kind = srow['kind'] if srow else ''
+        for i, v in enumerate(data):
+            if v != VENDOR_MARKER:
+                continue
+            x, y = i % GRID, i // GRID
+            quad = vendor_quadrant(x, y)
+            shop = VENDOR_SHOPS[kind == 'town'][(quad[0], quad[1])]
+            side, word = ('', '') if _art_to_letter is None else sign_run(data, x, y)
+            varows.append({
+                'layer': layer, 'sector': sec,
+                'world': srow['world'] if srow else '',
+                'era': srow['era'] if srow else '',
+                'kind': kind, 'x': x, 'y': y, 'marker_byte': '0x%02x' % v,
+                'quadrant': quad, 'shop': shop,
+                'sign_side': side, 'sign_word': word,
+                'sign_grade': 'decoded' if word else ('stand-in' if side else 'no sign'),
+                'source': 'mapx/MAPG tile bytes; marker+ray asm/4050; shop rule asm/1590; '
+                          'sign letters via place_index.art_to_letter',
+                'grade': 'observed',
+            })
+
     return {'world': wrows, 'sector': srows, 'place': prows, 'vehicle': vrows,
             'tile': trows, 'npc': nrows, 'creature': crows, 'site': sirows,
+            'vendor': varows,
             'gate': gate_rows(D('original', 'ultimaii.exe'))}
 
 
@@ -444,6 +565,8 @@ COLUMNS = {
     'site': ['layer', 'from_sector', 'world', 'era', 'kind', 'art', 'map_byte',
              'x', 'y', 'dest_sector', 'dest_exists', 'dest_name', 'dest_name_source',
              'dest_guide_name', 'arrival', 'source', 'grade'],
+    'vendor': ['layer', 'sector', 'world', 'era', 'kind', 'x', 'y', 'marker_byte',
+               'quadrant', 'shop', 'sign_side', 'sign_word', 'sign_grade', 'source', 'grade'],
 }
 
 
@@ -741,6 +864,42 @@ def verify(tables):
         print('    door to nothing: %s' % m)
     for u in unreachable_sites:
         print('    no door: %s' % u)
+    # ---- the vendor table ---------------------------------------------------------------
+    # The checks here are structural, not a vocabulary match. Asserting that a sign's word must
+    # equal its quadrant's shop name would need a hand-written word->shop table derived from
+    # this very scan, which is circular and would go red the first time the game names a shop
+    # after a person (GEORGES, KURTS, ALFREDS are all real signs here). So the table records
+    # both facts, prints the vocabulary per quadrant for a person to read, and hard-fails only
+    # on the things that can only mean the scan broke.
+    if _art_to_letter is None:
+        bad.append('vendor sign decoding is unavailable (%s) — every sign_word would be blank '
+                   'and the table would look healthy while checking nothing'
+                   % (_SIGN_IMPORT_ERROR or 'symbol missing, import did not fail'))
+    if not tables.get('vendor'):
+        bad.append('vendor table is empty — no 0x%02x marker was found in any map, which means '
+                   'the scan is broken and not that the game has no shops' % VENDOR_MARKER)
+    by_sec = collections.defaultdict(set)
+    vocab = collections.defaultdict(collections.Counter)
+    for r in tables.get('vendor', []):
+        if r['kind'] in ('wilderness', 'dungeon', 'tower'):
+            bad.append('vendor marker in %s %s (%s) at (%d,%d) — asm/4050 rejects site kind 0, '
+                       'so a marker out in the open cannot be a shop'
+                       % (r['layer'], r['sector'], r['kind'], r['x'], r['y']))
+        if r['kind'] in ('town', 'village'):
+            by_sec[(r['layer'], r['sector'], r['kind'])].add(r['quadrant'])
+        if r['sign_word']:
+            vocab[(r['kind'], r['quadrant'], r['shop'])][r['sign_word']] += 1
+    incomplete = [k for k, q in sorted(by_sec.items()) if len(q) < 4]
+    for k in incomplete:
+        print('    vendor note: %s %s (%s) has markers in %d of 4 quadrants'
+              % (k[0], k[1], k[2], len(by_sec[k])))
+    for k in sorted(vocab):
+        print('  vendor signs %-8s %-3s -> %-10s %s'
+              % (k[0], k[1], k[2], dict(vocab[k].most_common())))
+    print('  vendor: %d markers across %d site sectors; %d carry a decoded sign'
+          % (len(tables.get('vendor', [])), len({(r['layer'], r['sector'])
+                                                 for r in tables.get('vendor', [])}),
+             sum(1 for r in tables.get('vendor', []) if r['sign_word'])))
     return bad, named, len(unnamed)
 
 
@@ -763,7 +922,7 @@ def main():
     ap.add_argument('--verify', action='store_true', help='build in memory and assert invariants')
     ap.add_argument('--check-fresh', action='store_true',
                     help='fail if the committed census differs from a fresh build')
-    ap.add_argument('--what', default=None, help='print one entity: world|sector|place|npc|tile|creature|gate|vehicle|site')
+    ap.add_argument('--what', default=None, help='print one entity: world|sector|place|npc|tile|creature|gate|vehicle|site|vendor')
     ap.add_argument('--where', default=None, help='filter as column=value, substring match')
     ap.add_argument('--out', default=CENSUS_DIR)
     a = ap.parse_args()

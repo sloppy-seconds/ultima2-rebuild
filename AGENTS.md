@@ -482,8 +482,9 @@ Verification, in two independent layers:
 
 * **`disasm/census/` is the one-stop lookup, and it is generated.** `tools/census.py` joins the
   place, planet, npc and tile indices, the two wiki crosswalks, the vendored guide table, the
-  bestiary and the exe's own gate table into nine tables: `world`, `sector`, `place`, `npc`,
-  `tile`, `creature`, `gate`, `vehicle`, and `site`. Ask it before hand-joining anything:
+  bestiary and the exe's own gate table into ten tables: `world`, `sector`, `place`, `npc`,
+  `tile`, `creature`, `gate`, `vehicle`, `site`, and `vendor`. Ask it before hand-joining
+  anything:
 
   ```bash
   python3 tools/census.py --what sector --where world=pluto
@@ -496,6 +497,15 @@ Verification, in two independent layers:
   "where do I stand to test X" is a lookup instead of a hand-scan of map bytes. Its rule is
   `site_for_tile()`'s, not a guess, and `--verify` reports doors that lead to a missing sector
   and site sectors with no door.
+
+  The `vendor` table is one row per `0x68` vendor marker: its cell, the quadrant it sits in,
+  the shop that quadrant means, and the sign spelled out in alphabet tiles beside it. A vendor
+  is a placed tile, not a creature — `cmd_T` is a two-cell ray onto the marker, and `asm/1590`
+  picks the shop from the player's quadrant and the site kind. The shop column comes from that
+  rule and the sign column comes from the bytes with no rule at all, so their agreement is
+  independent evidence, and it is total: no sign word appears under two shops. Use it instead
+  of reasoning about which settlement has what — the clue seller is a village vendor and the
+  pub is a town vendor, so no site has both.
 
   It is the only writer of that directory, and it invents nothing — every row names its source.
   Two gates cover it in `check_all.sh`: `--verify` asserts the data's invariants (every guide row

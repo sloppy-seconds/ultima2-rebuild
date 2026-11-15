@@ -25,8 +25,8 @@ implemented and no `UNPROVEN:` marker remains anywhere in `engine/src/`.
 
 | item | where | what is missing | grade | who |
 | --- | --- | --- | --- | --- |
-| The clue seller | `commerce.c` `U2_SHOP_CLUE` | The digit-to-price mechanism is known (the digit is placed into the hundreds byte, no multiply). What is missing is a **selection rule for the clue pool** — nobody has mapped which clue a given digit buys. | inferred | agent, needs a live shoppe |
-| The pub | `commerce.c` `U2_SHOP_PUB` | `1-BUY` is a constant 5 gold and is buildable. `2-TIP` drives the barkeep chatter table (`asm/155D` + `asm/16BD`), which is read but has **never been observed executing**. Half a pub is worse than none, so it refuses. | inferred | agent |
+| The clue seller | `commerce.c` `U2_SHOP_CLUE` | The digit-to-price mechanism is known (the digit is placed into the hundreds byte, no multiply). What is missing is a **selection rule for the clue pool** — nobody has mapped which clue a given digit buys. Narrowed 2026-11-15: the vendor is a placed `0x68` marker whose sign reads `SEER` or `ORACLE`, and it stands only in the NW quadrant of a **village**, never a town (`census --what vendor`). | inferred | agent, needs a live shoppe |
+| The pub | `commerce.c` `U2_SHOP_PUB` | `1-BUY` is a constant 5 gold and is buildable. `2-TIP` drives the barkeep chatter table (`asm/155D` + `asm/16BD`), which is read but has **never been observed executing**. Half a pub is worse than none, so it refuses. Its sign reads `DRUNK…` and it stands only in the SW quadrant of a **town**, so no site has both a pub and a clue seller. | inferred | agent |
 | The talking half of `cmd_T` | `commerce.c`, `"no dialogue for that role"` | The scripted arm and the `street_*` chain are wired; one role has no dialogue and says so rather than inventing one. | inferred | agent |
 | The goal-spec policy rule | `docs/goal-spec.md` P8 | The engine now knows *why* something is invulnerable (slot 0, G78) but the policy layer has no way to express "stop attacking this", so a bot will attack an invulnerable guard forever. This is a bot rule, not engine behaviour. | measured | agent |
 
