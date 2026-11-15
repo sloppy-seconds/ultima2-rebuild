@@ -20,13 +20,25 @@
 #   2026-10-27 alongside engine/src/game/overworld.c:u2_death, which implements
 #   this span; not derived by tools/provenance_from_traces.py.
 # MEMORY-ONLY: this span zeroes DS:51..59 in the data segment and does NOT write the
-#   save file. It calls only L_0052f9 (the H.P. repaint); the save body is L_0024fd and
-#   nothing in this span or its three sibling fragments calls it. Confirmed on disk
+#   save file. It calls only L_0052f9 (the H.P. repaint). CORRECTED 2026-11-15, second
+#   wrong claim in this header: it used to say "the save body is L_0024fd and nothing here
+#   calls it". There is no save body at L_0024fd — that is the FILE offset of the sector
+#   store gate (runtime 0x22FD, asm/22FD_sector_store_gate), which writes the 4096-byte
+#   sector buffer and never the player record. The record writer is asm/2474, and nothing
+#   here reaches it either, so the conclusion stands on a better reason. Confirmed on disk
 #   2026-11-03: three runs ended with the character dead and every one of their `player`
 #   files still held the untouched seed record (hp 9999, food 999999, gold 9999, exp 9999)
-#   while live memory at the same instant read all zeros. So death costs the session, not
-#   the character -- restart and load, and the character is whole. This was asserted the
-#   other way in session first, on the inference that a zeroed record must get saved.
+#   while live memory at the same instant read all zeros. Re-confirmed 2026-11-15 with a
+#   watcher on every file in the run dir at one-second resolution: two separate rocket
+#   crashes, `DS:51..59` reading all zeros both times, and zero game-file writes across
+#   the whole session.
+#   DEATH IS TERMINAL, and this is the part a future agent will act on. There is no "press
+#   any key", no return to the title menu, no in-game way back: the screen shows
+#   `ENDGAME IS DEAD!` and sits there until the program is hard-restarted (owner,
+#   2026-11-15, after waiting for a keypress that never comes). So "restart and load" is an
+#   operator action, not something the program does, and the character is whole only if a
+#   save exists to come back to — death costs the session since the last write, which may
+#   be nothing at all if the last write was hours and one planet ago.
 #   See docs/save-format.md § 10, which carries the table of what does write the file.
 # confidence: high for the zeroing and the announcement (bytes plus a screen);
 #   the four-way fragment cut is mechanical, not semantic
