@@ -3,7 +3,7 @@
 #           whose operand lives in the next map fragment (37F1).
 # func 37DC..37F0  len 021 B  evidence: seed+reko (jump table cs:0730 entry J)
 # provenance: live:cmd-letters-20261025; static
-#           entry executed in 2 of 265 harvests; confirmed by the capture of 2026-10-25 (CMD
+#           entry executed in 2 of 266 harvests; confirmed by the capture of 2026-10-25 (CMD
 #           log reads `JUMP...WHEE...`). Was recorded as never executed against a 60-harvest
 #           corpus that has since grown without this line being refreshed.
 # confidence: high
