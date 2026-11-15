@@ -7,6 +7,44 @@
 #           entry never appears in ExecutedInstructions of any of the 60 harvests; derived by tools/provenance_from_traces.py
 # confidence: low (bytes proven by check_func.py)
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
+# CLUE POOL, decoded 2026-11-15, and it is the reason this file's name is too narrow. The span
+#           1D6A..1F1C (file offsets; the labels L_001d6a..L_001f1b) is NOT code. The disassembler
+#           ran off the end of the clue seller's menu and drew ten NUL-separated strings as
+#           invented instructions -- every `.byte 0x??  # forced-kept: gas re-encodes 'add
+#           %al,0x53(%bx,%di)' differently` from L_001d6a to L_001f1b is text, not code. Same
+#           failure already recorded for asm/4C50 and, in its own header, for this table's sibling
+#           asm/16BD_barkeep_chatter_hints.asm.
+#           Reachability, read from the bytes at file 1D3D..1D68 (labels L_001d3c..L_001d67):
+#             call read_decimal_digit (asm/2028, returns one digit 0..9)
+#             mov %al,0x1f / mov %al,0x27 / mov %al,0x28   DS:1F = digit; DS:27:28 = digit
+#             call 0x2253                                  the gold charge (digit x 100 by
+#                                                          placement, which is what the menu's
+#                                                          own text says: HOW MUCH WILL YOU PAY *100?)
+#             mov 0x1f,%bl ; mov %bx,%si ; inc %si         SI = digit + 1
+#             lea %cs:0x1b6a,%ax ; mov %ax,0x27            cursor = runtime 0x1b6a = FILE 0x1d6a
+#             mov %bx,%di (DI=0) ; call L_00175d           the walker, asm/155D
+#           The cursor lands on the NUL at file 0x1d6a, one byte before entry 0 at 0x1d6b -- the
+#           same off-by-one-by-design the sibling table documents. Ten digits (0..9) for ten
+#           entries, so digit N buys entry N-1 and digit 0 is free. NOTE the 0x200 skew that has
+#           tripped this tree twice: `lea` operands in bodies are RUNTIME addresses, L_<addr>
+#           labels are FILE offsets, and runtime + 0x200 = file.
+# strings (entry index, then the text; 0x8d is the in-string carriage return the emitter takes):
+#           0 "ASK ME NO QUESTIONS,\x8dI'LL TELL YOU NO LIES."
+#           1 "THE QUEEN IS THE KING.\x8dAND THE KING IS A SPY."
+#           2 "THE EVIL MEN DO.\x8dIS A HORRIBLE THING."
+#           3 "BUT DISPELLING MEANS\x8dTHAT YOU MUST HAVE THE RING."
+#           4 "JUST WHERE IT IS,\x8dI CANNOT SAY."
+#           5 "BUT I'LL TELL YOU RIGHT NOW,\x8dTHERE IS NO OTHER WAY."
+#           6 "I HEAR IN A TOWN\x8dWHERE THE WATER RUNS FREE."
+#           7 "THERE IS AN OLD MAN\x8dLIVING UNDER A TREE."
+#           8 "HE HAS NOT A NAME\x8dBUT HE DOES HAVE A CLUE"
+#           9 "MAYHAPS IF YOU FIND HIM,\x8dHE'LL TELL IT TO YOU!"
+#           Entry 2 reads oddly and is left exactly as the bytes have it. Entry 8 has no trailing
+#           period in the original. Neither is corrected: the bytes are the text.
+# note: no asm file owns 1D6A, so this is recorded in the owning function's header per AGENTS § 3.
+#           A re-cut into asm/1D6A_clue_pool.asm is the right end state (asm/16BD is the precedent,
+#           split-from asm/15E1) but it needs a row in the function map that assemble_clean.sh
+#           orders by, so it is a separate change with the full byte proof behind it.
 # SCOPE WIDER THAN THE NAME, and now observed. This span (19D7..2027) carries several shoppe
 #           menus, not only the magic one: the TRANSPORT and WEAPONS text sits in this same file.
 #           Live 2026-10-29 (captures/spice86/shop-window-transport, owner-played, wizard BUYTEST):

@@ -27,6 +27,17 @@
 # note: the cursor is set to 0x16bc, ONE byte before the first entry -- the NUL that ends the
 #           tavern menu's own code. The walker skips to the next NUL before it starts counting,
 #           so that leading NUL is what puts entry 0 at 0x16bd. Do not "fix" the off-by-one.
+# note: address spaces, clarified 2026-11-15 because this header mixes them. 0x16bc and 0x16bd are
+#           RUNTIME addresses; the entry labels in this file (L_0018bd onward) are FILE offsets,
+#           and runtime + 0x200 = file. So the cursor at runtime 0x16bc is the NUL at file 0x18bc
+#           and entry 0 at runtime 0x16bd is L_0018bd. The `lea cs:0x16bc ; mov ds:0x27,ax` pair is
+#           at file 0x18a8..0x18ad (labels in asm/15E1_tavern_menu.asm), not 0x16a8. The sibling
+#           clue pool was decoded the same way the same day and is documented in
+#           asm/19D7_magic_shop_menu.asm's header; its cursor is runtime 0x1b6a = file 0x1d6a.
+# note: this table is the BARKEEP's, reached from the tavern menu. The clue seller (asm/1AE0 arm of
+#           asm/1590) uses a different table and a different cursor, so "which entry prints" is
+#           settled for both without a capture: the index is the digit the player pays, and the
+#           walker is shared. What remains unobserved is only the tavern's own index source.
 # note: DS:27:28 is shared scratch. docs/commerce.md § 3b measured it as the price operand on
 #           the shop path; here the same two bytes hold a code-segment cursor. Same aliasing
 #           hazard as DS:1F, which has twenty-plus writers.
