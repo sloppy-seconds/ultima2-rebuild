@@ -399,6 +399,13 @@ Verification, in two independent layers:
   renames the `asm/` file and writes the header.** Not a follow-up, not a
   backlog item. If no file covers the address yet, record it in the owning
   function's header and say so.
+* **A rename is not finished until every tool that cites the old filename is updated, and the
+  extractor is the one that bites.** `engine/tools/extract/extractor.py`'s MANIFEST names `asm/`
+  files as string locators, so a renamed file makes it exit 1 with `extractor: missing <file>`
+  and CP1 then reports `extractor produced nothing` — loud, which is the point, but it will look
+  like a content bug rather than a rename unless you know to grep the MANIFEST. `grep -rn
+  "<old-name>" engine/tools tools` is part of the rename, not a follow-up. Hit 2026-11-15 on
+  `34E4_sub_34e4` → `34E4_site_enter_dungeon`.
 * **Never infer the world model from a directory listing of `original/`.** The sector number is
   `DS:49 * 10 + DS:4A`, and the tens byte carries two axes told apart by `DS:6D`: on Earth it is
   the **era** (0..4), off Earth it is the **world**. The root `mapx` set is *damage, not design*

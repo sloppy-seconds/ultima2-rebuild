@@ -48,8 +48,9 @@
  *     pyramid, so the PICMIN label below is unverified). Couplet 3 (PLEAD WITH MEDIEVAL
  *     KINGS) was never observed -- the town picture was directly followed by the dungeon
  *     picture. The earlier "PICSPA then PICMIN, split inferred" note was a one-second-
- *     sampling guess and is refuted; present_poem() in game/title.c still implements that
- *     guess and needs the per-couplet pictures (flagged follow-up, cosmetic).
+ *     sampling guess and is refuted. **present_poem() now implements the observed mapping**
+ *     (2026-11-15), with couplet 3 keeping the town picture because it is the last one seen
+ *     before the gap rather than an invented fifth.
  *   - PICDNG, PICTWN and PICOUT are referenced by name in the executable (file offsets
  *     0x5c3, 0x63d, 0x72a) and ARE used: they are the demonstration pictures under
  *     couplets 4, 2 and 1 respectively (see the demonstration note above).
@@ -68,8 +69,13 @@ struct u2_frame;
 
 /* The picture names, as the executable spells them. */
 #define U2_PIC_TITLE   "picdra"   /* the Ultima II dragon logo, the intro splash */
-#define U2_PIC_STARS   "picspa"   /* starfield, under the opening couplet */
-#define U2_PIC_PYRAMID "picmin"   /* Minax's pyramid, under the rest of the poem */
+#define U2_PIC_STARS   "picspa"   /* starfield, under couplet 5 of the poem */
+#define U2_PIC_PYRAMID "picmin"   /* the couplet-6 field of figures over a cross; the pack
+                                     calls it picmin and it is NOT a pyramid, so the name is
+                                     the file's and not a description -- see the G58 note */
+#define U2_PIC_OUTDOOR "picout"   /* outdoor map, under couplet 1 */
+#define U2_PIC_TOWN    "pictwn"   /* town, under couplets 2 and 3 */
+#define U2_PIC_DUNGEON "picdng"   /* dungeon wireframe, under couplet 4 */
 
 /* Non-zero only when BOTH halves could work: a renderer that accepts a frame, and a
  * readable picture file. Callers branch on this so a terminal player keeps the text

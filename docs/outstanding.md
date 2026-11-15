@@ -54,7 +54,7 @@ Short list; the recipe and byte evidence live in the named G-row.
 | **G77** — the plane's own march-step cost | `U2_PLANE_STEP_MS` is a borrowed 103 ms floor. | inferred | agent |
 | **G76** — column 40 spill or clamp | one frame at margin `0x28` with a full-width line. | inferred | agent |
 | **G30** — does `Ctrl-Y` move south | blocked on tooling: `spice86_type.py` has no modifier-key support. | inferred | agent, after a tool change |
-| **G58** — which picture underlies each couplet of the demonstration | the `present_poem` code fix is still open. | measured | agent |
+| **G58 — CLOSED 2026-11-15.** The pictures were already observed; the engine was the open half. `present_poem()` now maps each couplet to its own picture instead of the refuted two-picture guess, and `pic.h` carries the three names the executable itself references. Couplet 3 stays inferred (never observed, keeps the town picture) and couplet 6's `picmin` label stays unverified — the file is not a pyramid. | the code fix, which shipped | measured, one row inferred | done |
 
 ## 4. Decisions only the owner can make
 

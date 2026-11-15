@@ -411,7 +411,7 @@ MANIFEST = [
     ("U2_S_SITE_TOWN",         "343F_sub_343f.asm",       ("run", 0x364A, 5, "-TOWN")),
     ("U2_S_SITE_TOWER",        "343F_sub_343f.asm",       ("run", 0x367F, 6, "-TOWER")),
     ("U2_S_SITE_CASTLE",       "34B5_sub_34b5.asm",       ("run", 0x36B8, 7, "-CASTLE")),
-    ("U2_S_SITE_DUNGEON",      "34E4_sub_34e4.asm",       ("run", 0x36EF, 8, "-DUNGEON")),
+    ("U2_S_SITE_DUNGEON",      "34E4_site_enter_dungeon.asm", ("run", 0x36EF, 8, "-DUNGEON")),
     # The UNLOCK command (asm/42F1 cmd_U and its two refusals). The prompt's db line
     # terminates with `,0` so the db-index locator finds it; both refusals carry a
     # leading 0x8d line-marker byte, which puts them outside DB_RE on purpose (see the

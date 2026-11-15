@@ -250,12 +250,21 @@ static int present_poem(u2_ctx *ctx)
      * placeholder, because a wall of scrolling text is not a demonstration and running
      * all twelve lines at a terminal would read as a bug rather than a fallback.
      *
-     * The picture-per-couplet split is INFERRED, not observed: the capture was sampled
-     * at one second and shows PICSPA first and PICMIN for the rest, which is not fine
-     * enough to say which couplet changes it. Recorded as needing a finer capture in
-     * docs/needs-gameplay.md rather than presented as settled.
+     * The picture under each couplet is OBSERVED, not inferred: ~130 frames across several
+     * loops in captures/spice86/g58-demonstration (docs/needs-gameplay.md G58). What is
+     * below replaces a refuted guess -- this used to show the starfield for couplet 1 and
+     * the pyramid for everything after, which came from a one-second sampler that could not
+     * see the changes at all. Couplet 3 is the one inferred row: it was never observed,
+     * because the town picture was directly followed by the dungeon one, so it keeps the
+     * town picture rather than inventing a fifth.
      */
-    const int pictures = u2_pic_can_show(ctx, U2_PIC_PYRAMID);
+    static const char *const couplet_pic[] = {
+        U2_PIC_OUTDOOR, U2_PIC_TOWN,   U2_PIC_TOWN,
+        U2_PIC_DUNGEON, U2_PIC_STARS,  U2_PIC_PYRAMID
+    };
+    int pictures = 0;
+    for (int c = 0; c < NARR(couplet_pic); c++)
+        if (u2_pic_can_show(ctx, couplet_pic[c])) { pictures = 1; break; }
     const int limit = pictures ? NARR(POEM) : 2;
 
     for (int i = 0; i < limit && i < NARR(POEM); i += 2) {
@@ -266,7 +275,10 @@ static int present_poem(u2_ctx *ctx)
         if (i + 1 < NARR(POEM) && POEM[i + 1].s[0])
             seam_str_out_at(ctx, POEM[i + 1].col, POEM[i + 1].row, POEM[i + 1].s);
         if (pictures) {
-            if (show_pic(ctx, i == 0 ? U2_PIC_STARS : U2_PIC_PYRAMID, POEM_HOLD_MS))
+            const int ci = i / 2;      /* one couplet per two narrative lines */
+            if (show_pic(ctx, couplet_pic[ci < NARR(couplet_pic) ? ci
+                                                                 : NARR(couplet_pic) - 1],
+                         POEM_HOLD_MS))
                 return 1;
             continue;
         }
