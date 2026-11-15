@@ -210,10 +210,14 @@ prose.
 
 The chest-vs-PASSWALL persistence contradiction was framed as "the owner's rule vs the chest
 code". The third possibility was written down as a hypothesis and is now measured: **the original
-writes the sector back to disk**, so a mutated sector can persist. `asm/2305_sector_store.asm` is
-`AH=28h, CX=0x1000, DX=[DS:472]` — the whole 4096-byte sector — and it runs end to end in 33
-harvests. It has no direct caller anywhere in the binary; it is reached only by the single `je` in
-`asm/22FD_sector_store_gate.asm`, whose entire body is `if (DS:6D == 0) store()`. Earth only.
+writes the sector back to disk**, so a mutated sector can persist. `asm/2305_sector_store.asm`
+opens `AH=28h, CX=0x1000, DX=[DS:472]` — the whole 4096-byte sector — and it runs end to end in
+33 harvests. It has no direct caller anywhere in the binary; it is reached only by the single `je`
+in `asm/22FD_sector_store_gate.asm`, whose entire body is `if (DS:6D == 0) save()`. Earth only.
+And it does not stop at the sector: under that one `AH=28h` and before a single `ret` it writes
+three files — `mapxNN`, then `monxNN` (256 B from `DS:137`), then the player record (256 B from
+`DS:36`). The Phase 2 map had cut the routine into four files and the second piece was named
+`monster_data_load` and described as a read; see that file's history, merged 2026-11-15.
 
 Two consequences worth more than the finding itself. First, **a gate on a store is part of the
 store's path**: `asm/22FD` was read in 2026-10-29 as "not a sector store, there is no file I/O in
