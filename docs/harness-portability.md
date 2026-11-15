@@ -1919,3 +1919,27 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   happen, mutate something the write would carry and look again; to show it does, instrument the
   write call, not the file. Both survived review because each returned a plausible answer rather
   than an error. → Tier 2, harness contract.
+
+- **A watcher that has never observed a positive event cannot certify a negative one.** A
+  session recorded zero filesystem writes across a long playthrough and reported the
+  absence as a finding. It was almost certainly true, and it was worthless as stated, because
+  nothing in the session had demonstrated the watcher could see a write at all. The control
+  cost one keypress and fired within a second. Any harness that concludes "this never
+  happens" from a silent instrument must run the event that does happen, in the same session,
+  with the same instrument, and put the timestamp in the record. → Tier 1, harness contract.
+- **A missing binary inside a container reads as a mismatch, not as an error.** A restore
+  step compared files with `cmp -s`; the image had no `cmp`, so every invocation exited 127,
+  every comparison reported "differs", and the log claimed 82 files restored when three had
+  changed. The copies were harmless, so the outcome was correct and the log was fabricated.
+  Replacing it with a checksum did not fix it either, because that checksum tool prints the
+  path alongside the value and the two paths are never equal. Both defects were invisible
+  from the result. Prefer a comparison whose failure mode is a nonzero exit you check, and
+  assert the tool exists before trusting a verdict from it. → Tier 2, harness contract.
+- **A recorder that shells out to sibling scripts only works where those siblings live.**
+  A capture sidecar was copied into a container to reach a path the host could not see; its
+  breakpoint arm and its frame arm both invoke neighbouring scripts by repo-relative path,
+  so both failed — one with an error in a log nobody read, one silently producing zero
+  frames. The path was in fact host-visible all along and the detour was unnecessary. Before
+  relocating a tool, check that its dependencies travel with it; when a tool needs a path it
+  cannot see, the first question is whether the path is really invisible, not how to ship
+  the tool to it. → Tier 2, harness layout.
