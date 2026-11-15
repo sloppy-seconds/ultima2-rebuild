@@ -1409,7 +1409,8 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
  * peek 8be:47b before and after one Right in a live run. */
 #define U2_SPACE_SHIP_STEP 4
 
-static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping)
+static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
+                             int warp_frame, int keep_frame)
 {
     /* The readout survives the scrolling CMD pane because space_values runs before every
      * prompt and asm/6FA3 L_0071fd narrows the scroll margin to 0x1f, one column short of
@@ -1420,6 +1421,8 @@ static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping)
      * scene from state alone. The warp is the caller's business, so the caller overrides
      * here rather than the builder growing a hidden input. */
     sc.warping = warping;
+    sc.warp_frame = warp_frame;
+    sc.keep_frame = keep_frame;
     u2_space_scene_draw(&ow->frame, &sc);
 
     /* The field clear takes the WHOLE frame -- u2_frame_clear memsets every row, not
@@ -1437,7 +1440,10 @@ static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping)
     u2_font_draw_vram_rows(&ow->frame, &ctx->vram, U2_MSG_TOP, U2_ROWS - 1);
 }
 
-static void space_paint(u2_ctx *ctx, u2_overworld *ow) { space_paint_mode(ctx, ow, 0); }
+static void space_paint(u2_ctx *ctx, u2_overworld *ow)
+{
+    space_paint_mode(ctx, ow, 0, 0, 0);
+}
 
 /* ---- the hyperwarp animation ---------------------------------------------------
  *
@@ -1481,7 +1487,18 @@ static void space_warp_phase(u2_ctx *ctx, u2_overworld *ow, int frames, int mode
     for (int i = 0; i < frames; i++) {
         if (ctx->exit_code || ctx->input_exhausted)
             return;          /* a closed window must not cost 509 more frames */
-        space_paint_mode(ctx, ow, mode);
+        /* The trail rule, straight off asm/6B3D: `mov 0x4c7,%al ; or %al,%al ; je
+         * L_006e14` skips the erase of the star's old position when the mode is zero, and
+         * nothing in asm/6DFD clears the screen, so mode 0 ACCUMULATES and the accumulated
+         * result is a line along each ray. Any other mode erases the star's own old pixel
+         * and shows one clean dot; the engine reaches that same picture by clearing.
+         *
+         * Where that is a coarser approximation than the original: asm/6B3D erases per
+         * STAR, so the trail phase A leaves is eaten dot by dot as phase B runs, whereas
+         * this wipes the whole frame on B's first frame. The streaks are the same and the
+         * way they go away is not. Recorded rather than left silent, because it is the
+         * kind of thing that reads as a bug and is in fact the known gap. */
+        space_paint_mode(ctx, ow, mode, i, mode == 0);
         seam_present_frame(ctx);
         seam_wait_ms(ctx, U2_WARP_FRAME_MS);
         mode += step;

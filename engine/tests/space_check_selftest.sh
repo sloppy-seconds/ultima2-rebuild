@@ -93,6 +93,23 @@ else
     echo "  ok    dropped warp phase caught by space_view_gate (counts are bytes)"
 fi
 
+# The trail. An unconditional u2_frame_clear is what a renderer does by default, and deleting
+# the keep_frame guard looks like a simplification rather than a regression — but it is the
+# difference between the warp reading as streaks and reading as a shimmer. So the guard must
+# be removable and the gate must notice.
+total=$((total+1))
+grep -v 'if (!s->keep_frame)' src/game/space_view.c > "$WORK/space_view_noclear.c"
+if [ "$(wc -l < "$WORK/space_view_noclear.c")" -ge "$(wc -l < src/game/space_view.c)" ]; then
+    echo "  BAD   the noclear mutant is identical to the source — it proves nothing"
+    fails=$((fails+1))
+elif U2_VIEW_GATE_SRC="$WORK/space_view_noclear.c" python3 tests/space_view_gate.py \
+        >/dev/null 2>&1; then
+    echo "  BAD   the unconditional-clear mutant was not caught — the trail leg cannot fail"
+    fails=$((fails+1))
+else
+    echo "  ok    unconditional frame clear caught by space_view_gate (mode 0 must accumulate)"
+fi
+
 if [ "$fails" -ne 0 ]; then
     echo "SPACE SELFTEST: FAIL ($fails of $total)"
     exit 1

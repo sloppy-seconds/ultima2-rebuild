@@ -145,7 +145,7 @@ if h_n:
           f"horizontal stroke is {h_n.group(1)} px, matching asm/6CC4")
 
 # The star field must state honestly what is and is not decoded.
-VIEW_C = os.path.join(ROOT, "engine", "src", "game", "space_view.c")
+VIEW_C = os.environ.get("U2_VIEW_GATE_SRC") or os.path.join(ROOT, "engine", "src", "game", "space_view.c")
 vc = read(VIEW_C)
 check("NOT decoded" in vc or "NOT DECODED" in vc,
       "the star field states plainly that the per-star algorithm is undecoded")
@@ -229,6 +229,32 @@ for fn, want in (("space_warp_field", [128, 128, 63]),
         got = [int(x) for x in re.findall(r"space_warp_phase\(ctx, ow,\s*(\d+)", m.group(1))]
         check(got == want,
               f"{fn} runs {got} frames; asm/6DFD's counters are {want}")
+
+# ---- leg 9: the warp trail ----------------------------------------------------------
+# The streaks. asm/6B3D's mode byte decides whether the previous frame survives:
+# `mov 0x4c7,%al ; or %al,%al ; je L_006e14` skips the erase of the star's old position when
+# the mode is zero, and nothing in asm/6DFD clears the screen between redraws, so mode 0
+# accumulates into a line along each ray. That is what the warp LOOKS like, and an engine that
+# clears unconditionally cannot produce it at any mode — which is exactly the bug this leg
+# exists to stop, because a per-frame clear is what a renderer does by default and deleting the
+# guard looks like a simplification. The control in space_check_selftest.sh makes the clear
+# unconditional again and requires this to go red.
+view_c = read(VIEW_C)
+m = re.search(r"void u2_space_scene_draw\(.*?\n\}", view_c, re.S)
+check(m is not None, "u2_space_scene_draw found in space_view.c")
+if m:
+    body = m.group(0)
+    clear = re.search(r"(if\s*\(\s*!\s*s->keep_frame\s*\)\s*\n?\s*)?u2_frame_clear\(", body)
+    check(clear is not None and clear.group(1) is not None,
+          "the space field clear is GUARDED on keep_frame — an unconditional clear makes the "
+          "warp a shimmer instead of streaks, which is the original's whole visual")
+    check("warp_frame" in body,
+          "the warp field grows its star radii with warp_frame (a static field cannot trail)")
+check(re.search(r"space_paint_mode\(ctx, ow, mode,\s*i,\s*mode == 0\)", src) is not None,
+      "the warp keeps the previous frame exactly when the mode is 0, as asm/6B3D does")
+for fld in ("warp_frame", "keep_frame"):
+    check(re.search(r"int\s+" + fld + r"\s*;", read(VIEW_H)) is not None,
+          f"u2_space_scene carries {fld}")
 
 # ---- leg 6: the space text pane -----------------------------------------------------
 # Owner playtest 2026-11-10, two symptoms: the hyperwarp target prompt never appeared, and

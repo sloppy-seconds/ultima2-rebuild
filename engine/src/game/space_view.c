@@ -93,18 +93,30 @@ void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out)
 
 void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s)
 {
-    u2_frame_clear(f, U2_CGA_BLACK);
+    /* The trail, and the whole of it: mode-0 frames of asm/6B3D do not erase the star's
+     * old position and the warp path never clears, so the previous frame is the canvas.
+     * Clearing here is what made the engine's warp a shimmer instead of streaks. */
+    if (!s->keep_frame)
+        u2_frame_clear(f, U2_CGA_BLACK);
 
     uint32_t h = star_hash(s->star_seed ? s->star_seed : 1u);
 
     if (s->warping) {
         /* Radiating field: dots along rays out of the view centre. The centre and the
          * rectangle are measured (space_view.h); the ray count, the per-ray spacing and
-         * the animation rate are NOT decoded -- see the file header. */
+         * the animation rate are NOT decoded -- see the file header.
+         *
+         * The radius grows with warp_frame and wraps, which is the engine's stand-in for
+         * the tables asm/6B3D walks: the rays themselves are stable across frames (the
+         * seed is, and the hash chain per ray does not depend on the radius), so what
+         * accumulates when the frame is kept is a line along each ray rather than noise.
+         * Wrapping is what the original's byte arithmetic does too. */
+        const int span = U2_SPACE_VIEW_COLS / 2 - 4;
         for (int r = 0; r < U2_SPACE_WARP_RAYS; r++) {
             h = star_hash(h);
             const int angle_num = (int)(h % 1024u);          /* 0..1023 of a turn */
-            for (int d = 4; d < U2_SPACE_VIEW_COLS / 2; d += 3) {
+            for (int k = 0; k < span / 3; k++) {
+                const int d = 4 + (k * 3 + s->warp_frame) % span;
                 h = star_hash(h);
                 if ((h & 3u) == 0) continue;                 /* sparse along the ray */
                 /* integer ray march: dx,dy from a coarse angle, radius d */

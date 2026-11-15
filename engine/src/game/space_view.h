@@ -72,6 +72,28 @@ typedef struct u2_space_scene {
      * scattered points, the warp field is 1,900..6,000 lit pixels arranged radially --
      * so they cannot be the same drawing. */
     int warping;
+    /* Outward-motion counter for the warp field, 0 when static.
+     *
+     * The original's stars live in two 64-entry tables (DS:4CD/DS:50D) that asm/6B3D
+     * recomputes every call, so each frame they sit further out along their ray and the
+     * frame after that further still. This is the engine's stand-in for those tables:
+     * the field is generated from a hash rather than stored, so the frame index is what
+     * makes a star's radius grow. See asm/6B3D_space_field_draw's header.
+     *
+     * It only produces anything visible when `keep_frame` is also set — a cleared frame
+     * with moved stars is a shimmer, not a streak. */
+    int warp_frame;
+    /* Non-zero to draw INTO the frame that is already there instead of clearing first.
+     *
+     * This is the trail. asm/6B3D's mode byte decides it: `mov 0x4c7,%al ; or %al,%al ;
+     * je L_006e14` skips the `call L_004daa` that would clear the star's old position,
+     * so in mode 0 the old pixel stays lit while the moved star plots a new one further
+     * out, and nothing in asm/6DFD's warp path clears the screen between redraws. The
+     * accumulated result is a line radiating from the ship, which is what the warp
+     * actually looks like. Mode 1 erases its own old pixel per star, so it shows one
+     * clean dot and no trail — the engine reproduces that by clearing, which is the same
+     * picture arrived at differently, and the difference is recorded rather than hidden. */
+    int keep_frame;
     /* Star field seed. NOT decoded from the original -- see u2_space_scene_from(). */
     uint32_t star_seed;
 } u2_space_scene;
