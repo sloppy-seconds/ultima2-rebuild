@@ -1890,3 +1890,17 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   away; reserve the trace for "did this ever run across a long session". General form: check the
   retention window of any execution log before citing it as evidence of a single occurrence, and
   prefer the observable the event actually changes. → Tier 2, harness contract.
+
+- 2026-11-15 — two lessons from one boundary change, both about policy rather than bytes.
+  First: **a function-boundary policy has to name which kinds of evidence authorise a split, and
+  a code/data boundary is a different proof class from a routine boundary.** A routine boundary is
+  asserted by a dispatch target or a return; a code/data line is asserted by the consumer that
+  walks the data and by the data's own internal structure (entry starts landing on the running
+  sums of record lengths is not an accident over hundreds of bytes). A policy that only recognises
+  the first kind will either refuse a data split it should allow or, worse, let a fall-through
+  judgement through because it looks like the same thing. Second: **a summary of a ruling is not
+  the ruling.** The recorded one-line version of a prior decision said "leave this range alone";
+  the decision's own body permitted a split at named dispatch targets and named them. An override
+  was declared, and re-reading the source found no override. General form: when a change looks like
+  it contradicts a prior ruling, quote the ruling from the document that carries its reasoning
+  before writing the word "override" — the short version exists to be skimmed and will drift.

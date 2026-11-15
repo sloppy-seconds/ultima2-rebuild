@@ -6,15 +6,37 @@ costs is known game behaviour. The three merges landed in `4644eb9`; § 6 below 
 execution record. What follows in § 1–5 is the proposal as written, kept intact because
 the reasoning is the part worth keeping.
 
-**Partly reversed 2026-11-15, and worth an owner look.** `19D7..2027` was split after all, into
-`asm/19D7_magic_shop_menu.asm` (`19D7..1B6A`), `asm/1B6B_clue_pool.asm` (`1B6B..1D1C`) and
-`asm/1D1D_shop_menus.asm` (`1D1D..2027`). Two things changed since the ruling: the span's
+Note the ruling as written was narrower than "leave it alone", and the summary sentence above is
+the loose version of it. § 3's own words allowed a split at `jmp` targets, and named them. See the
+next block.
+
+**`19D7..2027` was split on 2026-11-15, and this first status block got that wrong once already.**
+An earlier version of this file called the split a partial reversal of the ruling. It is not one, and
+re-reading § 3 before claiming otherwise is what found that out. The ruling forbade subdividing
+`19D7..2027` **on fall-through grounds**, and then said what to do instead: *"If it is split at all,
+split it only at addresses that are `jmp` targets from elsewhere (`1AE0`, `1D1D`, `1E4F`, `1F75` are
+the ones with inbound jumps in the tree)."* The split used exactly two boundaries:
+
+* **`1D1D`** — the armour catalogue, and a boundary the ruling pre-authorised by name. Re-checked
+  against the executable rather than taken on faith: inbound direct branches are `1AE0` from file
+  `0x17c5`, `1D1D` from `0x17b4`, `1E4F` from `0x17c2` and `1F75` from `0x17d0`, all four inside the
+  shop selector. So `1D1D` is a dispatch target, which is the hard kind of evidence § 3 asked for.
+* **`1B6B`** — not a routine boundary at all. It is where code stops and data starts, and its proof
+  is stronger than a `jmp` target: the walker's cursor is written with `0x1b6a`, the ten entry
+  starts sit at exactly the running sums of the string lengths plus their terminators, and the span
+  ends precisely where the armour catalogue's `nop` begins. § 3's prohibition was about inventing
+  routine boundaries out of fall-throughs; a code/data line is a different claim and a better-evidenced
+  one.
+
+What the ruling forbids is still unbuilt, and stays unbuilt: the fall-through candidates `1D39`,
+`1E69` and `1F93` were **not** split out. `asm/1D1D_shop_menus.asm` therefore holds armour, weapons
+and transport together as one file, which is the shape § 3 recommended and not an oversight.
+
+Two things did genuinely change since 2026-10-23, neither of them a reversal: the span's
 `1D6A..1F1C` was proved to be ten NUL-separated clue strings drawn as instructions rather than
 code, and `make content-check` requires a committed string to be present *as data* in `asm/`,
 which a `.byte` forced-keep is not. So the split corrected a false body and unlocked the clue
-text, and `assemble_clean.sh` still rebuilds the binary byte-ident. The § 2 argument for leaving
-the range alone — that the boundaries are uncertain — was weakened by the same finding, since the
-pool boundary is exact. Flagged here rather than slipped in, because it overrides a ruling.
+text, and `assemble_clean.sh` still rebuilds the binary byte-ident.
 
 Splitting a function boundary is a Phase 2/3 change to the byte-proof harness and needs the
 owner's approval, plus a `check_func.py` run per new range. Opened by ticket G22; this

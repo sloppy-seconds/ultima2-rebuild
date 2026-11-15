@@ -27,6 +27,12 @@
 #           live and the threshold is the part still unseen.
 # confidence: low (bytes proven by check_func.py)
 # split-to: asm/1B6B_clue_pool.asm (1B6B..1D1C) and asm/1D1D_shop_menus.asm (1D1D..2027)
+# boundary: this file's new end is a CODE/DATA line, not a routine boundary. The last byte is the
+#           cursor-seed NUL the clue walker needs; the byte after it is the first clue. No `jmp`
+#           or `call` reaches either side of that line — the pool is reached by the walker's cursor,
+#           not by dispatch — so its proof is the cursor write plus the ten entry starts, not a
+#           branch target. See docs/g22-split-proposal.md § 3 for why that is a stronger kind of
+#           boundary than a fall-through, and asm/1D1D_shop_menus.asm for the dispatch kind.
 # body corrected: 2026-11-15 -- evidence: this file now ends at runtime 0x1b6a (file 0x1d6a).
 #           The bytes from 0x1d6b on were ten NUL-separated clue strings that the disassembler
 #           had rendered as instructions and gas had force-kept as `.byte` blobs, and they are

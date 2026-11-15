@@ -30,6 +30,13 @@
 #           above are live play with frames, not harvested execution.
 # confidence: low (bytes proven by check_func.py)
 # split-from: asm/19D7_magic_shop_menu.asm (19D7..2027)
+# boundary: this file starts at a DISPATCH TARGET, not a return. Runtime 0x1d1d is reached by a
+#           direct `jmp` from file 0x17b4, inside the shop selector, which is what makes it a
+#           boundary the bytes assert rather than one inferred from a fall-through — the
+#           distinction docs/g22-split-proposal.md § 3 turns on, and the reason the armour,
+#           weapons and transport catalogues stay in ONE file here: 1E4F and 1F75 are also jmp
+#           targets, but 1D39, 1E69 and 1F93 are fall-throughs, and splitting on those would
+#           invent boundaries the original does not contain.
 # body corrected: 2026-11-15 -- evidence: new file, and its body is byte-for-byte the tail of
 #           asm/19D7_magic_shop_menu.asm from runtime 0x1d1d. The re-cut put the clue pool that
 #           sat in front of it (asm/1B6B_clue_pool.asm) into its own file, so this content is
