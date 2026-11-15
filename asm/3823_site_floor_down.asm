@@ -15,8 +15,15 @@
 #           slots through the [DS:272]/[DS:372] pair, zeroes the site kind, calls asm/2490, and
 #           then branches on [DS:6D] between staging a cell from [DS:6A]/[DS:6B] and writing the
 #           256-byte player record with an int-21h handle write. That last branch means leaving a
-#           dungeon SAVES THE GAME, and it has never been observed. Dungeons are parked
-#           (AGENTS.md § 3), so this block is recorded and not modelled.
+#           dungeon SAVES THE GAME. OBSERVED 2026-11-15 by captures/spice86/g82-site-autosave,
+#           which had to force the world byte to see the other arm: standing on the sector-30
+#           dungeon cell, `E` then `K` with DS:6D = 0x00 rewrote the run's `player` (food
+#           800000 -> 799990) and left `mapx30` and `monx30` alone; the identical two keys with
+#           DS:6D poked to 0x09 rewrote nothing. The exit itself is proven by state, not
+#           inference: position returned to (25,5), sector to 30, and DS:25 underflowed to 0xff.
+#           Two turns of PASS on Earth with food falling 130 points in memory wrote nothing, so
+#           the write belongs to this transition and not to the tick. Dungeons are parked
+#           (AGENTS.md § 3), so this block is still recorded and not modelled in the engine.
 # notes: L_0055b5 renders one packed-decimal byte as two ASCII digits, high nibble first, and
 #           what it is handed comes from `add $0x0,%al ; daa` rather than a stored BCD byte — so
 #           a floor past 99 prints a wrapped pair instead of a third digit. Do not "simplify"

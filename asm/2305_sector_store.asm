@@ -34,6 +34,15 @@
 #           are written per call. docs/phase4-state.md records the measured save-path behaviour
 #           (outdoors + Earth writes player AND mapxNN AND monxNN), which is the stronger evidence
 #           for both names being written, from asm/3DFA rather than from here.
+# MEASURED 2026-11-15 (captures/spice86/g82-site-autosave), and it narrows the question rather
+#           than closing it. Entering the sector-30 dungeon on Earth changed `monx30` and left
+#           `mapx30` byte-identical. So at a site entry ONE file is written and it is the monster
+#           file: one `AH=28h`, one FCB, and the FCB in force at the call site picks the file. A
+#           routine that patches two names and writes once is not "the sector store" in the sense
+#           of both sector files, and anything citing it as proof that both are written per call
+#           is over-reading it. Whether any other call site has the map FCB current is untested.
+#           The same capture also confirms the gate is the whole story on worlds: the identical
+#           entry with DS:6D poked to 0x09 wrote nothing at all.
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 sub_2305:
 L_002505:
