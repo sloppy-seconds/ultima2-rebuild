@@ -2180,11 +2180,17 @@ static u2_cmd_result cmd_C(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
             return cast_failed(ctx);
         /* `mov $0x0,%al ; mov 0x8,%bx ; mov %al,(%bx,%si)` — bx and si are the address the
          * validity callee left behind, so the write lands exactly on the cell that was tested,
-         * and it writes zero rather than clearing the rock bit. terrain_put rather than put
-         * because the change has to survive the next stamp pass, which is the same reason an
-         * emptied chest uses it; whether it then reaches the sector file on a save is inferred
-         * from the game's own write-back and has not been observed. */
-        u2_world_dungeon_terrain_put(&ow->world, st->site_floor, tx, ty, 0);
+         * and it writes zero rather than clearing the rock bit.
+         *
+         * `put` and NOT `terrain_put`, and that is the whole behaviour. `terrain_put` also
+         * writes map_base, which is the ground record the grid is restamped from, so a write
+         * through it survives leaving the site and coming back. PASSWALL does not: nothing in a
+         * town or a dungeon persists between entries, and the wall you punched is standing
+         * again when you walk back in. Owner ruling 2026-11-15, and it is the kind of rule a
+         * byte-level port gets wrong by being tidier than the original — the cleared cell is
+         * exactly as dirty-looking as a chest you emptied, and only the between-entries test
+         * tells them apart. */
+        u2_world_dungeon_put(&ow->world, st->site_floor, tx, ty, 0);
         cmd_done(ctx);
         return U2_CMD_DONE;
     }
@@ -2215,24 +2221,23 @@ static u2_cmd_result cmd_C(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
 
     case 7: { /* MAGIC MISSILE.
              *
-             * The amount is `2*DS:56 + 0x1e + CF`, and the `cmc ; sbb` idiom then subtracts
-             * that plus one. DS:56 is the HIGH packed-decimal byte of total experience, not a
-             * level, and doubling a BCD byte with no DAA is not a scale — it is a sawtooth.
-             * Computed from the bytes and validated at the two live-measured points (0x99 -> 82,
-             * 0x01 -> 33): the curve peaks at 255 for 0x70 and collapses to 1 at 0x71, so a
-             * character who earns enough to carry that byte up watches their best attack drop
-             * to a point of damage.
+             * The amount is u2_cast_missile_amount(), which is asm/3139 L_0034b2 transcribed
+             * instruction by instruction, and it is non-monotone on purpose: DS:56 is the high
+             * packed-decimal byte of experience, doubling it with no DAA is a sawtooth, and the
+             * `cmc` before the `sbb` takes the +1 back whenever that doubling overflowed. Peaks
+             * at 255 for 0x70, collapses to 0 for 0x71. Validated at the two live-measured
+             * points (0x01 -> 33, 0x99 -> 82) and pinned across the peak in commerce_check.
              *
-             * That is the shape the third-party "31 + twice your level" was reaching for, and
-             * it is the single most likely place for a well-meaning rewrite to diverge, because
-             * it looks like a bug rather than a fidelity. Port it literally. */
+             * This is the single most likely place for a well-meaning rewrite to diverge,
+             * because it looks like a bug rather than a fidelity. Port it literally.
+             */
         const int slot = cast_target(ctx, ow);
         if (slot < 0) return cast_failed(ctx);
-        const unsigned hi = (unsigned)st->exp_lo;   /* DS:56 — the field is named exp_lo and is the HIGH byte; see the naming wart in state.h */
-        const unsigned dbl = hi * 2u;
-        const unsigned amount = ((dbl & 0xffu) + 0x1eu + (dbl > 0xffu ? 1u : 0u)) & 0xffu;
+        const unsigned amount = u2_cast_missile_amount(st->exp_lo);
         u2_attack a;
-        const int r = u2_combat_cast_damage(ctx, slot, amount + 1u, &a);
+        /* DS:56 is state.h's `exp_lo` and is the HIGH byte; the naming wart is documented in
+         * state.h and the field name is an address, not a significance. */
+        const int r = u2_combat_cast_damage(ctx, slot, amount, &a);
         /* Survived: the slot keeps the reduced HP and NOTHING prints. That silence is the
          * original's, cited to asm/3139 L_0034ca, where the `jb` after the second `cmc` is
          * taken on survival — the opposite of how the idiom reads at a glance. */
@@ -2281,11 +2286,16 @@ static u2_cmd_result cmd_C(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
  *   C  implemented 2026-11-15, off captures/spice86/magic-casts-2026-11-15, where all nine arms
  *      were filmed working in the original. The gates and all nine arms are in cmd_C above and
  *      each carries its own citation. What is still NOT modelled, named rather than left as a
- *      gap: the PASSWALL write's route to the sector file on a save (the live cell change is
- *      filmed, the persistence is inferred from the game's own write-back); the tower-side floor
- *      orientation, which the capture only ever saw move 0 -> 1; and the low-nibble stamp that
- *      reappears in a cell PASSWALL cleared, which the engine does not model at all because it
- *      draws creatures from the arrays rather than stamping them.
+ *      gap: the low-nibble stamp that reappears in a cell PASSWALL cleared, which the engine
+ *      does not model at all because it draws creatures from the arrays rather than stamping
+ *      them. Two things this entry used to call unobserved are closed and are recorded here so
+ *      they do not get reopened. The tower's floor orientation is captured, not inferred:
+ *      captures/spice86/d12-ladder-ds25 filmed DESCEND at tower floor 0 taking [DS:25] to 0xFF
+ *      and ejecting the player, which is the inversion, and the same capture filmed UP LADDER
+ *      at tower floor 0 FAILING rather than exiting — which is what the split in cast_ladder
+ *      predicts, since in a tower UP LADDER is the increment arm and the floor-0 exit belongs
+ *      to the decrement arm. And PASSWALL's write does NOT persist between entries (owner
+ *      ruling 2026-11-15), which is why it goes through `put` and not `terrain_put`.
  *      One ordering rule there is easy to get wrong and is now gated: the count is decremented
  *      BEFORE the location gate, so a cast that fails with -FAILED! outside a tower or dungeon
  *      still spends the spell. Check the stock, spend, then fail — not check, fail, spend. The

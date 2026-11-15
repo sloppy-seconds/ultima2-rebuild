@@ -74,6 +74,13 @@ int u2_combat_cannon(u2_ctx *ctx, int cx, int cy, u2_attack *out);
  * arithmetic with a shape worth reading in cmd_C before trusting it. */
 int u2_combat_cast_damage(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *out);
 
+/* asm/3139 L_0034b2: the MAGIC MISSILE amount as a pure function of [DS:56], the HIGH
+ * packed-decimal byte of total experience. Doubling a BCD byte with no `daa` is a sawtooth,
+ * not a scale: it peaks at 255 for 0x70 and collapses to 0 for 0x71. Exposed so a gate can pin
+ * the curve -- a rewrite that "fixes" this produces a different spell and nothing else in the
+ * engine would notice. combat.c carries the instruction-by-instruction transcription. */
+unsigned u2_cast_missile_amount(uint8_t exp_hi);
+
 /* asm/3139 slots 6 and 9: PRAYER and KILL reach asm/30D1 with no damage step, so the creature
  * dies at any HP and the reward block runs as it does for melee. Always returns 2. */
 int u2_combat_cast_kill(u2_ctx *ctx, int slot, u2_attack *out);

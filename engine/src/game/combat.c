@@ -361,6 +361,47 @@ int u2_combat_cast_damage(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *out)
     return apply_damage_to_slot(ctx, slot, dmg, out, 0);
 }
 
+/* asm/3139 L_0034b2, the MAGIC MISSILE amount, transcribed instruction by instruction:
+ *
+ *     mov  0x56,%al        AL = [DS:56], the HIGH packed-decimal byte of total experience
+ *     add  %al,%al         AL = 2*E, and CF is now bit 7 of E
+ *     adc  $0x1e,%al       AL = 2*E + 0x1e + CF, and CF is now whether that overflowed
+ *     mov  %al,0x20        [DS:20] = that byte
+ *     mov  0x177(%di),%al  the creature's HP
+ *     cmc                  <-- the instruction that is easy to read as noise
+ *     sbb  0x20,%al        HP - [DS:20] - CF
+ *     cmc
+ *     mov  %al,0x177(%di)
+ *     jb   survived
+ *
+ * The `cmc` before the `sbb` inverts the carry the `adc` just left, so the value actually
+ * subtracted is [DS:20] + 1 when the addition did NOT overflow and [DS:20] + 0 when it did.
+ * A port that reads the pair as "minus (amount + 1)" is wrong for every experience byte from
+ * 0x71 upward, and it is wrong in the direction that looks like a rounding detail.
+ *
+ * And the shape, which is the reason this is worth transcribing rather than summarising: E is
+ * packed decimal and doubling a BCD byte with no `daa` afterwards is not a scale, it is a
+ * sawtooth. The amount peaks at 255 for E = 0x70 and then collapses to ZERO at E = 0x71,
+ * because 0xE2 + 0x1e is 0x100 -- the byte wraps to 00 and the carry it generates is the same
+ * carry the `cmc` then spends to take the +1 back away. A wizard who earns enough to carry
+ * that byte up watches their best attack fall to nothing at all.
+ *
+ * That is the game. The third-party "31 + twice your level" is what someone wrote down after
+ * watching it do something roughly linear at low experience, and this is the single most
+ * likely place for a rewrite to "fix" the original into a different spell. It is gated in
+ * tests/commerce_check.c alongside the shop rules, under spell rules.
+ */
+unsigned u2_cast_missile_amount(uint8_t exp_hi)
+{
+    const unsigned dbl = (unsigned)exp_hi * 2u;
+    const unsigned cf_in = dbl > 0xFFu ? 1u : 0u;
+    const unsigned sum = (dbl & 0xFFu) + 0x1Eu + cf_in;
+    const unsigned amount = sum & 0xFFu;
+    const unsigned cf_out = sum > 0xFFu ? 1u : 0u;
+    /* `cmc ; sbb $0x20` -- subtract the amount, plus one iff the adc did not carry. */
+    return amount + 1u - cf_out;
+}
+
 /* asm/3139 slots 6 and 9: PRAYER (behind the coin flip) and KILL. Both reach asm/30D1 with no
  * damage step, so the creature dies whatever its HP and the reward is the same block melee and
  * the cannon reach. Returns 2 (killed) always; a caller that found no target must not call this

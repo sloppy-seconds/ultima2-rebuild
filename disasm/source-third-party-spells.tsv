@@ -27,6 +27,13 @@ slot	name	class	claim	price_gold	verdict	grade
 # charisma), so a fixed per-spell cost cannot exist and a high-int buyer is quoted less for the
 # same spell. A maxout character (int 99, cha 99) should therefore be quoted BELOW these numbers.
 # Nobody has quoted a spell shoppe live. That is the open test.
+#
+# RESOLVED ON PRINCIPLE 2026-11-15, owner: "as long as we match the original." The engine quotes
+# through asm/20AB with the SLOT as the index, which is what asm/1869 and asm/19D7 both do, so the
+# engine matches the binary and these numbers stay unverified. The live quote is still worth having
+# as corroboration -- it would turn a structural argument into a measurement -- but it is no longer
+# a blocker on anything, and a discrepancy against this column would be a note about the source,
+# not a defect in the engine.
 # The class column matches the two shop catalogues exactly (asm/1869 cleric shrine sells 1-6,
 # asm/19D7 magic shoppe sells 1,2,3,7,8,9), which is corroborating, and note the CAST path itself
 # tests no class byte at all: the shop gate is the entire restriction.

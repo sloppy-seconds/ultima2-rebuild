@@ -107,6 +107,20 @@
 #           DS:20 + 1, not DS:20. Measured at two points and both exact: DS:56 = 0x99
 #           gives DS:20 = 0x51 and HP 0x99 -> 0x47; DS:56 = 0x01 gives DS:20 = 0x20 and
 #           HP 0x99 -> 0x78.
+#             CORRECTION 2026-11-15, found while lifting this into a gated function: "DS:20 + 1"
+#           is right at both measured points and wrong in general, because the `cmc` at L_0034c0
+#           inverts the carry the `adc $0x1e` just left rather than setting it. The value
+#           subtracted is DS:20 + 1 when that addition did NOT overflow and DS:20 + 0 when it
+#           did. Both measured points are below the overflow, which is why two good measurements
+#           agreed with a wrong rule -- the usual shape for this mistake, and the reason a
+#           behavioural claim wants a computed point past the boundary and not only two
+#           measurements either side of nothing.
+#             Where it bites: the addition overflows from DS:56 = 0x71 up, and that is exactly
+#           where the doubling wraps. At 0x70 the amount is 0xFE and the subtraction is 255, the
+#           peak; at 0x71 the sum is 0x100, so DS:20 = 0x00 with CF set, the cmc spends the +1,
+#           and MAGIC MISSILE subtracts ZERO -- the spell does nothing at all to a creature of
+#           any HP, and since the `jb` on survival is taken on no-borrow the creature is even
+#           reported as having survived. Pinned in engine/tests/commerce_check.c.
 #             "scales with level" is wrong in shape, not just unproven: DS:56 is the HIGH
 #           BCD byte of experience (state.h, with its naming wart recorded), there is no
 #           level field, and a binary doubling of a BCD digit is not monotone — 0x99

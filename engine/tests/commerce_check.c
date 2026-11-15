@@ -577,6 +577,37 @@ int main(void)
     CHECK(u2_bcd_add_five(0x99) == 0x04,
           "spell sale: 99 + 5 is 04 -- the original has no ceiling and must not saturate");
 
+    /* ---- the MAGIC MISSILE curve ------------------------------------------
+     *
+     * asm/3139 L_0034b2, and the reason it is gated here rather than trusted: [DS:56] is the
+     * HIGH packed-decimal byte of total experience, and doubling it with no `daa` is not a
+     * scale, it is a sawtooth. The amount peaks at 255 for 0x70 and collapses to ZERO for
+     * 0x71, because 0xE2 + 0x1e is 0x100 -- the byte wraps and the carry it makes is the same
+     * carry the `cmc` before the `sbb` spends to take the +1 back off.
+     *
+     * Two of these rows are measurements, not arithmetic: 0x01 -> 33 and 0x99 -> 82 are what
+     * the original actually did on camera (captures/spice86/cmd-c-magic-missile and
+     * captures/spice86/magic-casts-2026-11-15). The rest are computed from the bytes, and the
+     * peak-and-cliff pair is the one a "cleanup" would flatten -- a rewrite that reads the
+     * `cmc ; sbb` as "minus amount plus one" is off by one for every byte from 0x71 up and
+     * would still pass both measured rows. */
+    CHECK(u2_cast_missile_amount(0x01) == 33, "magic missile: 0x01 -> 33 (measured live)");
+    CHECK(u2_cast_missile_amount(0x99) == 82, "magic missile: 0x99 -> 82 (measured live)");
+    CHECK(u2_cast_missile_amount(0x00) == 31, "magic missile: 0x00 -> 31, the floor");
+    CHECK(u2_cast_missile_amount(0x70) == 255, "magic missile: 0x70 is the peak, 255");
+    CHECK(u2_cast_missile_amount(0x71) == 0,
+          "magic missile: 0x71 is ZERO, not 1 -- the carry from the wrap pays for the +1");
+    /* The control that makes the cliff above able to fail: the plausible misreading, spelled
+     * out so a reader can see which byte of the idiom it drops. */
+    CHECK(u2_cast_missile_amount(0x71) != 1,
+          "magic missile: the naive `amount + 1` reading gives 1 here and is wrong");
+    /* Monotone below the cliff, which is what the third-party "31 + twice your level" was
+     * watching, and the reason the rule looks linear to anyone who has only seen a low-level
+     * character cast it. */
+    CHECK(u2_cast_missile_amount(0x02) > u2_cast_missile_amount(0x01) &&
+          u2_cast_missile_amount(0x30) > u2_cast_missile_amount(0x20),
+          "magic missile: monotone in the range a new character ever sees");
+
     printf("commerce_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
 }
