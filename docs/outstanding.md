@@ -6,6 +6,10 @@ capture corpus. Nothing here is recalled and nothing is copied from a handoff wi
 confirmed. Where a handoff said "open" and the tree says "shipped", the item is not in the list
 below — it is in § 7, which is the correction record.
 
+**Re-checked the same day, later.** Two rows of § 1 had already closed while this file was being
+written: the `DS:46` writer (closed statically by G80b) and the pub (shipped). Both are in § 7
+now. This is the exact failure this file was written to catch, catching itself.
+
 **What this is not.** `docs/needs-gameplay.md` is the capture worklist and stays the authority
 for open *questions*; `docs/handoff-outstanding-agent-tests.md` is the index of the subset an
 agent can drive without the owner, and it is fresher than anything it indexes (updated
@@ -20,14 +24,13 @@ it can be driven from a shell.
 ## 1. Work to build: gaps the code names, plus owner-ruled items
 
 These are the only places the engine admits it does not do something. `grep -rn "engine_gap(ctx,"
-engine/src/` returns two, and the command table has no `NULL` slots left — all 26 letters are
+engine/src/` returns one, and the command table has no `NULL` slots left — all 26 letters are
 implemented and no `UNPROVEN:` marker remains anywhere in `engine/src/`.
 
 | item | where | what is missing | grade | who |
 | --- | --- | --- | --- | --- |
 | Implement the clue seller (was: map it) | `commerce.c` `U2_SHOP_CLUE` | **Decoded 2026-11-15, no capture was needed.** The pool is ten NUL-separated strings at file `0x1d6b..0x1f1c`, currently drawn as fake instructions inside `asm/19D7_magic_shop_menu.asm` (see its header). The rule: `read_decimal_digit` returns 0..9, that digit is the price via `×100` byte placement (`price[0] = digit`, `price[1] = 0x00`, so digit 3 is 300 gold and digit 0 is free), `SI = digit + 1`, cursor `DS:27 = 0x1b6a`, and the shared walker `asm/155D` emits entry `digit`. Ten digits, ten entries. **Blocked on plumbing, not on knowledge:** the strings must be committed via the extractor, and `make content-check` proves a committed string is present *as data* in `asm/` — which they are not yet, because they are rendered as `.byte` forced-keeps. The fix is a re-cut of `asm/19D7` at `1D6A` into two files plus two rows in `disasm/function-map.tsv`, exactly as `asm/16BD` was re-cut from `asm/15E1`. The `db` rendering is byte-exact and already generated; the split was not attempted here because it edits the byte-exact reconstruction and needs `check_func` plus the full `assemble_clean.sh` proof behind it. | measured | agent |
-| Implement the pub's `2-TIP` | `commerce.c` `U2_SHOP_PUB` | The chatter table is already decoded — `asm/16BD_barkeep_chatter_hints.asm`, ten entries (three bar chatter, seven hints), walker `asm/155D`, cursor at runtime `0x16bc`. Its own index source is the only unread part; the table and the mechanism are not gaps. `1-BUY` is a constant 5 gold and is buildable. | measured | agent |
-| The `DS:46` writer | `state.h:194` | The shrine's `SISTER` branch is proven (`DS:46 == 1`), but nobody has found what writes `DS:46`. If the create flow stores `1`/`0` and not `'F'`/`'M'`, the engine's `sex == 1` test never fires and `state.h`'s comment is a port bug. Static search, not a capture. | inferred | agent |
+| The talking half of `cmd_T` | `commerce.c`, `"no dialogue for that role"` | The scripted arm and the `street_*` chain are wired; one role has no dialogue and says so rather than inventing one. | inferred | agent |
 | The talking half of `cmd_T` | `commerce.c`, `"no dialogue for that role"` | The scripted arm and the `street_*` chain are wired; one role has no dialogue and says so rather than inventing one. | inferred | agent |
 | The goal-spec policy rule | `docs/goal-spec.md` P8 | The engine now knows *why* something is invulnerable (slot 0, G78) but the policy layer has no way to express "stop attacking this", so a bot will attack an invulnerable guard forever. This is a bot rule, not engine behaviour. | measured | agent |
 
@@ -48,7 +51,7 @@ Short list; the recipe and byte evidence live in the named G-row.
 | item | blocks | grade | who |
 | --- | --- | --- | --- |
 | **G81** — the chest / PASSWALL persistence contradiction | `dungeon.c` empties a chest through `terrain_put`, which writes `map_base` and therefore **persists between entries**. Owner ruled the same day that nothing in a dungeon persists between entries, which is why PASSWALL now uses `put`. Both cannot be right. The chest rule came from bytes read within one visit; nobody has emptied a chest, left, and walked back in. **Static angle found 2026-11-15, not yet followed:** the original writes the whole sector back to disk (`asm/2305`), so in the original anything that mutates the sector CAN persist — which would make the owner's recollection the thing that is wrong, not the chest code. Read what `asm/2305` actually writes before changing either call. | inferred vs owner-ruled, unresolved | agent, static first |
-| **G80** — does the cleric shrine ever say `SISTER` | `commerce.c` `sell_spell`. `asm/1869` compares `[DS:46]` to `1`; that byte holds the typed `'M'`/`'F'`, so read literally it always says BROTHER. Same capture settles whether the greeting prints the name (`asm/507A` is a one-instruction stub). | inferred | agent, headless |
+| **G80** — does the cleric shrine print the character's NAME | `commerce.c` `sell_spell`. The `SISTER` half of this row is closed (see § 7): the branch is real, `DS:46` holds the typed letter, and the shrine always says `BROTHER`. What is left is the other thing the same call site does: `asm/1869` calls `L_00527a` between `BROTHER ` and the menu, and `asm/507A` is a three-byte fragment whose body lives in the next tiling fragments — a fragment split, not a stub, so it is readable statically. The engine prints the name as an inference. | inferred | agent, static |
 | **G43** — the plane's forest rule, and W6 the plane's airborne flag | `docs/handoff-vehicle-state-machine.md` W6 is the one genuinely open item there and it is marked as needing a capture rather than a guess. | recalled | agent, needs the plane |
 | **G49** — frigate cannon reach | `cmd_F`. Owner recalls a 3-space range; nothing decoded gives a range at all. | recalled | agent, needs a frigate |
 | **G77** — the plane's own march-step cost | `U2_PLANE_STEP_MS` is a borrowed 103 ms floor. | inferred | agent |
@@ -94,6 +97,8 @@ and is not. Each was verified against code or a gate, not against another docume
 
 | claimed open | where it was claimed | actual state, and how it was checked |
 | --- | --- | --- |
+| The pub's `1-BUY` and `2-TIP` | `docs/outstanding.md` § 1 (this file) | **Shipped today, 2026-11-15.** `shop_pub` in `commerce.c`, with the fifteen literals (five menu, ten barkeep) committed through the extractor as 4-tuple `run` locators, so they resolve from `asm/` with no copy of the game present — better than the shop menus, which are exe-only. The index rule turned out to be readable after all: `1-BUY` stores the constant 1 (the `rand_byte` at `asm/15E1:1847` is drawn, masked by `and $0x3` and then overwritten), and `2-TIP` charges the digit and lands on `digit + sign_of_al(rand_byte)` computed in a byte and forced to 0 at 10. `run_cp6.sh` gates all three arms of `asm/50D8` with pinned `--rng-state` values, plus a control that a digit outside 1 and 2 prints nothing and costs nothing. Two controls were run against the gate and both went red. |
+| The `DS:46` writer, and with it G80's `SISTER` question | `docs/outstanding.md` § 1 and § 3 (this file) | **Closed 2026-11-15 by G80b, and this file simply had not been told.** Exactly one writer, file `0x5951`, `mov %al,0x46` with `cmp $0x4d,%al` (`'M'`) three bytes later, so `DS:46` holds the typed letter and the shrine's `cmp $0x1` can never match. `SISTER` is dead code in the original and the engine is already faithful — do not "fix" it. Evidence is in `asm/1869_cleric_shrine.asm`'s header and `docs/needs-gameplay.md` G80b. |
 | Minax does nothing (role 0 skipped) | `handoff-2026-11-12.md` § 1a | **Shipped 2026-11-12.** `ai.c` runs the `asm/1040` arm with `U2_S_MINAX_CRIES` and the packed-decimal −100 on `DS:51`; 24 Minax checks in `ai_check.c`, wired into CP4 and CP5. The premise also got corrected the same day: Minax is `role 0x84`, reached through the **bit-7** branch, not `role == 0`. |
 | Minax's teleport is observed but undecoded | § 1b | **Decoded and shipped.** `u2_minax_teleport()` at `overworld.c:2053`, called from the melee and cannon survive paths. It is a **swap of `mon_x` and `mon_y`** — its own inverse, which is exactly why she oscillates NE↔SW. Proven live: slot 31 went (60,3)→(3,60) on one hit. |
 | Invulnerable castle creatures have no mechanism | § 1c | **Decoded and shipped.** There is no invulnerability flag: a creature parked in **slot 0** is invulnerable to melee, talk and cannon because every scan skips slot 0. `monsters.c:326`, `u2_monsters_at_attackable`, G78. The same slot-0 skip turns up in the CAST target finder. |

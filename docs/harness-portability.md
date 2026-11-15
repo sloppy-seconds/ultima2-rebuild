@@ -189,6 +189,24 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-15 — A table's index source can look random and be a constant, and the tell is the
+  instruction that follows the random call.** A shop's chatter table was recorded as "the table is
+  decoded, its index source is the only unread part" and parked as needing a live conversation with
+  an NPC. The caller draws a random byte, masks it, and then overwrites the register before storing
+  it, so the index is a constant and the mask is a vestige. The sibling arm was the real rule:
+  index = typed digit + sign(random byte), computed in one byte, with an unsigned compare that
+  forces the sum back to zero once it reaches ten. Two transferable rules. **(1)** Before
+  scheduling a capture to find which entry a table prints, read the store site: a value computed and
+  then overwritten is a constant, and a mask whose result nobody reads is not a mechanism. **(2)**
+  Where a sum is done in one byte and tested with an unsigned below-take, model the byte and not the
+  arithmetic — a negative addend wraps to 255 and takes the far arm, which is behaviour rather than
+  overflow.
+
+  And a rule read off bytes that no capture has ever executed still needs a gate, because otherwise
+  the read is a claim. Pin the generator to one state per arm so every branch of a three-way sign
+  function is exercised rather than the one the default seed happens to produce, and ship the
+  control case with it — an input outside the accepted set must print nothing and cost nothing — so
+  the gate is demonstrably able to go red.
 * **2026-11-10 — A loop that looks unpaced may be paced by the cost of a callee whose identity a
   fragment boundary hid, and "this animation does not exist" is the wrong conclusion to reach from
   bytes alone.** A tight input-poll loop with no delay call and no draw resolved, read through the
