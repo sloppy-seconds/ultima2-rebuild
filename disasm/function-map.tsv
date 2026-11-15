@@ -411,7 +411,9 @@ start	end	len	evidence	name_hint
 19B3	19B9	0007	seed+reko	
 19BA	19D3	001A	seed+reko	
 19D4	19D6	0003	seed+reko	
-19D7	2027	0651	seed+reko	
+19D7	1B6A	0194	seed+reko	magic_shop_menu
+1B6B	1D1C	01B2	seed+reko	clue_pool
+1D1D	2027	030B	seed+reko	shop_menus
 2028	2051	002A	seed+call+reko	read_decimal_digit
 2052	20AA	0059	seed+call+reko	gold_spend_price
 20AB	2121	0077	seed+call+reko	bcd_price_from_stats
