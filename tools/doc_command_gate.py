@@ -171,6 +171,13 @@ def selftest():
 
 
 def main(argv):
+    # `-h` must answer before anything else, or `--help` falls through to a full check of the
+    # default docs -- which cite this file, so the check runs `--help` on itself and recurses until
+    # the subprocess timeout. The gate caught its own tool with exactly the check it exists to run,
+    # via a `| tail` that swallowed the exit status and let the commit land anyway.
+    if "-h" in argv or "--help" in argv:
+        print((__doc__ or "").strip())
+        return 0
     if "--selftest" in argv:
         return selftest()
     docs = [a for a in argv if not a.startswith("-")]
