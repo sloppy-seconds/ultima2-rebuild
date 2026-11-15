@@ -217,7 +217,16 @@ u2_cmd_result u2_dungeon_get(u2_ctx *ctx, u2_overworld *ow)
 
     /* asm/363B runtime 0x36F1 clears the cell through the cell pointer, so the
      * chest is gone for good. Both copies, or the creature restamp would put it
-     * back: see u2_world_terrain_put's header for why a map-only write is erased. */
+     * back: see u2_world_terrain_put's header for why a map-only write is erased.
+     *
+     * Do NOT "fix" this to the map-only helper on the theory that chests should not
+     * persist across re-entry. G81 asked exactly that and the answer is that the
+     * both-copies write is right and the reload is what makes the chest come back:
+     * asm/34E4 stores the sector you are LEAVING (the store gate runs before DS:4A
+     * changes) and then re-reads 0x1000 bytes over DS:472 for the sector you are
+     * entering, and asm/3823 on the way out writes only the player record. A site's
+     * own mapx is therefore never written and is re-read on every entry. Pinned by
+     * two checks in tests/site_check.c ("G81: ..."). */
     u2_world_dungeon_terrain_put(&ow->world, (int8_t)ctx->state.site_floor,
                                  ow->x, ow->y, 0);
 

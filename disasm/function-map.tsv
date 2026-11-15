@@ -647,7 +647,7 @@ start	end	len	evidence	name_hint
 34C3	34CE	000C	reko	
 34CF	34E0	0012	seed+reko	
 34E1	34E3	0003	seed+reko	
-34E4	3524	0041	seed+reko	
+34E4	3524	0041	seed+reko	site_enter_dungeon
 3525	3539	0015	seed+reko	
 353A	353C	0003	seed+reko	
 353D	3545	0009	reko	

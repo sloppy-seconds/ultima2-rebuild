@@ -1953,3 +1953,23 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   wrong name gets cited as fact by everything downstream and a blank one does not. The
   detector's own rule should be that a fragment which does not set its own mode byte is a
   continuation, not a function. → Tier 1, boundary detection.
+* **2026-11-15 — "does this change survive leaving and coming back?" is usually a question about
+  call order, not about a live session, and a harness should try the static form before it books a
+  capture.** The question here was whether an emptied container stays emptied across a site exit and
+  re-entry, and it had been parked as needing gameplay because two settled findings appeared to
+  contradict each other: the game does write whole sector images back to disk, and nothing inside a
+  site persists. Both were true. What settled it was reading the site-entry routine and noticing the
+  order of two calls in it: the store runs **before** the current-sector byte is reassigned, so what
+  gets written is the sector you are standing in and never the one you are entering, and the loader
+  runs after, re-reading the destination image from disk into the same buffer the store writes from.
+  A site's own image is therefore read fresh on every entry and never written back, which makes the
+  persistence rule a consequence of ordering rather than a policy anyone implemented. Three
+  transferable points. **(1)** When a persistence question is open, look for the entry routine and
+  ask whether the write precedes or follows the context switch; that single ordering fact decides it
+  and costs one read. **(2)** If load and store share one buffer, then cross-visit persistence is
+  decided by whether the load happens, and any in-memory distinction between "write one copy" and
+  "write both copies" helpers is about within-visit restamping and has nothing to do with it —
+  arguing about helper strength is the red herring, and it is the kind of argument a project will
+  have if the reload is not written down. **(3)** A capture is still worth running when the static
+  answer would change a shipped behaviour, but write the static argument first and let the capture
+  confirm a specific prediction rather than explore. → Tier 1, evidence discipline.

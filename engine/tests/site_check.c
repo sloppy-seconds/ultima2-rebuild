@@ -126,6 +126,39 @@ int main(int argc, char **argv)
         CHECK(gates > 0, "the pack has gate cells to check (found %d)", gates);
         CHECK(missing == 0, "every gate cell in every world sector names a sector "
                             "file that exists (%d gates checked)", gates);
+
+        /* G81, closed statically 2026-11-15: nothing a site does to its own sector survives
+         * re-entry, and the reason is the loader, not the write helper. asm/34E4 — the
+         * "-DUNGEON" arm — calls the store gate at L_0024fd BEFORE it touches DS:4A, so what
+         * gets stored is the sector you are standing in and never the one you are entering;
+         * then it calls L_002490, which reads 0x1000 bytes over DS:472, the same buffer the
+         * store writes from. Leaving is asm/3823, which writes the player record and nothing
+         * else. So a town's or dungeon's own mapx is read fresh from disk on every entry and
+         * is never written back: an emptied chest refills, and the owner's "nothing in a town
+         * or a dungeon persists" rule needs no exception. The engine already matches, because
+         * site_reload() runs on both transitions. Pinned here rather than left to that
+         * argument, because the chest write in dungeon.c uses the both-copies helper and
+         * someone reading only that line will reach for the weaker one. */
+        {
+            u2_sector_id id = { 3, 1 };          /* sector 31: a town, and it has chests */
+            const int cell = 4 + 23 * U2_SECTOR_EDGE;
+            u2_world a, b;
+            memset(&a, 0, sizeof a);
+            if (u2_world_load(&ctx, &a, 1, id) == U2_WORLD_OK) {
+                const uint8_t was = a.map[cell];
+                u2_world_terrain_put(&a, 4, 23, 0x08);
+                CHECK(a.map[cell] == 0x08,
+                      "G81: the clear is visible in the live buffer");
+                memset(&b, 0, sizeof b);
+                (void)u2_world_load(&ctx, &b, 1, id);
+                CHECK(b.map[cell] == was,
+                      "G81: and a reload restores it — the reload, not the helper, is "
+                      "what makes a cleared chest come back");
+            } else {
+                skipped++;
+                printf("  SKIP  G81 reload check (mapx31 not in the pack)\n");
+            }
+        }
     }
 
     /* --- gates must admit the player, or `E` can never fire -----------------
