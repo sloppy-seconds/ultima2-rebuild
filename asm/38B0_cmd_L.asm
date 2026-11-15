@@ -36,13 +36,23 @@
 #   a DIFFERENT string from cmd_B's 'A METALIC VOICE COMMANDS:' — different spelling, verb
 #   and file; they must never be merged). Launched: 'PREPARE FOR LAUNCH!', then if [DS:6D]
 #   and [DS:4A] are both zero it records the launch cell at DS:6A/6B with DS:69=1 and calls
-#   the save body at asm/24FD — launching a rocket SAVES THE GAME. Then two 256-byte tables
+#   the sector store gate. CORRECTED 2026-11-15, because a wrong claim here propagated: this said
+#   "calls the save body at asm/24FD — launching a rocket SAVES THE GAME", and
+#   docs/handoff-2026-11-03.md recorded "the reason a rocket launch silently saves" on the
+#   strength of it. There is no asm/24FD. The instruction is `call L_0024fd`, and L_<addr> labels
+#   are FILE offsets (runtime + 0x200 = file), so the target is file 0x24fd = runtime 0x22FD =
+#   asm/22FD_sector_store_gate. A launch stores the SECTOR, on Earth and only where the sector's
+#   ones digit is 0; it is not a character save. The record writer is asm/2474 and this handler
+#   never reaches it. Then two 256-byte tables
 #   at DS:272 and DS:372 are filled with 0xFF, position goes to (0,0), DS:12 = 0xFF, and
 #   '(PRESS ANY KEY)' prints with no leading newline glyph of its own.
 #   The flight is not steerable: y += 2 every iteration, and x += 1 whenever the new y is a
 #   multiple of 8 (asm/3B9F: `and $7,%al ; jne`). It stops on any key, and the tile it
 #   stopped on decides everything — tile 0x08 grass and it lives, anything else jumps to
-#   runtime 0x0E62, which is the death tail. So a rocket is aimed by timing, not steering.
+#   runtime 0x0C62, which is the death tail. CORRECTED 2026-11-15: this read 0x0E62, which is that
+#   routine's FILE offset (asm/0C62_death.asm). As a runtime address 0x0E62 lands mid-instruction
+#   inside the Balron spawn arm of asm/0DC4 — the same skew, in the same file, two lines from the
+#   one above. So a rocket is aimed by timing, not steering.
 #
 #   THE FLIGHT IS ANIMATED, and the animation is this routine's render, not a separate one.
 #   Per iteration the loop is: march, `call L_005cb1`, `mov $0x1c,%bx ; call L_000911`,
@@ -103,7 +113,7 @@
 #   this project so far of a static decode by live play.
 #   Still inferred after that session: the crash arm's survival case. Both observed
 #   landings were on a lethal tile (0x00 water, then 0x0c forest) and both ran the death
-#   tail at runtime 0x0E62; landing on 0x08 grass is predicted safe and has NOT been
+#   tail at runtime 0x0C62; landing on 0x08 grass is predicted safe and has NOT been
 #   tested. And the plane's airborne flag (W6) remains open.
 #
 # CORRECTION 2026-11-03, and it matters for the engine: THE SOUTHWARD FLIGHT IS THE
