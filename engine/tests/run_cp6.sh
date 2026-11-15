@@ -8,10 +8,10 @@
 #   2. The behavioural half drives ./u2 against a synthetic sector built by
 #      tests/cp6_commerce_seed.py — engine-authored filler, never the player's own files —
 #      and asserts the shop text, the gold, and the owned-count slot for each purchase.
-#   3. The gaps are asserted too. The clue seller and the talking branch are NOT implemented,
-#      and a gate that only checks what works cannot tell an unimplemented branch from a broken
-#      one. So the clue case asserts the named gap, the pub case asserts that a menu digit
-#      outside 1 and 2 prints nothing at all, and the two broken-ray cases assert the refusal.
+#   3. The gaps are asserted too. The talking branch is NOT fully implemented, and a gate that
+#      only checks what works cannot tell an unimplemented branch from a broken one. So the
+#      pub case asserts that a menu digit outside 1 and 2 prints nothing at all, and the two
+#      broken-ray cases assert the refusal.
 #
 # The pub is here even though no capture has ever reached it, because asm/15E1 is fully decoded
 # and a rule read off bytes with nothing asserting it is a rule that drifts.
@@ -271,6 +271,51 @@ else
         [ "$(gold_of "$WORK/pub-other.out")" = "9999" ] \
             && ok "CP6 T: the rejected digit left the gold alone" \
             || bad "CP6 T: digit 5 took gold: $(gold_of "$WORK/pub-other.out")"
+    fi
+
+    # (f2) the clue seller: asm/1AE0, the west/north half of a VILLAGE. The digit the player
+    #     pays is both the price and the index — price pair DS:27:28 = digit,0, which is the digit
+    #     x100 by placement with no multiply anywhere, and the walker emits entry `digit`. So
+    #     digit 0 is free and digit 9 costs 900. Each clue is two lines because each carries the
+    #     emitter's newline glyph in the middle, so the two halves are asserted separately: the
+    #     flattened transcript joins them with a raw 0x0d, and a whole-clue grep would be
+    #     asserting on a byte that is not text.
+    if run_case clue clue 'T\n0xf0\n3\n' "$WORK/clue.out"; then
+        said "$WORK/clue.out" "TIME AND TRAVEL MADE ME WISE," \
+            && ok "CP6 T: the clue seller opens with its own riddle" \
+            || bad "CP6 T: no clue-seller menu from (9,5) north in a village"
+        said "$WORK/clue.out" "HOW MUCH WILL YOU PAY *100?" \
+            && ok "CP6 T: the menu states the x100 rule in its own text" \
+            || bad "CP6 T: expected 'HOW MUCH WILL YOU PAY *100?'"
+        said "$WORK/clue.out" "BUT DISPELLING MEANS" \
+            && ok "CP6 T: digit 3 prints clue 3, first line" \
+            || bad "CP6 T: digit 3 did not print clue 3"
+        said "$WORK/clue.out" "THAT YOU MUST HAVE THE RING." \
+            && ok "CP6 T: and clue 3's second line, after the embedded newline glyph" \
+            || bad "CP6 T: clue 3's second line is missing"
+        [ "$(gold_of "$WORK/clue.out")" = "9699" ] \
+            && ok "CP6 T: digit 3 is 300 gold by byte placement (9999 -> 9699)" \
+            || bad "CP6 T: clue gold is $(gold_of "$WORK/clue.out"), expected 9699"
+    else
+        bad "CP6 T: clue case did not seed"
+    fi
+
+    # The two ends of the ladder: digit 0 is free and still buys a clue, digit 9 costs 900.
+    if run_case clue clue-free 'T\n0xf0\n0\n' "$WORK/clue-free.out"; then
+        said "$WORK/clue-free.out" "ASK ME NO QUESTIONS," \
+            && ok "CP6 T: digit 0 buys clue 0 rather than leaving silently" \
+            || bad "CP6 T: digit 0 printed no clue"
+        [ "$(gold_of "$WORK/clue-free.out")" = "9999" ] \
+            && ok "CP6 T: and digit 0 costs nothing" \
+            || bad "CP6 T: the free clue took gold: $(gold_of "$WORK/clue-free.out")"
+    fi
+    if run_case clue clue-dear 'T\n0xf0\n9\n' "$WORK/clue-dear.out"; then
+        said "$WORK/clue-dear.out" "HE'LL TELL IT TO YOU!" \
+            && ok "CP6 T: digit 9 buys clue 9, the last line of the poem" \
+            || bad "CP6 T: digit 9 did not print clue 9"
+        [ "$(gold_of "$WORK/clue-dear.out")" = "9099" ] \
+            && ok "CP6 T: digit 9 is 900 gold (9999 -> 9099)" \
+            || bad "CP6 T: dear clue gold is $(gold_of "$WORK/clue-dear.out"), expected 9099"
     fi
 
     # (g) the two ways the ray fails. Both must print FUNNY, NO RESPONSE! and nothing else,

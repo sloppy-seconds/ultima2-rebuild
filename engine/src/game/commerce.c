@@ -500,6 +500,52 @@ static u2_transact_result shop_pub(u2_ctx *ctx)
     return U2_TRANSACT_OPEN;
 }
 
+/* asm/1AE0: the clue seller. One menu, one digit, and the digit is both the price and the
+ * index — which is the whole trick of this shoppe and the reason it looked unmappable for so
+ * long. The bytes at the tail of asm/19D7_magic_shop_menu.asm are:
+ *
+ *   call str_out            'TIME AND TRAVEL MADE ME WISE,\rPRECIOUS GOLD, A CLUE IT
+ *                           BUYS!HOW MUCH WILL YOU PAY *100?'
+ *   call read_decimal_digit -> AL = digit
+ *   mov %al,0x1f ; mov %al,0x27 ; mov $0x0,%al ; mov %al,0x28
+ *                           DS:1F = digit; the price pair DS:27:28 = digit,0, which is the
+ *                           digit x100 BY PLACEMENT. There is no multiply anywhere, and the
+ *                           menu's own text says *100 rather than implying it.
+ *   call 0x2253             the charge. On "you can't afford it" it prints the refusal and
+ *                           does not come back, so nothing may print after a failed spend.
+ *   mov 0x1f,%bl ; mov %bx,%si ; inc %si          SI = digit + 1
+ *   lea %cs:0x1b6a,%ax ; mov %ax,0x27             the walker's cursor, the NUL one byte
+ *                                                 before entry 0 of asm/1B6B_clue_pool.asm
+ *   call asm/155D                                 emits entry SI-1, i.e. entry `digit`
+ *   jmp cmd_done
+ *
+ * So digit N costs N x 100 gold and buys clue N, digit 0 is free and buys clue 0, and the ten
+ * clues read as one poem when paid in order. No farewell, no confirmation line: the clue IS
+ * the response, and the original prints nothing else. Never observed executing — no capture
+ * has stood a character at the clue seller — so the gate in tests/run_cp6.sh is what keeps the
+ * reading honest. */
+static u2_transact_result shop_clue(u2_ctx *ctx)
+{
+    static const char *const clues[10] = {
+        U2_S_CLUE_0, U2_S_CLUE_1, U2_S_CLUE_2, U2_S_CLUE_3, U2_S_CLUE_4,
+        U2_S_CLUE_5, U2_S_CLUE_6, U2_S_CLUE_7, U2_S_CLUE_8, U2_S_CLUE_9,
+    };
+
+    seam_str_out(ctx, U2_S_CLUE_MENU);
+
+    const int digit = read_digit(ctx);
+    if (digit < 0)
+        return U2_TRANSACT_REFUSED;
+
+    /* price[0] is DS:27 and price[1] is DS:28, so {digit, 0} is digit hundreds gold. */
+    const uint8_t price[2] = { (uint8_t)digit, 0x00u };
+    if (!u2_spend_price(ctx, price))
+        return U2_TRANSACT_REFUSED;
+
+    seam_str_out(ctx, clues[digit]);
+    return U2_TRANSACT_OPEN;
+}
+
 /* ---- the selector ---------------------------------------------------------- */
 
 u2_shop u2_commerce_shop_for(int x, int y, int site_kind)
@@ -747,11 +793,7 @@ u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, i
          * 4/5/6 onto pool slots 7/8/9, and the price is quoted on the SLOT. See sell_spell. */
         return sell_spell(ctx, shop == U2_SHOP_WIZARD);
     case U2_SHOP_CLUE:
-        /* GAP — the clue seller takes digit x 100 by byte placement (the digit goes into
-         * the hundreds byte and the low byte is zeroed; there is no multiply), but the clue
-         * itself is a pool this project has not mapped to a selection rule. */
-        engine_gap(ctx, "clue seller not implemented -> clue pool");
-        return U2_TRANSACT_NO_DEALER;
+        return shop_clue(ctx);
     case U2_SHOP_PUB:
         return shop_pub(ctx);
     case U2_SHOP_NONE:

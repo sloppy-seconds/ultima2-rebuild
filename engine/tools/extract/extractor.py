@@ -605,19 +605,37 @@ MANIFEST = [
     ("U2_S_DONT_HAVE_THAT_MUCH",   "2052_gold_spend_price.asm", 0),
     # The four shop bodies live in asm/19D7 (the G22 boundary defect: one file, several
     # routines). Armour first, then weapons, then transport.
-    ("U2_S_ARMOUR_MENU",           "19D7_magic_shop_menu.asm", ("run", 0x1F21, 97, "     THE ARMOUR SHOPPE:")),
-    ("U2_S_SHOP_THANKS",           "19D7_magic_shop_menu.asm", ("run", 0x1F92, 23, "THANKS FOR COMING BY...")),
-    ("U2_S_SHOP_AH_YES",           "19D7_magic_shop_menu.asm", ("run", 0x1FB3,  9, "AH! YES! ")),
-    ("U2_S_SHOP_FOR_YOU_ONLY",     "19D7_magic_shop_menu.asm", ("run", 0x1FC9, 14, "FOR YOU ONLY ")),
-    ("U2_S_SHOP_HOW_BOUT",         "19D7_magic_shop_menu.asm", ("run", 0x1FF1, 15, "HOW 'BOUT IT? ")),
-    ("U2_S_SHOP_OH_WELL",          "19D7_magic_shop_menu.asm", ("run", 0x201E,  9, "OH, WELL.")),
-    ("U2_S_SHOP_SOLD",             "19D7_magic_shop_menu.asm", ("run", 0x2032,  5, "SOLD!")),
-    ("U2_S_WEAPONS_MENU",          "19D7_magic_shop_menu.asm", ("run", 0x2053, 85, "  THE WEAPONS SHOPPE:")),
-    ("U2_S_SHOP_AH_YES_A",         "19D7_magic_shop_menu.asm", ("run", 0x20D9, 11, "AH! YES! A ")),
-    ("U2_S_TRANSPORT_MENU",        "19D7_magic_shop_menu.asm", ("run", 0x2179, 51, "WELCOME, TO THE TRANSPORT")),
-    ("U2_S_TRANSPORT_DEAL",        "19D7_magic_shop_menu.asm", ("run", 0x21C3, 21, "GOLD, DEAL, OK? --- ")),
-    ("U2_S_TRANSPORT_BYE",         "19D7_magic_shop_menu.asm", ("run", 0x21F2, 17, "O.K. BYE THEN...")),
-    ("U2_S_TRANSPORT_RIDE",        "19D7_magic_shop_menu.asm", ("run", 0x220E, 13, "RIDE SWIFTLY!")),
+    ("U2_S_ARMOUR_MENU",           "1D1D_shop_menus.asm",        ("run", 0x1F21, 97, "     THE ARMOUR SHOPPE:")),
+    ("U2_S_SHOP_THANKS",           "1D1D_shop_menus.asm",        ("run", 0x1F92, 23, "THANKS FOR COMING BY...")),
+    ("U2_S_SHOP_AH_YES",           "1D1D_shop_menus.asm",        ("run", 0x1FB3,  9, "AH! YES! ")),
+    ("U2_S_SHOP_FOR_YOU_ONLY",     "1D1D_shop_menus.asm",        ("run", 0x1FC9, 14, "FOR YOU ONLY ")),
+    ("U2_S_SHOP_HOW_BOUT",         "1D1D_shop_menus.asm",        ("run", 0x1FF1, 15, "HOW 'BOUT IT? ")),
+    ("U2_S_SHOP_OH_WELL",          "1D1D_shop_menus.asm",        ("run", 0x201E,  9, "OH, WELL.")),
+    ("U2_S_SHOP_SOLD",             "1D1D_shop_menus.asm",        ("run", 0x2032,  5, "SOLD!")),
+    ("U2_S_WEAPONS_MENU",          "1D1D_shop_menus.asm",        ("run", 0x2053, 85, "  THE WEAPONS SHOPPE:")),
+    ("U2_S_SHOP_AH_YES_A",         "1D1D_shop_menus.asm",        ("run", 0x20D9, 11, "AH! YES! A ")),
+    ("U2_S_TRANSPORT_MENU",        "1D1D_shop_menus.asm",        ("run", 0x2179, 51, "WELCOME, TO THE TRANSPORT")),
+    ("U2_S_TRANSPORT_DEAL",        "1D1D_shop_menus.asm",        ("run", 0x21C3, 21, "GOLD, DEAL, OK? --- ")),
+    ("U2_S_TRANSPORT_BYE",         "1D1D_shop_menus.asm",        ("run", 0x21F2, 17, "O.K. BYE THEN...")),
+    ("U2_S_TRANSPORT_RIDE",        "1D1D_shop_menus.asm",        ("run", 0x220E, 13, "RIDE SWIFTLY!")),
+    # The clue seller's pool (asm/1B6B_clue_pool.asm), ten NUL-separated two-line clues. The
+    # digit the player pays IS the index and the price x100, so entry 0 is free and entry 9 costs
+    # 900. Each literal carries the emitter's newline glyph (0x8d) in the middle, so the listing
+    # splits the payload around it -- `db "ASK ME NO QUESTIONS,",0x8d,"I'LL TELL YOU NO LIES.",0x00`
+    # -- and the raw-text fallback could not see it as one quoted literal. The data-stream proof
+    # added for these is what makes them resolve from asm/ with no copy of the game present, the
+    # same bytes `--verify` proves them against.
+    ("U2_S_CLUE_MENU",             "19D7_magic_shop_menu.asm",   ("run", 0x1CE4, 87, "TIME AND TRAVEL MADE ME WISE,\rPRECIOUS GOLD, A CLUE IT BUYS!HOW MUCH WILL YOU PAY *100?")),
+    ("U2_S_CLUE_0",                "1B6B_clue_pool.asm",         ("run", 0x1D6B, 43, "ASK ME NO QUESTIONS,\x8dI'LL TELL YOU NO LIES.")),
+    ("U2_S_CLUE_1",                "1B6B_clue_pool.asm",         ("run", 0x1D97, 44, "THE QUEEN IS THE KING\x8dAND THE KING IS A SPY.")),
+    ("U2_S_CLUE_2",                "1B6B_clue_pool.asm",         ("run", 0x1DC4, 36, "THE EVIL MEN DO\x8dIS A HORRIBLE THING.")),
+    ("U2_S_CLUE_3",                "1B6B_clue_pool.asm",         ("run", 0x1DE9, 49, "BUT DISPELLING MEANS\x8dTHAT YOU MUST HAVE THE RING.")),
+    ("U2_S_CLUE_4",                "1B6B_clue_pool.asm",         ("run", 0x1E1B, 31, "JUST WHERE IT IS,\x8dI CANNOT SAY.")),
+    ("U2_S_CLUE_5",                "1B6B_clue_pool.asm",         ("run", 0x1E3B, 51, "BUT I'LL TELL YOU RIGHT NOW,\x8dTHERE IS NO OTHER WAY.")),
+    ("U2_S_CLUE_6",                "1B6B_clue_pool.asm",         ("run", 0x1E6F, 43, "I HEAR IN A TOWN\x8dWHERE THE WATER RUNS FREE.")),
+    ("U2_S_CLUE_7",                "1B6B_clue_pool.asm",         ("run", 0x1E9B, 40, "THERE IS AN OLD MAN\x8dLIVING UNDER A TREE.")),
+    ("U2_S_CLUE_8",                "1B6B_clue_pool.asm",         ("run", 0x1EC4, 41, "HE HAS NOT A NAME\x8dBUT HE DOES HAVE A CLUE")),
+    ("U2_S_CLUE_9",                "1B6B_clue_pool.asm",         ("run", 0x1EEE, 46, "MAYHAPS IF YOU FIND HIM,\x8dHE'LL TELL IT TO YOU!")),
     # The grocery quote (asm/1799 -> asm/17B2 -> asm/17B7 -> asm/17C5) and its two answers.
     ("U2_S_FOOD_COSTS",            "1799_tavern_food_price.asm", 0),
     ("U2_S_FOOD_PER100",           "17C5_sub_17c5.asm",        ("run", 0x19C9, 19, "PER 100, WANT ONE? ")),
@@ -919,11 +937,20 @@ def collect(source, exe, exe_path, warn):
                 # (`db " IS DEAD!",0x8d,0x00`) and widening DB_RE to match them
                 # would renumber the string indices of every file that has one,
                 # which is the exact hazard the DB_RE comment above documents.
+                # A second proof is tried first: the file's decoded DATA stream, the same
+                # bytes `--verify` proves a committed string against, so the fallback can
+                # never resolve something the gate would refuse. That reaches a literal the
+                # listing splits on the game's newline glyph
+                # (`db "ASK ME NO QUESTIONS,",0x8d,"I'LL TELL YOU NO LIES.",0x00`), which is
+                # the shape the raw-text search below cannot see at all. It reads
+                # asm_db_stream and NOT DB_RE's parsed list, so it adds a fallback without
+                # moving a single db-index — the hazard the paragraph above documents.
                 want = loc[3].encode("latin-1")
-                if ('"%s"' % loc[3]) not in open(path, encoding="utf-8").read():
+                in_data = want in asm_db_stream(fname)
+                if not in_data and ('"%s"' % loc[3]) not in open(path, encoding="utf-8").read():
                     sys.exit(f"extractor: {sym}: asm fallback cannot find "
                              f"{loc[3]!r} as a quoted literal in {fname}")
-                rows.append((sym, want, f"asm:{fname}"))
+                rows.append((sym, want, f"asm:{fname}{' data' if in_data else ''}"))
             else:
                 rows.append((sym, b"", "unavailable without the user's copy"))
             continue

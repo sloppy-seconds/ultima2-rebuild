@@ -39,12 +39,16 @@ CASES = {
     "armour":    ((3, 2), (38, 5), (38, 4), (38, 3), SIGN, MARK),
     "weapons":   ((3, 2), (9, 5),  (9, 4),  (9, 3),  SIGN, MARK),
     "transport": ((3, 2), (38, 40), (38, 39), (38, 38), SIGN, MARK),
-    # The pub is dispatched and NOT implemented, so the gate asserts it stays silent.
+    # The pub: sector 32 is a town, and the west/south half of a town is asm/15E4.
     "pub":       ((3, 2), (9, 40), (9, 39), (9, 38), SIGN, MARK),
     # sector 31 is a village (kind 1). North-east half -> the grocery. The cells mirror
     # the real sector-31 geometry measured on 2026-10-29: marker (55,19), 0x7C at
     # (55,20), player (55,21).
     "grocery":   ((3, 1), (55, 21), (55, 20), (55, 19), COUNTER, MARK),
+    # The clue seller: the west/north half of a VILLAGE is asm/1AE0, so the same quadrant
+    # that makes a town the weapons shoppe makes a village the clue seller. Same cell
+    # geometry as the weapons case, different site kind -- which is the whole selector.
+    "clue":      ((3, 1), (9, 5), (9, 4), (9, 3), SIGN, MARK),
     # Near cell is plain floor: asm/4081 rejects before the marker is ever consulted.
     "nosign":    ((3, 2), (38, 5), (38, 4), (38, 3), FLOOR, MARK),
     # Marker missing one cell further out: asm/409F rejects.
