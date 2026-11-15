@@ -562,6 +562,36 @@
 #define U2_S_FOOD_YES_B "NO ONIONS AND TO GO PLEASE!"
 /* exe@0x1A27 */
 #define U2_S_THANK_YOU_AGAIN "THANK YOU, COME AGAIN!"
+/* exe@0x17E8 */
+#define U2_S_PUB_WELCOME "WELCOME TO THE PUB!"
+/* exe@0x17FC */
+#define U2_S_PUB_MENU "1-BUY, 2-TIP --- "
+/* exe@0x182D */
+#define U2_S_PUB_STRONG_ONE "HERE, HAVE A STRONG ONE!"
+/* exe@0x1855 */
+#define U2_S_PUB_TIP_HOW "TIP HOW MUCH? "
+/* exe@0x188D */
+#define U2_S_PUB_BARKEEP_SAYS "THE BARKEEP SAYS:"
+/* exe@0x18BD */
+#define U2_S_BARKEEP_0 "CAUGH..."
+/* exe@0x18C6 */
+#define U2_S_BARKEEP_1 "ISN'T THIS A GREAT GAME?"
+/* exe@0x18DF */
+#define U2_S_BARKEEP_2 "HHMMM..."
+/* exe@0x18E8 */
+#define U2_S_BARKEEP_3 "SOME FIGHTERS WEAR MAGIC HELMS!"
+/* exe@0x1908 */
+#define U2_S_BARKEEP_4 "AVIATORS USE SKULL KEYS!"
+/* exe@0x1921 */
+#define U2_S_BARKEEP_5 "SAYLORS WEAR BLUE TASSLES!"
+/* exe@0x193C */
+#define U2_S_BARKEEP_6 "MAGES CARRY WANDS OR STAFFS!"
+/* exe@0x1959 */
+#define U2_S_BARKEEP_7 "GUARDS CARRY KEYS!"
+/* exe@0x196C */
+#define U2_S_BARKEEP_8 "ANKHS OPEN SPACE!"
+/* exe@0x197E */
+#define U2_S_BARKEEP_9 "PLANES NEED BRASS BUTTONS!"
 /* exe@0x3E31 */
 #define U2_S_OFFER_GOLD_DIRECT "OFFER GOLD DIRECT-"
 /* exe@0x3E5F */

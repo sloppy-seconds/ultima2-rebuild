@@ -8,10 +8,13 @@
 #   2. The behavioural half drives ./u2 against a synthetic sector built by
 #      tests/cp6_commerce_seed.py — engine-authored filler, never the player's own files —
 #      and asserts the shop text, the gold, and the owned-count slot for each purchase.
-#   3. The gaps are asserted too. The pub, the cleric shrine, the wizard shoppe, the clue
-#      seller and the talking branch are NOT implemented, and a gate that only checks what
-#      works cannot tell an unimplemented branch from a broken one. So the pub case asserts
-#      silence, and the two broken-ray cases assert the refusal.
+#   3. The gaps are asserted too. The clue seller and the talking branch are NOT implemented,
+#      and a gate that only checks what works cannot tell an unimplemented branch from a broken
+#      one. So the clue case asserts the named gap, the pub case asserts that a menu digit
+#      outside 1 and 2 prints nothing at all, and the two broken-ray cases assert the refusal.
+#
+# The pub is here even though no capture has ever reached it, because asm/15E1 is fully decoded
+# and a rule read off bytes with nothing asserting it is a rule that drifts.
 #
 # The behavioural half SKIPs when the content strings are empty, which is what they are
 # without a copy of the game to extract from (docs/phase4-plan.md: the engine ships zero
@@ -65,7 +68,10 @@ fi
 # --- 2/3. the behavioural half ----------------------------------------------
 # Every shop literal here is a `run` locator (the menus are multi-segment db lines the asm
 # fallback cannot index), so with no copy of the game they come out empty and the prints are
-# empty too. Asserting on them then would be asserting on nothing.
+# empty too. Asserting on them then would be asserting on nothing. The pub's five literals and
+# its ten barkeep entries are deliberately NOT on this list: each is a single quoted literal in
+# the listing, so the asm fallback resolves them and they are never empty, with the game or
+# without it.
 NEED="U2_S_ARMOUR_MENU U2_S_WEAPONS_MENU U2_S_TRANSPORT_MENU U2_S_FOOD_COSTS U2_S_SHOP_SOLD U2_S_GET_WEAPON U2_S_GET_ARMOUR U2_S_GET_WHAT"
 EMPTY=""
 for sym in $NEED; do
@@ -206,14 +212,65 @@ else
             || bad "CP6 T: food is $(field_of "$WORK/grocery.out" food), expected '51 00 00'"
     fi
 
-    # (f) the pub is dispatched and unimplemented. Silence is the honest answer, and it is
-    #     asserted so that a future half-implementation cannot land quietly.
-    if run_case pub pub 'T\n0xf0\n' "$WORK/pub.out"; then
-        if said "$WORK/pub.out" "WELCOME TO THE PUB" || said "$WORK/pub.out" "1-BUY"; then
-            bad "CP6 T: the pub printed a menu, and commerce.c says it is not implemented"
-        else
-            ok "CP6 T: the pub quadrant stays silent, matching the documented gap"
+    # (f) the pub: asm/15E4, the west/south quadrant of a town. Two menu answers, and both end
+    #     with the barkeep printing ONE entry out of the ten-entry table at asm/16BD. None of
+    #     this has ever executed in a capture, so these assertions are the only thing between
+    #     the byte-level read and a plausible guess:
+    #       1-BUY   5 gold, and the index is the constant 1 (the rand_byte at asm/15E1:1847 is
+    #               drawn, masked by `and $0x3` and then overwritten by `mov $0x1`).
+    #       2-TIP   the digit in gold, and the index is digit + sign_of_al(rand_byte) in a byte,
+    #               forced to 0 when the sum reaches 10.
+    #     The three rng states below pin all three arms of asm/50D8: -1, 0 and +1.
+    if run_case pub pub 'T\n0xf0\n1\n' "$WORK/pub.out"; then
+        said "$WORK/pub.out" "WELCOME TO THE PUB" \
+            && ok "CP6 T: the pub quadrant prints the pub's own welcome" \
+            || bad "CP6 T: no pub menu from (9,40) north"
+        said "$WORK/pub.out" "1-BUY, 2-TIP --- " \
+            && ok "CP6 T: the pub menu offers BUY and TIP and nothing else" \
+            || bad "CP6 T: expected the '1-BUY, 2-TIP --- ' menu line"
+        said "$WORK/pub.out" "HERE, HAVE A STRONG ONE!" \
+            && ok "CP6 T: 1-BUY prints the drink line" \
+            || bad "CP6 T: no 'HERE, HAVE A STRONG ONE!' on 1-BUY"
+        said "$WORK/pub.out" "THE BARKEEP SAYS:ISN'T THIS A GREAT GAME?" \
+            && ok "CP6 T: 1-BUY buys barkeep entry 1, the constant asm/15E1:184C stores" \
+            || bad "CP6 T: the barkeep did not say entry 1 after a drink"
+        [ "$(gold_of "$WORK/pub.out")" = "9994" ] \
+            && ok "CP6 T: the drink is the constant 5 gold (9999 -> 9994)" \
+            || bad "CP6 T: drink gold is $(gold_of "$WORK/pub.out"), expected 9994"
+    else
+        bad "CP6 T: pub case did not seed"
+    fi
+
+    # 2-TIP, three draws. tip 3 with a -1 draw is entry 2; tip 3 with a +1 draw is entry 4;
+    # tip 9 with a +1 draw sums to 10 and is forced back to entry 0, which is the only way the
+    # `cmp $0xa ; jb` guard can be told apart from an unguarded add.
+    for tc in "neg:008000000000:3:HHMMM...:9996" "pos:000000000001:3:AVIATORS USE SKULL KEYS!:9996" \
+              "wrap:000000000001:9:CAUGH...:9990"; do
+        name="${tc%%:*}"; rest="${tc#*:}"; rng="${rest%%:*}"; rest="${rest#*:}"
+        tip="${rest%%:*}"; rest="${rest#*:}"; line="${rest%%:*}"; want="${rest#*:}"
+        if run_case pub "pub-tip-$name" "T\n0xf0\n2\n$tip\n" "$WORK/pub-tip-$name.out" "$rng"; then
+            said "$WORK/pub-tip-$name.out" "$line" \
+                && ok "CP6 T: tip $tip on a $name draw prints '$line'" \
+                || { bad "CP6 T: tip $tip on a $name draw did not print '$line'"; sed -n '1,6p' "$WORK/pub-tip-$name.out.txt"; }
+            [ "$(gold_of "$WORK/pub-tip-$name.out")" = "$want" ] \
+                && ok "CP6 T: the tip is the digit in gold ($tip: 9999 -> $want)" \
+                || bad "CP6 T: tip $tip gold is $(gold_of "$WORK/pub-tip-$name.out"), expected $want"
         fi
+    done
+
+    # The control that makes the block above able to fail: a menu digit outside 1 and 2 jumps
+    # to cmd_done with no message and no charge (asm/15E1:1819). Silence here is the original's,
+    # so it is asserted rather than excused — and if the handler ever grows a catch-all print,
+    # this is what goes red.
+    if run_case pub pub-other 'T\n0xf0\n5\n' "$WORK/pub-other.out"; then
+        if said "$WORK/pub-other.out" "THE BARKEEP SAYS"; then
+            bad "CP6 T: digit 5 reached the barkeep, but asm/15E1:1819 jumps to cmd_done"
+        else
+            ok "CP6 T: a menu digit outside 1 and 2 prints nothing and costs nothing"
+        fi
+        [ "$(gold_of "$WORK/pub-other.out")" = "9999" ] \
+            && ok "CP6 T: the rejected digit left the gold alone" \
+            || bad "CP6 T: digit 5 took gold: $(gold_of "$WORK/pub-other.out")"
     fi
 
     # (g) the two ways the ray fails. Both must print FUNNY, NO RESPONSE! and nothing else,

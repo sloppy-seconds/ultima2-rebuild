@@ -629,6 +629,38 @@ MANIFEST = [
     ("U2_S_FOOD_YES_A",            "17F5_sub_17f5.asm",        ("run", 0x19F5,  4)),
     ("U2_S_FOOD_YES_B",            "17F5_sub_17f5.asm",        ("run", 0x19FA, 27)),
     ("U2_S_THANK_YOU_AGAIN",       "181A_tavern_thanks.asm",     0),
+    # The pub (asm/15E4, the west/south quadrant of a town; asm/15E1 is the menu body).
+    #
+    # asm/15E1's menu literal is ONE db line split on the game's newline glyph --
+    # `db "WELCOME TO THE PUB!",0x0d,"1-BUY, 2-TIP --- ",0x00` -- so each line is its own symbol
+    # and the engine prints the newline itself, the same convention as the cleric and wizard
+    # menus. Each is a 4-tuple because each half IS a single quoted literal in the listing, which
+    # is exactly what the asm fallback searches for; the whole-line form could never be found that
+    # way, which is why the shop menus above are exe-only.
+    #
+    # The ten barkeep entries are single-segment db lines in asm/16BD, but that file tags them
+    # `# entry N` and not `# string`, so DB_RE matches none of them and the int locator would
+    # report the file as holding zero strings. The 4-tuple form reaches them without widening
+    # DB_RE, which is the hazard that comment documents.
+    #
+    # Offsets are FILE offsets (runtime + 0x200), each one the byte after its own `call str_out`
+    # or the first byte of the entry, and each length excludes the terminator. Read back from
+    # original/ultimaii.exe and confirmed to be the bytes named.
+    ("U2_S_PUB_WELCOME",           "15E1_tavern_menu.asm",       ("run", 0x17E8, 19, "WELCOME TO THE PUB!")),
+    ("U2_S_PUB_MENU",              "15E1_tavern_menu.asm",       ("run", 0x17FC, 17, "1-BUY, 2-TIP --- ")),
+    ("U2_S_PUB_STRONG_ONE",        "15E1_tavern_menu.asm",       ("run", 0x182D, 24, "HERE, HAVE A STRONG ONE!")),
+    ("U2_S_PUB_TIP_HOW",           "15E1_tavern_menu.asm",       0),
+    ("U2_S_PUB_BARKEEP_SAYS",      "15E1_tavern_menu.asm",       ("run", 0x188D, 17, "THE BARKEEP SAYS:")),
+    ("U2_S_BARKEEP_0",             "16BD_barkeep_chatter_hints.asm", ("run", 0x18BD,  8, "CAUGH...")),
+    ("U2_S_BARKEEP_1",             "16BD_barkeep_chatter_hints.asm", ("run", 0x18C6, 24, "ISN'T THIS A GREAT GAME?")),
+    ("U2_S_BARKEEP_2",             "16BD_barkeep_chatter_hints.asm", ("run", 0x18DF,  8, "HHMMM...")),
+    ("U2_S_BARKEEP_3",             "16BD_barkeep_chatter_hints.asm", ("run", 0x18E8, 31, "SOME FIGHTERS WEAR MAGIC HELMS!")),
+    ("U2_S_BARKEEP_4",             "16BD_barkeep_chatter_hints.asm", ("run", 0x1908, 24, "AVIATORS USE SKULL KEYS!")),
+    ("U2_S_BARKEEP_5",             "16BD_barkeep_chatter_hints.asm", ("run", 0x1921, 26, "SAYLORS WEAR BLUE TASSLES!")),
+    ("U2_S_BARKEEP_6",             "16BD_barkeep_chatter_hints.asm", ("run", 0x193C, 28, "MAGES CARRY WANDS OR STAFFS!")),
+    ("U2_S_BARKEEP_7",             "16BD_barkeep_chatter_hints.asm", ("run", 0x1959, 18, "GUARDS CARRY KEYS!")),
+    ("U2_S_BARKEEP_8",             "16BD_barkeep_chatter_hints.asm", ("run", 0x196C, 17, "ANKHS OPEN SPACE!")),
+    ("U2_S_BARKEEP_9",             "16BD_barkeep_chatter_hints.asm", ("run", 0x197E, 26, "PLANES NEED BRASS BUTTONS!")),
     # cmd_O (OFFER GOLD), asm/3C2E. Nine strings, in the order they appear in the file,
     # which is also the order of the handler's arms: the aim prompt, the two refusals, the
     # amount question, then the four special-recipient lines and the stat-raise line. The

@@ -423,6 +423,83 @@ static u2_transact_result shop_transport(u2_ctx *ctx)
     return U2_TRANSACT_OPEN;
 }
 
+/* asm/15E4: the pub. Two menu answers, and both end the same way — the barkeep says one line
+ * out of the ten-entry table at asm/16BD_barkeep_chatter_hints.asm.
+ *
+ * The table is not indexed by anything the player picks. asm/15E1 keeps the index in DS:25 and
+ * hands the shared walker asm/155D an SI of index+1 with the cursor at the NUL one byte BEFORE
+ * entry 0; the walker skips SI NULs and prints the entry it lands on, so SI = index + 1 is what
+ * emits `index`. That off-by-one belongs to the walker and is not a bug to fix here.
+ *
+ *   1-BUY  charge 5 gold (DS:27 = 0, DS:28 = 5), print HERE, HAVE A STRONG ONE!, then
+ *          `call rand_byte ; and $0x3,%al ; mov $0x1,%al` — the random byte is drawn, masked and
+ *          thrown away, and the index is the constant 1. A drink always buys entry 1, "ISN'T
+ *          THIS A GREAT GAME?". The rand_byte call is kept because it advances the generator the
+ *          whole game shares; the mask is not, because nothing reads the result.
+ *   2-TIP  prompt TIP HOW MUCH? , read a digit, charge that many gold (DS:27 = 0, DS:28 = digit),
+ *          then index = digit + sign_of_al(rand_byte()) computed in a BYTE: `clc ; adc 0x25,%al`,
+ *          `cmp $0xa,%al ; jb keep`, else 0. So a tip of 1 on a -1 draw lands on entry 0, and a
+ *          tip of 9 on a +1 draw runs past 9 and is forced back to 0. The table's three chatter
+ *          rows are the cheap outcome; the seven hints are entries 3..9.
+ *   other  asm/15E1:1819 jumps straight to cmd_done with no message at all. Silence is the
+ *          original's behaviour here and not an engine gap, so nothing is printed and nothing is
+ *          charged — the charge sites sit inside the two arms above.
+ *
+ * Never observed executing: asm/15E1 appears in no harvest's ExecutedInstructions, so the rule is
+ * read from the bytes. The strings are the game's own and now come through the extractor, so the
+ * whole path is gated in tests/run_cp6.sh against a synthetic town rather than left as a header
+ * claim. */
+static u2_transact_result shop_pub(u2_ctx *ctx)
+{
+    static const char *const barkeep[10] = {
+        U2_S_BARKEEP_0, U2_S_BARKEEP_1, U2_S_BARKEEP_2, U2_S_BARKEEP_3, U2_S_BARKEEP_4,
+        U2_S_BARKEEP_5, U2_S_BARKEEP_6, U2_S_BARKEEP_7, U2_S_BARKEEP_8, U2_S_BARKEEP_9,
+    };
+
+    seam_str_out(ctx, U2_S_PUB_WELCOME);
+    seam_char_print(ctx, '\r');
+    seam_str_out(ctx, U2_S_PUB_MENU);
+
+    const int digit = read_digit(ctx);
+    if (digit < 0)
+        return U2_TRANSACT_REFUSED;
+
+    int idx;
+    if (digit == 1) {
+        const uint8_t price[2] = { 0x00u, 0x05u };   /* DS:27 = 0, DS:28 = 5 */
+        if (!u2_spend_price(ctx, price))
+            return U2_TRANSACT_REFUSED;
+        seam_str_out(ctx, U2_S_PUB_STRONG_ONE);
+        seam_char_print(ctx, '\r');
+        (void)u2_rand_byte(ctx);        /* asm/15E1:1847 — drawn, masked, discarded; see above */
+        idx = 1;
+    } else if (digit == 2) {
+        seam_str_out(ctx, U2_S_PUB_TIP_HOW);
+        const int tip = read_digit(ctx);
+        if (tip < 0)
+            return U2_TRANSACT_REFUSED;
+        const uint8_t price[2] = { 0x00u, (uint8_t)tip };
+        if (!u2_spend_price(ctx, price))
+            return U2_TRANSACT_REFUSED;
+
+        /* asm/50D8_sign_of_al: zero is 0, bit 7 clear is +1, bit 7 set is -1. Written again
+         * here rather than shared because ai.c's copy is a static in another translation
+         * unit and this routine is the second and only other caller in the binary. */
+        const uint8_t r = u2_rand_byte(ctx);
+        const int sign = r == 0u ? 0 : ((r & 0x80u) ? -1 : 1);
+        idx = (tip + sign) & 0xFF;      /* byte arithmetic: 1 + -1 is 0, 9 + 1 is 10 */
+        if (idx >= 10)
+            idx = 0;                    /* cmp $0xa ; jb ; else mov $0,%al */
+    } else {
+        return U2_TRANSACT_REFUSED;
+    }
+
+    seam_str_out(ctx, U2_S_PUB_BARKEEP_SAYS);
+    seam_char_print(ctx, '\r');
+    seam_str_out(ctx, barkeep[idx]);
+    return U2_TRANSACT_OPEN;
+}
+
 /* ---- the selector ---------------------------------------------------------- */
 
 u2_shop u2_commerce_shop_for(int x, int y, int site_kind)
@@ -676,10 +753,7 @@ u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, i
         engine_gap(ctx, "clue seller not implemented -> clue pool");
         return U2_TRANSACT_NO_DEALER;
     case U2_SHOP_PUB:
-        /* GAP — the pub's 1-BUY is a constant 5 gold and its 2-TIP drives the barkeep
-         * chatter table (asm/155D + asm/16BD), which is read but has never been observed
-         * executing. Half a pub is worse than none. */
-        return U2_TRANSACT_NO_DEALER;
+        return shop_pub(ctx);
     case U2_SHOP_NONE:
         break;
     }
