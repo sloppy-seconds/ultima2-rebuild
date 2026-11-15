@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""target_check.py — the gate for the two-target adapter. Needs no emulator.
+
+Four things are pinned here, and the fourth is the reason the file exists:
+
+1. `--ds-json` reads the bytes it claims to. Spot-checked against documented DS offsets
+   rather than re-derived — a full reimplementation in Python is exactly the second copy of
+   the decode this design exists to prevent.
+2. The decode is deterministic: same bytes, same observation.
+3. EngineTarget drives end to end and the observation has the shape policy is written
+   against.
+4. A modifier key is REFUSED loudly. This is the mutation-shaped check: the failure it
+   prevents is a bot reporting "the game ignored Ctrl-Y" when the key was never delivered,
+   which is a real false negative this project already paid a session for.
+"""
+
+import json
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(HERE)
+ENGINE = os.path.join(REPO, "engine")
+sys.path.insert(0, HERE)
+from target import U2_BIN, DS_LEN, Spice86Target, EngineTarget   # noqa: E402
+
+checks = 0
+fails = []
+
+
+def ok(cond, msg):
+    global checks
+    if cond:
+        checks += 1
+    else:
+        fails.append(msg)
+        print("  NOT OK  %s" % msg)
+
+
+def ds_blob(fields):
+    """A DS mirror with a few fields set, everything else zero."""
+    b = bytearray(DS_LEN)
+    for off, val in fields.items():
+        b[off] = val
+    return b
+
+
+def decode(blob):
+    path = "/var/tmp/u2-target-check.bin"
+    with open(path, "wb") as f:
+        f.write(bytes(blob))
+    p = subprocess.run([U2_BIN, "--headless", "--ds-json", path], cwd=ENGINE,
+                       capture_output=True, text=True, timeout=60)
+    for line in p.stdout.splitlines():
+        i = line.find('{"u2api"')
+        if i >= 0:
+            return json.loads(line[i:])
+    raise AssertionError("--ds-json gave nothing: %r %r" % (p.stdout[-200:], p.stderr[-200:]))
+
+
+# --- 1. the decode reads the documented offsets --------------------------------------
+# Offsets are the original's DS, cited in engine/src/core/state.h. Only the ones a bot
+# acts on first: position, sector pair, name, and the packed-decimal counters.
+blob = ds_blob({0x00: 25, 0x01: 7})
+for i, ch in enumerate(b"BOTTEST"):
+    blob[0x36 + i] = ch
+blob[0x49] = 0x04; blob[0x4A] = 0x00          # sector digits: 40, wilderness
+blob[0x51] = 0x42; blob[0x52] = 0x00          # hp, packed decimal
+blob[0x58] = 0x12; blob[0x59] = 0x34          # gold, packed decimal
+
+obs = decode(blob)
+inner = obs["state"]["state"]
+ok(obs["mode"] == "world", "a blob with a name must report mode=world, got %r" % obs["mode"])
+ok(inner["pos"] == {"x": 25, "y": 7}, "pos must come from DS:00/01, got %r" % inner["pos"])
+ok(obs["char"]["name"] == "BOTTEST", "name must come from DS:36, got %r" % obs["char"]["name"])
+ok(str(inner["sector"]) in ("4", "04", "40"),
+   "sector must reflect DS:49/4A, got %r" % inner["sector"])
+ok(obs["char"]["hp"] == 4200, "hp must decode packed decimal, got %r" % obs["char"]["hp"])
+ok(obs["char"]["gold"] == 1234, "gold must decode packed decimal, got %r" % obs["char"]["gold"])
+
+# --- 2. determinism: one decoder cannot disagree with itself -------------------------
+ok(decode(bytearray(blob)) == obs, "the same bytes must decode identically twice")
+
+# --- 3. a title-screen blob is not a world ------------------------------------------
+title = decode(bytes(DS_LEN))
+ok(title["mode"] == "title", "an empty blob must report title, got %r" % title["mode"])
+
+# --- 4. the refusal, which is the check that matters ---------------------------------
+# No emulator needed: resolve_key rejects the shape before anything is sent. Note this calls
+# the real resolver — an earlier draft monkeypatched _send and then asserted the patch had
+# refused, which is a check that can only ever pass.
+st = None
+try:
+    import importlib.util as _il
+    _spec = _il.spec_from_file_location("st_tools", os.path.join(REPO, "tools", "spice86_type.py"))
+    st = _il.module_from_spec(_spec); _spec.loader.exec_module(st)
+except Exception as ex:                        # noqa: BLE001
+    ok(False, "could not load spice86_type to test refusal: %s" % ex)
+if st:
+    for bad in ("ctrl-Right", "alt-9"):
+        try:
+            st.resolve_key(bad)
+            ok(False, "%s must be refused, not silently downgraded" % bad)
+        except SystemExit:
+            ok(True, "%s is refused rather than downgraded" % bad)
+    # And the deliverable ones resolve, so the refusal above is not just a broken resolver.
+    for good, (scan, asc) in {"ctrl-y": (0x15, 0x19), "ctrl-s": (0x1F, 0x13)}.items():
+        got = st.resolve_key(good)
+        ok(tuple(got[-2:]) == (scan, asc), "%s must resolve to (%02x,%02x), got %r"
+           % (good, scan, asc, got))
+
+# And the adapter surfaces a failed send instead of reporting a refusal by the game.
+class _Boom:
+    returncode = 1
+    stdout = ""
+    stderr = "ring write refused"
+
+_real = subprocess.run
+subprocess.run = lambda *a, **k: _Boom()
+try:
+    try:
+        Spice86Target._send(Spice86Target("x"), "a")
+        ok(False, "a failed key send must raise, not look like a game refusal")
+    except RuntimeError:
+        ok(True, "a failed key send raises rather than masquerading as a refused move")
+finally:
+    subprocess.run = _real
+
+# --- 5. EngineTarget end to end ------------------------------------------------------
+# save_dir goes under /var/tmp on purpose. The engine writes a save record where it is told
+# to, and the first run of this check wrote one to ./saves/ at the repo root — which CP3 then
+# failed, because CP3's job is to assert no generated artefact is left untracked in the tree.
+# A gate that dirties the tree it is gating is worse than a slow one: it makes the next
+# unrelated run red.
+try:
+    save_dir = os.path.join("/var/tmp", "u2-bot-check-saves")
+    os.makedirs(save_dir, exist_ok=True)
+    e = EngineTarget(save_dir=save_dir).start()
+    o = e.create("BOTTEST", stats=[10, 10, 10, 10, 10, 40])
+    ok(o["mode"] in ("world", "created"), "engine create returned mode %r" % o["mode"])
+    k = e.key("Down")
+    ok("state" in k and "char" in k, "engine observation must carry state and char")
+    ok(k["state"]["state"]["pos"] is not None, "engine observation must carry pos")
+    ok(set(o) >= set(["mode", "digest", "char", "state"]),
+       "engine observation missing top-level keys: %s" % sorted(set(o)))
+    ok(set(o) == set(decode(bytearray(blob))),
+       "both targets must emit the same top-level keys: %s vs %s"
+       % (sorted(o), sorted(decode(bytearray(blob)))))
+    e.close()
+except Exception as ex:                       # noqa: BLE001 - report, do not crash the gate
+    ok(False, "EngineTarget end-to-end failed: %s" % ex)
+
+if fails:
+    print("  FAIL  %d checks passed, %d failed" % (checks, len(fails)))
+    sys.exit(1)
+print("  ok  %d checks: one decoder, two targets, undeliverable keys refused" % checks)

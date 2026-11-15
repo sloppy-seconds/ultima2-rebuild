@@ -385,6 +385,10 @@ int main(int argc, char **argv)
     u2_ctx ctx;
     const char *trace_arg = NULL;
     const char *report_path = NULL;
+    /* --ds-json: a raw DS blob to decode with the engine's own decoder, then exit.
+     * Deliberately not ctx.load_ds_path: that one resumes a run in progress, this one is a
+     * read-only decode and must not reach the game loop at all. */
+    const char *ds_json_path = NULL;
     const char *map_dump_path = NULL;
     unsigned seed = U2_RNG_DEFAULT_SEED;
     int rng_probe = 0;
@@ -571,6 +575,8 @@ int main(int argc, char **argv)
             rng_state_given = 1;
         } else if (strcmp(a, "--load-ds") == 0 && i + 1 < argc) {
             ctx.load_ds_path = argv[++i];
+        } else if (strcmp(a, "--ds-json") == 0 && i + 1 < argc) {
+            ds_json_path = argv[++i];
         } else if (strcmp(a, "--dump-ds") == 0 && i + 1 < argc) {
             dump_ds_path = argv[++i];
         } else if (strcmp(a, "--trace-rolls") == 0 && i + 1 < argc) {
@@ -1035,6 +1041,60 @@ int main(int argc, char **argv)
         fprintf(stderr, "u2: backend initialisation failed\n");
         u2_trace_close(&ctx);
         return 1;
+    }
+    /* --ds-json: decode a raw DS blob with the engine's own decoder and exit.
+     *
+     * This is the seam that lets a Python bot read the ORIGINAL's memory and the engine's
+     * through one decoder (docs/bot-driver.md § 1). The blob comes from Spice86 over HTTP;
+     * the output is the shape `--api` emits, so a policy written against one target reads the
+     * other without knowing which it has.
+     *
+     * Placed here, after wire_backends, for the reason api.c spells out above u2_api_attach:
+     * u2_state_json reads the renderer, input and clock names out of ctx and segfaults on the
+     * nulls that precede them. The first attempt put this right after u2_state_init and died
+     * exactly as that comment predicted.
+     *
+     * enter_world is not part of DS — it is the engine's own request-to-play flag — so mode
+     * would otherwise report "created" for a blob that is plainly mid-game. Deriving it from
+     * the presence of a name is the same test emit_obs already uses for "title", and it is
+     * not a guess about a phase the blob does not carry: a blob with no character in it is
+     * not in a world.
+     */
+    if (ds_json_path) {
+        /* Both forms, because the two callers hold different ones. `--load-ds` takes
+         * whitespace-separated hex, which is what `--dump-ds` writes and what a demo
+         * checkpoint carries. A live Spice86 read is raw bytes, and so is every .ds file
+         * already under captures/ — 10240 of them, larger than the mirror, so the leading
+         * sizeof(u2_state) bytes are the DS segment and the rest is whatever the dump
+         * spanned. Sniffed on content rather than on a caller-declared mode: a flag that
+         * silently parsed binary as hex would return plausible garbage fields instead of an
+         * error, and that is the failure shape this project keeps being bitten by. */
+        int rc = -1;
+        FILE *ds = fopen(ds_json_path, "rb");
+        if (ds) {
+            static unsigned char raw[sizeof(u2_state)];
+            size_t got = fread(raw, 1, sizeof raw, ds);
+            fclose(ds);
+            int hexy = 1;
+            for (size_t k = 0; k < got && hexy; k++)
+                /* The explicit `!= 0` is not paranoia. strchr(s, '\0') returns a pointer to
+                 * the terminating NUL, which is non-NULL and therefore true, so a naive
+                 * `strchr(set, byte)` reports every NUL byte as a hex digit — and a blob of
+                 * all zeros, which is a real and common case (a blank DS mirror), was then
+                 * handed to the text loader and rejected as "not whitespace-separated hex".
+                 * Found by the gate, not by reading: the first blob tried had non-zero bytes
+                 * in it and took the correct branch by accident. */
+                hexy = raw[k] != 0 && strchr("0123456789abcdefABCDEF \t\r\n", raw[k]) != NULL;
+            if (got == sizeof raw && !hexy)
+                rc = u2_state_load_ds_buf(&ctx.state, raw, got);
+        }
+        if (rc != 0) rc = u2_state_load_ds(&ctx.state, ds_json_path);
+        if (rc != 0) { release_backends(&ctx); u2_trace_close(&ctx); return 2; }
+        if (ctx.state.name[0]) ctx.enter_world = 1;
+        const int orc = u2_api_emit_observation(&ctx);
+        release_backends(&ctx);
+        u2_trace_close(&ctx);
+        return orc == 0 ? 0 : 2;
     }
     /* After the backends, before anything runs: the first observation names the renderer,
      * input and clock, and those only exist once wire_backends has chosen them. */

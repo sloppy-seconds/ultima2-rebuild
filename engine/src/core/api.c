@@ -407,6 +407,27 @@ void u2_api_end(u2_ctx *ctx, const char *reason)
     free(a);
 }
 
+/* One observation line, on stdout, for a caller that is not running a session.
+ *
+ * This exists so the DS decode has exactly one implementation. The bot has to look at the
+ * original's memory as well as the engine's (docs/bot-driver.md), and the obvious way to do
+ * that is a Python parser for the DS block — which would be a second hand-maintained copy of
+ * every field offset and every packed-decimal rule in state.h, drifting silently and showing
+ * it as a bot acting on a wrong field. So the bot ships raw bytes at the engine instead and
+ * gets this function's output for them, and the two targets cannot disagree about what a
+ * byte means because there is only one decoder.
+ *
+ * It is the same emit_obs() the live API prints, not a parallel formatter: same `char` block,
+ * same `state` block, same digest. A caller that reads one can read the other.
+ */
+int u2_api_emit_observation(u2_ctx *ctx)
+{
+    if (!ctx->api && u2_api_attach(ctx) != 0) return -1;
+    emit_obs(ctx);
+    fputc('\n', stdout);
+    return 0;
+}
+
 static int do_create(u2_ctx *ctx, const char *line)
 {
     u2_character c;

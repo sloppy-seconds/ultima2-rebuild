@@ -65,4 +65,9 @@ int  u2_api_active(const u2_ctx *ctx);
 /* Finalise. Idempotent. */
 void u2_api_end(u2_ctx *ctx, const char *reason);
 
+/* Print one observation line for whatever is currently in ctx->state, then return.
+ * Used by --ds-json so a caller holding a raw DS blob gets the engine's own decode of it;
+ * see the comment at the definition for why the decode is not duplicated in Python. */
+int  u2_api_emit_observation(u2_ctx *ctx);
+
 #endif /* U2_API_H */

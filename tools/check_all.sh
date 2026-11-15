@@ -120,6 +120,10 @@ run "space_check selftest" engine/tests/space_check_selftest.sh -- bash engine/t
 # conventions are pinned against externally checkable values (Ctrl-Z = 0x1A is the DOS EOF
 # byte; Ctrl-S/Ctrl-Q are XOFF/XON).
 run "spice86_type selftest" tools/spice86_type.py -- python3 tools/spice86_type.py --selftest
+# The two-target bot adapter: one DS decoder (the engine's), two executables, and an
+# undeliverable key that refuses instead of pretending the game ignored it. Needs no
+# emulator, which is what makes it gateable — the live proof is bot/play_original.py.
+run "bot target adapter" bot/target_check.py -- python3 bot/target_check.py
 # Whether a container image still matches its Containerfile. The old test was "does
 # an image exist", so an edited recipe was silently ignored — which cost a full
 # SDL3 container cycle to a message blaming the Makefile. Runs against a podman
