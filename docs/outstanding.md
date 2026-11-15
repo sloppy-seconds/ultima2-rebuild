@@ -29,8 +29,6 @@ implemented and no `UNPROVEN:` marker remains anywhere in `engine/src/`.
 
 | item | where | what is missing | grade | who |
 | --- | --- | --- | --- | --- |
-| Implement the clue seller (was: map it) | `commerce.c` `U2_SHOP_CLUE` | **Decoded 2026-11-15, no capture was needed.** The pool is ten NUL-separated strings at file `0x1d6b..0x1f1c`, currently drawn as fake instructions inside `asm/19D7_magic_shop_menu.asm` (see its header). The rule: `read_decimal_digit` returns 0..9, that digit is the price via `×100` byte placement (`price[0] = digit`, `price[1] = 0x00`, so digit 3 is 300 gold and digit 0 is free), `SI = digit + 1`, cursor `DS:27 = 0x1b6a`, and the shared walker `asm/155D` emits entry `digit`. Ten digits, ten entries. **Blocked on plumbing, not on knowledge:** the strings must be committed via the extractor, and `make content-check` proves a committed string is present *as data* in `asm/` — which they are not yet, because they are rendered as `.byte` forced-keeps. The fix is a re-cut of `asm/19D7` at `1D6A` into two files plus two rows in `disasm/function-map.tsv`, exactly as `asm/16BD` was re-cut from `asm/15E1`. The `db` rendering is byte-exact and already generated; the split was not attempted here because it edits the byte-exact reconstruction and needs `check_func` plus the full `assemble_clean.sh` proof behind it. | measured | agent |
-| The talking half of `cmd_T` | `commerce.c`, `"no dialogue for that role"` | The scripted arm and the `street_*` chain are wired; one role has no dialogue and says so rather than inventing one. | inferred | agent |
 | The talking half of `cmd_T` | `commerce.c`, `"no dialogue for that role"` | The scripted arm and the `street_*` chain are wired; one role has no dialogue and says so rather than inventing one. | inferred | agent |
 | The goal-spec policy rule | `docs/goal-spec.md` P8 | The engine now knows *why* something is invulnerable (slot 0, G78) but the policy layer has no way to express "stop attacking this", so a bot will attack an invulnerable guard forever. This is a bot rule, not engine behaviour. | measured | agent |
 
@@ -97,6 +95,7 @@ and is not. Each was verified against code or a gate, not against another docume
 | claimed open | where it was claimed | actual state, and how it was checked |
 | --- | --- | --- |
 | The pub's `1-BUY` and `2-TIP` | `docs/outstanding.md` § 1 (this file) | **Shipped today, 2026-11-15.** `shop_pub` in `commerce.c`, with the fifteen literals (five menu, ten barkeep) committed through the extractor as 4-tuple `run` locators, so they resolve from `asm/` with no copy of the game present — better than the shop menus, which are exe-only. The index rule turned out to be readable after all: `1-BUY` stores the constant 1 (the `rand_byte` at `asm/15E1:1847` is drawn, masked by `and $0x3` and then overwritten), and `2-TIP` charges the digit and lands on `digit + sign_of_al(rand_byte)` computed in a byte and forced to 0 at 10. `run_cp6.sh` gates all three arms of `asm/50D8` with pinned `--rng-state` values, plus a control that a digit outside 1 and 2 prints nothing and costs nothing. Two controls were run against the gate and both went red. |
+| The clue seller (`U2_SHOP_CLUE`) | `docs/outstanding.md` § 1 (this file) | **Built 2026-11-15, the day it was written up as blocked on plumbing.** The plumbing was the whole blocker and it took one re-cut: `asm/19D7` split at runtime `1b6a` into three files — the menu plus the cursor-seed NUL stays, the ten clues become `asm/1B6B_clue_pool.asm` as `db` lines, and the armour/weapons/transport catalogues become `asm/1D1D_shop_menus.asm`. `check_func.py` passes on all three and `assemble_clean.sh` rebuilds 1214 functions byte-ident. `shop_clue` in `commerce.c` charges the digit x100 by placement and prints entry `digit`; `run_cp6.sh` gates digit 0 (free, still buys clue 0), 3 (300 gold) and 9 (900 gold), each clue asserted as two lines because of the embedded newline glyph, and a control that shifts the index by one was run against the gate and went red. The eleven strings are committed through the extractor and resolve from `asm/` with no game present. |
 | The cleric shrine's greeting, and whether it prints the NAME | `docs/outstanding.md` § 3 (this file), `docs/needs-gameplay.md` G80 | **Closed 2026-11-15, statically.** `asm/507A` is not a one-instruction stub, it is a fragment split: `bx := 0`, then `mov 0x36(%bx),%al` / test / `call char_print` / `inc %bx` / loop across five fragments, and `DS:36` is the name field of the save record. So the shrine says `BROTHER <name>` and the engine was already right — the claim was just unproven. The fact was in the tree: `asm/0C62_death`'s header had read the same call correctly for the death announcement. Renamed to `asm/507A_print_player_name.asm` with the evidence in its header. |
 | The `DS:46` writer, and with it G80's `SISTER` question | `docs/outstanding.md` § 1 and § 3 (this file) | **Closed 2026-11-15 by G80b, and this file simply had not been told.** Exactly one writer, file `0x5951`, `mov %al,0x46` with `cmp $0x4d,%al` (`'M'`) three bytes later, so `DS:46` holds the typed letter and the shrine's `cmp $0x1` can never match. `SISTER` is dead code in the original and the engine is already faithful — do not "fix" it. Evidence is in `asm/1869_cleric_shrine.asm`'s header and `docs/needs-gameplay.md` G80b. |
 | Minax does nothing (role 0 skipped) | `handoff-2026-11-12.md` § 1a | **Shipped 2026-11-12.** `ai.c` runs the `asm/1040` arm with `U2_S_MINAX_CRIES` and the packed-decimal −100 on `DS:51`; 24 Minax checks in `ai_check.c`, wired into CP4 and CP5. The premise also got corrected the same day: Minax is `role 0x84`, reached through the **bit-7** branch, not `role == 0`. |
@@ -152,27 +151,41 @@ Because text is emitted by falling into it, **an address-reference search will n
 
 ### Three spans are string tables drawn as instructions
 
-`asm/4C50`, `asm/16BD` (fixed 2026-10-25), and `asm/19D7`'s `1D6A..1F1C` (fixed in header, bytes
-not yet re-cut). The tell is a run of `.byte 0x??  # forced-kept: gas re-encodes '...' differently`
-whose bytes are ASCII. **If a forced-keep run spells words, it is text.** Assume any long
-forced-keep run deserves this check before being cited as code.
+`asm/4C50`, `asm/16BD` (fixed 2026-10-25), and `asm/19D7`'s `1D6A..1F1C` (fixed 2026-11-15, and
+the bytes are now their own file, `asm/1B6B_clue_pool.asm`). The tell is a run of `.byte 0x??
+# forced-kept: gas re-encodes '...' differently` whose bytes are ASCII. **If a forced-keep run
+spells words, it is text.** Assume any long forced-keep run deserves this check before being
+cited as code.
 
-### The clue seller — complete spec, ready to build
+### The clue seller — built, and the recipe that did it
+
+The decode, in one place because three files now share it:
 
 1. Menu: `TIME AND TRAVEL MADE ME WISE,` `0x0d` `PRECIOUS GOLD, A CLUE IT BUYS!HOW MUCH WILL YOU PAY *100?`
 2. `read_decimal_digit` (`asm/2028`) → digit 0..9.
 3. Price: `price[0] = digit`, `price[1] = 0x00` — packed decimal placement, so digit 3 is 300 and
    digit 0 is free. No multiply anywhere, which is what the menu text says.
 4. `SI = digit + 1`; cursor `DS:27 = 0x1b6a`; `call asm/155D` → emits entry `digit`.
-5. The ten strings are in `asm/19D7_magic_shop_menu.asm`'s header, transcribed from bytes (not
-   from eye — two periods were wrong on the first pass and the generator caught it).
+5. The ten strings live in `asm/1B6B_clue_pool.asm`, transcribed from bytes (not from eye — two
+   periods were wrong on the first pass and the generator caught it).
 
-**The blocker is plumbing.** To commit the strings they go through the extractor, and
-`make content-check` proves a committed string is present *as data* in `asm/`. They are not data
-yet — they are `.byte` forced-keeps. So: re-cut `asm/19D7` at `1D6A` into two files, add two rows
-to `disasm/function-map.tsv` (that map, not a glob, is what `assemble_clean.sh` builds in), give
-the new file a `# body corrected:` marker naming the evidence, then add the extractor entries and
-build `U2_SHOP_CLUE`. `asm/16BD` is the worked precedent, split from `asm/15E1`.
+**The re-cut recipe, since it is the same one `asm/16BD` came from and it will come up again.** Cut
+the span file at the pool boundary into before / pool / after; give each piece a header; render the
+pool from the executable as `db` lines split on the newline glyph the way `asm/437E` splits
+`'VIEW',0x8d,'WITH MAGICAL HELM!'`; replace the glued `.byte` line at the boundary with the single
+NUL it still owes, commented, because the walker's cursor points at it; then, in order:
+
+* three rows in `disasm/function-map.tsv` — that map, not a glob, is what `assemble_clean.sh`
+  assembles in, and a row with a stray trailing tab makes `check_func.py` die on field count;
+* `python3 tools/check_func.py <SEG>` per segment;
+* `bash tools/assemble_clean.sh` over the whole binary — this is the only real proof;
+* `# body corrected:` markers on **all three** files, not just the pool. `asm_body_guard` flags a
+  new file and a changed file even when the bytes never moved, because the canonical stream changed
+  where the pool was re-rendered; `asm/15E1` carries the same marker for the same reason.
+
+One trap worth naming: `check_func.py` reads `L_<hex>` tokens in **header comments** as branch
+targets, so a prose mention of a label outside your own range is an error. Write bare hex in
+prose.
 
 ### G81 may be upside-down
 

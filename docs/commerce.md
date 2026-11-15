@@ -712,6 +712,16 @@ Splitting it is a Phase 2/3 function-boundary change, which touches the byte-pro
 harness, so it is **recorded as a defect and not done here.** It needs the owner's
 go-ahead and a per-function `check_func.py` run for each new range.
 
+**Done 2026-11-15, and the defect is gone.** The span is now three files: `asm/19D7_magic_shop_menu.asm`
+(`19D7..1B6A`, the wizard catalogue and the clue seller's arm), `asm/1B6B_clue_pool.asm`
+(`1B6B..1D1C`) and `asm/1D1D_shop_menus.asm` (`1D1D..2027`, armour, weapons and transport — three
+routines in one fragment, which is a Phase 2 tiling artefact rather than a property of the game).
+The pool turned out not to be code at all: `1D6A..1F1C` was ten NUL-separated strings the
+disassembler had run off the end of the menu and rendered as instructions, so the split corrected a
+false body as well as moving bytes, and `assemble_clean.sh` still rebuilds the binary byte-ident.
+The lesson generalises: **a long run of `.byte` forced-keeps whose bytes are ASCII is text**, and
+`asm/4C50` is the same failure still standing.
+
 ## 7. Follow-ups
 
 | item | note |
@@ -721,7 +731,7 @@ go-ahead and a per-function `check_func.py` run for each new range.
 | ~~**G23** — read `DS:27/28/29/2A` and `DI` live at runtime `17B7` and `2052` during a vendor purchase, to settle whether the food price is a constant or is derived from `int + cha`~~ **closed 2026-10-29** — it is derived, the printed pair and the charged pair are the same two bytes, and the printed number was `0020` and not `0200`. `captures/spice86/g23-food-live`, `captures/spice86/g23-weapons`; § 3b's correction and § 5d | resolved above |
 | ~~Assign `AH! YES! A ` (file `0x20D9`) to a shop~~ **not assigned** — the weapons shoppe uses `AH! YES! ` like armour does, on frame evidence; see § 5e. Its real owner is probably the wizard shoppe, which has never run | open, needs a capture |
 | Walk each shop routine's arithmetic to confirm every price is computed | closes the § 1 limit |
-| Split `asm/19D7` into its real routines | boundary change, needs approval + `check_func.py` per range |
+| ~~Split `asm/19D7` into its real routines~~ **done 2026-11-15** — three files, `check_func.py` per range, `assemble_clean.sh` byte-ident; see § 6 | resolved above |
 | ~~Confirm `[DS:46]` is gender and find the class byte the `NOT A CLERIC/WIZARD` guards test~~ **the class byte is `DS:47`** — `asm/1841` tests `[DS:47] == 1` before the shrine and `asm/19AF`'s successor fragment tests `[DS:47] == 2` before the magic shoppe. `[DS:46]` is untouched by this finding | resolved in part |
 
 ## 8. The tribute: TRANSACT is not only a shop command

@@ -6,6 +6,16 @@ costs is known game behaviour. The three merges landed in `4644eb9`; § 6 below 
 execution record. What follows in § 1–5 is the proposal as written, kept intact because
 the reasoning is the part worth keeping.
 
+**Partly reversed 2026-11-15, and worth an owner look.** `19D7..2027` was split after all, into
+`asm/19D7_magic_shop_menu.asm` (`19D7..1B6A`), `asm/1B6B_clue_pool.asm` (`1B6B..1D1C`) and
+`asm/1D1D_shop_menus.asm` (`1D1D..2027`). Two things changed since the ruling: the span's
+`1D6A..1F1C` was proved to be ten NUL-separated clue strings drawn as instructions rather than
+code, and `make content-check` requires a committed string to be present *as data* in `asm/`,
+which a `.byte` forced-keep is not. So the split corrected a false body and unlocked the clue
+text, and `assemble_clean.sh` still rebuilds the binary byte-ident. The § 2 argument for leaving
+the range alone — that the boundaries are uncertain — was weakened by the same finding, since the
+pool boundary is exact. Flagged here rather than slipped in, because it overrides a ruling.
+
 Splitting a function boundary is a Phase 2/3 change to the byte-proof harness and needs the
 owner's approval, plus a `check_func.py` run per new range. Opened by ticket G22; this
 document was task A5 of `docs/overnight-2026-10-23.md`.

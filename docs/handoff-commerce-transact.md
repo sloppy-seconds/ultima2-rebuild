@@ -21,9 +21,15 @@ them open.
 Still open after this run, and named where they are implemented: the cleric shrine, the magic
 shoppe, the pub and the clue seller are dispatched but not implemented (each gap is commented at
 its branch in `commerce.c` with the reason — the spell-slot question, the chatter table, the clue
-pool). Where the dialogue line renders on screen is not established. `[DS:46]` as gender is
-untouched. The ray's `0x7C` near-cell case is read but has never been the accepted tile in a live
-purchase except in the grocery reproduction.
+pool). **Two of those four have since shipped, and this paragraph is the one this file got wrong
+and left standing: the pub and the clue seller are both implemented now** (`shop_pub`, `shop_clue`).
+The pub shipped 2026-11-15 on the chatter table that had been re-cut out as `asm/16BD` back on
+2026-10-25; the clue seller shipped the same day on its pool, re-cut as `asm/1B6B_clue_pool.asm`.
+`run_cp6.sh` gates both and each was checked against a mutation control. What is genuinely left
+here is the cleric shrine and the magic shoppe. Where the dialogue line renders on screen is not
+established. `[DS:46]` as gender is untouched, and G80b showed why that is correct: the branch is
+dead code in the original. The ray's `0x7C` near-cell case is read but has never been the accepted
+tile in a live purchase except in the grocery reproduction.
 
 Repo at time of writing: `main`, tree clean, `check_all` green, CP0–CP6 green.
 
