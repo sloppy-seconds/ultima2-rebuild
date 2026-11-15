@@ -205,12 +205,16 @@ A killed Spice86 process can leave its previous port bound for a while, and the 
 ## Which tool for which job
 
 This table exists because the tooling was re-derived from scratch several times.
-Check it before writing anything new against a live session.
+Check it before writing anything new against a live session. It covers **capture**; for
+building an artifact, playing either binary in a browser, or seeding a save at a specific
+entry location, see `docs/tooling-procedures.md` § "Build, play, seed" — same reason, same
+kind of table, different three jobs.
 
 | job | tool | needs a display? |
 | --- | --- | --- |
 | launch / label / seed a run | `tools/spice86_start.sh` (`-h` for options) | no (`--headless`) |
 | **play the original in a browser** | **`deploy/spice86-novnc/up.sh`** | **no** — brings its own Xvfb + noVNC on :6085 |
+| **play our engine in a browser** | **`deploy/novnc/up.sh`** | **no** — same shape pointed at the Phase 4 binary, :6082 |
 | **send keys to a headless run** | **`tools/spice86_type.py --keys Escape,p`** | **no** — MCP |
 | enter the world unattended | `tools/spice86_start.sh --auto-play` | no |
 | list what the emulator can do | `tools/spice86_type.py --list` (63 MCP tools) | no |

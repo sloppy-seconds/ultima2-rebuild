@@ -76,14 +76,18 @@ read as done.
 
 ## 6. Environment, not code
 
-- **SDL3 is not installed on this host.** `make sdl` fails with `no usable SDL3 found`, so
-  `u2-sdl-static` cannot be rebuilt here, so the `engine build fresh` gate in
-  `tools/check_all.sh` has been red for that reason since before the spell work and will stay
-  red until SDL3 is installed or the stale binary is removed by someone who owns that choice.
-  Every other gate is green.
 - **Context-mode needs Node 24.15+; this host has 22.23.3.** Worked around throughout this
   session by running probes through `live_terminal_run` into `/var/tmp` files. It costs time on
   every session and nobody has written down who owns fixing it.
+
+One bullet was deleted from this section on 2026-11-15, and it is worth recording that it was here
+at all: it said SDL3 is not installed on this host, so `u2-sdl-static` cannot be rebuilt here, so
+the `engine build fresh` gate would stay red forever. All three clauses were wrong. The host is not
+meant to have SDL3 — `./deploy/linuxbuild/build.sh` builds the static-SDL artifact in a container,
+the image exists, and running it takes about a minute. The gate was red because of a dirty build
+tree, which `make clean` fixes. An environment constraint that was really a missing command sat in
+this file justifying itself for weeks. The build, play and seed paths are now in
+`docs/tooling-procedures.md` § "Build, play, seed".
 
 ---
 

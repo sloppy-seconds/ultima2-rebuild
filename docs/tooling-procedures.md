@@ -280,3 +280,145 @@ unpatched but reintroduces the NumLock problem. Default is `real`.
 - The burst-delay window has not been re-measured on this project's binary.
 - No `--patch-arrows` test has been run end-to-end against a live emulator; the
   patcher is proven against a file copy only.
+
+---
+
+# Build, play, seed
+
+Three sections, added 2026-11-15, because the tooling for all three already existed and was still
+being re-derived per session. The capture side has had a "Which tool for which job" table in
+`docs/spice86-capture.md` for weeks and it stopped the re-derivation there; nothing equivalent
+existed for these three, so every session wrote its own one-liners.
+
+**Read this before writing a build command, a `podman run`, or a save-file script.**
+
+## Build: one artifact, one container
+
+The rule is that **only the terminal build runs on the host**. Everything with a platform
+dependency is built in a container, and the container is the supported path, not a workaround for a
+deficient host. A note in `docs/outstanding.md` § 6 recorded the opposite — "SDL3 is not installed
+on this host, so `u2-sdl-static` cannot be rebuilt here" — for long enough to become the accepted
+reason a gate was red. It was false. The host is not supposed to have SDL3.
+
+| want | run | produces | notes |
+| --- | --- | --- | --- |
+| the dev binary, tests, gates | `make -C engine` | `engine/u2` | host, no platform deps. This is what `make test` uses |
+| the single-file Linux player | `./deploy/linuxbuild/build.sh` | `engine/u2-sdl-static` | SDL3 **static**, glibc dynamic. `--rebuild` forces a no-cache image rebuild |
+| the engine in a browser | `./deploy/novnc/up.sh` | container + staged `deploy/novnc/u2-sdl` | builds the artifact itself if it is stale, then streams it |
+| the original in a browser | `./deploy/spice86-novnc/up.sh` | container | Xvfb + Spice86 + x11vnc + websockify in one container |
+| the Windows build | `make sdl-win`, or `deploy/winbuild/` | `u2-sdl.exe` | cross-build, its own image |
+| substitute tile art | `deploy/art-pipeline/` | tile sets | see `docs/cleanroom-procedure.md` before commissioning art |
+
+Verified by running it, 2026-11-15: `./deploy/linuxbuild/build.sh` exits 0, writes
+`engine/u2-sdl-static`, and `ldd` on the result lists only `libc`, `libm` and the vdso — no
+`libSDL3.so`, which is the whole point of the static link. The image is `localhost/u2-linuxbuild`
+and freshness is keyed on the Containerfile's content hash, not on whether an image exists, because
+the older test let an edited Containerfile be silently ignored in favour of a stale image.
+
+**`make sdl` on the host is not a path and its failure is not a defect.** It probes for SDL3 dev
+headers via `engine/tools/sdl_probe.sh`; this host has none, deliberately. If you want the SDL build, run
+the container script above.
+
+**`make clean` is cheap, not a crisis.** The `engine build fresh` gate in `tools/check_all.sh`
+refuses to run over a dirty tree and says so (`fresh: run 'make clean' before rebuilding`). Running
+`make clean` deletes `engine/u2-sdl` and `engine/u2-sdl-static`, which are gitignored build output,
+and the container rebuilds the static one in about a minute. Do not treat a missing SDL binary as
+something to work around, and do not leave a stale one in place to keep a gate quiet — `outstanding.md`
+§ 6 carried exactly that stale binary as an environment constraint for weeks.
+
+## Play in a browser, both binaries
+
+Two containers, same shape, different binaries. Both run on `ai` and need nothing from the host
+except podman.
+
+| binary | command | host port | seeding |
+| --- | --- | --- | --- |
+| the original under Spice86 | `./deploy/spice86-novnc/up.sh` | 6085 | `--player tmp/<run>/player`, or `--no-player` for the title screen |
+| the Phase 4 engine | `./deploy/novnc/up.sh` | 6082 | `--cleanroom` for the substitute art, `--port N` to move it |
+
+Both take `--down` to stop and remove and `--rebuild` to refresh the image.
+`deploy/spice86-novnc/up.sh --status` and `deploy/novnc/up.sh --status` print what the running
+container is actually drawing, which is the difference between "the container is up" and "the game
+is on screen".
+
+**Use `up.sh`, never a hand-run `make` / `cp` / `podman build` / `podman run` chain.** The engine
+container used to document that sequence, and it is how a player got art they had not asked for:
+the build ran behind a swallowed redirect, a build that quietly did nothing produced no signal, and
+whatever `engine/u2-sdl` happened to be got copied into the image. `up.sh` now checks the artifact
+at four points and the load-bearing one runs the binary and requires it to announce the art mode it
+was asked for. It has a control: a planted wrapper that prints the substitute-art line makes
+`up.sh` exit 1 and refuse to stage.
+
+Two traps, both of which have cost a session an afternoon:
+
+* **The pristine `references/ultima2/player` is not a character.** It is the 384-byte blank the game
+  uses for *creation*. Seed nothing and `P` at the title answers "no character on disk!" — which
+  looks like a broken container and is not. `up.sh` seeds one by default and prints its name.
+* **Do not copy a `tiles.u2tl` into a save dir to "help" it.** It is a cache the engine writes for
+  itself, it belongs beside the content it came from (`<data-dir>/cache/tiles.u2tl`), and the
+  cleanroom path never overwrites it — so a stale one sits there looking like evidence about a run
+  that is not happening. `up.sh` deletes one from the old save-dir location on every deploy.
+
+The two READMEs (`deploy/novnc/README.md`, `deploy/spice86-novnc/README.md`) carry the detail and
+are the maintained copy; this table is an index onto them, not a replacement.
+
+## Seed a save at a specific entry location
+
+"Put me at sector 20 cell (20,20)" is a lookup, not a script. Both sides have a tool.
+
+### The original
+
+```sh
+python3 tools/u2_edit.py show FILE                 # decode a record
+python3 tools/u2_edit.py set  FILE sector 20       # one field by name
+python3 tools/u2_edit.py setpos FILE 20 20         # x, y
+python3 tools/u2_edit.py maxout FILE               # the test character
+```
+
+Then hand it to the runner: `tools/spice86_start.sh --player FILE --auto-play`, or
+`deploy/spice86-novnc/up.sh --player FILE`. `--seed-map PATH` drops a synthetic `mapxNN` into the
+run copy when the terrain matters.
+
+**Do not `setpos` into a SITE sector.** The trap is documented at the top of `tools/u2_edit.py` and
+it is a real one: the ones digit of the sector number *is* the site kind, so a sector like 22 is a
+dungeon and dropping a coordinate into it produces a state the game never builds itself. Use a
+wilderness sector. `tools/u2_endgame_save.py` is the worked example of building a specific
+scenario end to end.
+
+### The engine
+
+The engine reads a content dir and a save dir, so a scenario is a directory, not a patched binary:
+
+```sh
+mkdir -p /var/tmp/scenario/content /var/tmp/scenario/save/PLAYER
+```
+
+For a **real** sector, copy the game content and edit the save record with the same
+`tools/u2_edit.py`. For a **synthetic** sector — the case the CP6 and CP7 gates use —
+`engine/tests/cp6_commerce_seed.py <dir> <case>` writes a whole scenario (content, save, and the
+sector geometry the case needs) and prints what it placed. That is the tool to extend rather than
+re-implement; `docs/commerce.md` explains what each case is asserting.
+
+To drive it unattended and read what happened:
+
+```sh
+printf 'T\n0xf0\n3\n' > /var/tmp/scenario.keys        # keys; 0xf0 = a digit prompt
+./engine/u2 --headless --play-map --cleanroom \
+    --data-dir /var/tmp/scenario/content --save-dir /var/tmp/scenario/save \
+    --script /var/tmp/scenario.keys --trace=/var/tmp/scenario.trace \
+    --dump-each --dump-state > /var/tmp/scenario.out 2>&1
+```
+
+`--trace` writes one line per emitted string and per state change, `--dump-state` appends the JSON
+record, and `--dump-each` prints the screen after every key. Confirm a key landed by reading state,
+never by the send returning ok — a dropped key looks exactly like a no-op. This is the recipe that
+was being re-derived by hand until it was written down; `engine/tests/run_cp6.sh` is a working
+example of every part of it.
+
+### Both
+
+`tools/save_cross_load.py` is the cross-check: it loads the original's record into the engine and
+has the original load a record the engine wrote, reading both back out of live memory. Run it
+whenever save handling changes — `engine/src/core/save.c`, the write-back in `engine/src/core/world.c`,
+the DS layout in `engine/src/core/state.h`, or the harness itself. `docs/save-format.md` § 9 has the
+recipe and § 8 the reason a whole-window byte comparison is not achievable.
