@@ -195,9 +195,61 @@ static int take_screenshot_key(u2_ctx *ctx, const u2_key *out)
     return 1;
 }
 
+/* asm/4F58, asm/4F5C, asm/4F60: key_poll compares AL against 0x05, 0x0E and 0x17 and
+ * discards the key when it matches, before anything downstream can see it. Those three
+ * are exactly three of the four direction codes the arrow table at CS:0x4F09 emits --
+ * Right (0x05, Ctrl-E), Up (0x0E, Ctrl-N), Left (0x17, Ctrl-W) -- so the swallow is the
+ * mechanism that makes the arrows the only way in for three of the four compass points.
+ *
+ * South's code is 0x19 (Ctrl-Y) and it is NOT in the list, which is the whole reason
+ * G30 was worth asking. The bytes are `cmp $0x5,%al` / `cmp $0xe,%al` / `cmp $0x17,%al`
+ * and there is no `cmp $0x19,%al` anywhere in the tree.
+ *
+ * The mapping below is the other half of the same decode, and it is why one function
+ * here covers both the overworld and the dungeon.
+ */
+static int swallow_direction_control_bytes(u2_key *out)
+{
+    switch (out->ch) {
+    case 0x05:              /* Ctrl-E, the table's EAST */
+    case 0x0E:              /* Ctrl-N, the table's NORTH */
+    case 0x17:              /* Ctrl-W, the table's WEST */
+        return 1;
+    case 0x19:
+        /* The table's SOUTH, and the one direction code a player can type.
+         *
+         * asm/4FBE matches the arrow table on AH (`cmp %cs:0x4f09(%bx),%ah`) and
+         * asm/4FCC replaces AL with the mapped byte (`mov %cs:0x4f0a(%bx),%al`);
+         * then asm/4FD1 runs `mov $0xff,%ah`, which is the "a key was consumed"
+         * flag and which DESTROYS the scancode. So by the time anything downstream
+         * looks, a Down arrow and a typed Ctrl-Y are the same two bytes: AL = 0x19,
+         * AH = 0xFF. Nothing can distinguish them, in the overworld or in a site.
+         *
+         * Mapping the typed byte onto the code the arrow produces is therefore what
+         * makes that property true here rather than a guess about it -- and it is why
+         * this one line fixes the dungeon too, where asm/277B has Down mean RETREAT:
+         * the original cannot tell the two apart there either, so neither may we.
+         * Adding an arm to each caller instead would have left the dungeon wrong and
+         * looked complete.
+         *
+         * The SDL backend already turns Ctrl+letter into the control byte
+         * (`key & 0x1F`, see input_sdl.c), so 0x19 really does arrive here; before
+         * this it fell through to the command jump table, found no letter, and did
+         * nothing silently -- a divergence wearing the costume of a no-op.
+         */
+        out->ch   = U2_KEY_DOWN;
+        out->scan = 0x50;
+        return 0;
+    default:
+        return 0;
+    }
+}
+
 int seam_key_poll(u2_ctx *ctx, u2_key *out)
 {
     int got = ctx->input->poll(ctx, out);
+    if (got > 0 && swallow_direction_control_bytes(out))
+        return 0;
     if (got > 0 && take_screenshot_key(ctx, out))
         return 0;
     if (got > 0) {

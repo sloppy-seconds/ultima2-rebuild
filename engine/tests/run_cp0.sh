@@ -98,6 +98,32 @@ else
     sed 's/^/        /' "${WORK:-/var/tmp}/keywait.build" | head -5
 fi
 
+# The arrow table emits control bytes, and key_poll swallows three of the four.
+# South's (0x19) is not among them, so south is the one direction a player can type —
+# the answer to G30, which had been parked as needing a capture and could not be settled
+# by one, because Spice86's send_keyboard_key applies Shift but ignores Ctrl.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "${WORK:-/var/tmp}/dirkey_check" \
+        tests/dirkey_check.c src/core/seam.c src/core/vram.c src/core/state.c \
+        src/core/demo.c src/core/world.c src/core/roots.c src/core/slot.c \
+        src/core/font.c src/core/frame.c src/core/view.c src/core/rng.c \
+        src/core/timer.c src/core/replay.c src/core/sha256.c src/core/version.c \
+        src/debug/trace.c src/debug/dump_state.c 2>"${WORK:-/var/tmp}/dirkey.build"; then
+    if "${WORK:-/var/tmp}/dirkey_check" > "${WORK:-/var/tmp}/dirkey.out" 2>&1; then
+        n=$(sed -n 's/^  ok  \([0-9]\{1,\}\) checks.*/\1/p' "${WORK:-/var/tmp}/dirkey.out")
+        if [ "${n:-0}" -eq 0 ]; then
+            bad "CP0 direction-key run executed 0 checks — the test is not running"
+        else
+            ok "seam_key_poll: three direction codes swallowed, south typable ($n checks)"
+        fi
+    else
+        bad "direction-key contract violated:"
+        sed 's/^/        /' "${WORK:-/var/tmp}/dirkey.out"
+    fi
+else
+    bad "direction-key test harness did not build:"
+    sed 's/^/        /' "${WORK:-/var/tmp}/dirkey.build" | head -5
+fi
+
 # The PRNG is a shift register (asm/5217 + asm/522B + asm/5236), seeded once at
 # launch from the 0x40:6C byte (asm/0100). Vector derived by hand-decoding those
 # three fragments together; it guards regressions and documents the decode.
