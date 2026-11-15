@@ -64,7 +64,10 @@ recommendation in § 3a is to keep the loop-scoped structure rather than test th
 > a record a pre-slot tree left behind (`u2_slot_adopt_legacy`, spec § 4b, an owner-approved
 > amendment to D6) because the drop-in layout has no installer to run. The gate for the whole change is `engine/tests/content_immutable.py`, wired
 > into `run_cp4.sh`, and it runs its own red control every time. **To start a fresh
-> agent, read `docs/handoff-2026-11-12.md` first (**current entry point** — the Minax session:
+> agent, read `docs/outstanding.md` first (**what is actually left, validated against the tree
+> 2026-11-15** — it exists because handoff queues go stale faster than the sessions that read
+> them, and nine items in the entry point below had already shipped the same day it was written).
+> Then read `docs/handoff-2026-11-12.md` (the Minax session:
 > the game was won in the original, which retired several "never executed" notes in `asm/`, and
 > the open work is CP8 (Minax is skipped entirely by one line in `ai.c`, her teleport is observed
 > but undecoded, invulnerable castle creatures have no mechanism in the engine, and the engine's
@@ -447,6 +450,15 @@ Verification, in two independent layers:
 * **A wrong name is worse than no name.** If bytes contradict an existing name,
   add a `# NAME DISPUTED:` line in the same commit and propose the rename;
   do not silently rename on your own inference.
+* **A shipped item is closed in every live handoff that lists it open, in the same commit.**
+  The mirror of the rule above, and the same failure. A session ships something, records it in
+  the topic doc, and leaves the handoff that named it as open work — and the next agent reads
+  the handoff, because that is what this file tells it to read, and reports finished work as
+  the queue. This happened on 2026-11-15: nine items in the then-current entry point had shipped
+  the same day it was written. `docs/outstanding.md` is the validated answer to "what is left"
+  and is regenerated against the tree, not maintained by hand; when you close something it
+  names, close it there too rather than letting it drift into a second stale queue.
+
 * **Third-party data is a hypothesis the bytes get to veto.** `bestiary/` attaches
   community creature names to art indices, and it does so by measured bitmap
   identity — but the *name* itself comes from a wiki, not from this binary, and never
