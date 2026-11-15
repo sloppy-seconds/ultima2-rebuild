@@ -21,6 +21,12 @@
 #           would make it diverge from the bytes. The bug is the original's.
 # note: the pristine references/ultima2/player is an all-zero slot template (DS:46 == 0), which
 #           also never equals 1, so no shipped save can reach the branch either.
+# note: the greeting is "BROTHER <name>", not "BROTHER " alone. The `call L_00527a` between the
+#           salutation and the menu is asm/507A, which prints DS:36 up to its NUL -- the name field
+#           of the save record. It looked like a one-instruction stub because the loop lives in the
+#           four fragments after it; see that file's header. Closed statically 2026-11-15, and it
+#           had already been read correctly in asm/0C62_death's header, which prints the same field
+#           for the death announcement.
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 cleric_shrine:
 L_001a69:

@@ -824,10 +824,11 @@ static u2_transact_result sell_spell(u2_ctx *ctx, int wizard)
          * if a capture ever shows SISTER, the thing that was wrong is [DS:46]'s meaning and
          * this line changes with it. See docs/needs-gameplay.md. */
         seam_str_out(ctx, st->sex == 1 ? U2_S_SHOP_CLERIC_SIS : U2_S_SHOP_CLERIC_BRO);
-        /* asm/1869 then calls L_00527a, and asm/507A is a one-instruction stub in this tree,
-         * so what it emits is not reconstructed. The engine prints the character's name, which
-         * is what "BROTHER " reads as and is the only thing in the record that fits. Graded
-         * inferred and named here rather than left as an unremarked gap in the greeting. */
+        /* asm/1869 then calls L_00527a, which is asm/507A: bx := 0, then print DS:36+bx until
+         * a NUL. DS:36 is the name field of the save record, so the greeting is
+         * "BROTHER <name>". Proven statically 2026-11-15 by reading the five fragments the
+         * routine is split across (asm/507A's header); the same call is what prints the name in
+         * the death announcement, which had already been read correctly in asm/0C62_death. */
         seam_str_out(ctx, (const char *)st->name);
         seam_char_print(ctx, '\r');
         seam_str_out(ctx, U2_S_SHOP_MENU_LADDERS);
