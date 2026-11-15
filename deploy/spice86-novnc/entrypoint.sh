@@ -104,6 +104,38 @@ if [ -n "$SEED_MAP" ]; then
     esac
 fi
 
+# --- resume overlay --------------------------------------------------------
+# Set by up.sh --resume. The previous run's own files go on top of the pristine copy, so a
+# hard restart lands back in the same game rather than a fresh one. Sector files are
+# included deliberately: resuming "exactly the last game" means the world the last run
+# left behind, and the list is printed so a restored map is visible instead of silent.
+# See the death-is-terminal note in up.sh; this exists because the game gives no other way
+# back to the menu.
+if [ -n "${RESUME_DIR:-}" ]; then
+    if [ ! -d "$RESUME_DIR" ]; then
+        echo "spice86-novnc: RESUME_DIR not found: ${RESUME_DIR}" >&2
+        exit 1
+    fi
+    echo "spice86-novnc: resuming from ${RESUME_DIR}"
+    restored=0
+    for f in "$RESUME_DIR"/player "$RESUME_DIR"/mapx* "$RESUME_DIR"/monx* "$RESUME_DIR"/tlkx*; do
+        [ -f "$f" ] || continue
+        base=$(basename -- "$f")
+        # cksum, not cmp: this image has no `cmp`, and a missing binary exits non-zero, so
+        # `cmp -s` reported every file as differing and the log claimed 82 files restored
+        # when three had changed. And cksum prints the path, so only the first two fields
+        # (CRC and byte count) are comparable across two different directories.
+        if [ -f "${RUN_DIR}/${base}" ] &&
+           [ "$(cksum "$f" | cut -d' ' -f1,2)" = "$(cksum "${RUN_DIR}/${base}" | cut -d' ' -f1,2)" ]; then
+            continue
+        fi
+        cp -- "$f" "${RUN_DIR}/${base}"
+        echo "spice86-novnc:   restored ${base}"
+        restored=$((restored + 1))
+    done
+    echo "spice86-novnc: ${restored} file(s) restored over the pristine copy"
+fi
+
 # --- emulator --------------------------------------------------------------
 echo "spice86-novnc: Spice86 -e ${EXE_NAME} (cycles ${CYCLES}, http ${HTTP_PORT}, mcp ${MCP_PORT}, gdb ${GDB_PORT})"
 # --AllowIvtAddress0 is mandatory for this game (see AGENTS.md / spice86_start.sh).

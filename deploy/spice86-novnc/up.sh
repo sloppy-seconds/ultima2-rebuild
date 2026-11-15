@@ -7,6 +7,8 @@
 #   ./up.sh --down          # stop and remove the container
 #   ./up.sh                 # blank player disk: 'C' creates, 'P' has nothing to load
 #   ./up.sh --player FILE   # seed a saved character (then press P in the game)
+#   ./up.sh --resume [DIR]  # resume a previous run exactly: overlay that run dir's player
+#                           # AND its sector files, then launch. DIR defaults to the newest.
 #   ./up.sh --no-player     # same as the default now; kept so old invocations work
 #   ./up.sh --no-patch      # leave arrow keys unpatched (use the numpad)
 #   ./up.sh --name LABEL    # container name (default u2-spice86)
@@ -25,6 +27,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
 
 PLAYER=""
+RESUME=""
 NO_PLAYER=0
 NO_PATCH=0
 REBUILD=0
@@ -35,10 +38,13 @@ while [ $# -gt 0 ]; do
         --rebuild)   REBUILD=1; shift ;;
         --down)      DOWN=1; shift ;;
         --player)    PLAYER=$2; shift 2 ;;
+        --resume)    # optional argument: consume it only if it is not another flag
+                     if [ $# -ge 2 ] && [ "${2#-}" = "$2" ]; then RESUME=$2; shift; fi
+                     shift ;;
         --no-player) NO_PLAYER=1; shift ;;
         --no-patch)  NO_PATCH=1; shift ;;
         --name)      CONTAINER=$2; shift 2 ;;
-        -h|--help)   sed -n '2,12p' "$0"; exit 0 ;;
+        -h|--help)   sed -n '2,14p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -132,6 +138,38 @@ else
     # a specific save is something you ask for by name.
     echo "blank player disk in place: 'C' creates a new character; 'P' will say 'no character on disk!'"
     echo "      to play a specific save, restart with --player FILE"
+fi
+
+# --- resume a previous run ---------------------------------------------------
+# Death in Ultima II is terminal: the game offers no way back to the menu, so the only
+# recovery is a hard restart of the program (owner, 2026-11-15, after sitting on a death
+# screen waiting for a keypress that never comes). A hard restart normally means a fresh run
+# dir built from the pristine mount, which orphans everything the last run wrote.
+#
+# --resume fixes that by overlaying the previous run's own files on top of the pristine
+# copy, inside the container, before launch. Sector files are included on purpose: the
+# point is to resume exactly the last game, damage and all, not to pretend the game has no
+# mutable world. It restores what the last run actually wrote and prints the list, so a
+# resurrected map is visible rather than silent.
+if [ -n "$RESUME" ]; then
+    RESUME_BASE=$(basename -- "$RESUME")
+    [ -d "$RESUME" ] || { echo "no such run dir: $RESUME" >&2; exit 1; }
+elif [ -d "$RUNS_HOST" ]; then
+    RESUME_BASE=$(ls -1 "$RUNS_HOST" 2>/dev/null | grep -E '^[0-9]{8}-[0-9]{6}$' | tail -1)
+    [ -n "$RESUME_BASE" ] && RESUME="$RUNS_HOST/$RESUME_BASE"
+fi
+if [ -n "$RESUME" ]; then
+    [ -n "$RESUME_BASE" ] || RESUME_BASE=$(basename -- "$RESUME")
+    [ -f "$RESUME/player" ] || { echo "run dir has no player file: $RESUME" >&2; exit 1; }
+    ENV_ARGS+=(--env "RESUME_DIR=/project/tmp/runs/$RESUME_BASE")
+    echo "resuming from $RESUME"
+    echo "  player $(md5sum "$RESUME/player" | cut -c1-12)"
+    n=0
+    for f in "$RESUME"/mapx* "$RESUME"/monx* "$RESUME"/tlkx*; do
+        [ -f "$f" ] || continue
+        cmp -s "$f" "$ROOT/references/ultima2/$(basename -- "$f")" || n=$((n + 1))
+    done
+    echo "  $n sector/dialogue file(s) differ from pristine and will be restored"
 fi
 
 echo "starting $CONTAINER ..."
