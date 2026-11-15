@@ -5,6 +5,14 @@ FM Towns side-by-side layout to become our enhanced-mode layout, and asked that 
 layout be validated against the reference screenshots first. It has been, and the
 measurements are below.
 
+> **Added 2026-11-15 — a fifth item, owner-ruled, not a decision: enhanced mode should address
+> the player according to gender in its speech.** Tracked in `docs/outstanding.md` § 1. It lives
+> here because it is enhanced-only work, and it is a deliberate divergence rather than a fidelity
+> target: the DOS original's only gendered line is the cleric shrine's `BROTHER`/`SISTER`, and
+> that branch is dead code (`DS:46` holds the typed letter while the code compares against 1 —
+> `asm/1869_cleric_shrine.asm` header, G80b). There is no original behaviour to copy. Classic mode
+> must keep saying `BROTHER`, because matching the original there means the branch never fires.
+
 Four decisions need a ruling before any of this is built (§ 4). Two of them change
 what the player can see, which makes them gameplay decisions rather than cosmetic
 ones, and one of them changes a string's provenance, which makes it a licensing

@@ -17,7 +17,7 @@ it can be driven from a shell.
 
 ---
 
-## 1. Engine gaps the code itself names
+## 1. Work to build: gaps the code names, plus owner-ruled items
 
 These are the only places the engine admits it does not do something. `grep -rn "engine_gap(ctx,"
 engine/src/` returns two, and the command table has no `NULL` slots left — all 26 letters are
@@ -30,6 +30,8 @@ implemented and no `UNPROVEN:` marker remains anywhere in `engine/src/`.
 | The `DS:46` writer | `state.h:194` | The shrine's `SISTER` branch is proven (`DS:46 == 1`), but nobody has found what writes `DS:46`. If the create flow stores `1`/`0` and not `'F'`/`'M'`, the engine's `sex == 1` test never fires and `state.h`'s comment is a port bug. Static search, not a capture. | inferred | agent |
 | The talking half of `cmd_T` | `commerce.c`, `"no dialogue for that role"` | The scripted arm and the `street_*` chain are wired; one role has no dialogue and says so rather than inventing one. | inferred | agent |
 | The goal-spec policy rule | `docs/goal-spec.md` P8 | The engine now knows *why* something is invulnerable (slot 0, G78) but the policy layer has no way to express "stop attacking this", so a bot will attack an invulnerable guard forever. This is a bot rule, not engine behaviour. | measured | agent |
+
+| Gendered speech in enhanced mode | `docs/enhanced-layout-plan.md` | **Owner-ruled 2026-11-15, not built.** Enhanced mode should address the player according to their gender. This is a deliberate divergence from the original and must be treated as one: the DOS binary's only gendered line is the cleric shrine's `BROTHER`/`SISTER`, and that branch is **dead** — `DS:46` holds the typed letter `'M'`/`'F'` while the code compares against `1` (G80b, `asm/1869_cleric_shrine.asm` header). So there is no original behaviour to copy, only an intent to implement. Two consequences: it needs its own gate rather than a fidelity test, and it must not be switched on in classic mode, where matching the original means always saying `BROTHER`. Before building, find every gendered line the enhanced sources actually have — the FM Towns material in `references/` and `disasm/fmtowns-crosswalk.tsv` is where to look, because the DOS exe has exactly one and it never fires. | owner-ruled, unbuilt | agent |
 
 ## 2. Decoded, drawn, but not yet honest in the gate
 
@@ -112,3 +114,75 @@ the queue, exactly as happened here. The fix applied with this document is a sta
 head of that handoff's § 1; the rule that would prevent the class of it is that a session which
 ships an item listed open in a live handoff closes it **in that handoff**, in the same commit,
 rather than only in the topic doc.
+
+---
+
+## 8. Handover notes, 2026-11-15 session
+
+Concrete detail a fresh agent will need and would otherwise re-derive. Ordered by how much time
+each one would have cost.
+
+### The 0x200 skew — read this before touching any address
+
+`lea`/`mov` **operands inside asm bodies are runtime addresses**. `L_<addr>` **labels and `asm/`
+filenames are file offsets**. The relation is **runtime + 0x200 = file**. Mixing them is what made
+the clue table look unreachable for a year: the cursor operand `0x1b6a` appears to land inside the
+string "SORRY, GOOD DAY", but it is the NUL at file `0x1d6a`, one byte before entry 0. Two headers
+carried this error silently (`asm/16BD`, `asm/4598`'s filename-vs-label mismatch). When a decode
+looks impossible, convert before concluding.
+
+### The shared string-walker, and how text is emitted here
+
+Two mechanisms, both confirmed from bytes this session:
+
+* **Inline.** `call L_0051df` (str_out) prints the string sitting at its **return address** — the
+  text follows the call in the stream. Confirmed twice independently.
+* **Table.** `asm/155D` (body label `L_00175d`) walks a NUL-separated table: cursor in `DS:27:28`
+  pointing at the NUL *before* entry 0, index in `SI`, emits entry `SI`. Used by the tavern
+  (`asm/16BD`, cursor runtime `0x16bc`) and the clue seller (`asm/19D7`, cursor runtime `0x1b6a`).
+
+Because text is emitted by falling into it, **an address-reference search will not find a table**.
+`grep` for `lea` operands and you conclude the data is dead. It isn't. This is written in
+`asm/16BD`'s confidence note and it still took a session to relearn.
+
+### Three spans are string tables drawn as instructions
+
+`asm/4C50`, `asm/16BD` (fixed 2026-10-25), and `asm/19D7`'s `1D6A..1F1C` (fixed in header, bytes
+not yet re-cut). The tell is a run of `.byte 0x??  # forced-kept: gas re-encodes '...' differently`
+whose bytes are ASCII. **If a forced-keep run spells words, it is text.** Assume any long
+forced-keep run deserves this check before being cited as code.
+
+### The clue seller — complete spec, ready to build
+
+1. Menu: `TIME AND TRAVEL MADE ME WISE,` `0x0d` `PRECIOUS GOLD, A CLUE IT BUYS!HOW MUCH WILL YOU PAY *100?`
+2. `read_decimal_digit` (`asm/2028`) → digit 0..9.
+3. Price: `price[0] = digit`, `price[1] = 0x00` — packed decimal placement, so digit 3 is 300 and
+   digit 0 is free. No multiply anywhere, which is what the menu text says.
+4. `SI = digit + 1`; cursor `DS:27 = 0x1b6a`; `call asm/155D` → emits entry `digit`.
+5. The ten strings are in `asm/19D7_magic_shop_menu.asm`'s header, transcribed from bytes (not
+   from eye — two periods were wrong on the first pass and the generator caught it).
+
+**The blocker is plumbing.** To commit the strings they go through the extractor, and
+`make content-check` proves a committed string is present *as data* in `asm/`. They are not data
+yet — they are `.byte` forced-keeps. So: re-cut `asm/19D7` at `1D6A` into two files, add two rows
+to `disasm/function-map.tsv` (that map, not a glob, is what `assemble_clean.sh` builds in), give
+the new file a `# body corrected:` marker naming the evidence, then add the extractor entries and
+build `U2_SHOP_CLUE`. `asm/16BD` is the worked precedent, split from `asm/15E1`.
+
+### G81 may be upside-down
+
+The chest-vs-PASSWALL persistence contradiction was framed as "the owner's rule vs the chest
+code". There is a third possibility nobody wrote down: **the original writes the whole sector back
+to disk** (`asm/2305`), so in the original a mutated sector *can* persist, and the recollection is
+what is wrong. Read what `asm/2305` actually writes before changing either call — the answer may
+make both current behaviours correct and the rule the thing that needs the exception.
+
+### The method lesson, which is the one to keep
+
+Four items labelled "needs a live shoppe" or "needs gameplay" in this session's own docs were
+closed **statically** in under an hour: the clue pool, the pub's table, the `SISTER` branch, and
+the `DS:46` writer. In every case the bytes were already in the tree and the blocker was a wrong
+mental model (the 0x200 skew, an address-search that cannot work, a grep over mangled text instead
+of raw encodings). **Before scheduling a capture, ask what specifically the capture would tell you
+that a read cannot** — and if the answer is "which byte is written", search the raw encodings for
+the writer rather than the asm text, because the asm text is exactly what was wrong.
