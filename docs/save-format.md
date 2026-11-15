@@ -334,8 +334,24 @@ would have shown otherwise had silently refused. The full picture, measured with
 | `Q` inside a town | refused: `ONLY OUTDOORS!`, nothing written |
 | `Q` outdoors with `DS:6D != 0` | refused: `ONLY ON EARTH!`, nothing written |
 | **death, any cause** | **nothing.** The zeroing is memory-only |
-| **rocket launch from a wilderness sector** | `player` **only** — not `mapxNN`, not `monxNN` |
+| **rocket launch from a wilderness sector** | **nothing, corrected 2026-11-15.** This row used to say `player` only. It was wrong, and so was the `asm/38B0` header it came from: the call on the launch path is the sector store gate, not a record writer. See "the launch gate has two halves" below |
 | **entering a site** (town, tower, dungeon, castle, village) | **`player`, proven 2026-11-03** — and it records the sector you came **from**, not the one you entered |
+| **anything at all off Earth** — site entry, site exit, launch, landing, hyperjump, death | **nothing.** Measured on a genuine Planet X, not a poked world byte, in `captures/spice86/g82-planet-x-live`: ten transitions watched at one-second resolution across 91 files, zero writes, with a `Q` control that fired the same session |
+
+### The launch gate has two halves, and the second one bites
+
+`cmd_L`'s persist needs `[DS:6D] == 0` **and** the sector's ones digit `== 0`. Observed
+2026-11-15: launching from Pirates Cove — Earth, sector 41, ones digit `1` — wrote nothing,
+and launching from Planet X sector 90 wrote nothing. So launching from a town or village
+never banks the sector, on Earth or anywhere else. The wilderness half had been static
+inference until a person launched from a village and the watcher stayed quiet.
+
+### Death is terminal, not recoverable
+
+The table's death row says "nothing", which is the write half. The other half matters to
+anyone driving this in a container: `ENDGAME IS DEAD!` is a dead end. No keypress returns to
+the menu and there is no in-game restart, so recovery is a hard restart of the program, and
+`up.sh --resume` is what makes that land back in the same game instead of a fresh one.
 
 ### The rocket launch saves, silently, and bypasses the save guards
 
