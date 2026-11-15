@@ -6,6 +6,21 @@
 # provenance: static
 #           entry never appears in ExecutedInstructions of any of the 60 harvests; derived by tools/provenance_from_traces.py
 # confidence: low (bytes proven by check_func.py)
+# SISTER IS DEAD CODE IN THE ORIGINAL, closed 2026-11-15 statically (was needs-gameplay G80).
+#           The branch at file 0x1a7b is real -- `cmp $0x1,%al ; je 0x1a8c`, and the `call str_out`
+#           at 0x1a8c returns into "SISTER " at 0x1a8f while the fall-through call at 0x1a7d
+#           returns into "BROTHER " at 0x1a80. But [DS:46] is written in exactly ONE place in the
+#           whole binary: file 0x5951, `mov %al,0x46`, and the three bytes after it are
+#           `cmp $0x4d,%al ; jne` -- `'M'` -- followed by str_out returning into "MALE". So the
+#           byte holds the typed LETTER, never 1, and `cmp $0x1` cannot match. The shrine calls
+#           every visitor BROTHER. Searched for every store encoding to DS:46 (A2/A3/C6 06/C7 06),
+#           not just the asm text, because the text is what misled this project for a year: the
+#           three readers are asm/1869, asm/4598 and asm/505F and none of them is the writer.
+#           The engine is already faithful: status.c tests `sex == 'M'`, so commerce.c's
+#           `sex == 1` test never fires either. Do NOT "fix" the engine to say SISTER -- that
+#           would make it diverge from the bytes. The bug is the original's.
+# note: the pristine references/ultima2/player is an all-zero slot template (DS:46 == 0), which
+#           also never equals 1, so no shipped save can reach the branch either.
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 cleric_shrine:
 L_001a69:
