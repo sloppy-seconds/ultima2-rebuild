@@ -5,7 +5,7 @@
 #           and the seven hints are the game's own text; see docs/third-party-claims.md § 3.
 # func 16BD..1798  len 00DC B  evidence: re-cut 2026-10-25 from asm/15E1_tavern_menu.asm
 # strings: "CAUGH..."; "ISN'T THIS A GREAT GAME?"; "HHMMM..."; "SOME FIGHTERS WEAR MAGIC HELMS!";
-#          "AVIATORS USE SKULL KEYS!"; "SAYLORS WEAR BLUE TASSLES!"; "MAGES NEED WANDS OR STAFFS!";
+#          "AVIATORS USE SKULL KEYS!"; "SAYLORS WEAR BLUE TASSLES!"; "MAGES CARRY WANDS OR STAFFS!";
 #          "GUARDS CARRY KEYS!"; "ANKHS OPEN SPACE"; "PLANES NEED BRASS BUTTONS!"
 # provenance: static
 #           nothing here has been seen to run: 0x16BD and the selector at 0x155D are absent from
