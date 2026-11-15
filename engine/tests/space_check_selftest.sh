@@ -81,7 +81,7 @@ else
 fi
 
 total=$((total+1))
-grep -v 'space_warp_phase(ctx, ow, 128, 0, 0)' src/game/commands.c > "$WORK/commands_nowarp.c"
+grep -v 'space_warp_phase(ctx, ow, 128, 0, 0' src/game/commands.c > "$WORK/commands_nowarp.c"
 if [ "$(wc -l < "$WORK/commands_nowarp.c")" -ge "$(wc -l < src/game/commands.c)" ]; then
     echo "  BAD   the nowarp mutant is identical to the source — it proves nothing"
     fails=$((fails+1))
@@ -108,6 +108,37 @@ elif U2_VIEW_GATE_SRC="$WORK/space_view_noclear.c" python3 tests/space_view_gate
     fails=$((fails+1))
 else
     echo "  ok    unconditional frame clear caught by space_view_gate (mode 0 must accumulate)"
+fi
+
+# The warp tone. asm/6DFD seeds the divisor at 0x2200 with increment -1 and flips it to +1 at
+# phase B; asm/6B3D advances it per star. Deleting the tone outright is too obvious to ship,
+# so the control worth having is the sign flip: a one-character edit to phase B that makes the
+# tone fall where it should rise, sounds merely odd, and is invisible to every other check.
+total=$((total+1))
+grep -v 'seam_tone(ctx, divisor' src/game/commands.c > "$WORK/cmd_notone.c"
+if [ "$(wc -l < "$WORK/cmd_notone.c")" -ge "$(wc -l < src/game/commands.c)" ]; then
+    echo "  BAD   the no-tone mutant is identical to the source — it proves nothing"
+    fails=$((fails+1))
+elif U2_DIVE_GATE_SRC="$WORK/cmd_notone.c" python3 tests/space_view_gate.py \
+        >/dev/null 2>&1; then
+    echo "  BAD   the no-tone mutant was not caught — the tone leg cannot fail"
+    fails=$((fails+1))
+else
+    echo "  ok    silent warp caught by space_view_gate (the original latches the PIT per star)"
+fi
+
+total=$((total+1))
+sed 's/space_warp_phase(ctx, ow, 128, 1, 0, +1)/space_warp_phase(ctx, ow, 128, 1, 0, -1)/' \
+    src/game/commands.c > "$WORK/cmd_signflip.c"
+if cmp -s "$WORK/cmd_signflip.c" src/game/commands.c; then
+    echo "  BAD   the sign-flip mutant is identical to the source — it proves nothing"
+    fails=$((fails+1))
+elif U2_DIVE_GATE_SRC="$WORK/cmd_signflip.c" python3 tests/space_view_gate.py \
+        >/dev/null 2>&1; then
+    echo "  BAD   the phase-B sign flip was not caught — the tone leg cannot fail"
+    fails=$((fails+1))
+else
+    echo "  ok    phase-B increment flip caught by space_view_gate (asm/6DFD flips it to +1)"
 fi
 
 if [ "$fails" -ne 0 ]; then

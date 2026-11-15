@@ -1502,8 +1502,32 @@ static void space_paint(u2_ctx *ctx, u2_overworld *ow)
  * invented; the TRAIL is missing and needs no capture to fix.
  */
 
-static void space_warp_phase(u2_ctx *ctx, u2_overworld *ow, int frames, int mode, int step)
+/* The warp's tone. asm/6DFD seeds a CS-side accumulator once, at the head of phase A
+ * (`mov $0x2200,%bx ; mov %bx,%cs:0x6990`), and flips its increment at the head of phase B
+ * (`movw $0x1,%cs:0x6992` after `movw $0xffff,%cs:0x6992`). asm/6B3D then advances that
+ * accumulator once per star and latches it into PIT channel 2 once per star, and it walks 64
+ * table entries a frame -- so per frame the divisor moves by 64 x increment. A falling
+ * divisor is a rising pitch: from 1193180/0x2200 = 137 Hz at the seed.
+ *
+ * Measured live 2026-11-16 in captures/spice86/g83-g87-warp/, which is also the record of a
+ * wrong first reading of the same data -- the samples landed every 3.99 frames, so the
+ * apparent 0x100 quantisation was the sampling interval and not the signal. Read that file
+ * before "improving" these three constants.
+ *
+ * The mode >= 2 arm does not latch per star at all: it counts a word down and fires asm/7242
+ * on zero, which reloads to 0xE0 on the path space takes (asm/6999 sets the selector byte to
+ * 0xFF). 0xE0 star-calls is 3.5 frames, so that arm is a much slower, lower-pitched pulse. */
+#define U2_WARP_TONE_SEED   0x2200  /* asm/6DFD L_007021 */
+#define U2_WARP_TONE_STARS  64      /* asm/6B3D's table walk, one speaker latch each */
+#define U2_WARP_TONE_SLOW   0xE0    /* asm/7242's reload on the space path */
+
+/* tone_mode: -1 phase A (divisor falling), +1 phase B (rising), 0 the mode >= 2 arm. */
+static void space_warp_phase(u2_ctx *ctx, u2_overworld *ow, int frames, int mode, int step,
+                             int tone_mode)
 {
+    uint16_t divisor = U2_WARP_TONE_SEED;
+    unsigned slow = 0;
+
     for (int i = 0; i < frames; i++) {
         if (ctx->exit_code || ctx->input_exhausted)
             return;          /* a closed window must not cost 509 more frames */
@@ -1519,6 +1543,18 @@ static void space_warp_phase(u2_ctx *ctx, u2_overworld *ow, int frames, int mode
          * way they go away is not. Recorded rather than left silent, because it is the
          * kind of thing that reads as a bug and is in fact the known gap. */
         space_paint_mode(ctx, ow, mode, i, mode == 0);
+
+        /* One latch per frame rather than 64. The original writes the PIT 64 times a frame
+         * and each write overwrites the last, so what the speaker can reach is the frame's
+         * final divisor; emitting once is the same audible result without 64 syscalls. */
+        if (tone_mode) {
+            divisor = (uint16_t)(divisor + (uint16_t)(tone_mode * U2_WARP_TONE_STARS));
+            seam_tone(ctx, divisor, U2_WARP_FRAME_MS);
+        } else if (++slow >= U2_WARP_TONE_SLOW / U2_WARP_TONE_STARS) {
+            slow = 0;
+            seam_tone(ctx, divisor, U2_WARP_FRAME_MS);
+        }
+
         seam_present_frame(ctx);
         seam_wait_ms(ctx, U2_WARP_FRAME_MS);
         mode += step;
@@ -1527,15 +1563,15 @@ static void space_warp_phase(u2_ctx *ctx, u2_overworld *ow, int frames, int mode
 
 void space_warp_field(u2_ctx *ctx, u2_overworld *ow)
 {
-    space_warp_phase(ctx, ow, 128, 0, 0);      /* A */
-    space_warp_phase(ctx, ow, 128, 1, 0);      /* B */
-    space_warp_phase(ctx, ow,  63, 2, 2);      /* C */
+    space_warp_phase(ctx, ow, 128, 0, 0, -1);     /* A: seed 0x2200, falling */
+    space_warp_phase(ctx, ow, 128, 1, 0, +1);     /* B: increment flips, rising */
+    space_warp_phase(ctx, ow,  63, 2, 2, 0);      /* C: mode >= 2, rate-limited */
 }
 
 void space_warp_engage(u2_ctx *ctx, u2_overworld *ow)
 {
-    space_warp_phase(ctx, ow, 126, 0x80, -1);  /* D */
-    space_warp_phase(ctx, ow,  64, 2, 0);      /* E */
+    space_warp_phase(ctx, ow, 126, 0x80, -1, 0);  /* D: mode >= 2 throughout */
+    space_warp_phase(ctx, ow,  64, 2, 0, 0);      /* E: mode >= 2 */
 }
 
 static void space_loop(u2_ctx *ctx, u2_overworld *ow)

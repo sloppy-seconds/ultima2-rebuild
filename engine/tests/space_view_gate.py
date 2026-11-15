@@ -256,6 +256,36 @@ for fld in ("warp_frame", "keep_frame"):
     check(re.search(r"int\s+" + fld + r"\s*;", read(VIEW_H)) is not None,
           f"u2_space_scene carries {fld}")
 
+# ---- leg 10: the warp's tone --------------------------------------------------------
+# The original's warp has a sound and the engine had none, which is a divergence wearing the
+# costume of an omission: the sound-counts-as-a-message rule says the player must be told, and
+# here the original tells them with a tone rather than text. The generator is an accumulator
+# asm/6DFD seeds to 0x2200 with increment -1 and flips to +1 at phase B, advanced once per
+# star by asm/6B3D, so it moves 64 per frame; the mode >= 2 arm instead counts down and fires
+# every 0xE0 star-calls. Measured in captures/spice86/g83-g87-warp/.
+#
+# The control that matters is the sign flip. Deleting the tone entirely is obvious enough that
+# nobody would ship it; getting phase B's increment wrong is a one-character edit that sounds
+# merely odd, and nothing else would notice.
+tone = re.search(r"static void space_warp_phase\(.*?\n\}", src, re.S)
+check(tone is not None, "space_warp_phase found")
+if tone:
+    body = tone.group(0)
+    check("seam_tone" in body,
+          "the warp emits a tone — the original latches the PIT on every star, so silence "
+          "here is a divergence and not an unimplemented nicety")
+    check("U2_WARP_TONE_SEED" in body and "0x2200" in src,
+          "the tone accumulator is seeded from asm/6DFD's 0x2200, not invented")
+    check("U2_WARP_TONE_STARS" in body and "64" in src,
+          "the divisor advances per star (64 a frame), not per frame")
+    check("U2_WARP_TONE_SLOW" in body,
+          "the mode >= 2 arm is rate-limited, as asm/7242's reload does")
+for phase, sign in (("128, 0, 0", -1), ("128, 1, 0", 1)):
+    check(re.search(r"space_warp_phase\(ctx, ow, " + re.escape(phase) + r", "
+                    + ("-1" if sign < 0 else r"\+1") + r"\)", src) is not None,
+          "phase %s passes tone increment %+d — asm/6DFD flips the increment between A and B"
+          % ("A" if sign < 0 else "B", sign))
+
 # ---- leg 6: the space text pane -----------------------------------------------------
 # Owner playtest 2026-11-10, two symptoms: the hyperwarp target prompt never appeared, and
 # letters were missing from the HP/FOOD display. Both were the readout colliding with the CMD
