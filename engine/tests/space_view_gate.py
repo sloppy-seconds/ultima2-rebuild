@@ -199,6 +199,32 @@ if dm_loop:
     check(-1 < i_present < i_wait < i_poll,
           "the wait sits after the present and before the key poll, as in the original's loop")
 
+# ---- leg 8: the hyperwarp animation ------------------------------------------------
+# asm/6DFD's five redraw loops. The frame COUNTS are bytes (128, 128, 63, 126, 64) and the
+# frame TIME is not: asm/0711's slot value is dropped at every lookup inside those loops, so
+# the original's rate was the cost of drawing the field. That split is exactly what invites a
+# quiet regression -- a "tidy" that folds the phases, or a deleted wait on the reasoning that
+# the slot is not a delay anyway -- and either one turns a warp into a single frame. So the
+# counts and the present-before-wait ordering are both asserted, and the control in
+# space_check_selftest.sh deletes one phase to prove this leg can go red.
+wm = re.search(r"static void space_warp_phase\(.*?\n\}\n", src, re.S)
+check(wm is not None, "space_warp_phase found in commands.c")
+if wm:
+    wbody = re.sub(r"/\*.*?\*/", "", wm.group(0), flags=re.S)
+    i_p = wbody.find("seam_present_frame")
+    i_w = wbody.find("seam_wait_ms(ctx, U2_WARP_FRAME_MS)")
+    check(-1 < i_p < i_w,
+          "each warp frame presents before it waits (an un-presented loop draws frames nobody sees)")
+for fn, want in (("space_warp_field", [128, 128, 63]),
+                 ("space_warp_engage", [126, 64])):
+    m = re.search(r"void " + fn + r"\(u2_ctx \*ctx, u2_overworld \*ow\)\s*\{(.*?)\n\}\n",
+                  src, re.S)
+    check(m is not None, f"{fn} found in commands.c")
+    if m:
+        got = [int(x) for x in re.findall(r"space_warp_phase\(ctx, ow,\s*(\d+)", m.group(1))]
+        check(got == want,
+              f"{fn} runs {got} frames; asm/6DFD's counters are {want}")
+
 # ---- leg 6: the space text pane -----------------------------------------------------
 # Owner playtest 2026-11-10, two symptoms: the hyperwarp target prompt never appeared, and
 # letters were missing from the HP/FOOD display. Both were the readout colliding with the CMD

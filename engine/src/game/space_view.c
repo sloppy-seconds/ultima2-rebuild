@@ -80,12 +80,11 @@ void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out)
     }
 
     out->fuel = u2_bcd_dec1(st->items_held[U2_ITEM_TRI_LITHIUM]);
-    out->warping = 0;   /* NOT wired. The trigger and the frame counts are read out of
-                         * asm/6DFD (see its WARP ANIMATION block: DS:4C7 is the motion
-                         * mode, DS:4C8 the frame counter), but the engine's space scene
-                         * is a stateless render with no per-frame animation state to put
-                         * a countdown in, so selecting the branch is an engine feature,
-                         * not a decode. The field is drawn and never plays. */
+    out->warping = 0;   /* The scene builder stays stateless so a gate can build a scene from
+                         * state alone. The warp is driven by the caller: commands.c
+                         * space_warp_field() / space_warp_engage() rebuild the scene with
+                         * this overridden for the duration of asm/6DFD's redraw loops. See
+                         * that function's note for what is bytes and what is invented. */
     out->ship_x = st->space_ship_x;
     out->ship_y = st->space_ship_y;
     out->star_seed = ((uint32_t)st->world << 16) ^

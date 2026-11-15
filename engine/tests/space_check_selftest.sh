@@ -80,6 +80,19 @@ else
     echo "  ok    dive-wait mutant caught by space_view_gate"
 fi
 
+total=$((total+1))
+grep -v 'space_warp_phase(ctx, ow, 128, 0, 0)' src/game/commands.c > "$WORK/commands_nowarp.c"
+if [ "$(wc -l < "$WORK/commands_nowarp.c")" -ge "$(wc -l < src/game/commands.c)" ]; then
+    echo "  BAD   the nowarp mutant is identical to the source — it proves nothing"
+    fails=$((fails+1))
+elif U2_DIVE_GATE_SRC="$WORK/commands_nowarp.c" python3 tests/space_view_gate.py \
+        >/dev/null 2>&1; then
+    echo "  BAD   a dropped warp phase was not caught — the warp-count leg cannot fail"
+    fails=$((fails+1))
+else
+    echo "  ok    dropped warp phase caught by space_view_gate (counts are bytes)"
+fi
+
 if [ "$fails" -ne 0 ]; then
     echo "SPACE SELFTEST: FAIL ($fails of $total)"
     exit 1

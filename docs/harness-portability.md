@@ -1973,3 +1973,20 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   have if the reload is not written down. **(3)** A capture is still worth running when the static
   answer would change a shipped behaviour, but write the static argument first and let the capture
   confirm a specific prediction rather than explore. → Tier 1, evidence discipline.
+* **2026-11-15 — a call that loads a value is not a delay unless somebody reads the value, and the
+  check is one instruction long.** A loop shaped as `draw; load-slot; step-counter` reads naturally
+  as a paced animation: a routine that returns a scaled timing word, called once per iteration, is
+  the textbook shape of a frame delay. It was not. At five of the six call sites the very next
+  instruction is a counter increment or decrement — the register the lookup filled is never read.
+  The values are computed and dropped and the loop's rate is the cost of the draw itself. Three
+  consequences worth carrying. **(1)** When a call looks like a timing primitive, check what happens
+  to its output register before believing it; a callee that saves and restores that register at its
+  own entry and exit is a strong hint the value is inert at the site. **(2)** Once the delay is
+  gone, the animation's rate is a property of the original's hardware and is not recoverable from
+  the program at all, so a port must either run unpaced and fast or supply a number it cannot
+  justify — and if it supplies one, the number has to be named, labelled as invented at its
+  definition, and paired with the measurement that would replace it. Shipping it silently is how a
+  port ends up with a constant nobody can defend and a suite that passes anyway. **(3)** The same
+  lookup can be a real timeout at one site and dead code at another, so "what is this routine for"
+  is not a property of the routine; it is a property of each call site. → Tier 1, evidence
+  discipline.

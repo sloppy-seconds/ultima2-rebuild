@@ -1225,6 +1225,8 @@ static void space_orbit_determine(u2_ctx *ctx, const uint8_t dest[3])
  * mid-entry (the original blocks); 1 means the warp resolved and the loop should
  * continue. */
 static void space_paint(u2_ctx *ctx, u2_overworld *ow);   /* defined below, with the loop */
+void space_warp_field(u2_ctx *ctx, u2_overworld *ow);     /* asm/6DFD phases A/B/C */
+void space_warp_engage(u2_ctx *ctx, u2_overworld *ow);    /* asm/6DFD phases D/E */
 
 static int space_hyperwarp(u2_ctx *ctx, u2_overworld *ow)
 {
@@ -1235,6 +1237,13 @@ static int space_hyperwarp(u2_ctx *ctx, u2_overworld *ow)
         return 1;
     }
     st->items_held[U2_ITEM_TRI_LITHIUM] = u2_bcd_dec1(st->items_held[U2_ITEM_TRI_LITHIUM]);
+
+    /* asm/6DFD's first three redraw loops. They sit here, before the coordinate readout,
+     * because that is where the bytes put them: phases A/B/C run, then the off-course
+     * gate, then NO FUEL, then the readout. Placing them after the fuel test rather than
+     * before it is the one deliberate liberty, so a warp with no fuel does not animate a
+     * refusal. */
+    space_warp_field(ctx, ow);
 
     seam_str_out(ctx, U2_S_HYPERWARP_TO);
     /* The original's literal is one string, `HYPERWARP TO:` 0x8d `XENO=` 0x00 (asm/6DFD
@@ -1297,6 +1306,7 @@ static int space_hyperwarp(u2_ctx *ctx, u2_overworld *ow)
     seam_char_print(ctx, '\r');   /* the literal is "HYPERWARP ENGAGED!" 0x8d (asm/6DFD file
                                      0x6ffa), so the next line starts fresh. Without it the
                                      orbiting line runs on after the exclamation mark. */
+    space_warp_engage(ctx, ow);   /* asm/6DFD phases D and E, after the PREPARE line */
 
     const uint8_t rng[3] = { seam_rand_byte(ctx), seam_rand_byte(ctx), seam_rand_byte(ctx) };
     /* u2_space_hyperwarp tests the POST-decrement count, so it is handed the PRE value
@@ -1409,13 +1419,17 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
  * peek 8be:47b before and after one Right in a live run. */
 #define U2_SPACE_SHIP_STEP 4
 
-static void space_paint(u2_ctx *ctx, u2_overworld *ow)
+static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping)
 {
     /* The readout survives the scrolling CMD pane because space_values runs before every
      * prompt and asm/6FA3 L_0071fd narrows the scroll margin to 0x1f, one column short of
      * the readout's first visible glyph at 32. See that function's note. */
     u2_space_scene sc;
     u2_space_scene_from(ctx, &sc);
+    /* The scene builder is stateless and always says "not warping", so a gate can build a
+     * scene from state alone. The warp is the caller's business, so the caller overrides
+     * here rather than the builder growing a hidden input. */
+    sc.warping = warping;
     u2_space_scene_draw(&ow->frame, &sc);
 
     /* The field clear takes the WHOLE frame -- u2_frame_clear memsets every row, not
@@ -1431,6 +1445,68 @@ static void space_paint(u2_ctx *ctx, u2_overworld *ow)
      * (overworld.c, u2_font_draw_vram_rows after draw_view). Omitting it is what made
      * the screen look inert even though the loop was alive and reading keys. */
     u2_font_draw_vram_rows(&ow->frame, &ctx->vram, U2_MSG_TOP, U2_ROWS - 1);
+}
+
+static void space_paint(u2_ctx *ctx, u2_overworld *ow) { space_paint_mode(ctx, ow, 0); }
+
+/* ---- the hyperwarp animation ---------------------------------------------------
+ *
+ * asm/6DFD's bounded redraw loops, in the order the bytes run them. The structure is
+ * bytes; the frame DURATION is not, and that asymmetry is the whole note on this
+ * function. Read asm/6DFD's WARP ANIMATION block, which is where the finding lives.
+ *
+ * Five phases, each one `call asm/6B3D_space_field_draw` and then a counter step, with
+ * DS:4C7 the field's motion mode and DS:4C8 the frame counter:
+ *      A   128 frames, mode 0              plot in place
+ *      B   128 frames, mode 1              erase and plot -- motion
+ *      C    63 frames, mode 2,4,..,126     the >= 2 branch, mode rising by 2
+ *      D   126 frames, mode 0x80 down to 3
+ *      E    64 frames, mode 2
+ *
+ * The speed-slot lookups between them are NOT delays -- asm/0711's value is dropped at
+ * every one of them -- so the original's frame rate was the cost of drawing 64 stars into
+ * the CGA planes. This renderer is not a 4.77 MHz 6845, so the time that cost used to
+ * supply has to come from somewhere else, and no measurement of asm/6B3D exists to say
+ * what it was.
+ *
+ * U2_WARP_FRAME_MS IS THEREFORE INVENTED, not measured. It is named and labelled so one
+ * line replaces it when a cycle count for the field draw exists (docs/needs-gameplay.md
+ * G83). 2 ms puts all 509 frames near a second, which is the right order for 64 pixel
+ * plots on a machine of that speed; that is a guess about an order of magnitude and
+ * nothing more. The frame COUNTS are bytes. The frame TIME is not, and a smooth warp is
+ * not evidence about the original -- it is evidence the loop runs.
+ *
+ * The engine's field model has two states, not the original's three: asm/6B3D's mode >= 2
+ * branch is still unread, so every non-zero mode draws the same radiating stand-in. Phases
+ * C and D are therefore structurally present and visually identical to B. That is recorded
+ * rather than papered over, and it is the reason this is "the right shape at the right
+ * rate" and not a faithful warp.
+ */
+#define U2_WARP_FRAME_MS 2
+
+static void space_warp_phase(u2_ctx *ctx, u2_overworld *ow, int frames, int mode, int step)
+{
+    for (int i = 0; i < frames; i++) {
+        if (ctx->exit_code || ctx->input_exhausted)
+            return;          /* a closed window must not cost 509 more frames */
+        space_paint_mode(ctx, ow, mode);
+        seam_present_frame(ctx);
+        seam_wait_ms(ctx, U2_WARP_FRAME_MS);
+        mode += step;
+    }
+}
+
+void space_warp_field(u2_ctx *ctx, u2_overworld *ow)
+{
+    space_warp_phase(ctx, ow, 128, 0, 0);      /* A */
+    space_warp_phase(ctx, ow, 128, 1, 0);      /* B */
+    space_warp_phase(ctx, ow,  63, 2, 2);      /* C */
+}
+
+void space_warp_engage(u2_ctx *ctx, u2_overworld *ow)
+{
+    space_warp_phase(ctx, ow, 126, 0x80, -1);  /* D */
+    space_warp_phase(ctx, ow,  64, 2, 0);      /* E */
 }
 
 static void space_loop(u2_ctx *ctx, u2_overworld *ow)
