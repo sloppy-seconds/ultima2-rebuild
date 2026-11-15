@@ -148,11 +148,22 @@ void u2_space_descent_step(uint8_t *x, uint8_t *y);
  * beside the other two pacing figures so every animation rate the engine states is in
  * one place and changeable from one place.
  *
- * 2 ms puts asm/6DFD's 509 frames near a second, which is the right order for 64 pixel
- * plots on a 4.77 MHz machine driving CGA planes. That is a guess about an order of
- * magnitude and nothing more, and a smooth warp is evidence the loop runs, not evidence
- * about the original. */
-#define U2_WARP_FRAME_MS 2
+ * This WAS a guess and is now a measurement. 2 ms was an order-of-magnitude guess, and the
+ * comment said so; the placeholder was 12x too fast.
+ *
+ * Measured 2026-11-16 at 119,055 cycles per frame (mean of 14 deltas, spread 1.25%), by
+ * stopping on `asm/6B3D_space_field_draw` during a live hyperwarp -- one call walks all 64
+ * star-table entries, so one call is one frame. At the nominal 4.77 MHz that is 25.0 ms,
+ * about 40 frames/s across asm/6DFD's 509 frames. Full record, including the cycle dump and
+ * the reasoning about scope, in captures/spice86/g83-g87-warp/.
+ *
+ * Two caveats that travel with the number. It is a LOWER bound: Spice86 counts CPU cycles and
+ * models no 8088 bus wait states, so real hardware spent more wall-clock time per cycle than
+ * this division assumes -- and a lower bound looks exactly like a too-fast engine when a
+ * player meets it. And the tight spread is itself evidence: an unthrottled loop is what
+ * 1.25% looks like, which corroborates that the warp has no programmed pause at all and runs
+ * at the cost of drawing. */
+#define U2_WARP_FRAME_MS 25
 
 /* The dive's verdict on the tile it stopped on. asm/38B0: only 0x08 grass lives,
  * anything else jumps to runtime 0x0E62, the death tail. Observed twice, both
