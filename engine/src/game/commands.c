@@ -2366,7 +2366,13 @@ static u2_cmd_result cmd_C(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
  *      each carries its own citation. What is still NOT modelled, named rather than left as a
  *      gap: the low-nibble stamp that reappears in a cell PASSWALL cleared, which the engine
  *      does not model at all because it draws creatures from the arrays rather than stamping
- *      them. Two things this entry used to call unobserved are closed and are recorded here so
+ *      them. Note what that costs, because it is not cosmetic: the walk gate is `(c & 0x8f) != 0`
+ *      and the low nibble is one of the two tests, so a stamp landing back in a cleared cell
+ *      would make the ORIGINAL print -BLOCKED- where the engine walks. Whether that ever
+ *      happens wants a DS:1800 read, not another read of these bytes — see
+ *      docs/outstanding.md § 2. What IS gated is the settled half: a hole you do clear is
+ *      walkable, pinned by tests/passwall_check.c, whose mutant control writes 0x01 instead
+ *      of 0 and goes red on the walk assertion specifically. Two things this entry used to call unobserved are closed and are recorded here so
  *      they do not get reopened. The tower's floor orientation is captured, not inferred:
  *      captures/spice86/d12-ladder-ds25 filmed DESCEND at tower floor 0 taking [DS:25] to 0xFF
  *      and ejecting the player, which is the inversion, and the same capture filmed UP LADDER

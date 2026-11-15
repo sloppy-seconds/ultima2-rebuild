@@ -551,6 +551,31 @@ else
     sed 's/^/        /' "$WORK/chest.build"
 fi
 
+# ---- PASSWALL: the hole you can actually walk through (unit gate) ----------
+# asm/363B cmd_C slot 4. The filmed casts prove the cell byte changes; they do not prove
+# you can then use the hole. The walk gate is `(c & 0x8f) != 0` — bit 7 rock, LOW NIBBLE a
+# stamp in the way — so a PASSWALL write that left any low bit set would open the wall on
+# screen and still print -BLOCKED-. The mutant control (write 0x01 instead of 0) takes this
+# red on the walk assertion specifically; see tests/passwall_check.c for why the stamp half
+# of that mask is also pinned. See docs/outstanding.md § 2 for the open divergence.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/passwall_check" \
+        tests/passwall_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/passwall.build"; then
+    if "$WORK/passwall_check" > "$WORK/passwall.out" 2>&1; then
+        n=$(sed -n 's/^passwall_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/passwall.out")
+        if [ "${n:-0}" -eq 0 ]; then
+            bad "CP7 PASSWALL run executed 0 checks — the test is not running"
+        else
+            ok "CP7 PASSWALL: clears to an immediate 0 and the cleared cell is walkable ($n checks)"
+        fi
+    else
+        bad "CP7 PASSWALL check failed:"
+        sed 's/^/        /' "$WORK/passwall.out"
+    fi
+else
+    bad "CP7 PASSWALL harness did not build:"
+    sed 's/^/        /' "$WORK/passwall.build"
+fi
+
 # ---- dungeon fills the doubled frame (classic EGA) -----------------------
 # The wireframe is authored in 320x200 CGA space; in classic EGA it must scale by
 # the frame scale to fill the map window, not sit in the top-left quarter. CGA stays
