@@ -1172,8 +1172,28 @@ static void space_values(u2_ctx *ctx)
  * "PREPARE FOR LAUNCH!", which frame 22-right.png confirms (its pane is HYPERWARP
  * ENGAGED! / YOU ARE ORBITING EARTH. / CMD: RIGHT / CMD: and nothing above them).
  * Without this the engine re-composites the stale status block on every space frame. */
+/* The staging pair, uniformly 0xFF while in space and holding a staged sector map otherwise
+ * (docs/handoff-space-view.md § 3a, measured pad / orbit / landed).
+ *
+ * The engine does not model staging -- it reads sector maps straight through u2_world_* --
+ * so it cannot reproduce the *cause* of the pattern, only the pattern. That is said out
+ * loud rather than hidden, because it is the difference between a model and a mimic: the
+ * original's 0xFF falls out of having no map to stage, and here it is written deliberately
+ * at the two points that bracket the space loop. The value written on landing is a stand-in
+ * whose only required property is that it is not all-0xFF; nothing reads these bytes.
+ *
+ * What matters is that u2_state_mode() sees the same thing on both executables, because
+ * that function is the bot's only way to know where it is. § 3a forbids gating CONTROL FLOW
+ * on these bytes and nothing here does -- this is a report, not a branch. */
+static void space_stage_mark(u2_ctx *ctx, int in_space)
+{
+    memset(ctx->state.stage_a, in_space ? 0xFF : 0x00, sizeof ctx->state.stage_a);
+    memset(ctx->state.stage_b, in_space ? 0xFF : 0x00, sizeof ctx->state.stage_b);
+}
+
 static void space_screen_enter(u2_ctx *ctx)
 {
+    space_stage_mark(ctx, 1);
     seam_clear_screen(ctx);
     space_labels(ctx);
     space_values(ctx);
@@ -1625,6 +1645,10 @@ static void space_loop(u2_ctx *ctx, u2_overworld *ow)
             }
 
             rocket_descent(ctx, ow);
+            /* Landing restages the sector, which is what ends the all-0xFF pattern on the
+             * original. Done after the reload succeeded, so a failed reload leaves the
+             * state honest about still being in space rather than half-landed. */
+            space_stage_mark(ctx, 0);
             return;
         }
         default:

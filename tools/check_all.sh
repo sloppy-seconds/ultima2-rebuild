@@ -124,6 +124,12 @@ run "spice86_type selftest" tools/spice86_type.py -- python3 tools/spice86_type.
 # undeliverable key that refuses instead of pretending the game ignored it. Needs no
 # emulator, which is what makes it gateable — the live proof is bot/play_original.py.
 run "bot target adapter" bot/target_check.py -- python3 bot/target_check.py
+# The mode discriminator against the corpus, not just against itself. mode_check.c (CP0)
+# proves the rule is self-consistent; these prove it is TRUE of the original. The ordering
+# bug it caught — a dungeon's staging pair is also all-0xFF, so eighteen dungeon frames read
+# as space — was invisible to the synthetic test, which is the whole reason both exist.
+run "mode vs capture corpus" bot/mode_probe.py -- python3 bot/mode_probe.py
+run "mode vs orbit capture" bot/mode_orbit_check.py -- python3 bot/mode_orbit_check.py
 # Whether a container image still matches its Containerfile. The old test was "does
 # an image exist", so an edited recipe was silently ignored — which cost a full
 # SDL3 container cycle to a message blaming the Makefile. Runs against a podman

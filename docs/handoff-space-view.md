@@ -100,6 +100,14 @@ orbit from both neighbours is that **`DS:272..DS:371` and `DS:372..DS:471` are u
 while in space** -- all 512 bytes. On the pad they hold the village's staged map; after landing
 they hold sector 40's. It is a consequence of having no map to stage, not a designed flag.
 
+**One qualification, added when the observation layer came to use this.** The pair being
+uniformly `0xFF` is not unique to space: a dungeon has no staged sector map either, and
+`captures/spice86/dungeon-entry` ev034..ev051 is a dungeon descent in sector 35 with the pair
+uniformly `0xFF`. So all-0xFF means "nothing is staged", which orbit and a dungeon share, and
+a rule that reads it must test the dungeon digit first. That is what `u2_state_mode()` in
+`engine/src/core/state.c` does, and it reads the pair only to **report** a mode — everything
+this section says about not gating control flow on it still stands, and nothing branches on it.
+
 **So do not test the tables. Keep the loop.** `cmd_L` is only reachable from the overworld loop;
 while in space a different loop owns the keyboard and `L` means dive there. "In space" is a
 property of which loop is reading the keyboard. The engine already has this shape --

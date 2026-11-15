@@ -518,7 +518,28 @@ typedef struct u2_state {
                                        * gate items_held[CLOAK] at DS:DA). */
     /* 0x26D */ uint8_t paral_sleep;   /* C1: sleep turns, 0..15 (asm/0F48,
                                        * gate items_held[GREEN IDOL] at DS:E4). */
-    /* 0x26E */ uint8_t reserved_26E[0x204];  /* 0x26E..0x471 */
+    /* 0x26E */ uint8_t reserved_26E[0x004];  /* 0x26E..0x271 */
+    /* 0x272 */ uint8_t stage_a[0x100];  /* 0x272..0x371. The staging buffer asm/4ABB
+                                         * flushes: `mov cl,[si+0x272]`, "staging byte =
+                                         * tile id" (docs/phase4-implementation.md). Its
+                                         * exact geometry is still disputed
+                                         * (docs/needs-gameplay.md), so it is named by
+                                         * address and not by a claimed structure. */
+    /* 0x372 */ uint8_t stage_b[0x100];  /* 0x372..0x471. The second staging buffer.
+                                         *
+                                         * Both are uniformly 0xFF while the rocket is in
+                                         * space and hold a staged sector map otherwise --
+                                         * all 512 bytes, measured across pad / orbit /
+                                         * landed in captures/spice86/w6-orbit-dive and
+                                         * recorded in docs/handoff-space-view.md § 3a.
+                                         * That is a consequence of having no map to stage,
+                                         * not a designed flag, and § 3a is right that
+                                         * control flow must NOT test it. Reading it to
+                                         * REPORT a mode is a different act from gating on
+                                         * it: see u2_state_mode() in state.c, which is the
+                                         * only place that reads them, and which is a
+                                         * function of the state block alone so the original
+                                         * and the engine answer the same question. */
     /* 0x472 */ uint16_t map_base;    /* map table base offset, asm/50B3_map_tile_ptr.asm */
     /* 0x474 */ uint8_t reserved_474[0x007];  /* 0x474..0x47A */
     /* 0x47B */ uint8_t space_ship_x;   /* the in-space ship sprite's screen x.
@@ -703,6 +724,12 @@ _Static_assert(U2_OFF(text_attr)  == 0x23E, "text_attr moved");
 _Static_assert(U2_OFF(rng_state)  == 0x23F, "rng_state moved");
 _Static_assert(sizeof(((u2_state *)0)->rng_state) == 6, "rng_state is DS:0x23F..0x244");
 _Static_assert(U2_OFF(map_base)   == 0x472, "map_base moved");
+/* The staging pair is the only DS-observable discriminator for "in space", so a drift in
+ * where they sit silently turns the mode report back into a lie. Pin both ends. */
+_Static_assert(U2_OFF(stage_a) == 0x272 && U2_OFF(stage_b) == 0x372,
+               "staging buffers moved; u2_state_mode's space test is now reading noise");
+_Static_assert(U2_OFF(stage_b) + sizeof(((u2_state *)0)->stage_b) == 0x472,
+               "stage_b must end where map_base begins");
 _Static_assert(U2_OFF(left_margin)== 0x54F, "left_margin moved");
 
 /* Packed-decimal decode: a BCD pair is stored hundreds byte first
@@ -748,5 +775,16 @@ int u2_state_load_ds(u2_state *s, const char *path);
 /* Apply a checkpoint that is already in memory. Demands the whole span; see the
  * comment at the definition for why a short one is refused rather than tolerated. */
 int u2_state_load_ds_buf(u2_state *s, const unsigned char *buf, size_t n);
+
+/* The screen the state block implies: "title", "space", "dungeon", "site" or "world".
+ * Derived from the block alone, so a raw DS capture from the original and the engine's own
+ * live state answer it identically -- which is the whole reason it is here and not in api.c.
+ * The engine adds one value of its own on top ("created", a request-to-play flag that is not
+ * in DS); see the comment at the call site in api.c. */
+const char *u2_state_mode(const u2_state *s);
+
+/* The settlement digit that means dungeon. u2_site_is_dungeon() delegates here so the rule
+ * the game logic branches on and the rule the mode report derives from are one rule. */
+int u2_state_is_dungeon(const u2_state *s);
 
 #endif /* U2_STATE_H */

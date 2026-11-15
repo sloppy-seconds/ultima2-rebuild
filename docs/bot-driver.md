@@ -184,10 +184,18 @@ adapter gap; the adapter reads whatever state the game is in. It is that no tool
 vehicle where the game will accept it, and the field that marks "airborne" is the one W6
 already flagged as needing a capture rather than a guess.
 
-**A second gap fell out of the same test.** With `DS:6D = 0x0A` the bot reported `mode:
-"world"`, because `emit_obs` derives mode from `sector_second` and cannot see a space state —
-the gap `docs/play-api.md` deviation 2 already names ("dungeon and space are not
-distinguished"). It matters more now than when it was written: a bot that cannot tell it is in
-space cannot decide to hyperwarp, so closing G83 and G87 needs that discriminator, not just a
-launch.
+**A second gap fell out of the same test, and it is now closed.** With `DS:6D = 0x0A` the bot
+reported `mode: "world"`, because `emit_obs` derived mode from `sector_second` and could not
+see a space state at all — the gap `docs/play-api.md` deviation 2 used to name. It mattered
+more than when it was written: a bot that cannot tell it is in space cannot decide to
+hyperwarp.
+
+`u2_state_mode()` in `engine/src/core/state.c` closes it, and it is worth being precise about
+what that means. There is still no in-space byte, and the discriminator is the staging pair
+being uniformly `0xFF` — a side effect of having no map to stage, not a flag. It works, it
+works identically on both executables because it reads the state block and not a ctx, and it
+is validated against the captures that defined the three states. But it is derived from a
+rendering side effect, so it is bounded by what has been observed: a rocket launched from a
+sector whose ones digit is 4 or 5 would read as dungeon, and whether that is reachable is the
+same unknown as W6.
 

@@ -189,6 +189,23 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-16 — A derived classifier must be run over the existing corpus before it is
+  believed, because a green synthetic suite is not evidence the rule is true.** A mode report
+  was added for a state the binary has no byte for, and was derived from the document that
+  described the measurement. Its own unit tests passed. Run over the capture corpus it called
+  eighteen dungeon frames space, because the observable it keyed on — a staging buffer that is
+  uniformly `0xFF` — means "nothing is staged", which the dungeon shares with orbit. The
+  document was accurate about the three states it measured and silent about the fourth case.
+  Any rule derived from a summary of a measurement rather than the measurement should be
+  replayed against everything already captured before it ships; a corpus you already own is
+  the cheapest ground truth there is.
+* **2026-11-16 — A gate that asserts a sufficient condition cannot go red, and looks identical
+  to one that asserts a necessary one.** The check written to catch the bug above asserted
+  "nothing reports space unless the staging pair is set". The mutant that broke the rule still
+  satisfied it, so the gate stayed green while wrong. The fix was to assert the direction that
+  actually fails — "a dungeon sector must never report space". When writing a control, name
+  the state that must be caught and confirm the assertion is false in that state; a
+  one-directional implication is often unfalsifiable in exactly the case it was written for.
 * **2026-11-15 — A rename that corrects a wrong name leaves the wrong behaviour asserted
   everywhere the old name was quoted, and nothing checks prose.** A routine was renamed on
   byte evidence because it was not what its first name claimed. Three weeks later the

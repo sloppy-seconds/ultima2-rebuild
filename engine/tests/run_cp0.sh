@@ -124,6 +124,29 @@ else
     sed 's/^/        /' "${WORK:-/var/tmp}/dirkey.build" | head -5
 fi
 
+# The mode report: which screen the state block says the player is on. Derived, because the
+# original has no phase byte, and the ORDER of the tests is a finding rather than a style
+# choice — orbit is byte-identical to its launch pad in sector/position/DS:12/DS:13/DS:14,
+# and a dungeon shares the one observable that separates orbit from the pad. Both of those
+# came from captures, and the second one only after the synthetic tests were already green.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "${WORK:-/var/tmp}/mode_check" \
+        tests/mode_check.c src/core/state.c 2>"${WORK:-/var/tmp}/mode.build"; then
+    if "${WORK:-/var/tmp}/mode_check" > "${WORK:-/var/tmp}/mode.out" 2>&1; then
+        n=$(sed -n 's/^  ok  \([0-9]\{1,\}\) checks.*/\1/p' "${WORK:-/var/tmp}/mode.out")
+        if [ "${n:-0}" -eq 0 ]; then
+            bad "CP0 mode run executed 0 checks — the test is not running"
+        else
+            ok "u2_state_mode: title/space/dungeon/site/world, order pinned ($n checks)"
+        fi
+    else
+        bad "mode derivation violated:"
+        sed 's/^/        /' "${WORK:-/var/tmp}/mode.out"
+    fi
+else
+    bad "mode test harness did not build:"
+    sed 's/^/        /' "${WORK:-/var/tmp}/mode.build" | head -5
+fi
+
 # The PRNG is a shift register (asm/5217 + asm/522B + asm/5236), seeded once at
 # launch from the 0x40:6C byte (asm/0100). Vector derived by hand-decoding those
 # three fragments together; it guards regressions and documents the decode.

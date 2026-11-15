@@ -315,15 +315,20 @@ static void emit_obs(u2_ctx *ctx)
      * the overworld struct and does not exist at the title or in creation), and rng_rolls is
      * already inside the digest scope, so a caller can correlate it with the digest. */
     /* Mode, and the signal each value is read from. There is no phase field on the state
-     * block, so this is derived: no name means no character yet, `enter_world` is the
-     * engine's own request-to-play flag, and `sector_second` is the settlement digit. The
-     * middle state exists because the play API can create a character without the world
-     * having been entered, and reporting that as `world` was a lie a caller would act on.
-     * Dungeon and space are still NOT distinguished, and are named as a gap in
-     * docs/play-api.md rather than guessed at from the grid. */
-    const char *mode = !ctx->state.name[0] ? "title"
-                     : (!ctx->enter_world ? "created"
-                      : (ctx->state.sector_second ? "site" : "world"));
+     * block, so this is derived -- by u2_state_mode(), which reads the block alone so a raw
+     * DS capture off the original answers it the same way the live engine does. "created"
+     * is the one value layered on top here: `enter_world` is the engine's own
+     * request-to-play flag, set by the enhanced-mode creation tail at title.c, and it has
+     * no DS address, so only the engine can report it. The middle state exists because the
+     * play API can create a character without the world having been entered, and reporting
+     * that as `world` was a lie a caller would act on.
+     *
+     * Space and dungeon are no longer the gap this comment used to admit. Space is
+     * distinguishable and now is, via the staging pair; see § 3a of
+     * docs/handoff-space-view.md for the measurement and state.c for why the order of the
+     * tests is load-bearing. */
+    const char *mode = u2_state_mode(&ctx->state);
+    if (strcmp(mode, "title") != 0 && !ctx->enter_world) mode = "created";
     printf("{\"u2api\":%d,\"mode\":\"%s\",\"awaiting\":\"key\",\"rolls\":%u,\"digest\":\"%s\","
            "\"message\":\"",
            U2_API_PROTO, mode, (unsigned)ctx->rng_rolls, digest);

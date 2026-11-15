@@ -22,7 +22,9 @@
 
 int u2_site_is_dungeon(const u2_ctx *ctx)
 {
-    return ctx->state.sector_second == 4 || ctx->state.sector_second == 5;
+    /* Delegates to u2_state_is_dungeon() so the branch the game logic takes and the mode
+     * the API reports cannot answer the same question differently. */
+    return u2_state_is_dungeon(&ctx->state);
 }
 
 void u2_dungeon_facing(const u2_ctx *ctx, int *dx, int *dy)

@@ -67,6 +67,63 @@ int u2_state_load_ds_buf(u2_state *s, const unsigned char *buf, size_t n)
     return 0;
 }
 
+/* Which of the screens the state block says the player is on. Derived, never stored: the
+ * original has no phase byte, and inventing one would be exactly the plausible-boolean
+ * failure this project names over and over.
+ *
+ * The ORDER is the finding, and it took real captures to fix it. Two things were learned
+ * against the corpus rather than from the prose:
+ *
+ * 1. In orbit the sector, the position, DS:12, DS:13 and DS:14 are byte-identical to the pad
+ *    the rocket launched from (docs/handoff-space-view.md § 3a,
+ *    captures/spice86/w6-orbit-dive). The pad in that capture was sector 41, so a test that
+ *    looked at the settlement digit first would report a character in orbit as standing in a
+ *    village -- which is what the old derivation in api.c did, and why `mode` could not be
+ *    used to decide anything about space.
+ *
+ * 2. The staging pair being all-0xFF does NOT mean space. It means "there is no sector map
+ *    staged", and a dungeon is another thing that has none:
+ *    captures/spice86/dungeon-entry ev034..ev051 are a dungeon descent in sector 35 with the
+ *    pair uniformly 0xFF, and the first version of this function called all eighteen of them
+ *    space. The dungeon digit is therefore tested FIRST, because it is the specific signal
+ *    and the staging pair is the general one. Reading that off the captures instead of off
+ *    § 3a is the whole argument for running a new rule over the corpus before believing it.
+ *
+ * What is still not settled, stated rather than hidden: a rocket launched from a sector whose
+ * ones digit is 4 or 5 would be reported here as dungeon. Whether that is reachable is the
+ * same unknown as W6, and the honest position is that this discriminator is derived from a
+ * side effect and is bounded by what has been observed.
+ *
+ * Takes a state block and not a ctx on purpose: the original has no ctx, and a rule written
+ * against the block is a rule both executables answer to. That is what keeps the bot's two
+ * targets from drifting apart on a question as basic as where the player is.
+ */
+/* The settlement digit that means dungeon. Spelled out as its own function so
+ * u2_state_mode() and u2_site_is_dungeon() cannot drift: they are the same question asked
+ * from two places, and a third copy in a test would only make the drift look verified. */
+int u2_state_is_dungeon(const u2_state *s)
+{
+    return s->sector_second == 4 || s->sector_second == 5;
+}
+
+const char *u2_state_mode(const u2_state *s)
+{
+    size_t k;
+    int unstaged = 1;
+
+    if (s == NULL || !s->name[0]) return "title";
+
+    /* Specific before general: the digit says dungeon on its own, the staging pair only says
+     * "nothing is staged", which a dungeon shares with orbit. */
+    if (u2_state_is_dungeon(s)) return "dungeon";
+
+    for (k = 0; unstaged && k < sizeof s->stage_a; k++) unstaged = s->stage_a[k] == 0xFF;
+    for (k = 0; unstaged && k < sizeof s->stage_b; k++) unstaged = s->stage_b[k] == 0xFF;
+    if (unstaged) return "space";
+
+    return s->sector_second ? "site" : "world";
+}
+
 uint8_t u2_bcd_dec1(uint8_t v)
 {
     if (v == 0) return 0;

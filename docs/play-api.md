@@ -17,10 +17,26 @@ name.** They are listed here rather than edited silently into § 3 and § 4.
    observation reports `rng_rolls`, which is already inside the digest scope and so
    correlates with the digest it sits next to.
 2. **`mode` is derived, not tracked.** § 4 promised `title|creation|overworld|site|dungeon|
-   space`. There is no phase field, so it is read from the state: no name means `title`,
-   `sector_second` non-zero means `site`, otherwise `world`. Dungeon and space are **not**
-   distinguished, and saying so here is better than a field that guesses. Adding a real
-   phase is a small change to `game.c`, not to this file.
+   space`. There is no phase field, so it is read from the state by `u2_state_mode()` in
+   `state.c`, which returns `title`, `space`, `dungeon`, `site` or `world`, and `creation`
+   is layered on by `api.c` because the engine's request-to-play flag has no DS address.
+   Dungeon and space **are** now distinguished; they were not when this deviation was
+   written, and the reason they could not be is worth keeping.
+
+   Space is not a byte. In orbit the sector, position, `DS:12`, `DS:13` and `DS:14` are
+   byte-identical to the launch pad, so the only observable that separates them is the two
+   staging buffers (`DS:272..471`) being uniformly `0xFF` — measured in
+   `captures/spice86/w6-orbit-dive` and recorded at `docs/handoff-space-view.md` § 3a, which
+   also rightly warns that control flow must not test it. Nothing here gates on it; this is a
+   report.
+
+   And the staging pair does not mean space on its own. It means "nothing is staged", and a
+   dungeon shares that: `captures/spice86/dungeon-entry` ev034..ev051 is a dungeon descent
+   with the pair uniformly `0xFF`, and the first version of the rule called all eighteen
+   frames space while its own synthetic test sat green. The dungeon digit is therefore tested
+   first. `bot/mode_probe.py` runs the rule over every DS capture on disk and
+   `bot/mode_orbit_check.py` runs it against the pad/orbit/landed frames, which is what makes
+   the ordering a checked fact instead of an opinion.
 3. **`awaiting` is always `key`.** The plan said it would be derived from the site that
    blocked. Nothing records which call blocked, so the honest value is the one that is
    always true: the engine is blocked on a key. A finer answer needs a seam change.
