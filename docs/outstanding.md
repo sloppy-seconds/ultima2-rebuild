@@ -54,6 +54,9 @@ Short list; the recipe and byte evidence live in the named G-row.
 | **G77** — the plane's own march-step cost | `U2_PLANE_STEP_MS` is a borrowed 103 ms floor. | inferred | agent |
 | **G76** — column 40 spill or clamp | one frame at margin `0x28` with a full-width line. | inferred | agent |
 | **G30** — does `Ctrl-Y` move south | blocked on tooling: `spice86_type.py` has no modifier-key support. | inferred | agent, after a tool change |
+| **G84** — does a stamp land back in a PASSWALL-cleared cell, and does it block the step | the walk gate's low nibble is a movement test, so this is gameplay and not byte hygiene. One `DS:1800` read settles it. | measured (the mask), unknown (the stamp) | agent, headless |
+| **G85** — the warp animation has never been seen playing | built and gated structurally; every check is on counts and ordering, nobody has watched it. Also the moment to see whether 2 ms is even visible. | built, unobserved | agent, live run |
+| **G86** — owner: the rocket landing looks slower in the original than in the engine | `U2_DIVE_STEP_MS = 103` is a floor measured on one callee (`asm/5AB1`), not on the loop. A floor that is too low produces exactly this symptom. Same reasoning likely reaches `U2_PLANE_STEP_MS`, which is the same number under another name. | recalled | agent, headless |
 | **G58 — CLOSED 2026-11-15.** The pictures were already observed; the engine was the open half. `present_poem()` now maps each couplet to its own picture instead of the refuted two-picture guess, and `pic.h` carries the three names the executable itself references. Couplet 3 stays inferred (never observed, keeps the town picture) and couplet 6's `picmin` label stays unverified — the file is not a pyramid. | the code fix, which shipped | measured, one row inferred | done |
 
 ## 4. Decisions only the owner can make
