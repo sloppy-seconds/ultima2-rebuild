@@ -15,10 +15,39 @@ whatever binary happened to exist got copied into the image.
 | the original under Spice86 | `./deploy/spice86-novnc/up.sh` | 6085 |
 | the Phase 4 engine | `./deploy/novnc/up.sh` | 6082 |
 
-Both take `--down` to stop and remove, `--rebuild` to refresh the image, and `--status` to print
-what the running container is actually drawing — which is the difference between "the container is
-up" and "the game is on screen". Engine extras: `--cleanroom` for the substitute art, `--port N`.
-Spice86 extras: `--player FILE`, `--no-player`, `--no-patch`.
+Both take `--down` to stop and remove, `--name LABEL` to rename the container, and `-h` for the
+real list. They are **not** the same flag set, and the skill used to claim they were:
+
+| flag | original | engine | what it does |
+| --- | --- | --- | --- |
+| `--rebuild` | yes | **no** | refresh the image |
+| `--status` | **no** | yes | print what the running container is actually drawing — the difference between "the container is up" and "the game is on screen" |
+| `--player FILE` | yes | — | seed a saved character (then press `P`) |
+| `--resume [DIR]` | yes | — | resume a previous run exactly; `DIR` defaults to the newest run dir |
+| `--no-player`, `--no-patch` | yes | — | blank disk; leave arrows unpatched |
+| `--cleanroom`, `--port N`, `--load-save` | — | yes | substitute art; port; a specific save |
+
+## Death, and getting back into a game
+
+**Death in the original is terminal.** The screen prints `ENDGAME IS DEAD!` and sits there: no
+"press any key", no return to the title menu, nothing in-game to press. The only recovery is a hard
+restart of the program, and a plain restart builds a fresh run dir from the pristine files, which
+orphans everything the last run wrote. So:
+
+```sh
+./deploy/spice86-novnc/up.sh --resume            # newest run dir
+./deploy/spice86-novnc/up.sh --resume DIR        # a named one
+```
+
+`--resume` overlays that run's `player` **and** its `mapx*`/`monx*`/`tlkx*` over the pristine copy
+before launch, and prints which files it restored. Sector files are included on purpose: the point
+is to resume exactly the last game, damage and all. Note the image bakes `entrypoint.sh` in, so
+editing it needs `--rebuild`.
+
+What is worth resuming is only what the game actually wrote, and that list is short: `Q` outdoors on
+Earth writes `player` plus that sector's `mapx`/`monx`, and entering or leaving a site on Earth
+writes `player`. **Nothing off Earth is ever written**, so a Planet X trip survives only if you got
+home and saved. `asm/0C62_death.asm` and `docs/save-format.md` § 10 carry the byte evidence.
 
 ## Before concluding it is broken
 
