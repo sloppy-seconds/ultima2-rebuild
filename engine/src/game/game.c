@@ -42,7 +42,7 @@ static void draw_skeleton_screen(u2_ctx *ctx)
     seam_str_out_at(ctx, 2, 5, "spec: asm/ tree (byte-proven)");
     seam_str_out_at(ctx, 2, 7, "no game content - see CP1 extractor");
     seam_str_out_at(ctx, 2, 9, "seams: char_out str_out key_poll");
-    seam_str_out_at(ctx, 2, 10, "       rand_byte timed_wait speaker");
+    seam_str_out_at(ctx, 2, 10, "       rand_byte wait_ms   speaker");
     seam_str_out_at(ctx, 2, 12, "press Q to quit");
     /* Exercise the cursor seam here, over the last character of that line —
      * "press Q to quit" is 15 characters from column 2, so the final 't' is
@@ -73,10 +73,11 @@ static void draw_probe_line(u2_ctx *ctx, game_ctx *g)
              r1, r2, g->frames, g->keys_seen, g->last);
     seam_str_out_at(ctx, 1, 14, buf);
 
-    /* timed_wait + speaker_freq probes: the two remaining platform seams. */
+    /* wait_ms + speaker_freq probes: the two remaining platform seams. Note the
+     * first has no asm counterpart — see core/timer.c — so it is probed, not cited. */
     seam_wait_ms(ctx, 1);
     seam_tone(ctx, 0x0830, 5); /* divisor for ~750 Hz, asm/5CD2_speaker_freq.asm */
-    snprintf(buf, sizeof buf, "timed_wait(52CA) ok speaker_freq(5CD2)");
+    snprintf(buf, sizeof buf, "wait_ms ok      speaker_freq(5CD2)");
     seam_str_out_at(ctx, 1, 16, buf);
 }
 

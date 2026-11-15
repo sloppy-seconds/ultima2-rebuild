@@ -85,6 +85,11 @@ def read(p):
 
 # ---- leg 1: the loop must not spin, and must present and paint ---------------------
 src = read(CMD)
+# The pacing constants moved to game/space.h so the dive and the plane could not each carry
+# their own copy of one borrowed figure. This leg follows them; the point of the leg is that
+# the rate is a named constant citing a measurement, not where the file sits.
+PACE = os.environ.get("U2_PACE_GATE_SRC") or os.path.join(ROOT, "engine", "src", "game", "space.h")
+pace = read(PACE)
 m = re.search(r"static void space_loop\(.*?\n\}\n", src, re.S)
 check(m is not None, "space_loop found in commands.c")
 body = m.group(0) if m else ""
@@ -169,13 +174,13 @@ check(cx.endswith("/ 2") and cy.endswith("/ 2"),
 # The period clock the game was written for. The figure below is not a taste setting: it is
 # how the cited cycle count becomes milliseconds, and the check recomputes it.
 PERIOD_HZ = 4_770_000
-dm = re.search(r"#define\s+U2_DIVE_STEP_MS\s+(\d+)", src)
+dm = re.search(r"#define\s+U2_DIVE_STEP_MS\s+(\d+)", pace)
 check(dm is not None, "the dive step's pacing is a named constant, not an inline number")
 if dm:
     ms = int(dm.group(1))
     # the comment next to the constant must cite the measurement it came from
-    tail = src[dm.end():dm.end() + 1200]
-    cyc = re.search(r"([\d,]{6,}) emulated cycles", src)
+    tail = pace[dm.end():dm.end() + 1200]
+    cyc = re.search(r"([\d,]{6,}) emulated cycles", pace)
     check(cyc is not None,
           "the pacing cites a measured cycles-per-step figure, so it cannot be retuned blind")
     if cyc:

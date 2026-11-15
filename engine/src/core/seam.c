@@ -305,7 +305,7 @@ uint8_t seam_rand_byte(u2_ctx *ctx)
 
 void seam_wait_ms(u2_ctx *ctx, uint32_t ms)
 {
-    u2_trace(ctx, "timed_wait", "52CA", "ms=%u", ms);
+    u2_trace(ctx, "wait_ms", "engine", "ms=%u", ms);
     u2_wait_ms(ctx, ms);
 }
 

@@ -217,7 +217,7 @@ address on every call, which is what makes a trace auditable against `asm/`:
 | row clear | `asm/53A0_sub_53a0.asm` | `seam_clear_row` |
 | `key_poll` | `asm/4F4D_key_poll.asm` | `seam_key_poll` |
 | `rand_byte` | `asm/5217_rand_byte.asm` | `seam_rand_byte` |
-| `timed_wait` | `asm/52CA_timed_wait.asm` | `seam_wait_ms` |
+| `wait_ms` | **none** — the original has no delay primitive. This row used to cite `asm/52CA_timed_wait.asm`; that file was renamed 2026-10-21 to `52CA_dos_call_wrapper.asm`, it is the generic DOS FCB call wrapper, and the engine's prose outlived the rename by three weeks. The original paces by the cost of the work in the loop. | `seam_wait_ms` |
 | `speaker_freq` | `asm/5CD2_speaker_freq.asm` | `seam_tone` |
 | `map_tile_ptr` | `asm/50B3_map_tile_ptr.asm` | overworld module (CP4) |
 | `cmd_prompt` / `cmd_dispatch` / `cmd_done` | `asm/087D`, `asm/0A1F`, `asm/0A33` | command loop (CP6) |

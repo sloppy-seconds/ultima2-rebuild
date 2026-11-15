@@ -55,7 +55,8 @@ int  seam_key_wait(u2_ctx *ctx, u2_key *out);
 int  seam_key_wait_shown(u2_ctx *ctx, u2_key *out);
 /* seam: rand_byte (asm/5217_rand_byte.asm). */
 uint8_t seam_rand_byte(u2_ctx *ctx);
-/* seam: timed_wait (asm/52CA_timed_wait.asm). */
+/* seam: wait_ms — the engine's own pacing seam, with NO counterpart at asm/52CA.
+ * That routine is the DOS FCB call wrapper; see platform.h's seam table. */
 void seam_wait_ms(u2_ctx *ctx, uint32_t ms);
 /* seam: speaker_freq (asm/5CD2_speaker_freq.asm) — 8253 latch divisor. */
 void seam_tone(u2_ctx *ctx, uint16_t divisor, uint32_t ms);

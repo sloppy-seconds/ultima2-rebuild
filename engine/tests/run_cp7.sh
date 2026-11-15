@@ -576,6 +576,32 @@ else
     sed 's/^/        /' "$WORK/passwall.build"
 fi
 
+# ---- rocket descent pace: geometry observed, clock arithmetic (unit gate) ---
+# Owner recollection 2026-11-15: the original's landing looks slower than the engine's
+# (G86). Chasing it found the pace figure defined three times under two names in one file,
+# and the seam it was attributed to (asm/52CA) is the DOS FCB call wrapper, not a delay —
+# the original has no delay primitive at all. So this gate keeps two grades apart: the
+# march geometry is observed in dive-sweep-rate and must match position for position,
+# while 103 ms is 492,074 cycles divided by a nominal clock and is a LOWER BOUND, because
+# Spice86 models no 8088 bus wait states. See tests/dive_pace_check.c.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/dive_pace_check" \
+        tests/dive_pace_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/dive.build"; then
+    if "$WORK/dive_pace_check" > "$WORK/dive.out" 2>&1; then
+        n=$(sed -n 's/^dive_pace_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/dive.out")
+        if [ "${n:-0}" -eq 0 ]; then
+            bad "CP7 dive pace run executed 0 checks — the test is not running"
+        else
+            ok "CP7 dive pace: geometry matches the capture, clock pinned to its derivation ($n checks)"
+        fi
+    else
+        bad "CP7 dive pace check failed:"
+        sed 's/^/        /' "$WORK/dive.out"
+    fi
+else
+    bad "CP7 dive pace harness did not build:"
+    sed 's/^/        /' "$WORK/dive.build"
+fi
+
 # ---- dungeon fills the doubled frame (classic EGA) -----------------------
 # The wireframe is authored in 320x200 CGA space; in classic EGA it must scale by
 # the frame scale to fill the map window, not sit in the top-left quarter. CGA stays

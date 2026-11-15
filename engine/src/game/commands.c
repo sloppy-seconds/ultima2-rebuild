@@ -987,9 +987,14 @@ static void flight_line(u2_ctx *ctx, const char *word)
  * figure and we can do a measure later... give the plane its own constant, that way if we
  * have to change it later we don't have to decouple it then"). It is not a guess about the
  * plane: 103 ms is a measurement of asm/5AB1_map_render, the routine this loop calls, so it
- * is a floor. What it is not is the plane's own measurement, which is why it does not share
- * the dive's name -- one constant per loop means the capture closes the gap by editing one
- * line instead of first unpicking two loops that were welded together.
+ * is a floor. What it is not is the plane's own measurement.
+ *
+ * The two names are kept separate for that reason; the VALUES are not. They used to be
+ * defined three times in this file under two names, one pair of them identical and
+ * introduced by a comment claiming they differed, which is the kind of arrangement that
+ * survives until someone edits one. Both now live in game/space.h as one definition each,
+ * both marked borrowed, and tests/dive_pace_check.c asserts they are still equal so a
+ * future divergence is a decision rather than an accident.
  *
  * The capture that replaces it: docs/needs-gameplay.md G77. Seed a brass button
  * (items_held[11], DS:E1), board, launch, poll x,y,cycles per step exactly as
@@ -1001,7 +1006,7 @@ static void flight_line(u2_ctx *ctx, const char *word)
  * missed it) and its value is discarded by both of its callees, exactly like the dive's
  * slot 14. See asm/0711_speed_delay_lookup.
  */
-#define U2_PLANE_STEP_MS 103
+
 
 static u2_cmd_result launch_plane(u2_ctx *ctx, u2_overworld *ow)
 {
@@ -1342,24 +1347,9 @@ static int space_hyperwarp(u2_ctx *ctx, u2_overworld *ow)
  * every 26 s at the measured step rate — see docs/needs-gameplay.md G63.
  */
 
-/* One march step is one frame, and in the original the frame is paid for in CGA writes:
- * 492,074 emulated cycles between steps, measured over 13 consecutive steps at
- * --cycles 3000 (captures/spice86/dive-sweep-rate/dive1.csv), which at the 4.77 MHz the
- * game was written for is 103 ms and about 9.7 steps/s — a full north-to-south sweep of 32
- * steps in about 3.3 s, with x advancing 8 cells per sweep.
- *
- * The engine's own render is a memcpy, so the rate cannot fall out of the work the way it
- * does in the original; it has to be stated. This is that statement, and it is a measured
- * number and not a taste setting. There is no timeout behind it: the speed-delay slot the
- * original loads in the same loop is discarded by both of its callees (see
- * asm/0711_speed_delay_lookup), so nothing in the bytes sets a different figure.
- */
-#define U2_DIVE_STEP_MS 103
-
-/* The plane's flight loop has its own figure, defined next to that loop rather than
- * here: U2_PLANE_STEP_MS, above launch_plane. Same mechanism -- one asm/5AB1_map_render
- * per iteration -- different cost, so the two are deliberately not one number. */
-#define U2_PLANE_STEP_MS 103
+/* The pace of one march step is U2_DIVE_STEP_MS, defined in game/space.h with its
+ * derivation and its caveats, because the plane's loop uses the same borrowed figure and
+ * they used to be defined three times under two names in this one file. */
 
 static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
 {

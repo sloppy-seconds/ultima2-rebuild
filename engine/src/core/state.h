@@ -19,7 +19,7 @@
  *     core/state.c on why there is deliberately no encoder.
  *
  * A second variable space exists in the original and is NOT here: the CS-side
- * data area (jump table at cs:0x730, the timed_wait parameter block at
+ * data area (jump table at cs:0x730, the DOS call wrapper's parameter block at
  * cs:0x4F04..cs:0x4F0A, item tables around cs:0x48D0). Those are static
  * per-module state and live with the module that owns them, cited in its
  * header. See disasm/selfmod-capture.md.

@@ -189,6 +189,20 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-15 — A rename that corrects a wrong name leaves the wrong behaviour asserted
+  everywhere the old name was quoted, and nothing checks prose.** A routine was renamed on
+  byte evidence because it was not what its first name claimed. Three weeks later the
+  reimplementation still cited the old filename in six places — a seam table, two headers, a
+  module's own spec line, a README table — each of them restating the refuted behaviour as
+  fact, and one of them printing it on a diagnostics screen. The bytes were never wrong; the
+  prose outlived the correction. Two general rules fall out. **(1)** When a rename settles a
+  name, the grep is over the whole tree including the reimplementation's comments and
+  tables, not just the tools that parse the tree — a comment that cites a filename is a
+  claim, and claims rot silently. **(2)** Anything that cites a filename should be checked
+  by something that can open the filename. The one place in this project that did — a gate
+  grepping for a named constant in a named file — is the reason the move of that constant
+  was caught at all: it went red rather than quietly losing its grip. → Tier 1, evidence
+  discipline.
 * **2026-11-15 — A table's index source can look random and be a constant, and the tell is the
   instruction that follows the random call.** A shop's chatter table was recorded as "the table is
   decoded, its index source is the only unread part" and parked as needing a live conversation with

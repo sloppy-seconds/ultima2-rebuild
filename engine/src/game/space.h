@@ -108,11 +108,39 @@ int u2_space_armour_ok(uint8_t worn_armour);
 
 /* asm/38B0's descent, and the strongest confirmation in this project: this rule was
  * written from bytes alone, and then predicted both live landings to the cell.
- * Starting at (0,6): y += 2 every step, x += 1 whenever the new y is a multiple of 8.
- * From (0,6) that reaches (7,62) and (5,44), which is where the two runs stopped.
+ * y += 2 every step, x += 1 whenever the new y is a multiple of 8.
+ *
+ * The start is (0,0). This comment used to say (0,6), which was inferred from the
+ * landing-cell arithmetic and is one step wrong; captures/spice86/dive-sweep-rate
+ * sampled DS:00/DS:01 across a live dive and the first distinct position is (0,0).
  *
  * Advances *y and *x in place, wrapping at 64 like the original's byte arithmetic. */
 void u2_space_descent_step(uint8_t *x, uint8_t *y);
+
+/* The pace of the two animated launches, in milliseconds per march step.
+ *
+ * Both are the SAME borrowed figure, and neither is measured on its own loop. One march
+ * step is one frame, and in the original a frame costs one whole sector render
+ * (asm/5AB1_map_render): 492,074 emulated cycles between steps, measured over 13
+ * consecutive steps in captures/spice86/dive-sweep-rate/dive1.csv. Divided by the
+ * nominal 4.77 MHz that is 103 ms and about 9.7 steps/s.
+ *
+ * The division is the weak half and it is a LOWER BOUND, not an estimate with error bars.
+ * Spice86 counts CPU cycles and models no 8088 bus wait states, so real hardware spent
+ * more wall-clock time per cycle than the nominal clock implies. Owner recollection
+ * 2026-11-15 is that the original's landing looked slower than the engine's, which is
+ * exactly what a lower bound looks like when you meet it. docs/needs-gameplay.md G86 is
+ * the capture that would replace the arithmetic with a loop-level figure.
+ *
+ * There is no timeout behind either loop and no delay primitive anywhere in the binary.
+ * The speed-delay slot both loops load is discarded by its callee
+ * (asm/0711_speed_delay_lookup), and asm/52CA — which an earlier reading called
+ * `timed_wait` — is the DOS FCB call wrapper. See core/timer.c.
+ *
+ * Pinned by tests/dive_pace_check.c, which recomputes the division and fails if the
+ * constant and its derivation part company. */
+#define U2_DIVE_STEP_MS 103
+#define U2_PLANE_STEP_MS 103
 
 /* The dive's verdict on the tile it stopped on. asm/38B0: only 0x08 grass lives,
  * anything else jumps to runtime 0x0E62, the death tail. Observed twice, both
