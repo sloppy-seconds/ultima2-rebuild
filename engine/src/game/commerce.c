@@ -180,20 +180,21 @@ int u2_spend_price(u2_ctx *ctx, const uint8_t price[2])
 
 /* ---- the input the shops need ---------------------------------------------- */
 
-/* One line of engine-authored text, announced as such.
+/* The `[engine]` prefix convention, and why there is no function for it any more.
  *
- * The `[engine]` prefix is this project's convention for anything the original never printed
- * -- the same one --cleanroom uses for substitute art and title.c uses for stub screens. A
- * gap has to be visible, because an unimplemented branch that returns quietly is
- * indistinguishable from a hung game, and "it froze" is exactly what an owner reported for
- * one of these. It must never be mistaken for game text, because then a missing feature
- * reads as the reconstruction faithfully reproducing a refusal that never existed. */
-static void engine_gap(u2_ctx *ctx, const char *what)
-{
-    char buf[64];
-    snprintf(buf, sizeof buf, "[engine] %s", what);
-    seam_str_out(ctx, buf);
-}
+ * `[engine]` is this project's marker for anything the original never printed -- the same one
+ * --cleanroom uses for substitute art and title.c uses for stub screens. A gap has to be
+ * visible, because an unimplemented branch that returns quietly is indistinguishable from a
+ * hung game, and "it froze" is exactly what an owner reported for one of these. It must never
+ * be mistaken for game text, because then a missing feature reads as the reconstruction
+ * faithfully reproducing a refusal that never existed.
+ *
+ * This file used to hold the helper, and the tree used to hold exactly one call site. That
+ * site closed 2026-11-15 and the bytes said the faithful behaviour there was silence, so the
+ * helper went with it rather than sitting unused: an unused static is a -Werror build, and a
+ * helper kept alive by a comment is how a convention turns into dead code. `grep -rn
+ * engine_gap engine/src` returning nothing is the current state of the tree, and § 1 of
+ * docs/outstanding.md says so. When a new gap lands, write the helper back with its call. */
 
 /* Put what was just printed on the screen before blocking for the key that answers it.
  *
@@ -709,8 +710,7 @@ u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, i
              *
              * Placed before the n > 0 test on purpose: in asm/4209 the store follows the
              * print with no branch on whether a record came out, so a sector with no tlkx
-             * file still blesses you. The engine's "no dialogue for that role" line is an
-             * engine affordance and is not in the original at all. */
+             * file still blesses you. */
             if (st->world == 9 && st->sector_second == 3 && st->mon_role[slot] == 0x81u)
                 st->blessing = 1;
             if (n > 0) {
@@ -721,8 +721,21 @@ u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, i
                  * the CMD window until the next message displaces it, which is readable. */
                 return U2_TRANSACT_TREATED;
             }
-            engine_gap(ctx, "no dialogue for that role");
-            return U2_TRANSACT_NO_DEALER;
+            /* SILENCE IS FAITHFUL HERE, and this is the routine that proves it. asm/4209 does
+             * `sbb $0x80,%al ; call L_00174e` and nothing else: there is no branch on whether
+             * a record came out, and asm/154E_tlkx_record_printer walks NUL-delimited records
+             * in the loaded tlkx buffer until it reaches the Nth, then emits until the next
+             * NUL — `al = es:[di] ; cmp 0 ; je 1580` returns having printed nothing when the
+             * index runs past the records into the buffer's trailing zeros. So an out-of-range
+             * role prints nothing, waits, and falls through to cmd_done.
+             *
+             * This used to be the project's last engine_gap(), printing "[engine] no dialogue
+             * for that role". That message is not in the original at all, and printing an
+             * admission where the bytes are silent is the failure AGENTS.md § 3 names: the
+             * rule is that the player is told something happened OR the silence is cited, and
+             * here the faithful answer is the cited silence. Returning a distinct enum value
+             * keeps it observable to a test without putting text on screen. */
+            return U2_TRANSACT_SILENT;
         }
 
         /* role < 0x80: asm/40CB walks the creature-type chain. Type 0x6C is the tribute and

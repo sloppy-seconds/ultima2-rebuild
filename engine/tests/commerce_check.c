@@ -546,6 +546,25 @@ int main(void)
         CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_RING,
               "chain: Antos's blessing is what makes the ring obtainable");
         CHECK(ctx.state.items_held[0] == 1, "chain: the ring is in the inventory at the end");
+
+        /* A scripted role whose record index runs past the sector's dialogue is SILENT, not
+         * refused. asm/4209 has no branch on whether a record came out, and
+         * asm/154E_tlkx_record_printer returns having emitted nothing once the index walks
+         * off the end of the tlkx buffer, so the original prints no message at all. This was
+         * the project's last engine_gap(), which printed "[engine] no dialogue for that
+         * role" — text the original never had, in the one place the bytes are silent. */
+        {
+            u2_transact_result r;
+            arm_offer(&ctx, &ow, 0x8F, 0, 3, 1);   /* role 0x8F -> record 15 */
+            ow.world.tlkx[0] = 0;
+            memcpy(ow.world.tlkx + 1, "ONE RECORD ONLY", sizeof "ONE RECORD ONLY");
+            ow.world.tlkx_loaded = 1;
+            r = u2_commerce_transact(&ctx, &ow, 1, 0);
+            CHECK(r == U2_TRANSACT_SILENT,
+                  "an out-of-range tlkx index is silent, not refused (got %d)", (int)r);
+            CHECK(r != U2_TRANSACT_NO_DEALER,
+                  "and not the refusal either: FUNNY, NO RESPONSE! is for a ray that found nothing");
+        }
     }
 
     /* ---- the spell shoppes: the two rules a rewrite loses ---------------------

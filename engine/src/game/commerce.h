@@ -50,10 +50,13 @@ typedef enum u2_transact_result {
                                    implemented here (see commerce.c's GAP note) */
     U2_TRANSACT_OPEN,           /* a shop was reached and its menu printed */
     U2_TRANSACT_REFUSED,        /* a shop was reached and declined the transaction */
-    U2_TRANSACT_TREATED         /* the cursor held a type-0x6C creature and the tribute ran:
+    U2_TRANSACT_TREATED,        /* the cursor held a type-0x6C creature and the tribute ran:
                                    gold taken and HP raised. Distinct from OPEN because a
                                    test must be able to tell "the tribute fired" from "a
                                    shop menu printed" without grepping for text. */
+    U2_TRANSACT_SILENT          /* a scripted NPC whose tlkx record index is out of range:
+                                    the printer ran and emitted nothing. The original is
+                                    silent here, so the engine is too. */
 } u2_transact_result;
 
 /*
