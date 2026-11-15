@@ -13,8 +13,25 @@
 #                 plot new via L_004d76 ; store new into the tables
 #                 cmpb $0x2,0x4c7 ; jae L_006e52             ; mode >= 2 takes a further branch
 #           So **DS:4C7 is the animation mode**: 0 = plot in place, 1 = erase-and-plot
-#           (motion), >= 2 = the extra branch at L_006e3a, which walks the cs:0x6990/0x6992
-#           pair in its own loop. The engine's `out->warping` is the same distinction.
+#           (motion), >= 2 = the extra branch at L_006e3a. **Read 2026-11-15: the >= 2 branch
+#           draws nothing.** The star is plotted at L_006e30 (`call L_004d76`) BEFORE the
+#           `cmpb $0x2,0x4c7` at L_006e33, so both arms have already drawn the same pixel by
+#           the time they diverge. What the branch selects is a side effect, and it is a
+#           divider:
+#                 mode < 2 : cs:0x6990 += cs:0x6992 ; mov $0x1,%cx ; call L_005ed2
+#                 mode >= 2: decw cs:0x6994 ; jne skip ; call L_007442
+#           L_005ed2 is file-offset notation for runtime 0x5CD2, which is asm/5CD2_speaker_freq
+#           — the 8253 channel-2 latch. So mode 1 drives the speaker on every pass of the
+#           star loop, and mode >= 2 instead counts a CS-side word down and fires asm/7242
+#           only when it reaches zero. asm/7242 reloads that same word at its own tail, to
+#           0xE0 on one path and 0x18 on the other, selected by `cmpb $0xff,%cs:0x6998`, and
+#           its second path also calls the speaker. So the whole branch is a **rate-limited
+#           tone**, not a second animation, and the reload values are the period.
+#           The engine's `out->warping` is the same distinction, and the engine currently has
+#           no sound on either arm.
+# renamed again 2026-11-15 (same day): the header used to list "what the mode >= 2 branch
+#           draws" as undecoded. It draws nothing; the question was the wrong shape, and the
+#           right question — what does the branch DO — was answerable statically in one read.
 # func 6B3D..6CC3  len 0187 B  evidence: call+reko
 # calls: L_004d76 (pixel_plot), L_004daa (pixel_erase, colour 0), L_005ed2, L_006d47,
 #           L_006da0, L_006df6, L_006e5c, L_006e8c (+3 more)
@@ -26,8 +43,11 @@
 #           were read out of the body directly; the star count agreeing with the frame
 #           measurement is the corroboration that makes the table reading more than a guess.
 #           What is STILL not decoded: the per-star position algorithm (the cs:0x6cac delta
-#           table is read but its construction is not), and what the mode >= 2 branch draws.
-# confidence: medium-high for the mode byte and the tables; low for the >= 2 branch
+#           table is read but its construction is not), and what the tone actually sounds
+#           like — the divisor reaches asm/5CD2_speaker_freq through a value computed in
+#           asm/7242 from a masked timer read, and no capture has sampled it.
+# confidence: medium-high for the mode byte and the tables; **measured-static for the >= 2
+#           branch** (it is a divider into the speaker, not art); low for the audible result
 # provenance: static — the mode byte, the two tables and the erase-before-plot were read out of
 #           the body on 2026-11-15. The frame evidence for the star count is
 #           captures/spice86/ frames 014/049/050/096/097 as measured in space_view.h, which is
