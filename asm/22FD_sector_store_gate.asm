@@ -1,8 +1,15 @@
-# sector_store_gate — `if (DS:6D == 0) store_sector();` the sector being left
+# sector_store_gate — `if (DS:6D == 0) save_game();` — the one call that banks a game
 # name-evidence: the whole body IS the gate. `a0 6d 00` mov DS:6D,%al; `0a c0` or %al,%al;
 #           `74 01` je +1; and the `c3` ret lives in asm/2304. The je target is runtime 0x2305,
 #           which is asm/2305_sector_store.asm. There is no other instruction in the span, so the
 #           routine's entire behaviour is: on Earth, store; off Earth, return.
+# note: what "store" means, corrected 2026-11-15. This gate was named for the sector file because
+#           the store was believed to write the sector buffer and nothing else, which made every
+#           caller look like it banked a map tile. The store writes THREE files in one call —
+#           `mapxNN`, `monxNN` and the 256-byte player record at DS:36 — so every caller of this
+#           gate is a full save, and the player record is only ever banked through here or through
+#           the two inline exit writes (asm/2453 at runtime 0x2474, asm/3823 at runtime 0x389d).
+#           Breakpoint evidence: one hit per site entry, zero per exit, three files changed.
 # func 22FD..2303  len 0007 B  evidence: seed+call+reko
 # DS:6D is the WORLD byte: 0 = Earth, 1..9 the planets, 0x0A deep space (state.h:333, and
 #           asm/7030_space_collision writes it). So the store is Earth-only. Corroborated

@@ -329,14 +329,35 @@ would have shown otherwise had silently refused. The full picture, measured with
 
 | action | what lands on disk |
 | --- | --- |
-| crossing a site edge (leave or enter a town) | `mapx`/`monx` byte-identical to pristine. **`player` IS written on entry** — see "the site-entry save" below; the original measurement compared the sector files only |
+| crossing a site edge | **asymmetric, and this took three attempts to get right.** Entering calls the store and writes all three files. Leaving writes `player` only, from a different site. See "what `L_0024fd` actually is" below |
 | `Q` outdoors, gate satisfied | `player`, **and `mapxNN` and `monxNN` of the sector you are standing in** |
 | `Q` inside a town | refused: `ONLY OUTDOORS!`, nothing written |
 | `Q` outdoors with `DS:6D != 0` | refused: `ONLY ON EARTH!`, nothing written |
 | **death, any cause** | **nothing.** The zeroing is memory-only |
 | **rocket launch from a wilderness sector** | **nothing, corrected 2026-11-15.** This row used to say `player` only. It was wrong, and so was the `asm/38B0` header it came from: the call on the launch path is the sector store gate, not a record writer. See "the launch gate has two halves" below |
-| **entering a site** (town, tower, dungeon, castle, village) | **`player`, proven 2026-11-03** — and it records the sector you came **from**, not the one you entered |
+| **entering a site** (town, tower, dungeon, castle, village) | **`player` + `mapxNN` + `monxNN`** — the whole store, one call. Measured 2026-11-15 by md5-diffing a single `E` keypress against a quiet baseline. The player record it writes still records the sector you came **from**, not the one you entered |
 | **anything at all off Earth** — site entry, site exit, launch, landing, hyperjump, death | **nothing.** Measured on a genuine Planet X, not a poked world byte, in `captures/spice86/g82-planet-x-live`: ten transitions watched at one-second resolution across 91 files, zero writes, with a `Q` control that fired the same session |
+
+### What `L_0024fd` actually is, because every contradiction in this section is one name
+
+Every save citation in this section says `call L_0024fd`, and it has been called "the save
+body" on the assumption that it writes the player record. It does not, and the confusion is
+purely notational: `L_` labels are **file** offsets, and file `0x24FD` is runtime `0x22FD`,
+which is `asm/22FD_sector_store_gate` — the Earth gate. It falls through to
+`asm/2305_sector_store`, which writes **three** files under one `AH=28h`: `mapxNN` (4096
+bytes from `DS:472`), `monxNN` (256 bytes from `DS:137`) and `player` (256 bytes from
+`DS:36`).
+
+So there is exactly one store, and it is all-or-nothing per call. The two paths that write
+`player` alone are separate inline writes, not the store: the walk-off-a-site-edge path in
+`asm/2453` (runtime `0x2474`) and the ladder-descent path in `asm/3823` (runtime `0x389d`).
+Both were confirmed by breakpoint on 2026-11-15, and both are exit paths, which is why every
+record write ever seen in 262 execution traces is either an exit or character creation.
+
+That resolves the row above that used to say a launch writes `player` and nothing else, and
+the note that two routes into the same save body wrote different file sets. There is one
+store; the sector files it writes are often unchanged, and an unchanged write is invisible to
+a checksum and invisible to nothing else.
 
 ### The launch gate has two halves, and the second one bites
 
@@ -378,10 +399,12 @@ sector the launch happened in:
 | g60 | **41** site sector, `DS:4A = 1` | **IDENTICAL** — the game never wrote it |
 
 And `mapx40`, `monx40`, `mapx41`, `monx41`, `mapx30` were byte-identical to pristine in
-**both** runs. So the launch writes the player record and nothing else, which means the
-sector write described in the table above is *not* inside `L_0024fd`, or is conditional on
-something the launch path does not set. Unresolved, and it matters: two routes into the
-same save body write different sets of files.
+**both** runs — which was read as the sector files not being written, and that reading was
+wrong. They **are** written; they were written with the bytes they already had, because
+nothing had damaged them. This is the trap `docs/harness-portability.md` § 6 names: a file
+that comes back byte-identical after an operation is not evidence the write did not happen.
+The launch writes all three, same as every other route into the store, and there is no
+second save body writing a different set of files.
 
 ### Why this is a hazard for a player, not a curiosity
 
@@ -399,7 +422,10 @@ transition save. Where to look is named below.
 
 ### Open: the site-entry save, which this doc currently contradicts
 
-**RESOLVED 2026-11-03, same session, and the answer is yes.** `asm/341E` (village),
+**RESOLVED 2026-11-03, same session, and the answer is yes** — and the mechanism was pinned
+down on 2026-11-15: the `call L_0024fd` these routines share is the **sector store gate**, not
+a player-only save body, so what a site entry writes is the whole store. See "what
+`L_0024fd` actually is" above. `asm/341E` (village),
 `asm/343F` (`-TOWN`, `-TOWER`), `asm/34B5`/`asm/34CF` (`-CASTLE`) and `asm/34E4`
 (`-DUNGEON`) all share one shape — record the return cell, then save:
 

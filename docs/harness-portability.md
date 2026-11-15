@@ -1943,3 +1943,13 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   relocating a tool, check that its dependencies travel with it; when a tool needs a path it
   cannot see, the first question is whether the path is really invisible, not how to ship
   the tool to it. → Tier 2, harness layout.
+- **A routine cut in the middle will get a plausible wrong name on the far half, and the name
+  is the damage.** A boundary detector split one save routine into four pieces. The second
+  piece set up a 256-byte transfer with the same register pair a read uses and the same pair a
+  write uses — only the mode byte, set in the *first* fragment, distinguishes them — so it was
+  named a loader and documented as reading data into arrays. It was writing them to disk.
+  Nothing about that is detectable from the fragment alone, which is the point: an ambiguous
+  fragment must be left unnamed rather than named from its most plausible reading, because a
+  wrong name gets cited as fact by everything downstream and a blank one does not. The
+  detector's own rule should be that a fragment which does not set its own mode byte is a
+  continuation, not a function. → Tier 1, boundary detection.
