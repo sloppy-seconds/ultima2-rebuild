@@ -272,6 +272,10 @@ def main_site(out_dir: str, case: str) -> int:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
+        print("usage: cp6_commerce_seed.py DIR CASE\n")
+        print("CASE is one of:", ", ".join(sorted(CASES)))
+        raise SystemExit(0)
     if len(sys.argv) != 3:
         print("usage: cp6_commerce_seed.py DIR CASE", file=sys.stderr)
         raise SystemExit(2)

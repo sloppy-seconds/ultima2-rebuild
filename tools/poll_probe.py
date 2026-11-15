@@ -53,6 +53,12 @@ def step(port, rate, dur):
 
 
 def main():
+    # `-h` answers with this file's own docstring. Without it `--help` was read as a port number
+    # and the tool died in int() with a traceback, which is what tools/doc_command_gate.py now
+    # catches for every script a doc points at.
+    if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
+        print((__doc__ or "").strip())
+        return 0
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 20180
     rates = [3, 5, 8, 12, 20, 30, 40, 60]
     print(f"probing memory API on port {port}, {SIG_LEN}-byte reads")

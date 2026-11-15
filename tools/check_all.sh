@@ -165,6 +165,16 @@ else
     run "guard_selftest" engine/tests/asm_body_guard_selftest.sh -- bash engine/tests/asm_body_guard_selftest.sh
 fi
 
+echo "== documentation currency =="
+# The docs are load-bearing: AGENTS.md tells every session to consult docs/spice86-capture.md and
+# docs/tooling-procedures.md BEFORE writing a script. A page that names a renamed tool, or a tool
+# whose --help prints someone else's usage, sends the session into a failure and then a
+# re-derivation — the exact cost the pages exist to prevent. Two such drifts were found by accident
+# on 2026-11-15, which is why this is a gate and not a wish. Selftest first, because the gate's own
+# first selftest passed while checking nothing.
+run "doc_command_gate selftest" tools/doc_command_gate.py -- python3 tools/doc_command_gate.py --selftest
+run "doc_command_gate" docs/tooling-procedures.md -- python3 tools/doc_command_gate.py
+
 echo "== mutation harnesses (prove the model tests can go red) =="
 if [ "$FAST" = 1 ]; then
     # Deliberate: these compile the engine nine times each and need the committed

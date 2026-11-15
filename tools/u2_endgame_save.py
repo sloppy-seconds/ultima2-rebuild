@@ -25,6 +25,13 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(REPO, 'tools')
 REF = os.path.join(REPO, 'references/ultima2/player')
 
+# `-h` answers instead of forwarding the flag to a subprocess: this script shells out to cp
+# and u2_edit.py with its own argv, so `--help` used to print coreutils' help and exit 0,
+# which is the kind of plausible wrong answer tools/doc_command_gate.py exists to catch.
+if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
+    print((__doc__ or "").strip())
+    raise SystemExit(0)
+
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(REPO, 'engine/saves/_seeds/endgame-PLAYER')
 
 
