@@ -1194,7 +1194,7 @@ start	end	len	evidence	name_hint
 68C0	68EC	002D	call+reko	
 68ED	6998	00AC	call+reko	
 6999	6B3C	01A4	call+reko	
-6B3D	6CC3	0187	call+reko	
+6B3D	6CC3	0187	call+reko	space_field_draw
 6CC4	6D3D	007A	call+reko	
 6D3E	6D5A	001D	call+reko	
 6D5B	6D67	000D	call+reko	

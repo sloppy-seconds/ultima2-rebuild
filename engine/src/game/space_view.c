@@ -16,11 +16,18 @@
  *                the fact that it is white-only, and the centre of the radiating variant
  *                are all MEASURED (see space_view.h: asm/4B76's origin pair 16/16, and
  *                the white-pixel extents and centroid of frames 014/049/050/096/097).
- *                What is NOT decoded is the per-star algorithm, the star count for the
- *                warp field, and the animation rate -- the frames loop samples every
- *                4-5 s and the warp lasts under a second, so no two frames bracket a
- *                single star. The positions below are a deterministic hash inside the
- *                measured rectangle. Do not cite them as evidence about the original.
+ *                The star COUNT is now corroborated two ways: measured off five frames as
+ *                ~64, and read out of the binary as two 64-entry tables (DS:4CD for x,
+ *                DS:50D for y, stride 64) in asm/6B3D_space_field_draw.
+ *                What is NOT decoded is the per-star position algorithm and what the
+ *                field's mode >= 2 branch draws. The warp TRIGGER and DURATION are read
+ *                out of asm/6DFD (four bounded redraw loops, DS:4C7 as the motion mode,
+ *                DS:4C8 as the frame counter, delays 0x16/0x18/0x1a) — see that header.
+ *                An earlier note here said the warp "lasts under a second"; that was
+ *                inferred from a frame loop sampling every 4-5 s and the bytes contradict
+ *                it, so it is gone rather than softened. The positions below are still a
+ *                deterministic hash inside the measured rectangle. Do not cite them as
+ *                evidence about the original.
  */
 #include "game/space_view.h"
 
@@ -73,7 +80,12 @@ void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out)
     }
 
     out->fuel = u2_bcd_dec1(st->items_held[U2_ITEM_TRI_LITHIUM]);
-    out->warping = 0;   /* the warp animation's trigger and duration are NOT decoded -- see file header */
+    out->warping = 0;   /* NOT wired. The trigger and the frame counts are read out of
+                         * asm/6DFD (see its WARP ANIMATION block: DS:4C7 is the motion
+                         * mode, DS:4C8 the frame counter), but the engine's space scene
+                         * is a stateless render with no per-frame animation state to put
+                         * a countdown in, so selecting the branch is an engine feature,
+                         * not a decode. The field is drawn and never plays. */
     out->ship_x = st->space_ship_x;
     out->ship_y = st->space_ship_y;
     out->star_seed = ((uint32_t)st->world << 16) ^

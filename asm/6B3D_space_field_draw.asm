@@ -1,7 +1,33 @@
-# sub_6b3d — mechanical clean (bulk wave); behavior not yet reviewed
+# space_field_draw — redraws the 64-star space field, with a motion mode
+# name-evidence: it walks two parallel 64-entry tables, `mov 0x4cd(%si),%al` for x and
+#           `mov 0x50d(%si),%al` for y — and `0x50D - 0x4CD = 64`, exactly the star count
+#           the engine measured independently off five capture frames (space_view.c
+#           U2_SPACE_ORBIT_STARS). Each entry is recomputed relative to the ship at
+#           DS:47B/DS:47C through the delta table at cs:0x6cac, written back into the
+#           tables, and plotted through asm/4B76 (pixel_plot, colour 3). When the mode byte
+#           says the star has moved, the OLD table position is first cleared through
+#           asm/4BAA (the same address arithmetic with the mask inverted, colour 0), which
+#           is why this is a motion routine and not just a scatter:
+#                 mov 0x4c7,%al ; or %al,%al ; je L_006e14   ; mode 0 -> no erase
+#                 ... plot old (DS:479,DS:47A) via L_004daa ...
+#                 plot new via L_004d76 ; store new into the tables
+#                 cmpb $0x2,0x4c7 ; jae L_006e52             ; mode >= 2 takes a further branch
+#           So **DS:4C7 is the animation mode**: 0 = plot in place, 1 = erase-and-plot
+#           (motion), >= 2 = the extra branch at L_006e3a, which walks the cs:0x6990/0x6992
+#           pair in its own loop. The engine's `out->warping` is the same distinction.
 # func 6B3D..6CC3  len 0187 B  evidence: call+reko
-# calls: L_004d76, L_004daa, L_005ed2, L_006d47, L_006da0, L_006df6, L_006e5c, L_006e8c (+3 more)
-# confidence: low (bytes proven by check_func.py)
+# calls: L_004d76 (pixel_plot), L_004daa (pixel_erase, colour 0), L_005ed2, L_006d47,
+#           L_006da0, L_006df6, L_006e5c, L_006e8c (+3 more)
+# callers: asm/6999_space_status (the in-space command loop, i.e. the static orbit screen)
+#           and asm/6CC4_space_ship_erase — and six times from asm/6DFD_hyperwarp_flow,
+#           which is the only caller that sets DS:4C7 at all. asm/6999 never writes DS:4C7
+#           or DS:4C8, so the static screen draws in whatever mode the last hyperwarp left.
+# renamed 2026-11-15 from sub_6b3d. The mode byte, the two tables and the erase-before-plot
+#           were read out of the body directly; the star count agreeing with the frame
+#           measurement is the corroboration that makes the table reading more than a guess.
+#           What is STILL not decoded: the per-star position algorithm (the cs:0x6cac delta
+#           table is read but its construction is not), and what the mode >= 2 branch draws.
+# confidence: medium-high for the mode byte and the tables; low for the >= 2 branch
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 sub_6b3d:
 L_006d3d:

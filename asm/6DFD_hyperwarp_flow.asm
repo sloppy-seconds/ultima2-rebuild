@@ -15,6 +15,23 @@
 #   keeps what you typed (9/9/9 honoured exactly) and off-course overwrites it.
 #   Note the typed range is not bounded by the random range: 9 is accepted, and the
 #   coordinate readout can therefore exceed 7.
+# WARP ANIMATION, read 2026-11-15. This routine is the only caller that sets the space
+#       field's motion mode, so it is where the trigger and the duration live. Four bounded
+#       redraw loops, each `call L_006d3d` (asm/6B3D_space_field_draw) then a BIOS-tick
+#       delay via L_000911:
+#           L_007033  DS:4C8 = 0x80 (128 frames), DS:4C7 = 0   delay 0x16   plot in place
+#           L_007059  DS:4C8 = 0x80 (128 frames), DS:4C7 = 1   delay 0x16   erase + plot
+#           L_00714e  DS:4C7 counts down to 2                  delay 0x1a
+#           L_00716a  DS:4C8 = 0x40 (64 frames),               delay 0x1a
+#       plus `incb DS:4C7` steps between them that push the mode past 2, which is the
+#       branch in asm/6B3D at L_006e3a. So the animation is a few hundred frames of
+#       redraw-and-hold, not a sub-second flash: engine/src/game/space_view.c says the warp
+#       "lasts under a second", but that was inferred from a frame loop sampling every 4-5 s
+#       and the bytes do not support it. Trigger = hyperwarp engage, after the
+#       'PREPARE FOR HYPERWARP!' line at L_00712f; the static orbit screen in asm/6999 never
+#       touches DS:4C7, which is what makes the warp distinguishable at all.
+#       Still not decoded: what the mode >= 2 branch draws, and whether the 0x16/0x18/0x1a
+#       delays are ticks or milliseconds — L_000911 has not been read.
 # func 6DFD..6FA2  len 01A6 B  evidence: call+reko
 # strings: "HYPERWARP ENGAGED!"; "SHIP OFF COURSE!"; "NO FUEL!"; "HYPERWARP TO:" (+2 more)
 # calls: L_000911, L_00514d, L_0051df (str_out), L_0055f4, L_006c79, L_006d3d, L_006ec4, L_006f5b (+6 more)
