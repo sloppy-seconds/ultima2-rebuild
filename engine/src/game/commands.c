@@ -1466,13 +1466,15 @@ static void space_paint(u2_ctx *ctx, u2_overworld *ow) { space_paint_mode(ctx, o
  * nothing more. The frame COUNTS are bytes. The frame TIME is not, and a smooth warp is
  * not evidence about the original -- it is evidence the loop runs.
  *
- * The engine's field model has two states, not the original's three: asm/6B3D's mode >= 2
- * branch is still unread, so every non-zero mode draws the same radiating stand-in. Phases
- * C and D are therefore structurally present and visually identical to B. That is recorded
- * rather than papered over, and it is the reason this is "the right shape at the right
- * rate" and not a faithful warp.
+ * What the engine gets wrong, and it is buildable rather than a capture question: the
+ * original's streaks come from mode 0 NOT erasing the star's old position while the warp
+ * path never clears the screen, so frames accumulate into a trail radiating from the ship.
+ * `u2_space_scene_draw` calls `u2_frame_clear` on every frame, so no mode here can leave a
+ * trail — which is why the built warp reads as a shimmering field and not as the lines the
+ * owner remembers. The mode >= 2 branch is not the gap; it draws nothing, it is a rate-
+ * limited tone (see asm/6B3D_space_field_draw). Frame COUNTS are bytes; frame TIME is
+ * invented; the TRAIL is missing and needs no capture to fix.
  */
-#define U2_WARP_FRAME_MS 2
 
 static void space_warp_phase(u2_ctx *ctx, u2_overworld *ow, int frames, int mode, int step)
 {

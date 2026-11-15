@@ -29,6 +29,19 @@
 #           tone**, not a second animation, and the reload values are the period.
 #           The engine's `out->warping` is the same distinction, and the engine currently has
 #           no sound on either arm.
+#           **The streaks, and this is the part that was nearly missed.** The radiating lines
+#           the owner describes — stars stretched into lines, like they are moving fast — are
+#           not a second drawing routine and are not behind the >= 2 branch. They are what
+#           mode 0 draws, by omission: `mov 0x4c7,%al ; or %al,%al ; je L_006e14` skips the
+#           `call L_004daa` that clears the star's OLD table position, so in mode 0 the old
+#           pixel stays lit while the moved star plots a new one further out. Nothing in the
+#           warp path clears the screen between redraws — asm/6DFD calls this routine in a
+#           bounded loop and the only writes to the pixels are individual plot and erase — so
+#           successive mode-0 frames **accumulate into a trail radiating from the ship**. Mode
+#           1 is the opposite: erase-then-plot, one clean pixel, no trail. So the trail is a
+#           property of the mode byte and of the absence of a clear, and an engine that clears
+#           its frame every iteration cannot produce it at any mode. See
+#           `engine/src/game/space_view.c` `u2_space_scene_draw`, which does exactly that.
 # renamed again 2026-11-15 (same day): the header used to list "what the mode >= 2 branch
 #           draws" as undecoded. It draws nothing; the question was the wrong shape, and the
 #           right question — what does the branch DO — was answerable statically in one read.

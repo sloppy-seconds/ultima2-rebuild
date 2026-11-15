@@ -142,6 +142,18 @@ void u2_space_descent_step(uint8_t *x, uint8_t *y);
 #define U2_DIVE_STEP_MS 103
 #define U2_PLANE_STEP_MS 103
 
+/* The hyperwarp's per-frame delay, in milliseconds. INVENTED, and named so one line
+ * replaces it: docs/needs-gameplay.md G83 is the cycle sample that would retire it.
+ * The frame COUNTS of asm/6DFD's five redraw loops are bytes; this is not. It lives here
+ * beside the other two pacing figures so every animation rate the engine states is in
+ * one place and changeable from one place.
+ *
+ * 2 ms puts asm/6DFD's 509 frames near a second, which is the right order for 64 pixel
+ * plots on a 4.77 MHz machine driving CGA planes. That is a guess about an order of
+ * magnitude and nothing more, and a smooth warp is evidence the loop runs, not evidence
+ * about the original. */
+#define U2_WARP_FRAME_MS 2
+
 /* The dive's verdict on the tile it stopped on. asm/38B0: only 0x08 grass lives,
  * anything else jumps to runtime 0x0E62, the death tail. Observed twice, both
  * lethal: 0x00 water and 0x0c forest. Landing on 0x08 is predicted safe and has
