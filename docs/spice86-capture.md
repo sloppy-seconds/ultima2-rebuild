@@ -60,21 +60,28 @@ captures were written off as needing a human before it was found — check here 
 The claim that keystrokes require a display was true only of the **xdotool path**. The
 game reads the keyboard through INT 16h at exactly one site (`asm/4F4D_key_poll`,
 AH=01h then AH=00h), which is the BIOS typeahead ring, so a key is reachable by any
-route that reaches the emulator — no X server required. Poking the ring at
-`0040:001E` directly also works and is kept as `enqueue_bios` in
-`tools/spice86_type.py`, but `send_keyboard_key` is the supported path.
+route that reaches the emulator — no X server required.
 
-**...for unmodified keys only.** `send_keyboard_key` takes a single `PcKeyboardKey` and has
-no modifier concept, so a Ctrl or Alt chord cannot be expressed through it at all — `ctrl-y`
-sent that way arrives as a plain `Y`, which is worse than failing because the capture reads a
-plausible wrong answer. A modified key therefore goes through the ring, where the modifier has
-already left its mark: Ctrl+A..Z is ascii `0x01..0x1A` with the letter's own make-code, Alt is
-ascii `0x00`, Shift is the uppercase ascii. `--keys ctrl-y` resolves to `(0x15, 0x19)` and
-enqueues it. Two things worth knowing cold: **Ctrl-Y is `0x19`, not `0x18`** — the convention is
-`letter_index + 1`, so Ctrl-Z is `0x1A`, the DOS end-of-file byte, and `0x18` is Ctrl-X; and
-`--keymap` / `--selftest` resolve and check the table **without a running emulator**, which is
-what makes it testable rather than something only the one capture it was written for ever
-exercises. `--selftest` is wired into `check_all.sh`.
+**The supported path is `send_keyboard_key` over MCP, and it is the only one that works on
+this build.** Poking the ring at `0040:001E` directly — kept as `enqueue_bios` in
+`tools/spice86_type.py` — **does not deliver here**, measured 2026-11-16: the live head and
+tail are `0x043C` and `0x2000`, both outside the `0x1E..0x3E` the module documents, so the
+game is not reading that buffer. The old code silently reset an out-of-range tail to `0x1E`
+and wrote anyway; the write landed, read back correct and printed `ok`, and the key was
+consumed by nobody. It now **refuses with an explanation** instead, because a key that
+vanishes is indistinguishable from a key the game ignored, and a capture driven through it
+would have written down a confident wrong answer. Note the module's own docstring already
+recorded `head == tail == 0x041E`, which contradicts its constants two inches away — the
+observation was in the prose and the code trusted the constants.
+
+**...and modifiers cannot go through MCP at all.** `send_keyboard_key` takes a single
+`PcKeyboardKey` and has no modifier concept, so `ctrl-y` sent that way arrives as a plain
+`Y`. A modified key needs the ring, which is the blocker G30 is still sitting on: the
+modifier encoding is solved and self-tested (`--keys ctrl-y` resolves to scan `0x15`,
+ascii `0x19`; `--selftest` pins Ctrl+A..Z to `0x01..0x1A`, so Ctrl-Z is `0x1A`, the DOS
+end-of-file byte, and `0x18` is Ctrl-X), but there is nowhere to deliver it. **Ctrl-Y is
+`0x19`, not `0x18`.** `--keymap` and `--selftest` resolve and check the table without a
+running emulator, and `--selftest` is wired into `check_all.sh`.
 
 **Measured on this build (2026-10-21): headless Spice86 ignores both SIGTERM and
 SIGINT** — it sat through each until SIGKILL. So in headless mode no signal produces

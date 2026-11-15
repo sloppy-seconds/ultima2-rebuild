@@ -2004,3 +2004,22 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   lookup can be a real timeout at one site and dead code at another, so "what is this routine for"
   is not a property of the routine; it is a property of each call site. → Tier 1, evidence
   discipline.
+* **2026-11-15 — A pace figure derived from cycles and a nominal clock is a bound, and saying
+  which direction it bounds in is part of the number.** A descent rate was computed as cycles per
+  step divided by the nominal CPU frequency, and the emulator that produced the cycle count
+  models no bus wait states, so real hardware spent strictly more wall-clock time per cycle. The
+  figure was therefore a floor, and it was written down as an estimate. The consequence is not
+  cosmetic: a player who remembers it as slower is then read as reporting a defect, when the
+  measurement and the memory never disagreed. State the direction, name what the model omits, and
+  prefer "at least" in the prose over a bare number. → Tier 1, evidence discipline.
+* **2026-11-16 — A fallback that silently repairs out-of-range state is a disconnected wire that
+  prints `ok`.** A keyboard helper's ring fallback read a buffer tail, found it outside the range
+  the module documented, set it to the range start, wrote there and reported success. The write
+  landed and read back correct. The program was not reading that buffer at all, so every key sent
+  that way was consumed by nobody — and "the program ignored this key" is observationally
+  identical to "the key never arrived". A null result measured through it is a result about the
+  harness. When a fallback meets state it does not recognise, refusing is the only safe action,
+  because the alternative is not an error but a *finding*. And check whether a module's code and
+  its own docstring agree before trusting either: the observation that would have caught this was
+  already written in the same file's prose, two inches from constants that said otherwise.
+  → Tier 1, tooling that fails loudly.

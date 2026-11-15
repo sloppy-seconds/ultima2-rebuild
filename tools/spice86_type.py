@@ -242,10 +242,32 @@ def send_key(mcp, keyname):
 
 
 def enqueue_bios(mcp, port, scan, asc):
-    """Fallback: poke the BIOS typeahead ring directly (see module docstring)."""
+    """Fallback: poke the BIOS typeahead ring directly (see module docstring).
+
+    REFUSES rather than guessing, and that is the whole point of the shape of this
+    function. It used to read: if tail is outside the ring, set tail = RING_START and
+    write there anyway. On the build measured 2026-11-16 the live head/tail are 0x043C
+    and 0x2000 — both outside the 0x1E..0x3E this file documents — so that silent repair
+    fired every single time and wrote into a buffer the game never reads. The write
+    landed, read back correct, and printed 'ok'. A Ctrl-Y capture driven through it would
+    have reported "Ctrl-Y does nothing" as an observed fact, and it would have been wrong
+    in the way this project has been bitten by repeatedly: a plausible answer from a path
+    that was never connected.
+
+    Note the module docstring already recorded head == tail == 0x041E, which disagrees
+    with RING_START/RING_END two inches away in the same file. The code trusted the
+    constants and the observation sat in the prose.
+    """
     head, tail, _ = keyboard_state(port)
-    if not (RING_START <= tail < RING_END):
-        tail = RING_START
+    in_range = lambda v: RING_START <= v < RING_END
+    if not (in_range(head) and in_range(tail)):
+        raise SystemExit(
+            "BIOS ring state does not match this module's model: head=0x%04X tail=0x%04X, "
+            "expected both in 0x%02X..0x%02X. Refusing to write: on this build the game is "
+            "not reading the buffer at 0x%02X, so a key poked there is consumed by nobody "
+            "and looks exactly like a key the game ignored. Use the MCP path (plain keys) "
+            "or find the buffer head/tail actually point at before using this one."
+            % (head, tail, RING_START, RING_END - 2, RING_START))
     write_mem(mcp, BDA, tail, '%02x%02x' % (scan, asc))
     nxt = tail + 2
     if nxt >= RING_END:
