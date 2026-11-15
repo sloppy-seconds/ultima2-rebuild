@@ -180,6 +180,17 @@ def run_control(work):
 
 
 def main():
+    # Answer --help before anything else, including before the engine-binary check. The
+    # doc_command_gate (tools/doc_command_gate.py) cites this file from AGENTS.md and proves
+    # every cited command answers --help; without this early exit it had to be run against a
+    # built tree, so `make clean` turned a documentation gate red for a build reason.
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print(__doc__)
+        print("usage: content_immutable.py [WORKDIR] [--control-only]")
+        print("  WORKDIR         scratch dir for the throwaway content tree"
+              " (default /var/tmp/u2-content-immutable)")
+        print("  --control-only  run only the red control, not the gate")
+        return 0
     work = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") \
         else "/var/tmp/u2-content-immutable"
     shutil.rmtree(work, ignore_errors=True)
