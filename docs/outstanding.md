@@ -48,7 +48,7 @@ Short list; the recipe and byte evidence live in the named G-row.
 
 | item | blocks | grade | who |
 | --- | --- | --- | --- |
-| **G81** — the chest / PASSWALL persistence contradiction | `dungeon.c` empties a chest through `terrain_put`, which writes `map_base` and therefore **persists between entries**. Owner ruled the same day that nothing in a dungeon persists between entries, which is why PASSWALL now uses `put`. Both cannot be right. The chest rule came from bytes read within one visit; nobody has emptied a chest, left, and walked back in. **Static angle found 2026-11-15, not yet followed:** the original writes the whole sector back to disk (`asm/2305`), so in the original anything that mutates the sector CAN persist — which would make the owner's recollection the thing that is wrong, not the chest code. Read what `asm/2305` actually writes before changing either call. | inferred vs owner-ruled, unresolved | agent, static first |
+| **G81** — the chest / PASSWALL persistence contradiction | `dungeon.c` empties a chest through `terrain_put`, which writes `map_base` and therefore **persists between entries**. Owner ruled the same day that nothing in a dungeon persists between entries, which is why PASSWALL now uses `put`. Both cannot be right. **The static angle is now followed, and the premise was right.** `asm/2305` is a real, live store: `AH=28h`, `CX=0x1000`, `DX=[DS:472]` — the whole 4096-byte sector — and it executes end to end in 33 harvests. It is reached only through `asm/22FD`, whose entire body is `if (DS:6D == 0) store()`, so **the store is Earth-only**, and its callers are site entry for town, tower and dungeon, `cmd_L`, and the save path. So persistence of a mutated sector is a genuine property of the original on Earth, and "nothing persists" is not a design rule. What this does NOT settle: whether the chest's emptied byte is in the buffer at the moment a store fires — `cmd_G` (GET) is not itself a caller — so the live test is still the test (empty a chest, leave, walk back in). It also re-opens a decision: the engine's store-on-transition was deleted in 2026-10-29 on the strength of `asm/22FD`'s old header, which asserted the original writes no sector file at all. That header is now corrected, and the observation it leaned on (sector files byte-identical after town entries and exits) is exactly what storing unchanged content produces. **Re-adding the store is an owner decision, not a fix.** | measured (store), inferred (chest), unresolved | owner for the store, agent for the capture |
 | **G43** — the plane's forest rule, and W6 the plane's airborne flag | `docs/handoff-vehicle-state-machine.md` W6 is the one genuinely open item there and it is marked as needing a capture rather than a guess. | recalled | agent, needs the plane |
 | **G49** — frigate cannon reach | `cmd_F`. Owner recalls a 3-space range; nothing decoded gives a range at all. | recalled | agent, needs a frigate |
 | **G77** — the plane's own march-step cost | `U2_PLANE_STEP_MS` is a borrowed 103 ms floor. | inferred | agent |
@@ -128,12 +128,26 @@ each one would have cost.
 
 ### The 0x200 skew — read this before touching any address
 
-`lea`/`mov` **operands inside asm bodies are runtime addresses**. `L_<addr>` **labels and `asm/`
-filenames are file offsets**. The relation is **runtime + 0x200 = file**. Mixing them is what made
-the clue table look unreachable for a year: the cursor operand `0x1b6a` appears to land inside the
-string "SORRY, GOOD DAY", but it is the NUL at file `0x1d6a`, one byte before entry 0. Two headers
-carried this error silently (`asm/16BD`, `asm/4598`'s filename-vs-label mismatch). When a decode
-looks impossible, convert before concluding.
+**`asm/` filenames and `# func` ranges are RUNTIME addresses. `L_<addr>` labels are FILE
+offsets.** The relation is **runtime + 0x200 = file**. An earlier revision of this note said the
+filename was a file offset too, and it was wrong often enough to cost this session a wrong answer:
+every caller attribution in the first pass of the `asm/22FD` investigation was misfiled because it
+assumed the filename was a file offset. The proof is in the files themselves — `asm/22FD` declares
+`# func 22FD..2303` and its first label is `L_0024fd`; `asm/4050_cmd_T` declares `4050..40A5` and
+starts at `L_00425d`. Every file in the tree differs by exactly `0x200` between the two, so one of
+them is runtime and the other is file, and `docs/phase4-state.md` names which: "the name is `MAPX`
++ two digits self-patched into the code stream (`asm/2290`, file `0x24b7`)" — `0x24b7` is inside
+`asm/2290`, so the filename is the runtime one.
+
+**And the function map is keyed the same way as the filenames.** `disasm/function-map.tsv` rows are
+runtime ranges, so a caller found by scanning the executable at a *file* offset must be converted
+(`- 0x200`) before you look it up. Mixing them does not error; it silently attributes every call
+site to the wrong routine, which is worse than failing.
+
+Mixing the two is also what made the clue table look unreachable for a year: the cursor operand
+`0x1b6a` appears to land inside the string "SORRY, GOOD DAY", but it is the NUL at file `0x1d6a`,
+one byte before entry 0. Two headers carried this error silently (`asm/16BD`, `asm/4598`'s
+filename-vs-label mismatch). When a decode looks impossible, convert before concluding.
 
 ### The shared string-walker, and how text is emitted here
 
@@ -187,13 +201,24 @@ One trap worth naming: `check_func.py` reads `L_<hex>` tokens in **header commen
 targets, so a prose mention of a label outside your own range is an error. Write bare hex in
 prose.
 
-### G81 may be upside-down
+### G81 may be upside-down — and it partly is
 
 The chest-vs-PASSWALL persistence contradiction was framed as "the owner's rule vs the chest
-code". There is a third possibility nobody wrote down: **the original writes the whole sector back
-to disk** (`asm/2305`), so in the original a mutated sector *can* persist, and the recollection is
-what is wrong. Read what `asm/2305` actually writes before changing either call — the answer may
-make both current behaviours correct and the rule the thing that needs the exception.
+code". The third possibility was written down as a hypothesis and is now measured: **the original
+writes the sector back to disk**, so a mutated sector can persist. `asm/2305_sector_store.asm` is
+`AH=28h, CX=0x1000, DX=[DS:472]` — the whole 4096-byte sector — and it runs end to end in 33
+harvests. It has no direct caller anywhere in the binary; it is reached only by the single `je` in
+`asm/22FD_sector_store_gate.asm`, whose entire body is `if (DS:6D == 0) store()`. Earth only.
+
+Two consequences worth more than the finding itself. First, **a gate on a store is part of the
+store's path**: `asm/22FD` was read in 2026-10-29 as "not a sector store, there is no file I/O in
+these seven bytes" — true, and it missed that the routine's only branch lands on one. Second, the
+observation used to prove the original never writes a sector was that `mapx31`/`monx31` came back
+**byte-identical** after several town entries and exits. Storing unchanged content produces exactly
+that. It was never evidence of absence, and the engine's store-on-transition was deleted on the
+strength of it. Whether to put it back is the owner's call — see G81 in § 3 and the 2026-11-11
+stamped-write-back ruling in `docs/phase4-state.md`, because what gets written is the part that
+caused the ghost-creature bug.
 
 ### The method lesson, which is the one to keep
 

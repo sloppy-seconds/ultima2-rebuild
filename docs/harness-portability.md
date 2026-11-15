@@ -1904,3 +1904,18 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   was declared, and re-reading the source found no override. General form: when a change looks like
   it contradicts a prior ruling, quote the ruling from the document that carries its reasoning
   before writing the word "override" — the short version exists to be skimmed and will drift.
+
+- 2026-11-15 — two related evidence-class errors in one finding, both from reading a routine in
+  isolation. First: **a routine whose only instruction is a conditional branch to a side effect is
+  part of that side effect's path, and a reachability scan that follows only `call` targets will
+  conclude the side effect is dead.** The store in question had no caller anywhere in the binary and
+  was reached solely by that branch; a call-graph scan reported it unreachable and a header written
+  from that conclusion asserted the game never writes the file at all. For any "this code never
+  runs" claim, check branch successors and indirect targets before trusting the call graph, and
+  prefer positive execution evidence over absence of a discovered caller. Second, and sharper:
+  **a file that comes back byte-identical after an operation is not evidence the write did not
+  happen.** The same header cited sector files unchanged after several site transitions as proof of
+  no store — which is exactly what storing unmutated content produces. To show a write does not
+  happen, mutate something the write would carry and look again; to show it does, instrument the
+  write call, not the file. Both survived review because each returned a plausible answer rather
+  than an error. → Tier 2, harness contract.
