@@ -166,7 +166,28 @@ state the bot cannot earn by playing, which is a different thing and was conflat
 | G84 | a creature standing in a specific dungeon cell. `setpos` moves the player, not the monsters. |
 | G49 | a frigate offshore with a shore in range. No vehicle-placement tool exists. |
 | G43, G77 | the plane airborne. Needs a launch, which needs the plane in the right sector. |
-| G83, G87 | reachable today — space with fuel is seedable, and both are breakpoint reads. |
+| G83, G87 | **NOT seedable, corrected the same day this table was written — see below.** Needs a rocket launch. |
 | G76 | a frame read by a human or a vision model; the bot can capture it but not read glyphs. |
 | G75 | winning the game, which is goal-spec's whole problem, not this adapter's. |
+
+**The row above originally said G83 and G87 were "reachable today — space with fuel is
+seedable". That was asserted without testing it, which is the exact habit this project exists to
+stamp out, so it was checked.** `u2_edit.py set world 10` (0x0A, the deep-space value) writes
+the byte and it lands — `DS:6D` reads `0x0A` on a live run. The game then loaded the overworld
+in sector 40 anyway, at the character's normal entry cell, and drew the normal overworld.
+So the world byte alone does not produce a space start: the sector triple and the entry pair
+still decide where you are, and nothing in the save says "in flight".
+
+Reaching space therefore needs a **launch**, which means the rocket present, in a sector that
+can launch, with fuel — and that is the same blocker as G43 and G77 one level up. It is not an
+adapter gap; the adapter reads whatever state the game is in. It is that no tool can put a
+vehicle where the game will accept it, and the field that marks "airborne" is the one W6
+already flagged as needing a capture rather than a guess.
+
+**A second gap fell out of the same test.** With `DS:6D = 0x0A` the bot reported `mode:
+"world"`, because `emit_obs` derives mode from `sector_second` and cannot see a space state —
+the gap `docs/play-api.md` deviation 2 already names ("dungeon and space are not
+distinguished"). It matters more now than when it was written: a bot that cannot tell it is in
+space cannot decide to hyperwarp, so closing G83 and G87 needs that discriminator, not just a
+launch.
 
