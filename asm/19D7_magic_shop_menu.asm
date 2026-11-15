@@ -30,8 +30,8 @@
 #           labels are FILE offsets, and runtime + 0x200 = file.
 # strings (entry index, then the text; 0x8d is the in-string carriage return the emitter takes):
 #           0 "ASK ME NO QUESTIONS,\x8dI'LL TELL YOU NO LIES."
-#           1 "THE QUEEN IS THE KING.\x8dAND THE KING IS A SPY."
-#           2 "THE EVIL MEN DO.\x8dIS A HORRIBLE THING."
+#           1 "THE QUEEN IS THE KING\x8dAND THE KING IS A SPY."
+#           2 "THE EVIL MEN DO\x8dIS A HORRIBLE THING."
 #           3 "BUT DISPELLING MEANS\x8dTHAT YOU MUST HAVE THE RING."
 #           4 "JUST WHERE IT IS,\x8dI CANNOT SAY."
 #           5 "BUT I'LL TELL YOU RIGHT NOW,\x8dTHERE IS NO OTHER WAY."
@@ -39,8 +39,10 @@
 #           7 "THERE IS AN OLD MAN\x8dLIVING UNDER A TREE."
 #           8 "HE HAS NOT A NAME\x8dBUT HE DOES HAVE A CLUE"
 #           9 "MAYHAPS IF YOU FIND HIM,\x8dHE'LL TELL IT TO YOU!"
-#           Entry 2 reads oddly and is left exactly as the bytes have it. Entry 8 has no trailing
-#           period in the original. Neither is corrected: the bytes are the text.
+#           Entry 1 and entry 2 have no period before the carriage return, and entry 8 has no
+#           trailing period. All three were first transcribed by eye and corrected against a
+#           generator over the raw bytes -- the exact failure AGENTS § 5 warns about, caught the
+#           only reliable way. Nothing here is corrected away from the bytes; the bytes are the text.
 # note: no asm file owns 1D6A, so this is recorded in the owning function's header per AGENTS § 3.
 #           A re-cut into asm/1D6A_clue_pool.asm is the right end state (asm/16BD is the precedent,
 #           split-from asm/15E1) but it needs a row in the function map that assemble_clean.sh
