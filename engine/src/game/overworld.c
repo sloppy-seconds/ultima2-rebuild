@@ -736,12 +736,21 @@ static int food_spend(u2_ctx *ctx, unsigned bcd_sub)
  * Q is. The monsters write (256 B from DS:137) is still not lifted here; see the note
  * in overworld.h.
  */
-static int save_body(u2_ctx *ctx, u2_overworld *ow)
+/* The field update both save paths share: the record's return cell and sector triple
+ * take the caller's live position, so a later 'P' restores exactly where the player
+ * stood. Split out of save_body so the site-exit write can update the same fields
+ * without inheriting the sector writes that do not belong to it. */
+static void save_snapshot(u2_ctx *ctx, u2_overworld *ow)
 {
     ctx->state.entry_x       = (uint8_t)ow->x;
     ctx->state.entry_y       = (uint8_t)ow->y;
     ctx->state.sector_first  = (uint8_t)ow->sector_hi;
     ctx->state.sector_second = (uint8_t)ow->sector_lo;
+}
+
+static int save_body(u2_ctx *ctx, u2_overworld *ow)
+{
+    save_snapshot(ctx, ow);
 
     /* The original rewrites the sector unconditionally; the engine's contract
      * is to store only dirty sectors (world.h), and nothing dirties tiles
@@ -761,6 +770,36 @@ static int save_body(u2_ctx *ctx, u2_overworld *ow)
     if (u2_save_store(ctx) != U2_SAVE_OK)
         failed = 1;
     return failed;
+}
+
+/* The site-EXIT save: the player record alone, and no sector.
+ *
+ * Two paths in the original end by leaving a site, and both write the 256-byte record on
+ * Earth and nothing else:
+ *
+ *   asm/3823 (KLIMB out of a dungeon at floor 0, DESCEND out of a tower) ends its exit
+ *     block `mov 0x6d,%al ; or %al,%al ; je L_003a99`, and L_003a99 is
+ *     `lea 0x36,%dx ; mov $0x28,%ah ; mov $0x100,%cx ; call dos`.
+ *   asm/2453 (walk off a site edge, reached from asm/243E inside asm/2423_passability)
+ *     branches `cmp $0x0,%al ; je L_002674` onto asm/2474, the same 256-byte write.
+ *
+ * Both confirmed by breakpoint on 2026-11-15: a KLIMB out of the sector-30 dungeon fired
+ * runtime 0x389d and moved `player` and nothing else, while the entry earlier the same
+ * session fired the store at runtime 0x232c and moved three files. So this is NOT the
+ * store — it touches neither `mapx` nor `monx`. The CAST SURFACE and CAST UP-LADDER exits
+ * are deliberately not routed here either: they land on the slot-5 target at runtime
+ * 0x32A2, which carries no write, and saving from those two would bank a record the
+ * original leaves alone.
+ *
+ * Earth-gated for the same reason the store is: the branch reaching the write is
+ * `[DS:6D] == 0`. Off Earth the original restages the parked rocket and writes nothing.
+ */
+int u2_overworld_autosave_record(u2_ctx *ctx, u2_overworld *ow)
+{
+    if (ctx->state.world != 0)
+        return 0;
+    save_snapshot(ctx, ow);
+    return u2_save_store(ctx) != U2_SAVE_OK;
 }
 
 int u2_overworld_autosave(u2_ctx *ctx, u2_overworld *ow)
@@ -2719,6 +2758,12 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
          * not the high edge alone. See site_leave(). */
         if (u2_site_edge_crossed(ow->sector_lo, raw_x, raw_y)) {
             u2_overworld_site_leave(ctx, ow);
+            /* asm/2453 reaches asm/2474 by `cmp $0x0,%al ; je L_002674` on this exact
+             * path, so walking off a site's edge banks the player record on Earth —
+             * the record alone, no sector file. Breakpoint-confirmed 2026-11-15; the
+             * only capture where runtime 0x2474 has ever been seen execute is
+             * captures/spice86/s31-south-edge, which is this walk. */
+            (void)u2_overworld_autosave_record(ctx, ow);
             continue;
         }
 

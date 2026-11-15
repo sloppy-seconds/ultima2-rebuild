@@ -144,23 +144,37 @@ int u2_overworld_save(u2_ctx *ctx, u2_overworld *ow, const u2_save_policy *pol);
 
 /*
  * The save the original performs on its own initiative, with no prompt echoed and no
- * CMD-window message. Two triggers are proven and they are not gated like Q:
+ * CMD-window message. Three triggers are proven:
  *
  *   entering a site   asm/341E, asm/343F (-TOWN, -TOWER), asm/34B5/asm/34CF (-CASTLE)
  *                     and asm/34E4 (-DUNGEON) all record the return cell and then call
- *                     the save body. Callers must invoke this BEFORE switching the
+ *                     the store gate. Callers must invoke this BEFORE switching the
  *                     sector digit, because the original's file records the sector the
  *                     player came FROM — that is what makes dying in a town put you
  *                     back outside.
- *   rocket launch     asm/38B0, behind [DS:6D]==0 AND [DS:4A]==0. That guard belongs to
- *                     the caller, not here: this function performs the writes and
- *                     nothing else, so a caller that calls it unconditionally is
- *                     claiming a trigger the bytes do not show.
+ *   time-door transit asm/334D span, measured 2026-11-13 (gates.c). Same writes.
+ *   rocket launch     asm/38B0, behind [DS:6D]==0 AND [DS:4A]==0. That second half of
+ *                     the guard belongs to the caller, not here.
  *
- * Both are silent in the original, and this stays silent to match. Returns 0 on a
- * successful write, non-zero if the record could not be stored.
+ * NOT gated like Q on location or vehicle — Q's other two guards are its own — but IS
+ * gated on Earth, because the gate lives in the store (asm/22FD) and every silent path
+ * reaches the store through it. Off Earth this writes nothing, which a real Planet X
+ * playthrough confirmed the hard way (captures/spice86/g82-planet-x-live).
+ *
+ * All are silent in the original, and this stays silent to match. Returns 0 on a
+ * successful write or a deliberate off-Earth refusal, non-zero if the record could not
+ * be stored.
  */
 int u2_overworld_autosave(u2_ctx *ctx, u2_overworld *ow);
+
+/*
+ * The record-only save, for the two paths that leave a site. The original writes the
+ * 256-byte player record and NEITHER sector file here, so this is not the store and does
+ * not consult the dirty flags. See the definition for the two byte sites and for the two
+ * CAST exits that are deliberately excluded. Earth-gated, silent, same contract as
+ * u2_overworld_autosave().
+ */
+int u2_overworld_autosave_record(u2_ctx *ctx, u2_overworld *ow);
 
 /* Recomposite the frame from the current position: map window (pixel rows
  * 0..159) then the text rows 20..24 of the vram grid — status block, CMD

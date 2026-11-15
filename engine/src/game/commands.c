@@ -1882,12 +1882,14 @@ static u2_cmd_result site_shift(u2_ctx *ctx, u2_overworld *ow, bool down)
          * or above 0x80 would take the exit arm. Floors stay under 0x80 in practice. */
         if ((int8_t)ctx->state.site_floor < 0) {
             /* asm/3A44: back to the world. The original restores the entry cell, zeroes the
-             * site kind and re-reads the sector, which is exactly what site_leave() does, and
-             * then branches on [DS:6D] -- either staging a cell from [DS:6A]/[DS:6B] or
-             * writing the 256-byte player record with an int-21h handle write. That last
-             * branch means leaving a dungeon saves the game, and it is NOT modelled here:
-             * it belongs to the same parked dungeon span as the grid indexing. */
+             * site kind and re-reads the sector, which is exactly what site_leave() does,
+             * and then branches on [DS:6D] -- either staging a cell from [DS:6A]/[DS:6B] or
+             * writing the 256-byte player record. That last branch means leaving a dungeon
+             * saves the game, and it is modelled by the call below: the record only, no
+             * sector, Earth only. Observed 2026-11-15 by breakpoint at runtime 0x389d, which
+             * fired on the KLIMB and moved `player` and nothing else. */
             u2_overworld_site_leave(ctx, ow);
+            (void)u2_overworld_autosave_record(ctx, ow);
             cmd_done(ctx);
             return U2_CMD_DONE;
         }

@@ -331,6 +331,35 @@ int main(int argc, char **argv)
         ok(got && memcmp(rec, before, 256) == 0,
            "and off Earth it wrote nothing, so the cell stayed at the Earth value");
         a.state.world = 0;
+
+        /* --- the site-EXIT write: the record alone, Earth only ------------------
+         * asm/3823's exit arm and asm/2453's walk-off-the-edge arm both end on a
+         * 256-byte write of DS:36 and no sector write at all, so this is a different
+         * contract from the store: it must move the record where the store would also
+         * have flushed a dirty sector, and it must do nothing off Earth. */
+        out.x = 41;
+        out.y = 42;
+        out.sector_lo = 0;
+        ok(u2_overworld_autosave_record(&a, &out) == 0,
+           "leaving a site on Earth saves");
+        rf = fopen(saves_path, "rb");
+        got = rf && fread(rec, 1, 256, rf) == 256;
+        if (rf) fclose(rf);
+        ok(got && rec[0x24] == 41 && rec[0x25] == 42,
+           "and the record carries the restored outdoor cell, not the dungeon one");
+
+        memcpy(before, rec, 256);
+        a.state.world = 9;                      /* Planet X */
+        out.x = 60;
+        out.y = 61;
+        ok(u2_overworld_autosave_record(&a, &out) == 0,
+           "off Earth the exit save reports no failure");
+        rf = fopen(saves_path, "rb");
+        got = rf && fread(rec, 1, 256, rf) == 256;
+        if (rf) fclose(rf);
+        ok(got && memcmp(rec, before, 256) == 0,
+           "and off Earth leaving a site writes nothing either");
+        a.state.world = 0;
         /* The sector mechanism is proven by the discriminating assertion above (a
          * handed-down 2 lands on disk where the previous record held 0). Asserting 0
          * here too would pass against a mutant that hardcodes 0, so it is left out on
