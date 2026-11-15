@@ -29,6 +29,7 @@ implemented and no `UNPROVEN:` marker remains anywhere in `engine/src/`.
 
 | item | where | what is missing | grade | who |
 | --- | --- | --- | --- | --- |
+| The autosave the original has and the engine does not | `commands.c:1886`, `u2_overworld_save()` | The engine's only save call is `cmd_Q`. The original also banks the character on site entry, on leaving a site, on a time-door transit and on a rocket launch — all behind the same `DS:6D == 0` Earth test, written five separate times. The exit arm's own comment admits the branch "is NOT modelled here". Consequence a player would feel: in the original a crash after a site visit is permanent, in the engine it is undoable. See G82 for what is captured, what is not, and the `asm/2305` naming question it reopens. | measured (bytes), captured (entry, transit) | agent |
 | The talking half of `cmd_T` | `commerce.c`, `"no dialogue for that role"` | The scripted arm and the `street_*` chain are wired; one role has no dialogue and says so rather than inventing one. | inferred | agent |
 | The goal-spec policy rule | `docs/goal-spec.md` P8 | The engine now knows *why* something is invulnerable (slot 0, G78) but the policy layer has no way to express "stop attacking this", so a bot will attack an invulnerable guard forever. This is a bot rule, not engine behaviour. | measured | agent |
 
