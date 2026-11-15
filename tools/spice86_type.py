@@ -40,6 +40,17 @@ Usage:
     python3 tools/spice86_type.py --peek 8be:60:1        # read DS:60
     python3 tools/spice86_type.py --poke 8be:60=00       # DS:60 = 0, read back
     python3 tools/spice86_type.py --poke 8be:60=00 --keys Right
+    python3 tools/spice86_type.py --keys ctrl-y          # a MODIFIED key (see below)
+    python3 tools/spice86_type.py --keymap ctrl-y,alt-x  # show the encoding, send nothing
+
+MODIFIED KEYS. The MCP `send_keyboard_key` tool takes a single PcKeyboardKey and has no
+modifier concept at all, so `ctrl-y` cannot be expressed through it — it would arrive as a
+plain `Y`. A modified key has to go in the way a real BIOS put it in: as a (scancode, ascii)
+pair in the typeahead ring, because that is where the modifier already left its mark. Ctrl+A..Z
+is ascii 0x01..0x1A with the letter's own scancode, Alt+letter is ascii 0x00, and Shift+letter
+is the uppercase ascii. So `--keys ctrl-y` enqueues (0x15, 0x18) and nothing else. `--keymap`
+prints that resolution without touching a running emulator, which is what makes the table
+testable at all.
 """
 import argparse
 import json
@@ -80,6 +91,58 @@ def letter(name):
         raise SystemExit('unknown key %r — known: %s (single letters/digits always work)'
                          % (name, ', '.join(sorted(set(KEYS)))))
     return k
+
+
+# BIOS make-codes, set 1, for every key a modifier can legally sit on. These are the
+# keyboard controller's own codes, not SDL's, and they are what the typeahead ring stores.
+# Letters are laid out as the physical rows put them, which is why they are not contiguous.
+SCAN_AZ = {
+    'Q': 0x10, 'W': 0x11, 'E': 0x12, 'R': 0x13, 'T': 0x14, 'Y': 0x15, 'U': 0x16,
+    'I': 0x17, 'O': 0x18, 'P': 0x19,
+    'A': 0x1E, 'S': 0x1F, 'D': 0x20, 'F': 0x21, 'G': 0x22, 'H': 0x23, 'J': 0x24,
+    'K': 0x25, 'L': 0x26,
+    'Z': 0x2C, 'X': 0x2D, 'C': 0x2E, 'V': 0x2F, 'B': 0x30, 'N': 0x31, 'M': 0x32,
+}
+SCAN_09 = {d: i for i, d in enumerate('1234567890', start=0x02)}
+
+
+def resolve_key(name):
+    """Resolve a key spec into how it must be injected.
+
+    Returns ('mcp', spelling) for a plain key, or ('bios', scancode, ascii) for a modified
+    one. The split is not cosmetic: the MCP tool cannot express a modifier, so anything with
+    one MUST go through the ring or it silently arrives unmodified — a Ctrl-Y that lands as
+    'Y' is the exact plausible-wrong outcome this returns instead of.
+
+    Accepted: 'y', 'Y', 'ctrl-y', 'ctrl-Y', 'ctrlshift-y', 'alt-x', 'shift-y'.
+    """
+    mods, base = [], name.strip()
+    while '-' in base:
+        head, rest = base.split('-', 1)
+        h = head.lower()
+        if h in ('ctrl', 'control', 'alt', 'shift'):
+            mods.append(h if h != 'control' else 'ctrl')
+            base = rest
+        else:
+            break
+    if not mods:
+        return ('mcp', letter(name))
+
+    base = base.upper()
+    if len(base) != 1 or base not in SCAN_AZ:
+        raise SystemExit(f"{name!r}: modifiers are supported for letters only "
+                         f"(ctrl-y, alt-x, shift-y)")
+    scan = SCAN_AZ[base]
+    if 'ctrl' in mods:
+        # Ctrl+letter is ascii 0x01..0x1A, the convention the BIOS ring stores and the
+        # game's own command parser compares against.
+        return ('bios', scan, ord(base) - ord('A') + 1)
+    if 'alt' in mods:
+        # Alt leaves the scancode and a null ascii; the modifier lives in the BDA flag byte.
+        return ('bios', scan, 0x00)
+    if 'shift' in mods:
+        return ('bios', scan, ord(base))
+    raise SystemExit(f"{name!r}: unhandled modifier")
 
 
 # ---------------------------------------------------------------- HTTP read side
@@ -222,13 +285,61 @@ def main():
                     help='write hex bytes at a real-segment address, repeatable; '
                          'always prints the read-back, because a write that did not '
                          'land is the failure mode this project keeps hitting')
-    ap.add_argument('--keys', help='comma/space separated: Escape,p')
+    ap.add_argument('--keys', help='comma/space separated: Escape,p,ctrl-y '
+                                   '(ctrl-/alt-/shift- prefixes go through the BIOS ring)')
+    ap.add_argument('--keymap', metavar='SPEC',
+                    help='resolve key specs and print the encoding; sends nothing and '
+                         'needs no running emulator')
+    ap.add_argument('--selftest', action='store_true',
+                    help='check the modifier table against known control-byte conventions '
+                         'and exit; needs no running emulator')
 
     ap.add_argument('--delay', type=float, default=0.6,
                     help='seconds between keys (the game drains pending keys)')
     ap.add_argument('--list', action='store_true', help='list MCP tools and exit')
     ap.add_argument('--probe', action='store_true', help='show state, write nothing')
     a = ap.parse_args()
+
+    # Resolving a key must be checkable without a running emulator, or the modifier table is
+    # the kind of code that is only ever exercised by the one capture it was written for.
+    # Resolving a key must be checkable without a running emulator, or the modifier table is
+    # the kind of code that is only ever exercised by the one capture it was written for.
+    if a.selftest:
+        # Externally verifiable conventions, not this file's opinions: Ctrl-A..Z is 0x01..0x1A
+        # (Ctrl-Z = 0x1A is the DOS end-of-file byte), Ctrl-S/Ctrl-Q are XOFF/XON at 0x13/0x11,
+        # and the scancodes are the keyboard controller's own make-codes. A wrong byte here
+        # does not error, it silently sends a different command to the game.
+        expect = [('ctrl-a', 0x1E, 0x01), ('ctrl-z', 0x2C, 0x1A), ('ctrl-y', 0x15, 0x19),
+                  ('ctrl-s', 0x1F, 0x13), ('ctrl-q', 0x10, 0x11), ('ctrl-r', 0x13, 0x12),
+                  ('alt-x', 0x2D, 0x00), ('shift-y', 0x15, 0x59)]
+        bad = 0
+        for spec, scan, asc in expect:
+            got = resolve_key(spec)
+            ok = got == ('bios', scan, asc)
+            bad += not ok
+            print('  %-4s %-10s want scan=0x%02X ascii=0x%02X got %s'
+                  % ('ok' if ok else 'BAD', spec, scan, asc, got[1:]))
+        plain = resolve_key('y')
+        if plain != ('mcp', 'Y'):
+            bad += 1
+            print('  BAD  plain y must stay on the MCP path, got %s' % (plain,))
+        try:
+            resolve_key('ctrl-Right')
+            bad += 1
+            print('  BAD  ctrl-Right should be refused, not silently downgraded to Right')
+        except SystemExit:
+            print('  ok   ctrl-Right refused rather than silently sent as Right')
+        print('SPICE86_TYPE SELFTEST: %s (%d cases)' % ('PASS' if not bad else 'FAIL', len(expect) + 2))
+        return 1 if bad else 0
+
+    if a.keymap:
+        for spec in [k for k in a.keymap.replace(',', ' ').split() if k]:
+            r = resolve_key(spec)
+            if r[0] == 'bios':
+                print('%-14s -> bios ring  scan=0x%02X ascii=0x%02X' % (spec, r[1], r[2]))
+            else:
+                print('%-14s -> mcp key    %s' % (spec, r[1]))
+        return
 
     st = status(a.http_port)
     print('CS:%04X IP:%04X cycles=%d' % (st['cs'], st['ip'], st['cycles']))
@@ -273,10 +384,17 @@ def main():
             raise SystemExit('poke did not land — refusing to continue on a write that lied')
 
     for name in names:
-        keyname = letter(name)
-        r = send_key(mcp, keyname)
-        bad = (r or {}).get('error') or (r or {}).get('result', {}).get('isError')
-        print('sent %-8s as %-8s %s' % (name, keyname, 'FAILED %s' % bad if bad else 'ok'))
+        r_key = resolve_key(name)
+        if r_key[0] == 'bios':
+            _, scan, asc = r_key
+            slot = enqueue_bios(mcp, a.http_port, scan, asc)
+            print('sent %-8s as bios scan=0x%02X ascii=0x%02X at 0x%04X'
+                  % (name, scan, asc, slot))
+        else:
+            r = send_key(mcp, r_key[1])
+            bad = (r or {}).get('error') or (r or {}).get('result', {}).get('isError')
+            print('sent %-8s as %-8s %s'
+                  % (name, r_key[1], 'FAILED %s' % bad if bad else 'ok'))
         time.sleep(a.delay)
         s2 = status(a.http_port)
         h2, t2, _ = keyboard_state(a.http_port)
@@ -286,4 +404,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

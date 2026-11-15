@@ -64,6 +64,18 @@ route that reaches the emulator — no X server required. Poking the ring at
 `0040:001E` directly also works and is kept as `enqueue_bios` in
 `tools/spice86_type.py`, but `send_keyboard_key` is the supported path.
 
+**...for unmodified keys only.** `send_keyboard_key` takes a single `PcKeyboardKey` and has
+no modifier concept, so a Ctrl or Alt chord cannot be expressed through it at all — `ctrl-y`
+sent that way arrives as a plain `Y`, which is worse than failing because the capture reads a
+plausible wrong answer. A modified key therefore goes through the ring, where the modifier has
+already left its mark: Ctrl+A..Z is ascii `0x01..0x1A` with the letter's own make-code, Alt is
+ascii `0x00`, Shift is the uppercase ascii. `--keys ctrl-y` resolves to `(0x15, 0x19)` and
+enqueues it. Two things worth knowing cold: **Ctrl-Y is `0x19`, not `0x18`** — the convention is
+`letter_index + 1`, so Ctrl-Z is `0x1A`, the DOS end-of-file byte, and `0x18` is Ctrl-X; and
+`--keymap` / `--selftest` resolve and check the table **without a running emulator**, which is
+what makes it testable rather than something only the one capture it was written for ever
+exercises. `--selftest` is wired into `check_all.sh`.
+
 **Measured on this build (2026-10-21): headless Spice86 ignores both SIGTERM and
 SIGINT** — it sat through each until SIGKILL. So in headless mode no signal produces
 the exit dump and the harvest must never depend on one. `tools/spice86_stop.sh`
