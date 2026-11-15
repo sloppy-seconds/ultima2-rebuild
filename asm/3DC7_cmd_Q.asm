@@ -16,7 +16,7 @@
 # the sector store it used to be described as.
 # func 3DC7..3DDC  len 022 B  evidence: seed+reko (jump table cs:0730 entry Q)
 # provenance: live:play-test (+2 other harvests), static
-#           entry executed in 7 of 261 harvests; derived by tools/provenance_from_traces.py
+#           entry executed in 7 of 263 harvests; derived by tools/provenance_from_traces.py
 #           the guard chain above is from the raw bytes and from
 #           captures/spice86/save-wilderness, where both refusals and the accepted save were
 #           screenshotted

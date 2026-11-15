@@ -27,7 +27,7 @@
 #           where DS:4A == 0 and -FAILED! is the only outcome the gates allow.
 # func 310B..3138  len 046 B  evidence: seed+reko (jump table cs:0730 entry C)
 # provenance: live:cmd-letters2-20261025; static
-#           entry executed in 10 of 261 harvests; confirmed by the capture of 2026-10-25.
+#           entry executed in 10 of 263 harvests; confirmed by the capture of 2026-10-25.
 #           The capture's open question (was the aim gate entered?) is CLOSED 2026-10-25
 #           without a re-run: there is no aim gate. See above.
 #           Was recorded as never executed against a 60-harvest corpus that has since grown.
