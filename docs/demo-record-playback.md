@@ -1649,7 +1649,7 @@ A 196-record demo diverged at 58 with four creatures present on the recorder and
 playback -- `mon_x`, `mon_y`, `mon_hp`, `mon_type` and `mon_kind` at slots 25-28. The cause was
 sitting in a file timestamp: the slot's `mapx20` and `monx20` were written **seven seconds into
 the recording**, because the player pressed Q. A save rewrites the sector in the slot, which is
-faithful -- `asm/2340` (`mov $0x100,%cx; lea 0x137,%dx`) is the creature store and it is on the
+faithful -- `asm/2305_sector_store`'s second write (`mov $0x100,%cx; lea 0x137,%dx`) is the creature store and it is on the
 save path, and the original does the same -- so a later load of that file reads different bytes
 than the first load did. One delta per file could only describe the first.
 

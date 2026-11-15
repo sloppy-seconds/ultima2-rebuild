@@ -455,10 +455,7 @@ start	end	len	evidence	name_hint
 22FC	22FC	0001	seed+reko	
 22FD	2303	0007	seed+call+reko	sector_store_gate
 2304	2304	0001	seed+reko	
-2305	233F	003B	seed+reko	sector_store
-2340	2351	0012	seed+reko	monster_data_load
-2352	2360	000F	seed+reko	
-2361	2361	0001	seed+reko	
+2305	2361	005D	seed+reko	sector_store
 2362	236F	000E	seed+call+reko	aim_state_clear
 2370	2372	0003	seed+reko	
 2373	2377	0005	seed+reko	
