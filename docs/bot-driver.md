@@ -161,28 +161,28 @@ and is wired into `check_all.sh`.
 The adapter removed the *access* problem. What is left is the *scenario* problem — reaching a
 state the bot cannot earn by playing, which is a different thing and was conflated with it:
 
-| item | what it needs that play cannot produce |
+| item | what it needs, and whether the bot can reach it now |
 | --- | --- |
-| G84 | a creature standing in a specific dungeon cell. `setpos` moves the player, not the monsters. |
-| G49 | a frigate offshore with a shore in range. No vehicle-placement tool exists. |
-| G43, G77 | the plane airborne. Needs a launch, which needs the plane in the right sector. |
-| G83, G87 | **NOT seedable, corrected the same day this table was written — see below.** Needs a rocket launch. |
-| G76 | a frame read by a human or a vision model; the bot can capture it but not read glyphs. |
+| G84 | a creature standing in a specific dungeon cell. `setpos` moves the player, not the monsters. Still blocked. |
+| G49 | a frigate offshore with a shore in range. No vehicle-placement tool exists, and the frigate is not something a fresh character can walk to. Still blocked. |
+| G43, G77 | the plane airborne. The rocket path is proven; the plane's is the same shape and needs the plane tile, which census lists (sector 80). Reachable with a small extension. |
+| G83, G87 | **reachable now** — `bot/launch.py --hyperwarp <world>` gets a live session into a warp, and both are breakpoint reads taken during it. |
+| G76 | a frame read by a human or a vision model. The bot can capture space frames but its `screen` rows come back empty there, because the space screen is glyphs. |
 | G75 | winning the game, which is goal-spec's whole problem, not this adapter's. |
 
-**The row above originally said G83 and G87 were "reachable today — space with fuel is
-seedable". That was asserted without testing it, which is the exact habit this project exists to
-stamp out, so it was checked.** `u2_edit.py set world 10` (0x0A, the deep-space value) writes
-the byte and it lands — `DS:6D` reads `0x0A` on a live run. The game then loaded the overworld
-in sector 40 anyway, at the character's normal entry cell, and drew the normal overworld.
-So the world byte alone does not produce a space start: the sector triple and the entry pair
-still decide where you are, and nothing in the save says "in flight".
+**The row above originally said G83 and G87 needed a launch and nothing could reach one. That
+is no longer true.** `bot/launch.py` seeds a character beside a rocket pad, walks onto it,
+boards, launches and hyperwarps to a named world, and every step is confirmed from memory
+rather than assumed. It ran end-to-end against the original and arrived: see
+`captures/spice86/bot-launch-mars/` for the five frames, including the first warp-trail frame
+this project has ever captured.
 
-Reaching space therefore needs a **launch**, which means the rocket present, in a sector that
-can launch, with fuel — and that is the same blocker as G43 and G77 one level up. It is not an
-adapter gap; the adapter reads whatever state the game is in. It is that no tool can put a
-vehicle where the game will accept it, and the field that marks "airborne" is the one W6
-already flagged as needing a capture rather than a guess.
+Two things fell out of building it that are worth more than the script. **The launch is not
+observable any other way** — orbit and its launch pad differ in nothing but the staging pair,
+so without `u2_state_mode()` the bot could press `L` and never learn whether it worked. And
+**the fuel seed chooses the off-course outcome**: `asm/6DFD` fires `SHIP OFF COURSE!` iff
+`(fuel & 3) == 3` post-decrement, so w6-orbit-dive's seed of 9 makes *every* hyperwarp from
+it miss. That was observed by accident before it was understood, which is the usual way.
 
 **A second gap fell out of the same test, and it is now closed.** With `DS:6D = 0x0A` the bot
 reported `mode: "world"`, because `emit_obs` derived mode from `sector_second` and could not
