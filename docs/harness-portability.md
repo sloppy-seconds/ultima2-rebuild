@@ -189,6 +189,15 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-16 — A regularity in sampled data is a joint claim about the signal and the
+  sampling rate, and separating them is usually one division.** A breakpoint sampled a tone
+  accumulator every ~4 frames and the observed values were all multiples of 256, which was
+  written up as "the tone is quantised in coarse steps" and "this is not a sweep". Both were
+  the sampler: the accumulator moved by 1 per call, there were 64 calls a frame, and 4 frames
+  is 256 calls. The quantisation was the sampling interval and the sweep was the signal. Any
+  sampled quantity should be checked against the sample interval before its spacing, period or
+  monotonicity is reported as a property of the thing measured — and the check is arithmetic,
+  not another capture.
 * **2026-11-16 — A derived classifier must be run over the existing corpus before it is
   believed, because a green synthetic suite is not evidence the rule is true.** A mode report
   was added for a state the binary has no byte for, and was derived from the document that
