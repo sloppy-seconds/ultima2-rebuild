@@ -28,6 +28,8 @@
 # note: DS:5A/DS:5B as the parked outdoor coordinates is inferred from the two writes and
 #           the arrival-cell overwrite immediately after them, not separately confirmed.
 # confidence: high for the ordering and the two call targets (bytes); medium for DS:5A/5B
+# provenance: static — the ordering was read out of the body on 2026-11-15. No harvest has been
+#           checked for this entry point, so no live claim is made for it.
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 sub_34e4:
 L_0036e4:

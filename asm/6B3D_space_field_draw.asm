@@ -28,6 +28,10 @@
 #           What is STILL not decoded: the per-star position algorithm (the cs:0x6cac delta
 #           table is read but its construction is not), and what the mode >= 2 branch draws.
 # confidence: medium-high for the mode byte and the tables; low for the >= 2 branch
+# provenance: static — the mode byte, the two tables and the erase-before-plot were read out of
+#           the body on 2026-11-15. The frame evidence for the star count is
+#           captures/spice86/ frames 014/049/050/096/097 as measured in space_view.h, which is
+#           corroboration of the count and not a claim that this routine executed.
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 sub_6b3d:
 L_006d3d:
