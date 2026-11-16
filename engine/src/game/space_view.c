@@ -37,9 +37,9 @@
 #include "game/space.h"      /* u2_space_worlds, U2_WORLD_COUNT */
 
 /* The star field occupies the asm/4B76 view: 256x128 inset at (16,16). See space_view.h
- * -- the extents are measured off five capture frames, not chosen. */
-#define U2_SPACE_ORBIT_STARS  64    /* 77 white px in frames 226/227/228 minus the
-                                     * 13-px ship cross = ~64 stars. Measured. */
+ * -- the extents are measured off five capture frames, not chosen. The star COUNT lives
+ * in space_view.h now, because the warp tables in u2_overworld are sized by it and a
+ * second copy would be free to disagree. */
 #define U2_SPACE_WARP_RAYS    64    /* STRUCTURE measured (dots lie on rays out of the
                                      * view centre), COUNT not decoded. */
 #define U2_SPACE_WARP_PER_RAY 24
@@ -80,6 +80,13 @@ void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out)
     }
 
     out->fuel = u2_bcd_dec1(st->items_held[U2_ITEM_TRI_LITHIUM]);
+    /* The builder sets every field it knows about, and callers declare the struct on the
+     * stack, so a pointer field added later MUST be initialised here or it arrives as
+     * stack garbage. That is what happened when warp_x/warp_y were added: the draw took the
+     * table branch with wild pointers and the scripted launch in the space gate stopped
+     * reaching orbit, with no hint of the cause. */
+    out->warp_x = NULL;
+    out->warp_y = NULL;
     out->warping = 0;   /* The scene builder stays stateless so a gate can build a scene from
                          * state alone. The warp is driven by the caller: commands.c
                          * space_warp_field() / space_warp_engage() rebuild the scene with
@@ -89,6 +96,59 @@ void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out)
     out->ship_y = st->space_ship_y;
     out->star_seed = ((uint32_t)st->world << 16) ^
                      ((uint32_t)out->xeno << 8) ^ (uint32_t)out->yako;
+}
+
+void u2_space_warp_seed(uint8_t *sx, uint8_t *sy, int n, uint32_t seed)
+{
+    uint32_t h = star_hash(seed ? seed : 1u);
+    for (int i = 0; i < n; i++) {
+        h = star_hash(h);
+        sx[i] = (uint8_t)(h % 256u);
+        sy[i] = (uint8_t)((h >> 16) % 200u);   /* the view is 128 tall; the tables are bytes */
+    }
+}
+
+int u2_space_warp_advance(uint8_t *sx, uint8_t *sy, int n, int ship_x, int ship_y)
+{
+    /* One axis of asm/6B3D's step rule. `ship` is DS:47B for x and DS:47C for y.
+     * `ytable` is non-zero to use the eight-entry y table, whose upper half is unknown. */
+    int moved = 0;
+    for (int i = 0; i < n; i++) {
+        int old = sx[i];
+        unsigned d = (unsigned)(uint8_t)(old - ship_x);
+        int di = (int)(d >> 4);
+        if (di > 15) di = 15;                       /* cannot happen with uint8_t, pinned */
+        int step = di + 1;                          /* cs:0x6cac[i] == i + 1 */
+        if (old >= ship_x) {
+            int nv = old + step;
+            if (nv <= 0xff) sx[i] = (uint8_t)nv;    /* adc overflow -> jae not taken -> skip */
+        } else {
+            /* The original complements the wrapped difference, so its bucket here is
+             * (ship - old - 1) >> 4, not (ship - old) >> 4. Kept as it is written. */
+            di = (ship_x - old - 1) >> 4;
+            step = di + 1;
+            if (old >= step) sx[i] = (uint8_t)(old - step);
+        }
+
+        old = sy[i];
+        d = (unsigned)(uint8_t)(old - ship_y);
+        di = (int)(d >> 4);
+        if (di < 8) {                               /* cs:0x6cbc is only 8 entries deep */
+            step = di + 1;
+            if (old >= ship_y) {
+                int nv = old + step;
+                if (nv <= 0xff) sy[i] = (uint8_t)nv;
+            } else {
+                di = (ship_y - old - 1) >> 4;
+                if (di < 8) {
+                    step = di + 1;
+                    if (old >= step) sy[i] = (uint8_t)(old - step);
+                }
+            }
+        }
+        moved++;
+    }
+    return moved;
 }
 
 void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s)
@@ -101,7 +161,15 @@ void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s)
 
     uint32_t h = star_hash(s->star_seed ? s->star_seed : 1u);
 
-    if (s->warping) {
+    if (s->warping && s->warp_x && s->warp_y) {
+        /* The stateful field: positions come from the caller's tables, which it has
+         * already advanced with u2_space_warp_advance(). This is the path the original
+         * takes, and the picture it produces is the one the frames show -- sparse dots
+         * strung out along rays, because a star plots one pixel per pass at wherever its
+         * own distance put it, not one pixel per pass along a shared ray. */
+        for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++)
+            view_plot(f, s->warp_x[i], s->warp_y[i]);
+    } else if (s->warping) {
         /* Radiating field: dots along rays out of the view centre. The centre and the
          * rectangle are measured (space_view.h); the ray count, the per-ray spacing and
          * the animation rate are NOT decoded -- see the file header.

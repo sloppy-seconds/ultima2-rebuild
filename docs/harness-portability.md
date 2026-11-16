@@ -1717,7 +1717,18 @@ Newest first. One line per learning; the detail stays in the owning document.
   the two claims above was about which words a program prints, and the answer was sitting in the
   reconstruction as six `db` strings, one grep away, already proving the claim false. Visual
   evidence and textual evidence about the same string will disagree loudly when one is wrong, and
-  the cheap side was not the one that got consulted. → Tier 2, harness contract.
+  the cheap side was not the one that got consulted.
+- **A correctly decoded rule is not automatically a complete model, and the only way to find
+  out is to run it end to end before it reaches the screen.** A per-star motion rule was read
+  off the listing, implemented exactly as written, and unit-tested against the listing. Then
+  it was rendered, and after a few hundred frames the field had drained to the edges and the
+  middle was empty — because the rule's own skip condition strands any star that overflows,
+  and nothing in the decoded fragment ever puts it back. Every unit test stayed green. The
+  missing piece is real and is in a different routine, and no amount of re-reading the one
+  routine would have surfaced it. So: implement from bytes, unit-test against bytes, then run
+  the whole animation and look at the result before wiring it into what a player sees — and
+  when the whole-run result is worse, keep the tested rule and leave it unwired, with the
+  reason next to the code that declines to call it. → Tier 2, harness contract.
 
 ---
 

@@ -147,6 +147,30 @@ else
     sed 's/^/        /' "${WORK:-/var/tmp}/mode.build" | head -5
 fi
 
+# The warp's per-star step. This is the rule that makes the original's field radial --
+# a star steps away from the ship and the step grows with distance -- and it was decoded
+# from asm/6B3D on 2026-11-16 after two earlier readings of the same routine were wrong.
+# The y half of the table is only eight entries deep, so the test pins the REFUSAL to
+# step beyond it: a later session must settle G89 rather than guess a ninth value.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "${WORK:-/var/tmp}/warp_step_check" \
+        tests/warp_step_check.c $(find build/src -name '*.o' ! -name 'main.o' | tr '\n' ' ') \
+        2>"${WORK:-/var/tmp}/warp_step.build"; then
+    if "${WORK:-/var/tmp}/warp_step_check" > "${WORK:-/var/tmp}/warp_step.out" 2>&1; then
+        n=$(sed -n 's/^  ok  \([0-9]\{1,\}\) checks.*/\1/p' "${WORK:-/var/tmp}/warp_step.out")
+        if [ "${n:-0}" -eq 0 ]; then
+            bad "CP0 warp step run executed 0 checks — the test is not running"
+        else
+            ok "warp step: radial, away from ship, step grows with distance ($n checks)"
+        fi
+    else
+        bad "warp step violated:"
+        sed 's/^/        /' "${WORK:-/var/tmp}/warp_step.out"
+    fi
+else
+    bad "warp step test harness did not build:"
+    sed 's/^/        /' "${WORK:-/var/tmp}/warp_step.build" | head -5
+fi
+
 # The PRNG is a shift register (asm/5217 + asm/522B + asm/5236), seeded once at
 # launch from the 0x40:6C byte (asm/0100). Vector derived by hand-decoding those
 # three fragments together; it guards regressions and documents the decode.

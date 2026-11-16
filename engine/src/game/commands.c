@@ -1443,6 +1443,16 @@ static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
     sc.warping = warping;
     sc.warp_frame = warp_frame;
     sc.keep_frame = keep_frame;
+    /* NOT wired to ow->warp_x / warp_y, and that is deliberate. u2_space_warp_advance()
+     * implements asm/6B3D's step rule exactly as the bytes describe it and is unit-tested
+     * (CP0, warp_step_check), but running it for 509 frames drives the field to the two
+     * x edges and leaves the middle empty: a star that overflows past 255 is skipped, so
+     * it sits at its last valid position and stops moving, and after a few hundred frames
+     * almost every star has migrated out and frozen. The original at the same point in the
+     * warp is still populated across the whole view, so something re-seeds or wraps the
+     * tables and that has not been found. Rendering through the decoded rule therefore
+     * makes the screen WORSE, not better, and the hash field stays in charge until the
+     * missing piece is identified. See G89. */
     u2_space_scene_draw(&ow->frame, &sc);
 
     /* The field clear takes the WHOLE frame -- u2_frame_clear memsets every row, not

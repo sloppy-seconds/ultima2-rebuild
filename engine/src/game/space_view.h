@@ -30,6 +30,10 @@ typedef struct u2_ctx u2_ctx;
 #define U2_SPACE_VIEW_Y 16
 #define U2_SPACE_VIEW_COLS 256
 #define U2_SPACE_VIEW_ROWS 128
+/* 77 white px in frames 226/227/228 minus the 13-px ship cross = ~64 stars. Measured.
+ * Also the width of the original's DS:4CD / DS:50D tables, which is corroborating rather
+ * than assumed: the two 64-entry tables are 0x50D - 0x4CD = 64 apart. */
+#define U2_SPACE_ORBIT_STARS 64
 
 /* The radiating field is centred on the view centre. Measured: the centroid of the white
  * pixels in frames 014/049/096/097 is (127,63), (127,63), (124,64), (125,62) in view
@@ -94,9 +98,52 @@ typedef struct u2_space_scene {
      * clean dot and no trail — the engine reproduces that by clearing, which is the same
      * picture arrived at differently, and the difference is recorded rather than hidden. */
     int keep_frame;
+    /* The warp field's own star positions, or NULL to fall back on the hash field.
+     * These are the engine's version of the original's DS:4CD / DS:50D tables: 64
+     * entries, advanced once per redraw by u2_space_warp_advance() and written back.
+     * asm/6B3D reads a star's OLD position out of the table, derives a new one from
+     * its distance from the ship, and stores it, so the field is stateful and cannot
+     * be regenerated from a seed and a frame index. When these are set, `warp_frame`
+     * is not consulted.
+     *
+     * Nothing in the shipped engine sets them. The step rule they exist for is decoded
+     * and unit-tested, but running it to completion empties the middle of the field, so
+     * the renderer stays on the hash field until the missing piece is found — see the
+     * note in commands.c space_paint_mode() and G89 in docs/needs-gameplay.md. */
+    const uint8_t *warp_x;
+    const uint8_t *warp_y;
     /* Star field seed. NOT decoded from the original -- see u2_space_scene_from(). */
     uint32_t star_seed;
 } u2_space_scene;
+
+/* asm/6B3D's per-star motion, applied in place to `n` stars.
+ *
+ * Both axes run the same rule, and it is radial: a star steps AWAY from the ship by an
+ * amount that GROWS with its distance from the ship, which is what makes far stars
+ * outrun near ones and turns a drift into rays.
+ *
+ *   d = (uint8_t)(old - ship);  step = (d >> 4) + 1   (cs:0x6cac is 1..16)
+ *   old >= ship : new = old + step, skipped if it overflows past 255
+ *   old <  ship : new = old - step, skipped if old < step
+ *
+ * The two arms are `L_006d7f` (`adc`, add) and `L_006d57` (`xor $0xff` then `sbb`,
+ * subtract); the skips are the `jae` after the add and the `cmc; jb` after the
+ * subtract. The subtract arm's bucket is `(ship - old - 1) >> 4`, because the original
+ * complements the wrapped difference rather than measuring it the other way.
+ *
+ * y is the same shape against `cs:0x6cbc`, which reads live as 1..8 and then code. Only
+ * buckets 0..7 are settled, so a star whose y distance from the ship puts it in bucket 8
+ * or higher is left where it is rather than stepped by a value read out of the
+ * program's own instructions. That is a known divergence, not a guess: see G89.
+ *
+ * Returns the number of stars that moved. */
+int u2_space_warp_advance(uint8_t *sx, uint8_t *sy, int n, int ship_x, int ship_y);
+
+/* Fill a warp field with `n` starting positions from `seed`. The original's tables are
+ * seeded somewhere in the space-entry path and no capture has read that, so the
+ * distribution is the engine's; what matters for the animation is only that the field
+ * spans the view and is stable across the warp, both of which this gives. */
+void u2_space_warp_seed(uint8_t *sx, uint8_t *sy, int n, uint32_t seed);
 
 /* Build the scene from live state. Pure: reads, allocates nothing, draws nothing. */
 void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out);
