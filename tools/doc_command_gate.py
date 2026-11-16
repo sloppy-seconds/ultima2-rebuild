@@ -44,6 +44,9 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_DOCS = [
     "docs/tooling-procedures.md",
     "docs/spice86-capture.md",
+    # A plan that names tools is a document that will be followed. Plans are where a command goes
+    # stale quietly, because nobody re-reads them the way they re-read a runbook.
+    "docs/plan-bot-playthrough.md",
     "AGENTS.md",
     # The in-repo skills carry runnable commands and are routed to automatically, so a stale one
     # is worse than a stale doc: the model loads it without being told to. They are gated for the
