@@ -339,6 +339,16 @@ cannot be killed. The mechanism for detecting that in this port is unknown, and 
 answer is that the invulnerability is a creature-type or HP property rather than a dialogue
 response. Grade: **refuted for the tell, recalled for the phenomenon.**
 
+**Closed 2026-11-16, on the phenomenon rather than the tell.** The mechanism turned out to be
+structural and already decoded: `asm/23E6` scans slots 31 down to 1 and never examines slot 0,
+so a creature parked there is unhittable by melee, talk and cannon while still drawing, still
+blocking the cell and still running its AI (G78). What was missing was a way for a *policy* to
+see that, so the observation now carries `targets` — four values in N,E,S,W order, 1 attackable,
+0 empty, **-1 present but not targetable** — computed by the engine's own predicate and not by a
+second copy of the slot scan in the bot. `bot/policy.py` is the policy layer this section was the
+first rule of, and the rule generalises past guards: an attack the engine says cannot land is not
+retried, whatever caused that. Grade: **measured**, with the tell still refuted and unused.
+
 ---
 
 ## 4. What the walkthrough does NOT provide

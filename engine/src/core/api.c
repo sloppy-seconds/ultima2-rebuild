@@ -25,6 +25,7 @@
 #include "debug/dump_state.h"
 #include "game/creation.h"
 #include "game/gates.h"
+#include "game/monsters.h"
 
 #define LINE_MAX_LEN 4096
 #define SCR_MAX      4096
@@ -218,6 +219,42 @@ static void emit_counts(const char *const *tbl, int n, const uint8_t *counts)
         printf("%s\"%s\":%u", i ? "," : "", tbl[i], (unsigned)counts[i]);
 }
 
+static void emit_targets(const u2_ctx *ctx)
+{
+    /* P8 (docs/goal-spec.md): a bot needs a way to be told "stop attacking this", and the
+     * original's invulnerability has no flag to read -- the creature in slot 0 is simply never
+     * scanned by asm/23E6, so melee prints MISS, talk prints FUNNY NO RESPONSE and the cannon
+     * finds nothing, while the same creature still draws, still blocks the cell and still runs
+     * its AI. The only faithful way to express that as data is to ask the engine's own
+     * predicate, which is what this does: one rule, not a Python copy of a slot scan.
+     *
+     * Per neighbour, in N,E,S,W order:
+     *    1  a creature is there and an ATTACK / TRANSACT / cannon can target it
+     *    0  nothing there
+     *   -1  a creature is there and CANNOT be targeted (slot 0). This is the value that means
+     *       "do not spend an attack here", and it is deliberately distinct from 0 because the
+     *       two behave differently for stepping: slot 0 blocks a step all the same.
+     */
+    const int px = ctx->state.sector_x;
+    const int py = ctx->state.sector_y;
+    static const int dx[4] = { 0, 1, 0, -1 };
+    static const int dy[4] = { -1, 0, 1, 0 };
+    printf("\"targets\":[");
+    for (int i = 0; i < 4; i++) {
+        const int tx = (px + dx[i]) & 63;
+        const int ty = (py + dy[i]) & 63;
+        const int hit = u2_monsters_at_attackable(ctx, tx, ty);
+        const int block = u2_monsters_at(ctx, tx, ty);
+        int v;
+        if (hit >= 0) v = 1;
+        else if (block >= 0) v = -1;
+        else v = 0;
+        if (i) printf(",");
+        printf("%d", v);
+    }
+    printf("]");
+}
+
 static void emit_gate(const u2_ctx *ctx)
 {
     /* A bot cannot walk to a door it cannot see, and until now the observation carried no
@@ -341,8 +378,12 @@ static void emit_obs(u2_ctx *ctx)
     emit_char(ctx);
     /* Only once there is a world to have a door in. At the title or in creation the era and
      * world bytes are both zero, and reporting era 0 there would read as a real location. */
-    if (ctx->enter_world)
-        printf(","), emit_gate(ctx);
+    if (ctx->enter_world) {
+        printf(",");
+        emit_targets(ctx);
+        printf(",");
+        emit_gate(ctx);
+    }
     printf(",\"state\":%s}", jn > 0 ? js : "{}");
     fflush(stdout);
 

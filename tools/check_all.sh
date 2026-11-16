@@ -127,6 +127,7 @@ run "s86_ports selftest" tools/s86_ports.py -- python3 tools/s86_ports.py --self
 # undeliverable key that refuses instead of pretending the game ignored it. Needs no
 # emulator, which is what makes it gateable — the live proof is bot/play_original.py.
 run "bot target adapter" bot/target_check.py -- python3 bot/target_check.py
+run "bot policy rule" bot/policy.py -- python3 bot/policy.py
 # The mode discriminator against the corpus, not just against itself. mode_check.c (CP0)
 # proves the rule is self-consistent; these prove it is TRUE of the original. The ordering
 # bug it caught — a dungeon's staging pair is also all-0xFF, so eighteen dungeon frames read

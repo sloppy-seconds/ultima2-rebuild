@@ -174,6 +174,61 @@ try:
 except Exception as ex:                       # noqa: BLE001
     ok(False, "grid index checks failed: %s" % ex)
 
+# --- P8: "stop attacking this", expressed as data --------------------------------
+# The original has no invulnerability flag. asm/23E6 scans slots 31..1 and never looks at
+# slot 0, so a creature parked there is unhittable by melee, talk and cannon while still
+# drawing, still blocking the cell and still running its AI. The engine's own predicate is
+# the only faithful source, so the observation carries the answer rather than the bot
+# reimplementing a slot scan in Python.
+#
+# Per neighbour in N,E,S,W: 1 attackable, 0 empty, -1 present but NOT targetable.
+try:
+    def p8_blob(extra):
+        d = {0x00: 10, 0x01: 10, 0x49: 4, 0x4A: 0}   # sector 40, Earth wilderness
+        for i, c in enumerate(b"BOT"):
+            d[0x36 + i] = c                          # a nameless record reads as title
+        d.update(extra)
+        return ds_blob(d)
+
+    def mon(slot, x, y, hp=20, typ=0x60):
+        return {0x137 + slot: x, 0x157 + slot: y, 0x177 + slot: hp, 0x197 + slot: typ}
+
+    def both(a, b):
+        # dict(a, **b) would be the idiom but `**` needs string keys; these are offsets.
+        m = dict(a)
+        m.update(b)
+        return m
+
+    def tg(extra):
+        o = decode(p8_blob(extra))
+        return o.get("targets")
+
+    ok(tg({}) == [0, 0, 0, 0], "empty world reports no targets (got %s)" % tg({}))
+    ok(tg(mon(5, 10, 9)) == [1, 0, 0, 0],
+       "a slot-5 creature to the north is attackable (got %s)" % tg(mon(5, 10, 9)))
+    ok(tg(mon(0, 10, 9)) == [-1, 0, 0, 0],
+       "the SAME creature in slot 0 is present but NOT attackable -- this is the P8 "
+       "rule and the value a bot must not spend an attack on (got %s)" % tg(mon(0, 10, 9)))
+    ok(tg(both(mon(0, 11, 10), mon(7, 9, 10))) == [0, -1, 0, 1],
+       "slot 0 east and slot 7 west report both, in the right cells (got %s)"
+       % tg(both(mon(0, 11, 10), mon(7, 9, 10))))
+    # Slot 0 only makes a cell unhittable when it is the only thing there: asm/23E6 returns
+    # the first match scanning down, so a lower slot at the same cell is still targetable.
+    ok(tg(both(mon(0, 10, 11), mon(3, 10, 11))) == [0, 0, 1, 0],
+       "slot 0 sharing a cell with slot 3 does NOT make the cell unhittable (got %s)"
+       % tg(both(mon(0, 10, 11), mon(3, 10, 11))))
+    # The two scans exclude on DIFFERENT fields, and that asymmetry is measured, not
+    # incidental: asm/23E6 tests mon_type, so a zero-hp but still-typed slot is attackable
+    # here, while the step/block scan skips hp 0. Asserting this the wrong way round is what a
+    # first draft of this check did, which is how the asymmetry stays honest.
+    ok(tg(mon(5, 10, 9, hp=0)) == [1, 0, 0, 0],
+       "a zero-hp but still-typed slot IS attackable -- the attack scan tests type, not hp "
+       "(got %s)" % tg(mon(5, 10, 9, hp=0)))
+    ok(tg(mon(5, 10, 9, hp=0, typ=0)) == [0, 0, 0, 0],
+       "a slot empty on BOTH fields is nothing at all (got %s)" % tg(mon(5, 10, 9, hp=0, typ=0)))
+except Exception as ex:                       # noqa: BLE001
+    ok(False, "P8 target-eligibility checks failed: %s" % ex)
+
 if fails:
     print("  FAIL  %d checks passed, %d failed" % (checks, len(fails)))
     sys.exit(1)
