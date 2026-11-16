@@ -1443,22 +1443,18 @@ static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
     sc.warping = warping;
     sc.warp_frame = warp_frame;
     sc.keep_frame = keep_frame;
-    /* NOT wired to ow->warp_x / warp_y, and that is deliberate — twice over now.
+    /* NOT wired to ow->warp_x / warp_y yet, but the reason is now a to-do rather than a
+     * mystery. G90 closed 2026-11-16 (captures/spice86/g90-warp-table/): DS:4C7 is a sweep
+     * counter — 128->0, hold at 1 for 128 frames, 2->128 step 2, hold at 128 — and the
+     * erase is skipped exactly while it sits at 0. That 128-frame no-erase window is the
+     * streak field: 128 frames x 64 stars plotted with nothing erased, which measures as
+     * 3892 distinct dots on the original's screen at the warp's peak.
      *
-     * The first attempt drained the field to the x edges; that was fixed by noticing two
-     * of the four stores are unconditional (see u2_space_warp_advance). The corrected rule
-     * still does not reproduce the original, and the reason is now measured rather than
-     * guessed: **DS:4C7 is not a mode selector, it is a countdown from 128.** Read at
-     * asm/6B3D entry across 120 consecutive frames of a live warp it goes 128, 128, 124,
-     * 117, 110 ... 26, 19, monotonically non-increasing, about -1 per frame. So the
-     * `or %al,%al` / `je` that skips the erase fires only on the very last frame, and the
-     * `cmp $0x2` that the engine reads as "mode >= 2" is a countdown test, true for
-     * essentially the whole warp. Everything built on "mode 0 = accumulate, mode 1 = erase"
-     * — including this function's own trail model — is standing on a misread.
-     *
-     * The hash field stays in charge until DS:4C7's real role is settled. See G90.
-     * The step rule itself is kept and unit-tested because the four store arms are
-     * byte-verified; what is not settled is when a star is erased and when it is left.
+     * So the engine's `keep_frame` is currently true for the wrong window. The fix is
+     * ordinary implementation, not another capture: drive the sweep, hold the frame while
+     * its value is 0, and let the up-sweep eat the streaks the way the original's does.
+     * The step rule itself is byte-verified and unit-tested (CP0, warp_step_check); what
+     * is not yet done is feeding it through this paint path with the sweep as its clock.
      */
     u2_space_scene_draw(&ow->frame, &sc);
 

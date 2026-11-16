@@ -13,20 +13,29 @@
 #                 plot new via L_004d76 ; store new into the tables
 #                 cmpb $0x2,0x4c7 ; jae L_006e52             ; mode >= 2 takes a further branch
 #           So **DS:4C7 is the animation mode**: 0 = plot in place, 1 = erase-and-plot
-#   CORRECTED 2026-11-16 -- **DS:4C7 IS NOT A MODE, IT IS A COUNTDOWN.** Read at this
-#           routine's entry across 120 consecutive frames of a live hyperwarp
-#           (`captures/spice86/g90-warp-table/`), DS:4C7 runs 128, 128, 128, 128, 124, 117,
-#           110, 103, ... 26, 23, 22, 21, 20, 19: monotonically non-increasing, about -1 per
-#           frame, starting at 0x80. That is the 128-frame bound, living in the byte the
-#           listing appeared to use as a selector. Two consequences, both of which invalidate
-#           prose below and in the engine:
-#             * `or %al,%al ; je L_006e14` skips the erase only when the countdown reaches
-#               0, i.e. on the last frame or two -- not for a whole "mode 0" phase.
-#             * `cmpb $0x2,0x4c7 ; jae` is true for essentially the entire warp, so the arm
-#               it selects is the normal path and the arm it skips is the tail.
-#           What DS:4C8 holds instead is still open (it read 0 at every one of the 120 stops,
-#           so it is not the frame counter either). The four store arms further down are
-#           unaffected by this correction and remain byte-verified.
+#   CORRECTED 2026-11-16 -- **DS:4C7 IS NOT A MODE, IT IS A SWEEP COUNTER.** Read at this
+#           routine's entry across 600 consecutive frames of a live hyperwarp
+#           (`captures/spice86/g90-warp-table/full.txt`) its whole shape is:
+#               128 -> 0      over 328 frames   (decrementing)
+#               1 held         128 frames
+#               2,4,6 ... 128  128 frames       (incrementing by 2)
+#               128 held       ~81 frames
+#           So it is a down-then-up sweep, not a mode and not a plain countdown. The two
+#           branches the listing looks like a selector are:
+#             * `or %al,%al ; je L_006e14` skips the ERASE, and it fires for **128
+#               consecutive frames** -- the whole stretch where the sweep sits at 0. That
+#               window is the warp's trail: 128 frames x 64 stars plotted with nothing
+#               erased. Measured on screen at the peak of a warp: 6235 white px in 3892
+#               distinct 1-px dots, radiating out from the ship. That is what this window
+#               draws, and it is why the field climbs ~77 px -> ~6200 px and falls back.
+#             * `cmpb $0x2,0x4c7 ; jae` is the normal path for the whole sweep except the
+#               0 and 1 stretches, so the arm it selects is not a special mode either.
+#           An earlier correction on this same line today said the erase was skipped "only
+#           on the last frame or two". That was wrong too, and wrong in the direction that
+#           hid the answer: it was sampled over 120 frames, which is only the first leg of
+#           the sweep and never reaches 0. The full-shape read is what settled it.
+#           What DS:4C8 holds is still open -- it read 0 at every one of the 120 stops in
+#           the first read, so it is not the frame counter either.
 #           (motion), >= 2 = the extra branch at L_006e3a. **Read 2026-11-15: the >= 2 branch
 #           draws nothing.** The star is plotted at L_006e30 (`call L_004d76`) BEFORE the
 #           `cmpb $0x2,0x4c7` at L_006e33, so both arms have already drawn the same pixel by
