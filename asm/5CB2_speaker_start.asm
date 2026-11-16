@@ -1,4 +1,10 @@
-# sub_5cb2 — mechanical clean (bulk wave); behavior not yet reviewed
+# speaker_start — raises the PC-speaker gate and latches the PIT mode
+# name-evidence: out 0x43 (PIT mode/control), two out 0x42 (channel-2 latch), then in 0x61 / or / out
+#           0x61 — port 0x61 bits 0-1 are the speaker gate and the PIT gate. Confirmed live: polling
+#           the emulator's PC-speaker state showed Timer2GateEnabled go true at this routine and false
+#           at asm/5CE4, and an idle run with no input produced no stop here at all.
+# provenance: captures/spice86/step-sound-20261117, static
+# confidence: medium
 # func 5CB2..5CCB  len 001A B  evidence: seed+call+reko
 # confidence: low (bytes proven by check_func.py)
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
