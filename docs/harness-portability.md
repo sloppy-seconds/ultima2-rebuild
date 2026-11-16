@@ -189,6 +189,24 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-17 — The emulator's own audio-device state is a duration instrument, and it
+  needs no decode at all.** Tone routines in hand-written 8088 are frequently unreadable
+  (self-modifying parameter storage, arithmetic no static reader can pin), which had this
+  project recording sound durations as undecodable. But the speaker gate the routine
+  raises and lowers is visible in the emulator's PC-speaker state, so polling that state
+  and stamping the emulator's cycle counter at each edge measures the audible window
+  directly, in cycles, with the disassembly contributing only the port semantics. Two
+  cautions came with it: the input queue has to be drained first, because a queued key
+  produces its own response and reads exactly like a second response to the key under
+  test; and the cycle-to-millisecond division is a lower bound whenever the emulator
+  models no bus wait states.
+* **2026-11-17 — "Did it make a sound?" is an inert assertion wherever more than one
+  code path sounds.** A gate written as "the speaker fired during a walk" stayed green
+  with the step wiring deleted, because an unrelated animation tone also fires. The
+  non-inert form is the parameters, the count and the order: which tone, how many, and
+  whether the one that belongs to the complaint came after the complaint. Same shape as
+  the printed-message version of this bug, and it is worth checking whether a new
+  checker's positive case would also pass on the bug.
 * **2026-11-16 — A regularity in sampled data is a joint claim about the signal and the
   sampling rate, and separating them is usually one division.** A breakpoint sampled a tone
   accumulator every ~4 frames and the observed values were all multiples of 256, which was

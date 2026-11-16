@@ -1268,7 +1268,36 @@ HP fell 9999 → 9952 while a monster stood adjacent, and the log showed nothing
 | player death | prints | ok | `asm/0C82` announcement, already in `u2_death` |
 | paralysis on a refused step | prints `--PARALYZED!` | ok | CP5 C3 asserts it |
 | per-step food drain | silent | **needs a citation, not a fix** | the drain is measured (`G2`, 19 per step on foot) and no message was seen in that capture, so silence is probably faithful — but the rule requires the comment at the mutation site to say so and cite the capture. Until it does, this row stays open |
+| **step attempt (sound)** | **sounds: two 73 Hz thumps** | **measured** | was silent until 2026-11-17. `asm/5EC7` -> `asm/5D09` sequence 0 (record at `CS:5D5D`, `{count 0x05, divisor 0x4000}`) fires **twice per step attempt, accepted or refused**, which places it ahead of the terrain verdict beside the food charge — so the engine plays it in `u2_overworld_step_food`. Gated by `tests/sound_check.py` (CP5 sound), with two controls that were run and went red. `captures/spice86/step-sound-20261117` |
+| **refusal (sound)** | **sounds: one 932 Hz buzz, after the complaint** | **measured** | `asm/5C95` (divisor `0x500`, `cx=0x4000`, ~835k cycles) is reached through `asm/0A30`, and the invalid-move path is the one refusal site measured so far. The other sites `asm/0A30` serves are listed below and are still silent |
 | player commands (A–Z) | every implemented handler prints | ok | the CP5 dispatch gate asserts a distinct string per letter, which is what makes silence in a command impossible to miss |
+
+### The sound map, and what is still silent
+
+Before 2026-11-17 this project had never enumerated the original's sounds. It is now
+enumerated by scanning every `call`/`jmp` in `asm/` that enters the speaker library
+(runtime `0x5C95..0x5F00`) from outside it, and the library itself is four primitives
+(`asm/5CB2` start, `asm/5CD2` freq, `asm/5CE4` stop, `asm/5D09` a table-driven sequence
+player over the table at `CS:5D9B`) under fixed-parameter wrappers.
+
+| sound | wrapper | trigger sites | engine |
+| --- | --- | --- | --- |
+| step thud, 73 Hz x2 | `asm/5EC7` -> seq 0 | the arms of `asm/253B` (`asm/2575`, `asm/2590`), `asm/08E3`, `cmd_L` | **wired** |
+| refusal buzz, 932 Hz | `asm/5C95` via `asm/0A30` | ~22 sites: invalid move, `NO DOOR THERE!`, `OFFER WHAT?`, price too high, the vehicle board refusals, the arms-refused attack, `cmd_L`, `cmd_X` | **only the invalid-move site is wired** |
+| dungeon notices | `asm/5C95` | `TORCH BURNED OUT!`, `YOUR TORCH IS BLOWN OUT!`, `A GREMLIN STOLE SOME FOOD!`, `YOU FEEL A STRONG MAGIC!` | silent |
+| trap | `asm/5E3B` + `asm/5EF2` x4 | `ARGH! A TRAP!` in `asm/277B` | silent |
+| spell failure sweep | `asm/5E83` | both `-FAILED!` arms of `asm/3139_cast_spell_flow` | silent |
+| `HIT!` | `asm/5ED7` | `asm/2E3D_combat_attack_flow`, `asm/2BF8`, `asm/360E`, `asm/72A0` | silent |
+| wound tones | `asm/5EAC`, `asm/5EF2` | the melee wound loop | `asm/5EF2` wired (E1), `asm/5EAC` not |
+| Minax, force field | `asm/5EF2` | `asm/0F8E`, `asm/24B5` | silent |
+| warp tones | direct `asm/5CD2` | `asm/6B3D_space_field_draw` | **wired** |
+
+Every silent row above is a live violation of the rule at the head of this section, and
+none of them is a guess about the bytes — the wrappers and their parameters are read.
+What they lack is a **duration**, which is what the two wired sounds got from a capture.
+`asm/5DA9`'s own header says its frequency arithmetic is inferred and unconfirmed
+against a heard tone, which is why `combat.c` deliberately emits nothing on a cannon
+shot rather than inventing one.
 
 **Two live-session bugs this audit turned up, both reproduced headless:**
 
