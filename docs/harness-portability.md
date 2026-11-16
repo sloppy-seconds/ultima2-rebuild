@@ -1703,7 +1703,21 @@ Newest first. One line per learning; the detail stays in the owning document.
   counter, and had nothing to do with the geometry. The read was still worth doing and closed
   the item, but the premise was wrong and would have sent an implementer to code a fix against a
   mechanism that does not exist. State a gap's importance as a hypothesis with the check that
-  would falsify it, not as background. → Tier 2, harness contract.
+  would falsify it, not as background.
+- **A claim read off a thumbnail is not a claim about the image, and low resolution produces
+  confident wrong readings rather than uncertainty.** Two findings were written from a 320x200
+  screenshot as attached: that one renderer produced a directional smear where another produced
+  a radial burst, and that two on-screen labels differed. Both were false. Re-rendered at 300%
+  the two renderers have the same geometry and the labels are identical. The failure mode is
+  worth naming precisely: nothing looked broken, nothing came back ambiguous, and the misread
+  produced a *specific structural* story that was easy to believe. So scale the image before
+  asserting structure from it — a one-command step — and treat any visual claim that arrives
+  with a neat mechanism attached as needing that check most of all.
+- **Before a text claim reaches a document, grep the tree that already holds the text.** One of
+  the two claims above was about which words a program prints, and the answer was sitting in the
+  reconstruction as six `db` strings, one grep away, already proving the claim false. Visual
+  evidence and textual evidence about the same string will disagree loudly when one is wrong, and
+  the cheap side was not the one that got consulted. → Tier 2, harness contract.
 
 ---
 

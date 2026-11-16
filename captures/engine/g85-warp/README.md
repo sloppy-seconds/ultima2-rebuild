@@ -27,33 +27,45 @@ two commits before this capture. `UP` is not cosmetic: `0x0e` in a script is *no
 byte form is a key the game throws away and a script using it moves nobody while looking
 correct.
 
-## What the two actually look like
+## What the two actually look like — read at 3x
 
-`original-warp-trail.png` — the ship is a `+`, sitting right of centre and above centre, and
-the streaks radiate from **the ship** through a full 360 degrees. The rays are sparse and
-dotted: one pixel per star per frame at a growing radius, so each ray is a sample tape.
+**The first version of this section was wrong in both of its findings, and the error is worth
+recording more than the conclusion.** It was written from the 320x200 originals as attached,
+which is a thumbnail. Re-rendered at 300% (`magick in.png -scale 300% -alpha off out.png`),
+both claims collapse.
 
-`engine-warp-017.png`, `engine-warp-030.png` — the streaks converge on a dense knot near the
-centre and extend overwhelmingly along **one diagonal axis**, upper-right to lower-left. The
-field is far denser than the original's and reads as a beam rather than a burst. There is no
-ship marker on screen at all.
+What was claimed, and what is true:
 
-**So the divergence is real and it is structural, not cosmetic:** the original's stars move
-*away from the ship in every direction*; the engine's move along a shared direction, which is
-what produces a smear instead of a burst. The trail mechanism added on 2026-11-15 (mode 0 not
-erasing, radii growing with `warp_frame`) was necessary — without it the warp was a shimmer —
-but it is not sufficient, because growing every star's radius along one vector is a streak
-field, not a radial one.
+| claimed | actual |
+| --- | --- |
+| original radiates from the ship, engine smears along one diagonal axis — "a beam, not a burst" | **both are radial bursts through a full 360 degrees.** The engine's distribution is lumpier and has a diagonal emphasis, but it is not a beam. |
+| engine draws no ship marker | **it does.** A `+` sits upper-left of the convergence knot, at a similar offset to the original's. |
+| labels differ: original `XENO / YENO / ZARO`, engine `XENO / YARO / ZABO` | **identical on both sides: `XENO / YAKO / ZABO`.** `YENO` and `ZARO` do not occur anywhere in `asm/` — `grep -rh 'db "' asm/ \| grep -o '"[^"]*\(XEN\|YAK\|YEN\|ZAB\|ZAR\)[^"]*"'` returns `  XENO=`, `XENO=`, `  YAKO=`, ` YAKO=`, `  ZABO=`, ` ZABO=` and nothing else. The engine was never wrong, and the tree already said so. |
 
-## Second finding, in the readout
+The left column matches exactly, both sides: `XENO=6 YAKO=2 ZABO=3` above `PREPARE FOR
+HYPERWARP!` / `HYPERWARP ENGAGED!`.
 
-The left column matches the original exactly, including its odd spelling: `XENO=6 YAKO=2
-ZARO=3` above `PREPARE FOR HYPERWARP!` / `HYPERWARP ENGAGED!`.
+## The divergence that survives looking
 
-The right column does not. The original's target triple reads `XENO / YENO / ZARO`; the
-engine's reads `XENO / YARO / ZABO`. Two of the three labels differ. The values differ too,
-but that is expected — this run went off-course, so it is a different destination. The label
-words are strings, and one of the two sets is wrong.
+**Density, and it is the stagger.** The original's rays are sparse: mostly single dots with wide
+gaps between them, a few short segments, plus clusters of stationary dots in the corners that
+are stars not yet in motion. The engine's rays are near-solid lines. Same geometry, roughly
+ten times the ink.
+
+That is the mechanism G88 decoded, showing up as a visible difference. `cs:0x6cac` is 16
+entries of `index + 1`, indexed by `(x ^ 0xff) >> 4`, compared against a global counter at
+`DS:4C3` — a per-x-bucket gate, so only part of the field updates on a given pass. The engine
+has no such gate and redraws every star every frame, which is exactly what turns a dotted ray
+into a solid one. So G88 turned out to matter for the appearance after all, just not the way
+its own entry claimed: it explains the sparseness, not the radial shape.
+
+The remaining honest differences, in order of confidence:
+
+1. **No stagger gate** — engine rays solid, original dotted. Byte-backed, and now actionable.
+2. **Engine's ray distribution is lumpier**, with a diagonal emphasis and a denser knot. Cause
+   unknown; this is what G89 is about.
+3. **Right-column values differ** (`YAKO=06 ZABO=06` vs `YAKO=02 ZABO=03`), but this run went
+   off-course so it is a different destination and not necessarily a divergence.
 
 ## What this does NOT settle
 
