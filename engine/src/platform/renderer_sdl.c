@@ -389,7 +389,7 @@ static void sdl_upload(u2_ctx *ctx, const struct u2_frame *f)
      * content, so writing it out proves the cell->font->upload path without
      * a display (SDL_VIDEODRIVER=dummy). The input backend ends the run once
      * this flag is set. */
-    if (ctx->dump_screen && !v->dumped) {
+    if (ctx->dump_screen && !v->dumped && ctx->dump_every == 0) {
         int wrc;
         if (ctx->art_mode == U2_ART_EGA) {
             uint8_t pal[16][3];
@@ -411,7 +411,7 @@ static void sdl_upload(u2_ctx *ctx, const struct u2_frame *f)
      * the ship or from the screen centre, how fast does it read) is a claim about a frame in
      * the middle, so a flag that can only ever write frame zero cannot see any of them.
      * Deliberately does not set dump_screen_done: ending the run here would defeat the point. */
-    if (ctx->dump_every > 0 && v->frames % ctx->dump_every == 0) {
+    if (ctx->dump_every > 0 && (v->frames - 1) % ctx->dump_every == 0) {
         char path[512];
         const char *dot = strstr(ctx->dump_screen ? ctx->dump_screen : "", "%d");
         if (dot) {
