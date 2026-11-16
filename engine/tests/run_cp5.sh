@@ -1332,6 +1332,18 @@ else
     sed 's/^/        /' "$WORK/wv-v.out" | tail -5
 fi
 
+# (sound) The step thud and the refusal buzz. The original sounds every step attempt
+# twice (asm/5EC7 -> asm/5D09 sequence 0, divisor 0x4000) and every refusal once
+# (asm/5C95, divisor 0x500), and the checker asserts divisors, count, gap and order —
+# see tests/sound_check.py for why the naive "did it beep" assertion is inert.
+if python3 tests/sound_check.py ./u2 "$WORK/sound" > "$WORK/sound.out" 2>&1; then
+    ok "CP5 sound: $(tail -1 "$WORK/sound.out")"
+else
+    rc=$?
+    bad "CP5 sound: the speaker did not play the measured pattern (exit $rc)"
+    sed 's/^/        /' "$WORK/sound.out"
+fi
+
 printf '\n'
 if [ "$fail" -eq 0 ]; then
     printf 'CP5 SPEC: PASS\n'
