@@ -79,10 +79,32 @@
 #           mechanism by which only part of the field updates on a given pass, which is what
 #           makes the original's rays read as sparse dots rather than solid lines.
 #           The consequence for the new x is direct: `L_006e1c` stores `0x4c5` into the table,
-#           and `0x4c5` is `DS:4C3 + table[di]`. New x is a global counter plus a bucket
-#           offset. It is **not** a vector away from the ship, so this table does not by itself
-#           explain a radial field, and the y path at `L_006da0` and the derivation of `0x4c3`
-#           and `0x4c6` are still open.
+#           and `0x4c5` is `DS:4C3 + table[di]`. **And `DS:4C3` is the star's own old x** —
+#           `L_006d47` loads `0x4cd(%si)` and stores it to `0x4c3`, and nothing outside this
+#           routine writes it (`grep -rn 0x4c3 asm/` finds only these four sites). So the step
+#           is not a global sweep at all: it is `new_x = old_x + table_x[bucket(old_x)]`, a
+#           **position-dependent increment**, and that is the radial mechanism. Because
+#           `bucket(v) = (v ^ 0xff) >> 4`, a star near 0 gets bucket 15 and steps 16, a star
+#           near 255 gets bucket 0 and steps 1 — so the step shrinks with distance, which is
+#           what turns a uniform drift into rays.
+#           The y path at `L_006da0` is the same shape with a second table: `DS:4C4` is the
+#           star's old y, `di` is `bucket(old_y)`, and `L_006dc7` computes `0x4c4 -
+#           %cs:0x6cbc(%di)` into `DS:4C6`, gated by `jns` so a negative result is skipped.
+#           **The y table is where this stops being settled.** `cs:0x6cbc` live is `01 02 03
+#           04 05 06 07 08` and then code resumes — eight entries, not sixteen — while the
+#           bucket for any y below 128 lands in 8..15, which would mean most stars take their y
+#           step out of the program's own instructions. Either the y bucket is narrower than
+#           the code above reads, or that really is what happens. Settling it needs `%di`
+#           sampled at `L_006dc7` during a warp, not more reading of the listing.
+#           **One correction to how the mapping was pinned.** The `cs:0x6990 = 0x2200` and
+#           `cs:0x6998 = 0xFF` readings that retired the skew question were taken on a session
+#           left up by an earlier warp, so they were residue from `asm/6DFD` having run, not
+#           fresh state. They still demonstrate the mapping — those are the values that routine
+#           writes — but the independent confirmation on a never-warp'd session is that
+#           `cs:0x6cac` reads the same 1..16 / 1..8 ramp there as it does in orbit, and that
+#           `CS:0x6b3d` contains the routine's own bytes (`8a 84 cd 04` is `mov ah,[si+0x4cd]`).
+#           On a fresh title screen both CS words read zero, which is what an unseeded
+#           accumulator should do.
 # confidence: medium-high for the mode byte and the tables; **measured-static for the >= 2
 #           branch** (it is a divider into the speaker, not art); low for the audible result
 # provenance: static — the mode byte, the two tables and the erase-before-plot were read out of
