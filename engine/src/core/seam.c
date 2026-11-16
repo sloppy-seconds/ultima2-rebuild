@@ -367,6 +367,18 @@ void seam_tone(u2_ctx *ctx, uint16_t divisor, uint32_t ms)
     ctx->audio->tone(ctx, divisor, ms);
 }
 
+void seam_silence(u2_ctx *ctx, uint32_t ms)
+{
+    /* Traced before the backend is consulted, because the gap is a fact about the
+     * game's timing and not about what this machine can play: the terminal bell has
+     * no way to be quiet on purpose, and a gate that reads the trace must see the
+     * same turn on every backend. */
+    u2_trace(ctx, "speaker_silence", "5CE4", "ms=%u", ms);
+    if (!ctx->audio || !ctx->audio->silence)
+        return;
+    ctx->audio->silence(ctx, ms);
+}
+
 void seam_present(u2_ctx *ctx)
 {
     int changed = ctx->vram.dirty;

@@ -21,6 +21,7 @@
 #include "game/dungeon.h"     /* CP7: the interior sector */
 #include "game/feedback.h"    /* u2_feedback: the enhanced-mode announcement seam (E3) */
 #include "game/flash.h"       /* u2_flash_cell: the wound flash, both directions (E1) */
+#include "game/sound.h"       /* u2_sound_step, u2_sound_refusal: asm/5EC7 and asm/5C95 */
 #include "core/rng.h"         /* u2_rand_byte: asm/0BDB's damage randomiser */
 #include "game/status.h"
 #include "core/font.h"
@@ -1364,6 +1365,18 @@ static int step_charges(uint8_t stamp)
  * the second subtract never runs. */
 int u2_overworld_step_food(u2_ctx *ctx)
 {
+    /* The step thud belongs here, not at the caller, because the byte that makes
+     * it belongs to this dispatch: asm/2575 and asm/2590 are both arms of asm/253B
+     * and both call asm/5EC7, and the thud is measured on REFUSED steps exactly as
+     * it is on accepted ones — which is only possible if it sits ahead of the
+     * terrain verdict, in the same neighbourhood as the charge. Measured in
+     * captures/spice86/step-sound-20261117: six steps, two thumps each, and four
+     * refused steps, two thumps and then the buzz. The ship and rocket arms reach
+     * no drain and no thud has ever been heard from them, so they get none here
+     * rather than an invented one. */
+    if (step_charges(ctx->state.player_stamp) > 0)
+        u2_sound_step(ctx);
+
     for (int i = 0; i < step_charges(ctx->state.player_stamp); i++) {
         if (food_spend(ctx, U2_FOOD_PER_MOVE)) {
             u2_death(ctx);
@@ -2887,6 +2900,15 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             u2_tile_effect_ladder(ctx, ow, nx, ny);
 
             seam_str_out(ctx, U2_S_INVALID_MOVE);
+            /* The buzz, after the thumps and with the complaint, which is the order
+             * it was heard in: two 65k-cycle thumps then one 835k-cycle 932 Hz buzz
+             * (captures/spice86/step-sound-20261117). asm/0A15_invalid_move_to_cmd_done
+             * jumps to asm/0A30, and asm/0A30 is nothing but the call to the beep —
+             * so the sound is part of the refusal, not of the terrain. About twenty
+             * other refusal sites reach asm/0A30 the same way (no door, offer what,
+             * price too high, the vehicle refusals, the arms-refused attack); they are
+             * listed in docs/phase4-state.md and unwired until each is heard. */
+            u2_sound_refusal(ctx);
             seam_char_print(ctx, '\r');               /* the game's newline */
             seam_str_out(ctx, U2_S_CMD_PROMPT);
             /* The world still takes its turn. asm/0A02 (this complaint) falls through to

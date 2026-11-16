@@ -120,6 +120,13 @@ typedef struct u2_audio {
     const char *name;
     int  (*init)(u2_ctx *ctx);          /* optional */
     void (*tone)(u2_ctx *ctx, uint16_t divisor, uint32_t ms);
+    /* Optional: ms of silence, i.e. the speaker gate stays down. This exists
+     * because the original's step sound is TWO notes of asm/5D09's sequence 0
+     * about 120 ms apart, not one long one, and a backend that can only emit
+     * tone-after-tone would run them together into a single buzz. NULL means the
+     * backend has no way to be quiet on purpose, and the caller then plays the
+     * notes back to back. */
+    void (*silence)(u2_ctx *ctx, uint32_t ms);
     void (*shutdown)(u2_ctx *ctx);      /* optional */
 } u2_audio;
 

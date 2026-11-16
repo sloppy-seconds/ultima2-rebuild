@@ -100,6 +100,29 @@ static void sdl_audio_tone(u2_ctx *ctx, uint16_t divisor, uint32_t ms)
     a->tones++;
 }
 
+/* Silence, so two notes with a gap stay two notes. Same stream, same format,
+ * zero amplitude: the device plays the gap in real time while the engine's turn
+ * has already moved on, which is what makes the original's step sound — two
+ * thumps about 120 ms apart — reproducible without an animation clock. */
+static void sdl_audio_silence(u2_ctx *ctx, uint32_t ms)
+{
+    sdl_audio *a = ctx ? (sdl_audio *)ctx->be_audio : NULL;
+    if (!a || !a->open || ms == 0) return;
+
+    long total = (long)a->rate * (long)ms / 1000L;
+    if (total <= 0) return;
+    if (total > (long)a->rate * 5) total = (long)a->rate * 5;
+
+    int16_t *buf = calloc((size_t)total, sizeof(int16_t));
+    if (!buf) return;
+    if (!SDL_PutAudioStreamData(a->stream, buf, (int)(total * (long)sizeof(int16_t)))) {
+        free(buf);
+        return;
+    }
+    free(buf);
+    a->queued += total;
+}
+
 static void sdl_audio_shutdown(u2_ctx *ctx)
 {
     sdl_audio *a = ctx ? (sdl_audio *)ctx->be_audio : NULL;
@@ -116,6 +139,7 @@ const u2_audio u2_audio_sdl = {
     .name = "sdl",
     .init = sdl_audio_init,
     .tone = sdl_audio_tone,
+    .silence = sdl_audio_silence,
     .shutdown = sdl_audio_shutdown,
 };
 

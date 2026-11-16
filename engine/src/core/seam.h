@@ -60,6 +60,9 @@ uint8_t seam_rand_byte(u2_ctx *ctx);
 void seam_wait_ms(u2_ctx *ctx, uint32_t ms);
 /* seam: speaker_freq (asm/5CD2_speaker_freq.asm) — 8253 latch divisor. */
 void seam_tone(u2_ctx *ctx, uint16_t divisor, uint32_t ms);
+/* The gap between two tones: the speaker stays silent for ms. Backends without a
+ * silence seam answer NULL and the caller plays its notes back to back. */
+void seam_silence(u2_ctx *ctx, uint32_t ms);
 /* paint the grid to the active renderer (call at frame boundaries). */
 void seam_present(u2_ctx *ctx);
 /* Present the pixel framebuffer. Returns non-zero when the display asked to
