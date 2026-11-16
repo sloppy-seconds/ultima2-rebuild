@@ -253,6 +253,16 @@ typedef struct u2_ctx {
      * interesting one. */
     int dump_every;
     int dump_frames;        /* how many the renderer has written so far */
+    /* --start-at X,Y[,SECTOR]: stage the character at a position on the live state, which is
+     * what tools/u2_edit.py setpos does to a record on disk. It exists because --load-ds is
+     * applied from the overworld (overworld.c), so a checkpoint can only be resumed by a run
+     * that is already in the world -- and the only scripted way into the world was to walk
+     * there from the title, which no script can do. This is how a run gets placed beside a
+     * vehicle pad so it can press BOARD and reach its own space loop. */
+    int   start_at;
+    int   start_x;
+    int   start_y;
+    int   start_sector;     /* -1 = leave the sector the record carries */
     /* --debug cli: per-turn frame + state files. See debug/turnlog.h — this is the
      * answer to "how does an agent look at a game a person is playing right now",
      * which no combination of the startup dump flags can do. */

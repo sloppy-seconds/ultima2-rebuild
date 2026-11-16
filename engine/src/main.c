@@ -62,6 +62,13 @@ static void usage(const char *argv0)
         "                  exit. If the list has no x11 or wayland, the binary\n"
         "                  cannot open a window on any desktop.\n"
         "  --play-map      enter the overworld screen directly (CP4 development entry)\n"
+        "  --start-at X,Y[,SEC]\n"
+        "                  stage the character at a position on the live state, the live\n"
+        "                  equivalent of tools/u2_edit.py setpos. Implies --play-map. This\n"
+        "                  is how a scripted run gets placed beside a vehicle pad so it can\n"
+        "                  BOARD and reach the space loop on its own -- --load-ds cannot do\n"
+        "                  it, because that is applied from inside the overworld and so only\n"
+        "                  resumes a run already in the world.\n"
         "  --quit-on-death dev: stop at death instead of reloading the last save\n"
         "  --dev           development affordances only (Ctrl-Q ends the run). Off by\n"
         "                  default, and it never changes game behaviour: without it the\n"
@@ -455,6 +462,26 @@ int main(int argc, char **argv)
             }
             ctx.renderer_explicit = 1;
         } else if (strcmp(a, "--play-map") == 0) {
+            ctx.play_map = 1;
+        } else if (strcmp(a, "--start-at") == 0 && i + 1 < argc) {
+            /* X,Y or X,Y,SEC. Refuse a malformed argument rather than defaulting: a staging
+             * flag that silently ignored its own value would place the character somewhere
+             * plausible and every conclusion from the run would be about the wrong cell. */
+            int sx = -1, sy = -1, ss = -1;
+            const char *cs = argv[++i];
+            if (sscanf(cs, "%d,%d,%d", &sx, &sy, &ss) < 2 || sx < 0 || sx > 63
+                || sy < 0 || sy > 63) {
+                fprintf(stderr, "u2: --start-at wants X,Y or X,Y,SEC with 0..63, got '%s'\n", cs);
+                return 2;
+            }
+            if (ss < 0 || ss > 99) {
+                fprintf(stderr, "u2: --start-at sector must be 0..99, got %d\n", ss);
+                return 2;
+            }
+            ctx.start_at = 1;
+            ctx.start_x = sx;
+            ctx.start_y = sy;
+            ctx.start_sector = ss;
             ctx.play_map = 1;
         } else if (strcmp(a, "--quit-on-death") == 0) {
             /* Dev affordance for the scripted gates only. Death reloads the last save
@@ -1021,6 +1048,19 @@ int main(int argc, char **argv)
 
     if (ctx.play_map || map_dump_path)
         (void)u2_save_load(&ctx);
+
+    /* --start-at, applied to the loaded record rather than to the file: the point is to play
+     * a run from a chosen cell, and the sector override is what lets a script stand beside a
+     * rocket pad in a wilderness sector instead of wherever the save happens to be. */
+    if (ctx.start_at) {
+        ctx.state.sector_x = (uint8_t)ctx.start_x;
+        ctx.state.sector_y = (uint8_t)ctx.start_y;
+        if (ctx.start_sector >= 0) {
+            ctx.state.sector_first = (uint8_t)(ctx.start_sector / 10);
+            ctx.state.sector_second = (uint8_t)(ctx.start_sector % 10);
+        }
+        ctx.enter_world = 1;
+    }
 
     /* Parse the demo before a single backend is wired, so a file that cannot be
      * played is refused before anything has been opened or drawn. The refusal rules
