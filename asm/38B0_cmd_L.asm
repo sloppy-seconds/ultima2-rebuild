@@ -30,6 +30,26 @@
 #   governs the plane walked on the ground after landing. Whether the airborne loop should
 #   have any tile rule at all is now a byte-level no — it has none — but the owner's
 #   recollection is about the ground case and is consistent.
+#   OBSERVED 2026-11-16, owner-driven flight in the noVNC container with a ~5 Hz DS sampler
+#   (`captures/spice86/plane-flight-owner/`). Three things this file could not settle on its
+#   own, now settled:
+#     * **[DS:13] is a mount byte, not a flight flag.** It went 0x78 -> 0x26 on boarding and
+#       stayed 0x26 for 3.5 minutes after landing while the character stood still. So there is
+#       NO byte that distinguishes airborne from mounted-on-the-ground, and anything that needs
+#       to know must test behaviour: position advanced between two samples with no key sent.
+#     * **The heading pair is not a usable discriminator.** The initialisation above reads like
+#       a direction vector, and across a real flight DS:21/22 took 84 distinct values with
+#       DS:21 spanning 0x00..0xFF and DS:22 clustering 192..255 — not a heading — and it did NOT
+#       return to a ground value after landing. Note also that asm/0BDB_apply_hp_damage writes
+#       0x22, so this displacement is doing more than one job. Treat the launch initialisation
+#       as true and the pair as a field, not a flag.
+#     * **The loop ends at a sector change and does not restart.** Flying out of the town moved
+#       sector 41 -> 40 with [DS:13] still 0x26, and a second `L` was needed to fly again. So
+#       the loop is per-map, not per-flight-session, which fits the asm/243E sector-reload exit
+#       above but was not stated anywhere before.
+#   Still unconfirmed by observation: whether creatures move while airborne (the loop's callee
+#   list says no — map render, a discarded speed lookup, key poll — but nobody has flown past a
+#   creature), and the march-step cost, which the sampler bounded only from below at ~5 cells/s.
 #
 # ROCKET (0x3AD2). 'LAUNCH--ROCKET', then DS:E5 = items_held[15] = TRI-LITHIUM; without it
 #   'A METALLIC VOICE SAYS:' / 'SHIP INCAPABLE OF LAUNCH!' (note this metallic-voice line is

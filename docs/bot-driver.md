@@ -169,6 +169,7 @@ state the bot cannot earn by playing, which is a different thing and was conflat
 | G83, G87 | **reachable now** — `bot/launch.py --hyperwarp <world>` gets a live session into a warp, and both are breakpoint reads taken during it. |
 | G76 | a frame read by a human or a vision model. The bot can capture space frames but its `screen` rows come back empty there, because the space screen is glyphs. |
 | G75 | winning the game, which is goal-spec's whole problem, not this adapter's. |
+| **plane flight** | **The bot can board and walk a grounded plane; it cannot fly one, and the owner's flight session found out why there is no cheap fix.** `DS:13` is a mount byte — `0x26` for airborne and landed alike, observed staying `0x26` for 3.5 minutes after a landing while stationary — and the heading pair `DS:21/22` turned out not to be a heading at all (84 distinct values in one flight, no return to a ground value). So **no byte says "airborne"** and a bot must infer it: position advanced between two samples with no key sent. Flight is also free-running, faster than 5 cells/s, so the step-confirm loop the bot uses for everything else does not apply; steering needs a loop that observes and corrects while the plane keeps moving. See `captures/spice86/plane-flight-owner/`. |
 
 **The row above originally said G83 and G87 needed a launch and nothing could reach one. That
 is no longer true.** `bot/launch.py` seeds a character beside a rocket pad, walks onto it,
