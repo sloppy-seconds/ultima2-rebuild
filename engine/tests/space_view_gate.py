@@ -212,23 +212,36 @@ if dm_loop:
 # the slot is not a delay anyway -- and either one turns a warp into a single frame. So the
 # counts and the present-before-wait ordering are both asserted, and the control in
 # space_check_selftest.sh deletes one phase to prove this leg can go red.
-wm = re.search(r"static void space_warp_phase\(.*?\n\}\n", src, re.S)
-check(wm is not None, "space_warp_phase found in commands.c")
+# The warp is driven by the sweep, not by five flat phases. The phase counts this leg used to
+# assert (128, 128, 63, 126, 64) were read off asm/6DFD's loop bounds and turned out not to be
+# what the animation is: DS:4C7 sweeps 128->1, holds at 0 for 128 frames, holds at 1, climbs
+# 2->126 step 2, holds at 128 (G90, captures/spice86/g90-warp-table/full-sweep.txt). What the
+# frame TIME is made of is unchanged and still worth guarding: asm/0711's slot value is dropped
+# at every lookup, so the rate was the cost of drawing, and a deleted wait or a folded driver
+# turns a warp into one frame. The control in space_check_selftest.sh deletes the sweep walk.
+wm = re.search(r"static void space_warp_frame\(.*?\n\}\n", src, re.S)
+check(wm is not None, "space_warp_frame found in commands.c")
 if wm:
     wbody = re.sub(r"/\*.*?\*/", "", wm.group(0), flags=re.S)
     i_p = wbody.find("seam_present_frame")
     i_w = wbody.find("seam_wait_ms(ctx, U2_WARP_FRAME_MS)")
     check(-1 < i_p < i_w,
           "each warp frame presents before it waits (an un-presented loop draws frames nobody sees)")
-for fn, want in (("space_warp_field", [128, 128, 63]),
-                 ("space_warp_engage", [126, 64])):
-    m = re.search(r"void " + fn + r"\(u2_ctx \*ctx, u2_overworld \*ow\)\s*\{(.*?)\n\}\n",
-                  src, re.S)
-    check(m is not None, f"{fn} found in commands.c")
-    if m:
-        got = [int(x) for x in re.findall(r"space_warp_phase\(ctx, ow,\s*(\d+)", m.group(1))]
-        check(got == want,
-              f"{fn} runs {got} frames; asm/6DFD's counters are {want}")
+    check("u2_space_warp_sweep(frame)" in wbody,
+          "the warp frame is driven by the sweep, not by a phase counter")
+
+# The sweep's own shape, asserted against the measurement rather than remembered.
+view_c = read(VIEW_C)
+legs = {"U2_SWEEP_DESCEND": 192, "U2_SWEEP_ZERO": 128, "U2_SWEEP_ONE": 128,
+        "U2_SWEEP_ASCEND": 63, "U2_SWEEP_TOP_HOLD": 81}
+for name, want in legs.items():
+    m = re.search(r"#define\s+" + name + r"\s+(\d+)", read(VIEW_H))
+    check(m is not None and int(m.group(1)) == want,
+          f"{name} is {want} (measured in full-sweep.txt), got "
+          f"{m.group(1) if m else 'absent'}")
+check("U2_SWEEP_DESCEND + U2_SWEEP_ZERO" in src,
+      "the warp driver splits its two calls at the end of the accumulate window, which is "
+      "where asm/6DFD's PREPARE line falls")
 
 # ---- leg 9: the warp trail ----------------------------------------------------------
 # The streaks. asm/6B3D's mode byte decides whether the previous frame survives:
@@ -250,8 +263,16 @@ if m:
           "warp a shimmer instead of streaks, which is the original's whole visual")
     check("warp_frame" in body,
           "the warp field grows its star radii with warp_frame (a static field cannot trail)")
-check(re.search(r"space_paint_mode\(ctx, ow, mode,\s*i,\s*mode == 0\)", src) is not None,
-      "the warp keeps the previous frame exactly when the mode is 0, as asm/6B3D does")
+check(re.search(r"space_paint_mode\(ctx, ow, 1,\s*frame,\s*sw\.accumulate\)", src) is not None,
+      "the warp keeps the previous frame exactly when the sweep says accumulate, which is "
+      "exactly when DS:4C7 is 0")
+swf = re.search(r"u2_warp_sweep u2_space_warp_sweep\(int frame\)\s*\{(.*?)\n\}", view_c, re.S)
+check(swf is not None, "u2_space_warp_sweep found in space_view.c")
+if swf:
+    body = swf.group(1)
+    check(body.count("accumulate = 1") == 1,
+          "exactly one leg accumulates — the zero window is 128 frames, not several")
+    check("s.value = 0" in body, "that leg is the value-0 leg, as the erase gate requires")
 for fld in ("warp_frame", "keep_frame"):
     check(re.search(r"int\s+" + fld + r"\s*;", read(VIEW_H)) is not None,
           f"u2_space_scene carries {fld}")
@@ -267,8 +288,8 @@ for fld in ("warp_frame", "keep_frame"):
 # The control that matters is the sign flip. Deleting the tone entirely is obvious enough that
 # nobody would ship it; getting phase B's increment wrong is a one-character edit that sounds
 # merely odd, and nothing else would notice.
-tone = re.search(r"static void space_warp_phase\(.*?\n\}", src, re.S)
-check(tone is not None, "space_warp_phase found")
+tone = re.search(r"static void space_warp_frame\(.*?\n\}", src, re.S)
+check(tone is not None, "space_warp_frame found")
 if tone:
     body = tone.group(0)
     check("seam_tone" in body,
@@ -279,12 +300,15 @@ if tone:
     check("U2_WARP_TONE_STARS" in body and "64" in src,
           "the divisor advances per star (64 a frame), not per frame")
     check("U2_WARP_TONE_SLOW" in body,
-          "the mode >= 2 arm is rate-limited, as asm/7242's reload does")
-for phase, sign in (("128, 0, 0", -1), ("128, 1, 0", 1)):
-    check(re.search(r"space_warp_phase\(ctx, ow, " + re.escape(phase) + r", "
-                    + ("-1" if sign < 0 else r"\+1") + r"\)", src) is not None,
-          "phase %s passes tone increment %+d — asm/6DFD flips the increment between A and B"
-          % ("A" if sign < 0 else "B", sign))
+          "the rate-limited arm is present, as asm/7242's reload does")
+    # The sign flip is the fact worth guarding, and it is now derived rather than passed in:
+    # asm/6DFD seeds the step at -1 and flips it to +1 partway, and the flip point is not
+    # separately evidenced, so the engine derives direction from the sweep itself.
+    check("u2_space_warp_sweep(frame + 1).value > sw.value" in body,
+          "the tone direction follows the sweep's own direction — asm/6DFD flips the "
+          "increment partway through the warp, and a fixed sign is the regression")
+    check("+ U2_WARP_TONE_STARS" in body and "- U2_WARP_TONE_STARS" in body,
+          "the divisor both rises and falls; a one-directional tone is the old bug")
 
 # ---- leg 6: the space text pane -----------------------------------------------------
 # Owner playtest 2026-11-10, two symptoms: the hyperwarp target prompt never appeared, and

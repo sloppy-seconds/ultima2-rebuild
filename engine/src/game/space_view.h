@@ -139,11 +139,42 @@ typedef struct u2_space_scene {
  * Returns the number of stars that moved. */
 int u2_space_warp_advance(uint8_t *sx, uint8_t *sy, int n, int ship_x, int ship_y);
 
-/* Fill a warp field with `n` starting positions from `seed`. The original's tables are
- * seeded somewhere in the space-entry path and no capture has read that, so the
- * distribution is the engine's; what matters for the animation is only that the field
- * spans the view and is stable across the warp, both of which this gives. */
+/* Fill a warp field with `n` starting positions from `seed`. The original's initialiser is
+ * asm/6D3E: 64 entries, x from one random byte, y from a second masked `and $0x7f`. The
+ * distribution here is still the engine's own hash rather than the game's RNG — the values
+ * are not recoverable — but the SHAPE is the original's, and the 0x7f mask in particular is
+ * load-bearing: it is what keeps every y bucket inside the eight-entry y table. */
 void u2_space_warp_seed(uint8_t *sx, uint8_t *sy, int n, uint32_t seed);
+
+/* One frame of the warp's sweep counter, as measured on the original (G90, closed
+ * 2026-11-16, captures/spice86/g90-warp-table/full-sweep.txt). asm/6B3D gates the erase of
+ * each star's old pixel on this byte being non-zero:
+ *
+ *       mov 0x4c7,%al ; or %al,%al ; je L_006e14      ; zero -> do not erase
+ *
+ * so the frames where `value` is 0 are exactly the frames that ACCUMULATE, and that window
+ * is what draws the streaks. Measured shape over ~600 frames:
+ *
+ *   descend   128 -> 1   ~192 frames
+ *   hold      0          128 frames     <- accumulate: erase skipped every star, every frame
+ *   hold      1          128 frames
+ *   ascend    2,4,..,126  63 frames     (step +2)
+ *   hold      128        ~81 frames
+ *
+ * The leg lengths and the zero-window length are measured. The descend rate is fitted: the
+ * leg is ~192 frames for 127 decrements, which is not an integer, so `value` is interpolated
+ * rather than stepped and that approximation is labelled rather than hidden.
+ *
+ * Out of range it returns the final hold, so a caller that walks past the end settles. */
+#define U2_SWEEP_DESCEND   192      /* 128 -> 1 */
+#define U2_SWEEP_ZERO      128      /* held at 0: the accumulate window */
+#define U2_SWEEP_ONE       128      /* held at 1 */
+#define U2_SWEEP_ASCEND     63      /* 2,4,...,126 */
+#define U2_SWEEP_TOP_HOLD   81      /* held at 128 */
+
+typedef struct { int value; int accumulate; } u2_warp_sweep;
+u2_warp_sweep u2_space_warp_sweep(int frame);
+int u2_space_warp_sweep_frames(void);
 
 /* Build the scene from live state. Pure: reads, allocates nothing, draws nothing. */
 void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out);

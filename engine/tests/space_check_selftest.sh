@@ -81,16 +81,16 @@ else
 fi
 
 total=$((total+1))
-grep -v 'space_warp_phase(ctx, ow, 128, 0, 0' src/game/commands.c > "$WORK/commands_nowarp.c"
-if [ "$(wc -l < "$WORK/commands_nowarp.c")" -ge "$(wc -l < src/game/commands.c)" ]; then
+sed 's/u2_space_warp_sweep(frame)/u2_space_warp_sweep(0)/' src/game/commands.c > "$WORK/commands_nowarp.c"
+if cmp -s "$WORK/commands_nowarp.c" src/game/commands.c; then
     echo "  BAD   the nowarp mutant is identical to the source — it proves nothing"
     fails=$((fails+1))
 elif U2_DIVE_GATE_SRC="$WORK/commands_nowarp.c" python3 tests/space_view_gate.py \
         >/dev/null 2>&1; then
-    echo "  BAD   a dropped warp phase was not caught — the warp-count leg cannot fail"
+    echo "  BAD   a frozen sweep was not caught — the sweep-driven leg cannot fail"
     fails=$((fails+1))
 else
-    echo "  ok    dropped warp phase caught by space_view_gate (counts are bytes)"
+    echo "  ok    frozen sweep caught by space_view_gate (the frame must read the sweep)"
 fi
 
 # The trail. An unconditional u2_frame_clear is what a renderer does by default, and deleting
@@ -128,14 +128,14 @@ else
 fi
 
 total=$((total+1))
-sed 's/space_warp_phase(ctx, ow, 128, 1, 0, +1)/space_warp_phase(ctx, ow, 128, 1, 0, -1)/' \
+sed 's/int rising = u2_space_warp_sweep(frame + 1).value > sw.value;/int rising = 1;/' \
     src/game/commands.c > "$WORK/cmd_signflip.c"
 if cmp -s "$WORK/cmd_signflip.c" src/game/commands.c; then
     echo "  BAD   the sign-flip mutant is identical to the source — it proves nothing"
     fails=$((fails+1))
 elif U2_DIVE_GATE_SRC="$WORK/cmd_signflip.c" python3 tests/space_view_gate.py \
         >/dev/null 2>&1; then
-    echo "  BAD   the phase-B sign flip was not caught — the tone leg cannot fail"
+    echo "  BAD   an always-rising tone was not caught — the tone-direction leg cannot fail"
     fails=$((fails+1))
 else
     echo "  ok    phase-B increment flip caught by space_view_gate (asm/6DFD flips it to +1)"

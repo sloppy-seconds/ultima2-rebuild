@@ -113,6 +113,43 @@ void u2_space_warp_seed(uint8_t *sx, uint8_t *sy, int n, uint32_t seed)
     }
 }
 
+/* Leg boundaries live in the header: the warp driver splits its two calls at the end of
+ * the accumulate window and so needs U2_SWEEP_DESCEND and U2_SWEEP_ZERO too. */
+
+int u2_space_warp_sweep_frames(void)
+{
+    return U2_SWEEP_DESCEND + U2_SWEEP_ZERO + U2_SWEEP_ONE
+         + U2_SWEEP_ASCEND + U2_SWEEP_TOP_HOLD;
+}
+
+u2_warp_sweep u2_space_warp_sweep(int frame)
+{
+    u2_warp_sweep s;
+    if (frame < 0) frame = 0;
+
+    if (frame < U2_SWEEP_DESCEND) {
+        /* 127 decrements spread over 192 frames. Interpolated, so the value is monotone
+         * and lands exactly on 1 at the end of the leg; the original's own cadence inside
+         * this leg is not recoverable from what was sampled. */
+        s.value = 128 - (frame * 127) / U2_SWEEP_DESCEND;
+        s.accumulate = 0;
+    } else if (frame < U2_SWEEP_DESCEND + U2_SWEEP_ZERO) {
+        s.value = 0;
+        s.accumulate = 1;          /* asm/6B3D skips the erase here: this is the trail */
+    } else if (frame < U2_SWEEP_DESCEND + U2_SWEEP_ZERO + U2_SWEEP_ONE) {
+        s.value = 1;
+        s.accumulate = 0;
+    } else if (frame < U2_SWEEP_DESCEND + U2_SWEEP_ZERO + U2_SWEEP_ONE + U2_SWEEP_ASCEND) {
+        int f = frame - (U2_SWEEP_DESCEND + U2_SWEEP_ZERO + U2_SWEEP_ONE);
+        s.value = 2 * (f + 1);
+        s.accumulate = 0;
+    } else {
+        s.value = 128;
+        s.accumulate = 0;
+    }
+    return s;
+}
+
 int u2_space_warp_advance(uint8_t *sx, uint8_t *sy, int n, int ship_x, int ship_y)
 {
     /* asm/6B3D's four arms. The stores are NOT all gated the same way, and that asymmetry

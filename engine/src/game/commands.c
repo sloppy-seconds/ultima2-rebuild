@@ -1443,18 +1443,16 @@ static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
     sc.warping = warping;
     sc.warp_frame = warp_frame;
     sc.keep_frame = keep_frame;
-    /* NOT wired to ow->warp_x / warp_y yet, but the reason is now a to-do rather than a
-     * mystery. G90 closed 2026-11-16 (captures/spice86/g90-warp-table/): DS:4C7 is a sweep
-     * counter — 128->0, hold at 1 for 128 frames, 2->128 step 2, hold at 128 — and the
-     * erase is skipped exactly while it sits at 0. That 128-frame no-erase window is the
-     * streak field: 128 frames x 64 stars plotted with nothing erased, which measures as
-     * 3892 distinct dots on the original's screen at the warp's peak.
+    /* The sweep drives `keep_frame` above: asm/6B3D gates the erase of each star's own old
+     * pixel on DS:4C7 being non-zero, and that byte sweeps 128->1, holds at 0 for 128
+     * frames, holds at 1, climbs 2->126 step 2, holds at 128. The 128-frame zero window is
+     * the streak field — 128 frames x 64 stars plotted with nothing erased, which measures
+     * as 3892 distinct dots on the original at the warp's peak. G90,
+     * captures/spice86/g90-warp-table/.
      *
-     * So the engine's `keep_frame` is currently true for the wrong window. The fix is
-     * ordinary implementation, not another capture: drive the sweep, hold the frame while
-     * its value is 0, and let the up-sweep eat the streaks the way the original's does.
-     * The step rule itself is byte-verified and unit-tested (CP0, warp_step_check); what
-     * is not yet done is feeding it through this paint path with the sweep as its clock.
+     * `sc.warp_x` / `sc.warp_y` are left NULL on purpose. The stateful field they point at
+     * is seeded and stepped, but the step rule still strands stars, so drawing through it
+     * is worse than the hash field. See space_warp_frame.
      */
     u2_space_scene_draw(&ow->frame, &sc);
 
@@ -1535,56 +1533,68 @@ static void space_paint(u2_ctx *ctx, u2_overworld *ow)
 #define U2_WARP_TONE_SLOW   0xE0    /* asm/7242's reload on the space path */
 
 /* tone_mode: -1 phase A (divisor falling), +1 phase B (rising), 0 the mode >= 2 arm. */
-static void space_warp_phase(u2_ctx *ctx, u2_overworld *ow, int frames, int mode, int step,
-                             int tone_mode)
+/* One frame of the warp: advance the field, paint it, sound the tone.
+ *
+ * The sweep is the clock. asm/6B3D gates the erase of each star's own old pixel on DS:4C7
+ * being non-zero, so the frames where the sweep sits at 0 plot without erasing and the
+ * field accumulates into streaks; every other frame erases and plots, which is clean
+ * motion. That replaces the old five flat phases, which were a reading of asm/6DFD's loop
+ * bounds and did not correspond to what the byte actually does (G90). */
+static void space_warp_frame(u2_ctx *ctx, u2_overworld *ow, int frame)
 {
-    uint16_t divisor = U2_WARP_TONE_SEED;
-    unsigned slow = 0;
+    u2_warp_sweep sw = u2_space_warp_sweep(frame);
 
-    for (int i = 0; i < frames; i++) {
-        if (ctx->exit_code || ctx->input_exhausted)
-            return;          /* a closed window must not cost 509 more frames */
-        /* The trail rule, straight off asm/6B3D: `mov 0x4c7,%al ; or %al,%al ; je
-         * L_006e14` skips the erase of the star's old position when the mode is zero, and
-         * nothing in asm/6DFD clears the screen, so mode 0 ACCUMULATES and the accumulated
-         * result is a line along each ray. Any other mode erases the star's own old pixel
-         * and shows one clean dot; the engine reaches that same picture by clearing.
-         *
-         * Where that is a coarser approximation than the original: asm/6B3D erases per
-         * STAR, so the trail phase A leaves is eaten dot by dot as phase B runs, whereas
-         * this wipes the whole frame on B's first frame. The streaks are the same and the
-         * way they go away is not. Recorded rather than left silent, because it is the
-         * kind of thing that reads as a bug and is in fact the known gap. */
-        space_paint_mode(ctx, ow, mode, i, mode == 0);
+    /* The sweep is the clock and the accumulate window is now the measured one. What is
+     * deliberately NOT here is u2_space_warp_advance(): the decoded step rule is
+     * byte-verified and unit-tested, but it still strands stars (warp_step_check carries a
+     * characterization test that pins the freeze at frame 251 and goes red when someone
+     * fixes it), and rendering through it produces a near-empty screen — measured 31 white
+     * px against the original's ~6200 at the same point. So the hash field draws the stars
+     * and the sweep decides when the frame is kept. */
+    space_paint_mode(ctx, ow, 1, frame, sw.accumulate);
 
-        /* One latch per frame rather than 64. The original writes the PIT 64 times a frame
-         * and each write overwrites the last, so what the speaker can reach is the frame's
-         * final divisor; emitting once is the same audible result without 64 syscalls. */
-        if (tone_mode) {
-            divisor = (uint16_t)(divisor + (uint16_t)(tone_mode * U2_WARP_TONE_STARS));
-            seam_tone(ctx, divisor, U2_WARP_FRAME_MS);
-        } else if (++slow >= U2_WARP_TONE_SLOW / U2_WARP_TONE_STARS) {
-            slow = 0;
-            seam_tone(ctx, divisor, U2_WARP_FRAME_MS);
-        }
-
-        seam_present_frame(ctx);
-        seam_wait_ms(ctx, U2_WARP_FRAME_MS);
-        mode += step;
+    /* The tone follows the sweep's direction rather than a phase number: asm/6DFD seeds
+     * the divisor's step at -1 and flips it to +1 partway through, and the point it flips
+     * is not separately evidenced, so deriving it from the sweep is the honest version of
+     * "falling while the field closes, rising while it opens". */
+    int rising = u2_space_warp_sweep(frame + 1).value > sw.value;
+    static uint16_t divisor;
+    static unsigned slow;
+    if (frame == 0) { divisor = U2_WARP_TONE_SEED; slow = 0; }
+    if (rising >= 0) {
+        divisor = (uint16_t)(divisor + U2_WARP_TONE_STARS);
+        seam_tone(ctx, divisor, U2_WARP_FRAME_MS);
+    } else if (++slow >= U2_WARP_TONE_SLOW / U2_WARP_TONE_STARS) {
+        slow = 0;
+        seam_tone(ctx, divisor, U2_WARP_FRAME_MS);
+    } else {
+        divisor = (uint16_t)(divisor - U2_WARP_TONE_STARS);
     }
+
+    seam_present_frame(ctx);
+    seam_wait_ms(ctx, U2_WARP_FRAME_MS);
 }
+
+/* Frames the first call owns: the descend and the accumulate window. The rest falls to
+ * space_warp_engage, which asm/6DFD reaches only after the PREPARE line. */
+#define U2_WARP_FIELD_FRAMES  (U2_SWEEP_DESCEND + U2_SWEEP_ZERO)
 
 void space_warp_field(u2_ctx *ctx, u2_overworld *ow)
 {
-    space_warp_phase(ctx, ow, 128, 0, 0, -1);     /* A: seed 0x2200, falling */
-    space_warp_phase(ctx, ow, 128, 1, 0, +1);     /* B: increment flips, rising */
-    space_warp_phase(ctx, ow,  63, 2, 2, 0);      /* C: mode >= 2, rate-limited */
+    for (int f = 0; f < U2_WARP_FIELD_FRAMES; f++) {
+        if (ctx->exit_code || ctx->input_exhausted)
+            return;          /* a closed window must not cost 600 more frames */
+        space_warp_frame(ctx, ow, f);
+    }
 }
 
 void space_warp_engage(u2_ctx *ctx, u2_overworld *ow)
 {
-    space_warp_phase(ctx, ow, 126, 0x80, -1, 0);  /* D: mode >= 2 throughout */
-    space_warp_phase(ctx, ow,  64, 2, 0, 0);      /* E: mode >= 2 */
+    for (int f = U2_WARP_FIELD_FRAMES; f < u2_space_warp_sweep_frames(); f++) {
+        if (ctx->exit_code || ctx->input_exhausted)
+            return;
+        space_warp_frame(ctx, ow, f);
+    }
 }
 
 static void space_loop(u2_ctx *ctx, u2_overworld *ow)
