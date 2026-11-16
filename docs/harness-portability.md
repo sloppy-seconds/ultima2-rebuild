@@ -1728,7 +1728,19 @@ Newest first. One line per learning; the detail stays in the owning document.
   routine would have surfaced it. So: implement from bytes, unit-test against bytes, then run
   the whole animation and look at the result before wiring it into what a player sees — and
   when the whole-run result is worse, keep the tested rule and leave it unwired, with the
-  reason next to the code that declines to call it. → Tier 2, harness contract.
+  reason next to the code that declines to call it.
+- **A launcher that picks a free port and a client that hardcodes the default is a silent
+  cross-talk bug, not a cosmetic one.** If the launcher records what it chose somewhere the
+  client never reads, then whenever the default is already taken the client connects to a
+  different process and reports results about it as if they were about the one it meant to
+  drive. Nothing errors: a key sent to the wrong emulator and a key the right emulator
+  ignored look identical from the caller's side, and a screenshot of the wrong session is a
+  perfectly good screenshot of a real screen. So a harness with a port allocator needs one
+  resolver that every client goes through, precedence explicit-flag over environment over
+  recorded-session over default, and the resolver should say which it used — a silent
+  fallback to a default is the same failure wearing a different hat. The control that proves
+  it works is starting a session on deliberately non-default ports and showing the defaults
+  are closed while the tools still succeed. → Tier 2, harness contract.
 
 ---
 

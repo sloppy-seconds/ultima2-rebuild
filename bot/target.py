@@ -147,7 +147,15 @@ class Spice86Target(Target):
 
     name = "original"
 
-    def __init__(self, http_port=20180, mcp_port=20181, ds_seg=DS_SEG, ds_len=DS_LEN):
+    def __init__(self, http_port=None, mcp_port=None, ds_seg=DS_SEG, ds_len=DS_LEN):
+        # Ports default to whatever the live session recorded, not to 20180/20181. A bot
+        # that quietly talked to a stale emulator on the default ports would diff two
+        # processes it believed were one.
+        if http_port is None or mcp_port is None:
+            import sys
+            sys.path.insert(0, os.path.join(REPO, "tools"))
+            import s86_ports
+            http_port, mcp_port = s86_ports.resolve_pair(http_port, mcp_port)
         self.http_port = http_port
         self.mcp_port = mcp_port
         self.ds_seg = ds_seg

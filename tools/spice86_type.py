@@ -58,9 +58,21 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 HTTP = 20180
 MCP = 20181
+
+
+def _ports(a):
+    """Fill in any port the caller did not name, from the live session's record.
+
+    Hardcoding 20180/20181 here meant that a second session started while a stale one held
+    the defaults talked silently to the wrong emulator. s86_ports reads what
+    tools/spice86_start.sh actually chose; the defaults survive as the last resort."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import s86_ports
+    a.http_port, a.mcp_port = s86_ports.resolve_pair(a.http_port, a.mcp_port)
 DS = 0x08BE                      # proven in docs/spice86-capture.md
 BDA = 0x0040
 OFF_HEAD = 0x001A
@@ -299,8 +311,10 @@ def parse_addr(spec, allow_len):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument('--http-port', type=int, default=HTTP)
-    ap.add_argument('--mcp-port', type=int, default=MCP)
+    ap.add_argument('--http-port', type=int, default=None,
+                    help='default: the live session\'s recorded port (see tools/s86_ports.py)')
+    ap.add_argument('--mcp-port', type=int, default=None,
+                    help='default: the live session\'s recorded port (see tools/s86_ports.py)')
     ap.add_argument('--peek', action='append', metavar='SEG:OFF[:LEN]',
                     help='read memory (hex addr), repeatable; works without the MCP port')
     ap.add_argument('--poke', action='append', metavar='SEG:OFF=HEX',
@@ -321,6 +335,7 @@ def main():
     ap.add_argument('--list', action='store_true', help='list MCP tools and exit')
     ap.add_argument('--probe', action='store_true', help='show state, write nothing')
     a = ap.parse_args()
+    _ports(a)
 
     # Resolving a key must be checkable without a running emulator, or the modifier table is
     # the kind of code that is only ever exercised by the one capture it was written for.

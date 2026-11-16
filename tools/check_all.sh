@@ -121,6 +121,7 @@ run "warp_step selftest" engine/tests/warp_step_selftest.sh -- bash engine/tests
 # conventions are pinned against externally checkable values (Ctrl-Z = 0x1A is the DOS EOF
 # byte; Ctrl-S/Ctrl-Q are XOFF/XON).
 run "spice86_type selftest" tools/spice86_type.py -- python3 tools/spice86_type.py --selftest
+run "s86_ports selftest" tools/s86_ports.py -- python3 tools/s86_ports.py --selftest
 # The two-target bot adapter: one DS decoder (the engine's), two executables, and an
 # undeliverable key that refuses instead of pretending the game ignored it. Needs no
 # emulator, which is what makes it gateable — the live proof is bot/play_original.py.

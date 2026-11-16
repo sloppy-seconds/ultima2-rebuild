@@ -79,9 +79,13 @@ def read_video_state(client):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('out', nargs='?', help='path to write the PNG to')
-    ap.add_argument('--mcp-port', type=int, default=MCP)
+    ap.add_argument('--mcp-port', type=int, default=None,
+                    help="default: the live session's recorded port (see tools/s86_ports.py)")
     ap.add_argument('--list-tools', action='store_true')
     a = ap.parse_args()
+    if a.mcp_port is None:
+        import s86_ports          # sys.path already carries tools/ from the header
+        a.mcp_port = s86_ports.resolve("mcp")
 
     c = Mcp(a.mcp_port)
     c.open()
