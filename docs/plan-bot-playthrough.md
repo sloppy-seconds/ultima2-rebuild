@@ -40,6 +40,13 @@ Stated first because two of the three hard-sounding requirements are already loo
 | --- | --- | --- |
 | Moongate cells and destinations, all five eras | `tools/census.py --what gate` | **measured** (`asm/26B7`+`26C3`+`26C6`, cells at exe `0x2998`) |
 | Vehicle pads: sector, x, y, `gate_value` per mode | `tools/census.py --what vehicle` | **observed** |
+
+The bot reads these as **data** — `disasm/census/*.tsv` via `bot/census.py`, not by shelling out to
+`tools/census.py`. The TSVs are committed and `--check-fresh` regenerates and diffs them, so the
+file is the reviewed artefact; a CLI query re-runs the generator instead, which means a bot could
+pass against a table the committed tree does not have, and it couples the bot to a stdout format
+nothing guards. `bot/census.py` also checks each file's declared row count, so a truncated table
+raises instead of reading as a small table.
 | Place name → sector | `docs/place-index.md`, `tools/place_index.py` | byte-derived |
 | Rocket **launch**, end to end, proven against the original | `bot/launch.py` | demonstrated (reached Mars) |
 | Bot can see the grid, the tile under foot, and whether an attack can land | `bot/target.py` `read_grid` / `tile_at` / `targets` | gated |

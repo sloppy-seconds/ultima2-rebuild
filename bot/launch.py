@@ -10,7 +10,7 @@ position, DS:12, DS:13 and DS:14 are byte-identical between the pad and orbit.
 Why this unlocks more than it looks like. G43, G49, G77, G83 and G87 are all "be in a vehicle
 and observe something", and none of them could be driven because nothing could reach a
 vehicle. The recipe is the one w6-orbit-dive proved, with the pad coordinates read from
-`tools/census.py` rather than copied, because a hardcoded (38,3) silently becomes a lie the
+`disasm/census/*.tsv` rather than copied, because a hardcoded (38,3) silently becomes a lie the
 day the map table is regenerated.
 
 The session is left running on purpose. G83 (what a frame of the star field costs) and G87
@@ -31,6 +31,7 @@ import time
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "bot"))
 from target import make                                    # noqa: E402
+import census                                              # noqa: E402
 
 PRISTINE = os.path.join(REPO, "references", "ultima2", "player")
 
@@ -48,16 +49,11 @@ def rocket_pad():
     a proven pad rather than a plausible one -- the census lists both and says nothing about
     which one a character can actually reach and board.
     """
-    r = run(["python3", "tools/census.py", "--what", "vehicle", "--where", "what=rocket"])
-    if r.returncode != 0:
-        raise SystemExit("census failed: " + r.stderr.strip()[:200])
-    lines = [l.split("\t") for l in r.stdout.strip().splitlines()]
-    hdr = lines[0]
-    pads = [dict(zip(hdr, row)) for row in lines[1:]]
-    pads = [d for d in pads if d["layer"] == "mapx"]
+    pads = [d for d in census.ints("vehicle", "x", "y", "sector") if d["layer"] == "mapx"
+            and d["what"] == "rocket"]
     if not pads:
         raise SystemExit("census found no rocket tile on the mapx layer")
-    pad = next((d for d in pads if d["sector"] == "41"), pads[0])
+    pad = next((d for d in pads if d["sector"] == 41), pads[0])
     return int(pad["sector"]), int(pad["x"]), int(pad["y"])
 
 
@@ -92,13 +88,7 @@ def world_triple(name):
     or the ship lands in deep space. So there is no approximate answer to type, and guessing a
     triple is not a slightly-wrong input but a different outcome.
     """
-    r = run(["python3", "tools/census.py", "--what", "world"])
-    if r.returncode != 0:
-        raise SystemExit("census failed: " + r.stderr.strip()[:200])
-    lines = [l.split("\t") for l in r.stdout.strip().splitlines()]
-    hdr = lines[0]
-    for row in lines[1:]:
-        d = dict(zip(hdr, row))
+    for d in census.ints("world", "xeno", "yako", "zebo"):
         if d["name"].upper() == name.upper() and d["xeno"]:
             return int(d["xeno"]), int(d["yako"]), int(d["zebo"])
     raise SystemExit("no hyperjump triple known for %r" % name)

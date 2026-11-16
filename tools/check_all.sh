@@ -130,6 +130,7 @@ run "bot target adapter" bot/target_check.py -- python3 bot/target_check.py
 run "bot policy rule" bot/policy.py -- python3 bot/policy.py
 run "bot passmap (engine answers passability)" bot/passmap_check.py -- python3 bot/passmap_check.py
 run "bot nav (search only, no rules)" bot/nav.py -- python3 bot/nav.py
+run "bot census loader" bot/census.py -- python3 bot/census.py
 # The mode discriminator against the corpus, not just against itself. mode_check.c (CP0)
 # proves the rule is self-consistent; these prove it is TRUE of the original. The ordering
 # bug it caught — a dungeon's staging pair is also all-0xFF, so eighteen dungeon frames read
