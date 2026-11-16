@@ -245,12 +245,18 @@ if __name__ == "__main__":
     import sys
 
     ap = argparse.ArgumentParser(description="arm and validate the reject trap")
-    ap.add_argument("--http-port", type=int, default=20180)
-    ap.add_argument("--gdb-port", type=int, default=20190)
+    ap.add_argument("--http-port", type=int, default=None,
+                    help="default: the live session's recorded port (see tools/s86_ports.py)")
+    ap.add_argument("--gdb-port", type=int, default=None,
+                    help="default: the live session's recorded port (see tools/s86_ports.py)")
     ap.add_argument("--selftest", action="store_true",
                     help="prove the trap mechanism fires, using the address the "
                          "CPU is already executing. Skips cleanly with no emulator.")
     a = ap.parse_args()
+    if a.http_port is None or a.gdb_port is None:
+        import s86_ports          # sys.path carries tools/ when run as tools/<name>.py
+        a.http_port = s86_ports.resolve("http", a.http_port)
+        a.gdb_port = s86_ports.resolve("gdb", a.gdb_port)
 
     if not a.selftest:
         print("nothing to do offline; use --selftest against a live run "

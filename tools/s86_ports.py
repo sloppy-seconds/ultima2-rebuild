@@ -9,10 +9,13 @@ different process, and nothing would have said so — a dropped key and a key se
 else look identical from the caller's side.
 
 Precedence, highest first:
-  1. an explicit --http-port / --mcp-port on the command line
-  2. U2V2_HTTP_PORT / U2V2_MCP_PORT in the environment
-  3. S86_HTTP_PORT / S86_MCP_PORT in the session state file
-  4. 20180 / 20181
+  1. an explicit --http-port / --mcp-port / --gdb-port on the command line
+  2. U2V2_HTTP_PORT / U2V2_MCP_PORT / U2V2_GDB_PORT in the environment
+  3. S86_HTTP_PORT / S86_MCP_PORT / S86_GDB_PORT in the session state file
+  4. 20180 / 20181 / 20190
+
+The GDB port is included because bp_read.py needs it and it is allocated the same way, so
+the same stale-session trap applies to breakpoints as to keys and screenshots.
 
 The state file is read fresh on every call rather than cached at import, because a tool that
 resolved once at import would keep the pre-session default for the life of the process.
@@ -27,9 +30,11 @@ from pathlib import Path
 
 DEFAULT_HTTP = 20180
 DEFAULT_MCP = 20181
+DEFAULT_GDB = 20190
 
-_KEYS = {"http": ("S86_HTTP_PORT", "U2V2_HTTP_PORT"),
-         "mcp": ("S86_MCP_PORT", "U2V2_MCP_PORT")}
+_KEYS = {"http": ("S86_HTTP_PORT", "U2V2_HTTP_PORT", DEFAULT_HTTP),
+         "mcp": ("S86_MCP_PORT", "U2V2_MCP_PORT", DEFAULT_MCP),
+         "gdb": ("S86_GDB_PORT", "U2V2_GDB_PORT", DEFAULT_GDB)}
 
 
 def root() -> Path:
@@ -63,8 +68,11 @@ def resolve(which: str, explicit: int | None = None) -> int:
     """One port. `explicit` is a value the caller got from its own --*-port flag."""
     if explicit is not None:
         return explicit
-    default = DEFAULT_HTTP if which == "http" else DEFAULT_MCP
-    return _from_env(which) or _from_state(which) or default
+    if which not in _KEYS:
+        # Refusing is the whole point: a typo'd `which` that quietly returned 20180 is the
+        # same silent-wrong-emulator failure this module exists to remove.
+        raise KeyError(f"unknown port kind {which!r}; expected one of {sorted(_KEYS)}")
+    return _from_env(which) or _from_state(which) or _KEYS[which][2]
 
 
 def resolve_pair(explicit_http: int | None = None,
@@ -77,6 +85,8 @@ def describe(which: str, explicit: int | None = None) -> str:
     emulator gets talked to politely."""
     if explicit is not None:
         return "command line"
+    if which not in _KEYS:
+        raise KeyError(f"unknown port kind {which!r}; expected one of {sorted(_KEYS)}")
     if _from_env(which):
         return _KEYS[which][1]
     if _from_state(which):
@@ -123,6 +133,22 @@ def _selftest() -> int:
     check(resolve("http") in (DEFAULT_HTTP, _from_state("http")), "http resolves")
     check(describe("http", 1234) == "command line", "describe explicit")
 
+    # gdb is a real kind, not a typo that silently returns the http default
+    check(resolve("gdb", 5555) == 5555, "gdb honours explicit")
+    check(_KEYS["gdb"][2] == 20190, "gdb default is 20190")
+    try:
+        resolve("htp")
+        check(False, "an unknown port kind must raise, not fall back to a default")
+    except KeyError:
+        pass
+
+    # and the state file's own gdb key parses, since that is what a live session writes
+    with tempfile.TemporaryDirectory() as td:
+        p = Path(td) / ".spice86-session.env"
+        p.write_text("S86_GDB_PORT=20197\n")
+        m = re.search(r"^S86_GDB_PORT=(\d+)\s*$", p.read_text(), re.MULTILINE)
+        check(m and m.group(1) == "20197", "state file gdb port parses")
+
     print(f"s86_ports selftest: {checks} checks, {fails} failed")
     return 1 if fails else 0
 
@@ -131,4 +157,5 @@ if __name__ == "__main__":
     if "--selftest" in sys.argv:
         sys.exit(_selftest())
     h, m = resolve_pair()
-    print(f"http={h} ({describe('http')})  mcp={m} ({describe('mcp')})")
+    print(f"http={h} ({describe('http')})  mcp={m} ({describe('mcp')})  "
+          f"gdb={resolve('gdb')} ({describe('gdb')})")

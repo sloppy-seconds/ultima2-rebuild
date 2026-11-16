@@ -60,11 +60,15 @@ def sector_match(grid, maps):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("port", nargs="?", type=int, default=20180)
+    ap.add_argument("port", nargs="?", type=int, default=None,
+                    help="default: the live session's recorded port (see tools/s86_ports.py)")
     ap.add_argument("--out", default="/var/tmp/dungeon-cap")
     ap.add_argument("--hz", type=float, default=20.0)
     ap.add_argument("--seconds", type=float, default=600.0)
     a = ap.parse_args()
+    if a.port is None:
+        import s86_ports          # sys.path carries tools/ when run as tools/<name>.py
+        a.port = s86_ports.resolve("http")
 
     out = pathlib.Path(a.out)
     out.mkdir(parents=True, exist_ok=True)

@@ -234,6 +234,9 @@ s86_state_write "$PID" "$PGID" "$RUN_DIR" "$DUMP_DIR" "$LABEL" "$HTTP_PORT" "$MC
 
 if s86_wait_api "$HTTP_PORT" 90; then
     echo "HTTP API ready: http://127.0.0.1:$HTTP_PORT/api"
+    # Say where the ports live, because the read tools resolve from this file and a reader
+    # who assumes 20180 will silently talk to whatever is squatting on it.
+    echo "ports recorded in $(s86_state_file) -- read tools resolve them via tools/s86_ports.py"
     curl -fsS --max-time 5 "http://127.0.0.1:$HTTP_PORT/api/status" || true
     echo
 else

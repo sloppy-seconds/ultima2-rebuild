@@ -334,7 +334,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--http-port', type=int, default=None,
                     help='default: the live session\'s recorded port (see tools/s86_ports.py)')
-    ap.add_argument('--gdb-port', type=int, default=20190)
+    ap.add_argument('--gdb-port', type=int, default=None,
+                    help='default: the live session\'s recorded port (see tools/s86_ports.py)')
     ap.add_argument('--ip', help='runtime offset (hex) to stop at, e.g. 17B7')
     ap.add_argument('--cs', type=lambda x: int(x, 16), default=CS_DEFAULT,
                     help='code segment (hex), default 17D')
@@ -377,9 +378,10 @@ def main() -> int:
     ap.add_argument('--selftest', action='store_true',
                     help='positive and negative control against a live run')
     a = ap.parse_args()
-    if a.http_port is None:
+    if a.http_port is None or a.gdb_port is None:
         import s86_ports          # sys.path already carries tools/ from the header
-        a.http_port = s86_ports.resolve("http")
+        a.http_port = s86_ports.resolve("http", a.http_port)
+        a.gdb_port = s86_ports.resolve("gdb", a.gdb_port)
 
     ranges = parse_ranges(a.dump)
     post_ranges = parse_ranges(a.post_dump)

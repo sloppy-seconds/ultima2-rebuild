@@ -157,6 +157,32 @@ tools/spice86_stop.sh               # dumpAll -> teardown -> harvest to captures
 One session at a time, deliberately: the state file is singular and two emulators
 fighting over the same ports is the failure mode this avoids.
 
+### Which port a tool talks to
+
+`spice86_start.sh` picks the **first free port at or above 20180** and records what it chose
+in `tmp/.spice86-session.env` as `S86_HTTP_PORT` / `S86_MCP_PORT` / `S86_GDB_PORT`. It is
+not always 20180 — a stale session squatting on the defaults pushes the new one up.
+
+Every read tool resolves through `tools/s86_ports.py` rather than assuming, so the answer is
+the same one the launcher wrote:
+
+```bash
+python3 tools/s86_ports.py                  # http=20180 (tmp/.spice86-session.env) ...
+python3 tools/s86_ports.py --selftest       # precedence and parsing checks
+```
+
+Precedence, highest first: an explicit `--http-port` / `--mcp-port` / `--gdb-port`, then
+`U2V2_HTTP_PORT` / `U2V2_MCP_PORT` / `U2V2_GDB_PORT` in the environment, then the session
+state file, then 20180 / 20181 / 20190. `describe()` says which one answered, and that is
+the point of printing it: **a silent fallback to a default is how the wrong emulator gets
+talked to politely.** A key sent to the wrong session and a key the right session ignored
+look identical from the caller's side, and a screenshot of the wrong session is a perfectly
+good screenshot of a real screen. Nothing errors; the measurement is just about a different
+process.
+
+This is why the tools take `None` as the default and resolve after parsing rather than
+hardcoding 20180 in the `add_argument` call.
+
 ### What the script actually runs
 
 ```bash

@@ -60,13 +60,17 @@ def render(vga):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("port", nargs="?", type=int, default=20180)
+    ap.add_argument("port", nargs="?", type=int, default=None,
+                    help="default: the live session's recorded port (see tools/s86_ports.py)")
     ap.add_argument("--out", default="/var/tmp/u2-vga")
     ap.add_argument("--hz", type=float, default=120.0)
     ap.add_argument("--max-frames", type=int, default=6000)
     ap.add_argument("--seconds", type=float, default=0.0,
                     help="stop after this many seconds (0 = run until Ctrl-C)")
     args = ap.parse_args()
+    if args.port is None:
+        import s86_ports          # sys.path carries tools/ when run as tools/<name>.py
+        args.port = s86_ports.resolve("http")
 
     out = pathlib.Path(args.out)
     (out / "frames").mkdir(parents=True, exist_ok=True)

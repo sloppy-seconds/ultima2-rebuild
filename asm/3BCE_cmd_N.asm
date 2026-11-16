@@ -1,7 +1,7 @@
 # cmd_N — command handler 'N': prints "NEGATE TIME" then falls through
 # func 3BCE..3BDC  len 015 B  evidence: seed+reko (jump table cs:0730 entry N)
 # provenance: live:cmd-nr-live, static
-#           entry executed in 2 of 272 harvests; derived by tools/provenance_from_traces.py
+#           entry executed in 2 of 273 harvests; derived by tools/provenance_from_traces.py
 #           (first execution on record 2026-10-29, captures/spice86/cmd-nr-live; before that this
 #           was the one command letter never seen running in any harvest)
 # confidence: high (message literal; fallthrough into next fragment)

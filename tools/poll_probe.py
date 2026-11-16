@@ -59,7 +59,11 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
         print((__doc__ or "").strip())
         return 0
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 20180
+    if len(sys.argv) > 1 and sys.argv[1].isdigit():
+        port = int(sys.argv[1])
+    else:
+        import s86_ports          # sys.path carries tools/ when run as tools/<name>.py
+        port = s86_ports.resolve("http")
     rates = [3, 5, 8, 12, 20, 30, 40, 60]
     print(f"probing memory API on port {port}, {SIG_LEN}-byte reads")
     print(f"{'rate':>6} {'ok':>5} {'p50 ms':>8} {'max ms':>8} {'errs':>5}")

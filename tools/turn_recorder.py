@@ -93,12 +93,16 @@ def decompose(delta):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("port", nargs="?", type=int, default=20180)
+    ap.add_argument("port", nargs="?", type=int, default=None,
+                    help="default: the live session's recorded port (see tools/s86_ports.py)")
     ap.add_argument("--out", default="/var/tmp/u2-turns")
     ap.add_argument("--hz", type=float, default=50.0)
     ap.add_argument("--limit", type=int, default=4000,
                     help="stop after this many recorded turns")
     args = ap.parse_args()
+    if args.port is None:
+        import s86_ports          # sys.path carries tools/ when run as tools/<name>.py
+        args.port = s86_ports.resolve("http")
 
     out = pathlib.Path(args.out)
     (out / "turns").mkdir(parents=True, exist_ok=True)
