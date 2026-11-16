@@ -21,6 +21,25 @@ int u2_key_from_token(const char *tok, u2_key *k)
         k->ch = 0xFF;                 /* sentinel: "no key this poll" */
         return 1;
     }
+    /* Arrows are not bytes, and naming the byte is a trap. The original translates them
+     * through a scancode table at CS:0x4F09, so the engine carries a scancode alongside the
+     * key exactly as input_sdl.c does for a real keyboard. Writing 0x0e in a script does NOT
+     * press Up: seam_key_poll deliberately swallows 0x05/0x0E/0x17 because asm/4F58..4F60
+     * does, so the byte form is a key the game is written to discard. That is how this gap
+     * was found -- a script that appeared to move nobody. */
+    static const struct { const char *name; int ch; int scan; } arrows[] = {
+        { "UP",    U2_KEY_UP,    0x48 },
+        { "DOWN",  U2_KEY_DOWN,  0x50 },
+        { "LEFT",  U2_KEY_LEFT,  0x4B },
+        { "RIGHT", U2_KEY_RIGHT, 0x4D },
+    };
+    for (size_t j = 0; j < sizeof arrows / sizeof arrows[0]; j++) {
+        if (strcasecmp(tok, arrows[j].name) == 0) {
+            k->ch   = (uint8_t)arrows[j].ch;
+            k->scan = (uint8_t)arrows[j].scan;
+            return 1;
+        }
+    }
     for (size_t j = 0; j < sizeof table / sizeof table[0]; j++) {
         if (strcasecmp(tok, table[j].name) == 0) {
             k->ch = (uint8_t)table[j].ch;

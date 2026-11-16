@@ -12,8 +12,12 @@
  * Accepted forms, exactly the ones input_script.c has always accepted:
  *   A               a single printable character
  *   SP CR LF TAB ESC BS NUL DEL
+ *   UP DOWN LEFT RIGHT   the arrows, as arrows (scancode carried, not a control byte)
  *   0x41            explicit byte
  *   WAIT            "no key this poll" (ch = 0xFF sentinel)
+ *
+ * Arrows are named, not spelled as bytes: asm/4F58..4F60 makes the game discard three of the
+ * four direction control bytes, so 0x0e is not Up, it is a key the game throws away.
  */
 
 #include "core/ctx.h"
