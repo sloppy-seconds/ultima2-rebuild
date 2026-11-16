@@ -80,11 +80,28 @@ int main(void)
           "and that cycle is the ~26 s aiming window G63 quotes (got %d s)",
           256 * U2_DIVE_STEP_MS / 1000);
 
-    /* ---- 4. the two pace constants are ONE borrowed figure, not two ------------- */
-    CHECK(U2_DIVE_STEP_MS == U2_PLANE_STEP_MS,
-          "the dive and plane pace figures are the same borrowed number (%d vs %d) — if "
-          "they are now different, one was measured and this note is stale",
-          U2_DIVE_STEP_MS, U2_PLANE_STEP_MS);
+    /* ---- 4. the plane figure is now MEASURED, so the two are decoupled ---------- */
+    /* This check used to assert the two were the same borrowed number, and its own message
+     * said what would break it: "if they are now different, one was measured and this note is
+     * stale". That happened on 2026-11-16, so the equality is gone and what replaces it pins
+     * the measurement instead. See captures/spice86/plane-flight-owner/ for the run. */
+    CHECK(U2_PLANE_STEP_MS != U2_DIVE_STEP_MS,
+          "the plane figure has been measured and must no longer equal the borrowed dive "
+          "figure (%d vs %d)", U2_DIVE_STEP_MS, U2_PLANE_STEP_MS);
+    /* Recomputed from the raw counts, not remembered: 49 single-cell steps in 4000 ms at
+     * ~1350 Hz, three runs, identical. ms per step = 4000/49 = 81.63, rounded up to 82. */
+    CHECK(4000 / 49 == 81,
+          "4000 ms over 49 steps is 81 whole ms (got %d)", 4000 / 49);
+    CHECK(U2_PLANE_STEP_MS == 82,
+          "the measured plane step is 81.63 ms rounded up, so the constant must be 82 "
+          "(got %d)", U2_PLANE_STEP_MS);
+    /* The static prediction was that the plane costs MORE per step than the dive, because it
+     * calls asm/60C7 and an arrow dispatch per iteration. Measurement says less. Pinning the
+     * direction keeps a future edit from quietly re-borrowing the bigger number. */
+    CHECK(U2_PLANE_STEP_MS < U2_DIVE_STEP_MS,
+          "measured plane step (%d ms) is below the dive step (%d ms), which is the "
+          "prediction G77 made being refuted — re-measure before changing this",
+          U2_PLANE_STEP_MS, U2_DIVE_STEP_MS);
 
     /* ---- 5. the figure is a lower bound, and the file says so ------------------- */
     /* 492,074 cycles / 4.77 MHz = 103.2 ms. Recomputed here rather than remembered, so a

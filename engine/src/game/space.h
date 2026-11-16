@@ -140,7 +140,23 @@ void u2_space_descent_step(uint8_t *x, uint8_t *y);
  * Pinned by tests/dive_pace_check.c, which recomputes the division and fails if the
  * constant and its derivation part company. */
 #define U2_DIVE_STEP_MS 103
-#define U2_PLANE_STEP_MS 103
+
+/* The plane's own march step, MEASURED 2026-11-16, so this is no longer the borrowed dive
+ * figure. Headless Spice86 at the project's standard `--cycles 3000`, bot boarded a plane in
+ * sector 41, launched, and `DS:00/01` was polled at ~1350 Hz for 4.00 s: 49 single-cell steps,
+ * 0 seam crossings, 0 sector-change jumps, 5335 unchanged samples. Three runs, 49 steps each,
+ * zero spread at this resolution. 49 / 4.00 s = 12.3 cells/s = 82 ms per step.
+ *
+ * Basis warning, because the two numbers are NOT directly comparable. The dive's 103 ms is
+ * 492,074 emulated cycles divided by the nominal 4.77 MHz. This one is wall-clock in the
+ * emulator converted at the configured 3000 cycles/ms, i.e. ~246,000 cycles per step. That is
+ * LESS than the dive's figure, which refutes the static prediction in G77 that the plane loop
+ * "must cost more" because it calls asm/60C7 and an arrow-key dispatch per iteration. Bytes
+ * over reasoning: the prediction was wrong.
+ *
+ * Still a lower bound for the same reason the dive is: Spice86 counts CPU cycles and models no
+ * 8088 bus wait states, so real hardware spent more wall-clock time per cycle. */
+#define U2_PLANE_STEP_MS 82
 
 /* The hyperwarp's per-frame delay, in milliseconds. INVENTED, and named so one line
  * replaces it: docs/needs-gameplay.md G83 is the cycle sample that would retire it.

@@ -1072,7 +1072,9 @@ static u2_cmd_result launch_plane(u2_ctx *ctx, u2_overworld *ow)
          * is, paced only by seam_present_frame on the empty-poll branch (~16 ms, vsync).
          * Placed after the draw and before the next poll, which is where the original's
          * render sits: `3cd6 call L_005cb1 ; 3cd9 jmp 3c5f` back to the top of the loop.
-         * See U2_PLANE_STEP_MS for why the figure is borrowed and what closes that. */
+         * U2_PLANE_STEP_MS is now the measured march rate (49 steps in 4.00 s at ~1350 Hz,
+         * three runs, zero spread); see its definition in space.h for the basis warning and
+         * why it sits below the dive figure. */
         seam_wait_ms(ctx, U2_PLANE_STEP_MS);
     }
 

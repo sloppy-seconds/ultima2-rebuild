@@ -49,7 +49,15 @@
 #       above but was not stated anywhere before.
 #   Still unconfirmed by observation: whether creatures move while airborne (the loop's callee
 #   list says no — map render, a discarded speed lookup, key poll — but nobody has flown past a
-#   creature), and the march-step cost, which the sampler bounded only from below at ~5 cells/s.
+#   creature).
+#   The march-step cost is now MEASURED, not bounded from below. A bot boarded a plane in
+#   sector 41, launched, and `DS:00/01` was polled at ~1350 Hz for 4.00 s: 49 single-cell steps,
+#   0 seam crossings, 0 sector-change jumps, three runs, zero spread. 82 ms per step at the
+#   emulator's configured 3000 cycles/ms, i.e. ~246,000 cycles — about HALF the rocket dive's
+#   492,074, so the reasoning that this loop "must cost more" because it calls `L_0060c7` and an
+#   arrow dispatch per iteration was refuted by the measurement. `U2_PLANE_STEP_MS` is now this
+#   figure; it is still a lower bound, because no 8088 bus wait states are modelled. See
+#   `captures/spice86/plane-flight-owner/`.
 #
 # ROCKET (0x3AD2). 'LAUNCH--ROCKET', then DS:E5 = items_held[15] = TRI-LITHIUM; without it
 #   'A METALLIC VOICE SAYS:' / 'SHIP INCAPABLE OF LAUNCH!' (note this metallic-voice line is

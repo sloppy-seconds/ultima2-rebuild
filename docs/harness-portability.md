@@ -2136,3 +2136,18 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   addresses. Record which claims rest on a breakpoint and which rest on an observed state
   change, and do not let the former borrow confidence from the latter. → Tier 1, tooling that
   fails loudly.
+- **A rate measured by two reads around a sleep is not a rate.** A vehicle's flight speed was
+  first reported as 12 cells/s from `pos()`, `sleep(2.0)`, `pos()`, and a Manhattan distance.
+  Three things were wrong and none of them produced an error: the game masks both coordinates
+  `& 0x3F`, so a wrap makes the distance fiction; a sector change reloads the position, so a
+  jump can be a map transition and not motion at all; and the two reads bracket more than the
+  sleep, so the elapsed time is not what was divided by. The fix is not a better formula but a
+  different instrument: poll at the maximum practical rate (the emulator's memory API sustained
+  ~1350 Hz, not the 5 Hz a hand-written sampler defaults to), and count only transitions that
+  are single-cell steps within one sector, labelling wraps, jumps and unchanged samples
+  separately instead of folding them into a distance. That turned an unverifiable "12" into 49
+  steps in 4.00 s with 0 jumps and 0 wraps, three runs, zero spread — and it replaced a shipped
+  constant that was 25% off. The owner's instinct that 12 cells/s "seems too fast even for a
+  human player" is what sent it back to be measured; the number survived and the method did
+  not, which is the good outcome. A plausible figure nobody questions is the dangerous one. →
+  Tier 1, tooling that fails loudly.
