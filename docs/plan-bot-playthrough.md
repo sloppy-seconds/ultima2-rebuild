@@ -1,6 +1,14 @@
 # Plan — a bot that plays from character creation to winning
 
-Status: **plan only, nothing built.** Owner framing 2026-11-16: the bot does not need to fly a
+Status: **TABLED by the owner 2026-11-16**, after M1 shipped. Not abandoned — parked. If this is
+picked up, `M1 is done` below is the resume point and M2 is next; do not re-derive M1.
+
+What exists already: `bot/census.py` (census as data, not CLI), `bot/nav.py` (BFS, search only),
+`bot/policy.py` (the P8 rule), `bot/passmap_check.py`, `u2 --ds-json BLOB --passmap`,
+`u2_grid_passable`, and the observation's `targets` field. All gated in `check_all`.
+
+Status of the build: **M1 done, M2–M8 not started.** The layers below are a plan except where a
+milestone is marked done. Owner framing 2026-11-16: the bot does not need to fly a
 plane, but it does need to fly a rocket (landing is expected to be the hard part), probably use a
 boat, navigate the time doors, and know what to do from the start of the game to the win. A
 walkthrough supplies checkpoints where the current goal changes. **Fighter build first, so magic
