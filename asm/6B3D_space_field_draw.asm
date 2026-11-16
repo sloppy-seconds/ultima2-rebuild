@@ -55,10 +55,34 @@
 # renamed 2026-11-15 from sub_6b3d. The mode byte, the two tables and the erase-before-plot
 #           were read out of the body directly; the star count agreeing with the frame
 #           measurement is the corroboration that makes the table reading more than a guess.
-#           What is STILL not decoded: the per-star position algorithm (the cs:0x6cac delta
-#           table is read but its construction is not), and what the tone actually sounds
-#           like — the divisor reaches asm/5CD2_speaker_freq through a value computed in
-#           asm/7242 from a masked timer read, and no capture has sampled it.
+#           What is STILL not decoded: what the tone actually sounds like — the divisor
+#           reaches asm/5CD2_speaker_freq through a value computed in asm/7242 from a masked
+#           timer read, and no capture has sampled it.
+#
+#           **The cs:0x6cac table, decoded 2026-11-16 by a live CS read.** It is not in the
+#           file image: `original/ultimaii.exe` at `0x6cac` and at `0x6cac-0x200` both land
+#           mid-instruction, and so do the two known CS data words `cs:0x6990` and `cs:0x6998`,
+#           which is what proves the CS data area here has no file backing rather than proving
+#           the offset is wrong. Read live at `CS:0x6cac` (CS=0x17D, so linear 0x0847C) it is
+#           `01 02 03 ... 10` then `01 02 ... 08` and then code resumes — **16 entries, value
+#           = index + 1**. The mapping was pinned by two independent checks in the same read:
+#           `cs:0x6990` came back `00 22` = 0x2200, the exact seed `asm/6DFD` writes, and
+#           `cs:0x6998` came back `0xFF`, the value `asm/6B3D` itself compares against. The
+#           bytes are identical at the title screen and in orbit, so the table is static.
+#           The index is not a star number. Both sites build `%di` the same way — `xor $0xff,%al`
+#           then four `clc; rcr $1,%al` then `mov $0x0,%ah; mov %ax,%di` — which is
+#           `di = (x ^ 0xff) >> 4`, the high nibble of the complemented star x, so `di` is
+#           0..15 and the table is exactly wide enough. And the value is not a motion delta
+#           either: the two sites are `sbb` against `0x4c3` with a `cmc; jb` test, and `adc`
+#           against the same `0x4c3` with the sum stored to `0x4c5`. So it is a **per-x-bucket
+#           threshold and offset against a global counter at DS:4C3** — a stagger, and the
+#           mechanism by which only part of the field updates on a given pass, which is what
+#           makes the original's rays read as sparse dots rather than solid lines.
+#           The consequence for the new x is direct: `L_006e1c` stores `0x4c5` into the table,
+#           and `0x4c5` is `DS:4C3 + table[di]`. New x is a global counter plus a bucket
+#           offset. It is **not** a vector away from the ship, so this table does not by itself
+#           explain a radial field, and the y path at `L_006da0` and the derivation of `0x4c3`
+#           and `0x4c6` are still open.
 # confidence: medium-high for the mode byte and the tables; **measured-static for the >= 2
 #           branch** (it is a divider into the speaker, not art); low for the audible result
 # provenance: static — the mode byte, the two tables and the erase-before-plot were read out of

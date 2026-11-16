@@ -1686,7 +1686,24 @@ Newest first. One line per learning; the detail stays in the owning document.
   in the worklist which state stays unexercised in the shipped artifact. Separately, and
   it produced a false "still running" during verification: a job backgrounded by a
   non-interactive shell inherits SIGINT as ignored, so signal-handling tests need
-  `setsid` or they measure the harness. → Tier 2, harness contract.
+  `setsid` or they measure the harness.
+- **Three independent addresses landing on code is a fact about the segment, not three wrong
+  offsets.** When a project's own prose says a value lives at displacement X, and reading the
+  file at X and at X plus the known skew both land mid-instruction, the instinct is to keep
+  hunting for the right skew. The cheaper test is to read the same two or three displacements
+  from **live memory** and check them against values the program is known to write. Two of them
+  agreeing exactly, a seed constant and a selector byte, both with known writers, retires the
+  skew question in one read and establishes the real finding: that region has no file backing
+  and is constructed at run time. A derived constant that is only reachable live changes what a
+  reconstruction can claim about itself, which is worth recording in its own right.
+- **A gap entry's stated reason for mattering is a claim, and it propagates until someone tests
+  it.** A worklist item was filed saying a particular table "is the difference between" two
+  visible behaviours, and the next session went to read the table because that framing made the
+  read sound settled. The table was a stagger gate, a per-bucket threshold against a global
+  counter, and had nothing to do with the geometry. The read was still worth doing and closed
+  the item, but the premise was wrong and would have sent an implementer to code a fix against a
+  mechanism that does not exist. State a gap's importance as a hypothesis with the check that
+  would falsify it, not as background. → Tier 2, harness contract.
 
 ---
 
