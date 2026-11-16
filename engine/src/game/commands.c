@@ -1443,16 +1443,23 @@ static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
     sc.warping = warping;
     sc.warp_frame = warp_frame;
     sc.keep_frame = keep_frame;
-    /* NOT wired to ow->warp_x / warp_y, and that is deliberate. u2_space_warp_advance()
-     * implements asm/6B3D's step rule exactly as the bytes describe it and is unit-tested
-     * (CP0, warp_step_check), but running it for 509 frames drives the field to the two
-     * x edges and leaves the middle empty: a star that overflows past 255 is skipped, so
-     * it sits at its last valid position and stops moving, and after a few hundred frames
-     * almost every star has migrated out and frozen. The original at the same point in the
-     * warp is still populated across the whole view, so something re-seeds or wraps the
-     * tables and that has not been found. Rendering through the decoded rule therefore
-     * makes the screen WORSE, not better, and the hash field stays in charge until the
-     * missing piece is identified. See G89. */
+    /* NOT wired to ow->warp_x / warp_y, and that is deliberate — twice over now.
+     *
+     * The first attempt drained the field to the x edges; that was fixed by noticing two
+     * of the four stores are unconditional (see u2_space_warp_advance). The corrected rule
+     * still does not reproduce the original, and the reason is now measured rather than
+     * guessed: **DS:4C7 is not a mode selector, it is a countdown from 128.** Read at
+     * asm/6B3D entry across 120 consecutive frames of a live warp it goes 128, 128, 124,
+     * 117, 110 ... 26, 19, monotonically non-increasing, about -1 per frame. So the
+     * `or %al,%al` / `je` that skips the erase fires only on the very last frame, and the
+     * `cmp $0x2` that the engine reads as "mode >= 2" is a countdown test, true for
+     * essentially the whole warp. Everything built on "mode 0 = accumulate, mode 1 = erase"
+     * — including this function's own trail model — is standing on a misread.
+     *
+     * The hash field stays in charge until DS:4C7's real role is settled. See G90.
+     * The step rule itself is kept and unit-tested because the four store arms are
+     * byte-verified; what is not settled is when a star is erased and when it is left.
+     */
     u2_space_scene_draw(&ow->frame, &sc);
 
     /* The field clear takes the WHOLE frame -- u2_frame_clear memsets every row, not

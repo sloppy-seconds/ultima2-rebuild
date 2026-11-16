@@ -58,47 +58,79 @@ int main(void)
     CHECK(step_x(91, 100) == 90,   "left d=9: expected step 1, got %d", 91 - step_x(91, 100));
     CHECK(step_x(36, 100) == 32,   "left d=64: expected step 4, got %d", 36 - step_x(36, 100));
 
-    /* --- the two skips ----------------------------------------------------------- */
-    /* Add arm overflows past 255: `jae` is not taken and the star is left alone. */
-    CHECK(step_x(250, 100) == 250, "overflow must skip, got %d", step_x(250, 100));
-    /* Subtract arm underflows: old < step, so `cmc; jb` falls to the skip. */
-    CHECK(step_x(1, 200) == 1,     "underflow must skip, got %d", step_x(1, 200));
+    /* --- the two stores that WRAP and the two that refuse ------------------------ */
+    /* x add arm stores BEFORE its branch (L_006d98 then jae), so x wraps and is kept.
+     * This is the single fact that makes the original's field grow across a warp instead
+     * of draining: a star at 250 with step 10 lands at 4, not stuck at 250. */
+    CHECK(step_x(250, 100) == 4,   "x add arm must wrap (250+10 -> 4), got %d", step_x(250, 100));
+    /* x subtract arm stores AFTER its branch (jb L_006d79 then mov), so an underflow is
+     * refused and the star stays put. */
+    CHECK(step_x(1, 200) == 1,     "x sub arm must refuse an underflow, got %d", step_x(1, 200));
     /* Exactly on the boundary: ship=200, old=12 gives di = (200-12-1)>>4 = 11 and step 12,
      * so old == step and the star lands on 0 rather than being skipped. old=11 gives the
      * same step 12 but 11 < 12, so that one IS skipped. The pair is what pins the `jb`. */
     CHECK(step_x(12, 200) == 0,     "old == step must reach 0, got %d", step_x(12, 200));
     CHECK(step_x(11, 200) == 11,    "old == step-1 must skip, got %d", step_x(11, 200));
 
-    /* --- the y table is only eight deep ------------------------------------------ */
-    /* y distance 8 -> di 0 -> step 1, settled by the live read. */
+    /* --- y: the mirror image, gated on the SIGN instead of the carry ------------- */
+    /* y add arm: adc then `jns` before the store, so a result at or past 0x80 is refused. */
     {
-        uint8_t sx[1] = { 100 }, sy[1] = { 108 };
+        uint8_t sx[1] = { 100 }, sy[1] = { 127 };
         u2_space_warp_advance(sx, sy, 1, 100, 100);
-        CHECK(sy[0] == 109, "y d=8: expected 108 -> 109, got %d", sy[0]);
+        /* di = (127-100)>>4 = 1, step 2, so 127+2 = 129 which is >= 0x80 -> refused. */
+        CHECK(sy[0] == 127, "y add arm must refuse >= 0x80, got %d", sy[0]);
     }
-    /* y distance 190 -> di = 11, past the end of the table. Left alone, NOT stepped by a
-     * byte lifted out of the program's own instructions. This is the half of G89 that is
-     * still open, and the test pins the refusal so a later session cannot quietly guess.
-     * (The first version of this case used a distance of 200 measured the wrong way, which
-     * wrapped to bucket 3 and so asserted nothing at all; the selftest caught it.) */
     {
-        uint8_t sx[1] = { 100 }, sy[1] = { 200 };
-        u2_space_warp_advance(sx, sy, 1, 100, 10);
-        CHECK(sy[0] == 200, "y bucket >= 8 must be left alone, got %d", sy[0]);
+        uint8_t sx[1] = { 100 }, sy[1] = { 125 };
+        u2_space_warp_advance(sx, sy, 1, 100, 100);
+        /* di = 1, step 2 -> 127, still under 0x80, so this one moves. */
+        CHECK(sy[0] == 127, "y add arm below 0x80 must move, got %d", sy[0]);
+    }
+    /* y sub arm: the store sits before the `jns`, so it wraps and is kept. */
+    {
+        uint8_t sx[1] = { 100 }, sy[1] = { 1 };
+        u2_space_warp_advance(sx, sy, 1, 100, 100);
+        /* di = (100-1-1)>>4 = 6, step 7, so 1-7 wraps to 250 */
+        CHECK(sy[0] == 250, "y sub arm must wrap (1-7 -> 250), got %d", sy[0]);
+    }
+    /* The y table is eight deep and that is enough, because asm/6D3E seeds every y with
+     * `rand & 0x7f` and the ship sits at 0x40, so no y distance reaches bucket 8. A field
+     * seeded the way the original seeds it therefore never runs off the table. */
+    {
+        uint8_t sx[64], sy[64];
+        u2_space_warp_seed(sx, sy, 64, 7u);
+        int maxy = 0;
+        for (int i = 0; i < 64; i++) if (sy[i] > maxy) maxy = sy[i];
+        CHECK(maxy <= 0x7f, "seeded y must stay under 0x80 (asm/6D3E masks it), got %d", maxy);
     }
 
-    /* --- the field stays inside a byte ------------------------------------------- */
+    /* --- a CHARACTERIZATION test, pinning a known divergence --------------------- */
+    /* This one asserts something the model gets WRONG, on purpose.
+     *
+     * Measured on the original (captures/spice86/g90-warp-table/): the live star table
+     * stays full-range across ~300 of the warp's ~509 frames and the screen's white-pixel
+     * count climbs from ~77 to ~6200 and back. This model does not: after 250 frames every
+     * star has fallen into the sub-arm's refuse case and the field is frozen. That is why
+     * the rule is implemented and tested but NOT wired into the renderer.
+     *
+     * Pinning the freeze rather than leaving it unasserted is deliberate: it goes red the
+     * moment someone fixes the model, which forces them to look at G90 and update this
+     * comment instead of shipping a half-fix that looks finished. If this fails, the
+     * divergence is closed — delete this block and wire the field in space_paint_mode(). */
     {
         uint8_t sx[64], sy[64];
         u2_space_warp_seed(sx, sy, 64, 12345u);
-        for (int f = 0; f < 509; f++)
+        for (int f = 0; f < 250; f++)
             u2_space_warp_advance(sx, sy, 64, 128, 64);
-        int spread = 0;
-        for (int i = 1; i < 64; i++) {
-            int d = (int)sx[i] - (int)sx[i - 1];
-            spread += d < 0 ? -d : d;
-        }
-        CHECK(spread > 0, "509 frames must not collapse the field to one point");
+        uint8_t px[64], py[64];
+        memcpy(px, sx, 64); memcpy(py, sy, 64);
+        u2_space_warp_advance(sx, sy, 64, 128, 64);
+        int moved = 0;
+        for (int i = 0; i < 64; i++) if (sx[i] != px[i] || sy[i] != py[i]) moved++;
+        CHECK(moved == 0,
+              "KNOWN DIVERGENCE (G90): the model freezes by frame 251 but the original "
+              "does not; if this now moves, wire the field in and delete this check (moved=%d)",
+              moved);
     }
 
     /* --- seeding is deterministic ------------------------------------------------- */

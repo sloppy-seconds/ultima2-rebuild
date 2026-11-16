@@ -58,8 +58,8 @@ cat > "$WORK/m1.py" <<'PY'
 import sys, pathlib
 src, dst = sys.argv[1], sys.argv[2]
 s = pathlib.Path(src).read_text()
-out = s.replace("int step = di + 1;                          /* cs:0x6cac[i] == i + 1 */",
-                "int step = 1;")
+out = s.replace("            step = di + 1;\n            sx[i] = (uint8_t)(old + step);          /* wraps, stored unconditionally */",
+                "            step = 1;\n            sx[i] = (uint8_t)(old + step);")
 if out == s: sys.exit(1)
 pathlib.Path(dst).write_text(out)
 PY
@@ -77,30 +77,33 @@ pathlib.Path(dst).write_text(out)
 PY
 run_control "left arm steps toward the ship" "$WORK/m2.py"
 
-# Control 3: the eight-entry y guard is removed, so buckets past the end of cs:0x6cbc get
-# stepped by a value that is really an instruction byte. The test pins the refusal.
+# Control 3: the y add arm's sign gate is removed, so a result at or past 0x80 is stored.
+# asm/6B3D puts the store AFTER `jns` on this arm, so the gate is the byte-verified fact.
 cat > "$WORK/m3.py" <<'PY'
 import sys, pathlib
 src, dst = sys.argv[1], sys.argv[2]
 s = pathlib.Path(src).read_text()
-out = s.replace("        if (di < 8) {                               /* cs:0x6cbc is only 8 entries deep */",
-                "        if (1) {")
+out = s.replace("            if ((old + step) < 0x80) sy[i] = (uint8_t)(old + step);",
+                "            sy[i] = (uint8_t)(old + step);")
 if out == s: sys.exit(1)
 pathlib.Path(dst).write_text(out)
 PY
-run_control "y table bound removed" "$WORK/m3.py"
+run_control "y add-arm sign gate removed" "$WORK/m3.py"
 
-# Control 4: the overflow skip is removed, so a star can wrap past 255.
+# Control 4: the x add arm's store is put back under an overflow guard. This is not a
+# hypothetical -- it is the exact mistake the first version of this function made, and it is
+# what made the field drain to the x edges while every individual step still looked right.
+# The original stores at L_006d98 BEFORE the `jae`, so the wrap is kept.
 cat > "$WORK/m4.py" <<'PY'
 import sys, pathlib
 src, dst = sys.argv[1], sys.argv[2]
 s = pathlib.Path(src).read_text()
-out = s.replace("            if (nv <= 0xff) sx[i] = (uint8_t)nv;    /* adc overflow -> jae not taken -> skip */",
-                "            sx[i] = (uint8_t)nv;")
+out = s.replace("            sx[i] = (uint8_t)(old + step);          /* wraps, stored unconditionally */",
+                "            if (old + step <= 0xff) sx[i] = (uint8_t)(old + step);")
 if out == s: sys.exit(1)
 pathlib.Path(dst).write_text(out)
 PY
-run_control "add-arm overflow skip removed" "$WORK/m4.py"
+run_control "x add-arm store re-gated on overflow" "$WORK/m4.py"
 
 echo "warp_step selftest: $controls controls, $fails bad"
 [ "$fails" -eq 0 ] || exit 1

@@ -100,51 +100,67 @@ void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out)
 
 void u2_space_warp_seed(uint8_t *sx, uint8_t *sy, int n, uint32_t seed)
 {
+    /* asm/6D3E_sub_6d3e is the original's initialiser and it is exact: 64 entries, x from
+     * one random byte, y from a second masked with `and $0x7f`. The walk counts DOWN from
+     * 0x3f, which is why the table is filled back to front there; order does not matter
+     * here because the field is unordered. What matters and is reproduced is the 0x7f mask,
+     * because that is what keeps every y bucket inside the eight-entry y table. */
     uint32_t h = star_hash(seed ? seed : 1u);
     for (int i = 0; i < n; i++) {
         h = star_hash(h);
         sx[i] = (uint8_t)(h % 256u);
-        sy[i] = (uint8_t)((h >> 16) % 200u);   /* the view is 128 tall; the tables are bytes */
+        sy[i] = (uint8_t)((h >> 16) % 128u);
     }
 }
 
 int u2_space_warp_advance(uint8_t *sx, uint8_t *sy, int n, int ship_x, int ship_y)
 {
-    /* One axis of asm/6B3D's step rule. `ship` is DS:47B for x and DS:47C for y.
-     * `ytable` is non-zero to use the eight-entry y table, whose upper half is unknown. */
+    /* asm/6B3D's four arms. The stores are NOT all gated the same way, and that asymmetry
+     * is the whole difference between a field that sweeps forever and one that drains:
+     *
+     *   x, old >= ship : L_006d93 adc ; L_006d98 mov %al,0x4c5 ; L_006d9b jae
+     *                    store BEFORE the branch, so x WRAPS and is kept.
+     *   x, old <  ship : L_006d6e sbb ; cmc ; jb L_006d79 ; L_006d79 mov %al,0x4c5
+     *                    store AFTER the branch, so an underflow is refused.
+     *   y, old >= ship : L_006de9 adc ; jns L_006df3 ; L_006df3 mov %al,0x4c6
+     *                    store AFTER the branch, gated on the result being < 0x80.
+     *   y, old <  ship : L_006dc7 sbb ; cmc ; L_006dcd mov %al,0x4c6 ; jns
+     *                    store BEFORE the branch, so it WRAPS and is kept.
+     *
+     * So x wraps upward and y wraps downward and neither one strands a star at an edge.
+     * The first version of this function gated the two unconditional stores, which made
+     * every star crawl to 255 and freeze; measured against the original that is exactly
+     * backwards, because the original's field GROWS across a warp (77 white px in orbit,
+     * peaking near 6200 mid-warp, back to ~80 after) rather than draining.
+     *
+     * The y table is eight entries because eight is enough: the initialiser asm/6D3E
+     * stores `rand & 0x7f` into every y, and the ship sits at 0x40, so a y distance never
+     * exceeds 127 and the bucket never exceeds 7. No guard is needed and none is wanted —
+     * a guard here would hide a seeding bug rather than reveal it.
+     */
     int moved = 0;
     for (int i = 0; i < n; i++) {
         int old = sx[i];
-        unsigned d = (unsigned)(uint8_t)(old - ship_x);
-        int di = (int)(d >> 4);
-        if (di > 15) di = 15;                       /* cannot happen with uint8_t, pinned */
-        int step = di + 1;                          /* cs:0x6cac[i] == i + 1 */
+        int di, step;
         if (old >= ship_x) {
-            int nv = old + step;
-            if (nv <= 0xff) sx[i] = (uint8_t)nv;    /* adc overflow -> jae not taken -> skip */
+            di = (old - ship_x) >> 4;
+            step = di + 1;
+            sx[i] = (uint8_t)(old + step);          /* wraps, stored unconditionally */
         } else {
-            /* The original complements the wrapped difference, so its bucket here is
-             * (ship - old - 1) >> 4, not (ship - old) >> 4. Kept as it is written. */
             di = (ship_x - old - 1) >> 4;
             step = di + 1;
             if (old >= step) sx[i] = (uint8_t)(old - step);
         }
 
         old = sy[i];
-        d = (unsigned)(uint8_t)(old - ship_y);
-        di = (int)(d >> 4);
-        if (di < 8) {                               /* cs:0x6cbc is only 8 entries deep */
+        if (old >= ship_y) {
+            di = (old - ship_y) >> 4;
             step = di + 1;
-            if (old >= ship_y) {
-                int nv = old + step;
-                if (nv <= 0xff) sy[i] = (uint8_t)nv;
-            } else {
-                di = (ship_y - old - 1) >> 4;
-                if (di < 8) {
-                    step = di + 1;
-                    if (old >= step) sy[i] = (uint8_t)(old - step);
-                }
-            }
+            if ((old + step) < 0x80) sy[i] = (uint8_t)(old + step);
+        } else {
+            di = (ship_y - old - 1) >> 4;
+            step = di + 1;
+            sy[i] = (uint8_t)(old - step);          /* wraps, stored unconditionally */
         }
         moved++;
     }

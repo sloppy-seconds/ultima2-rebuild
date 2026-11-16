@@ -1729,6 +1729,18 @@ Newest first. One line per learning; the detail stays in the owning document.
   the whole animation and look at the result before wiring it into what a player sees — and
   when the whole-run result is worse, keep the tested rule and leave it unwired, with the
   reason next to the code that declines to call it.
+- **A byte that is tested is not necessarily a selector, and naming it one from the listing
+  alone is how a whole subsystem inherits a misread.** `or %al,%al; je` and `cmp $0x2; jae`
+  read as a three-way mode switch, and that reading was carried for weeks, built on in a
+  reimplementation, and written into a header — until the byte was read at 120 consecutive
+  frames of a live run and found to go 128, 124, 117, 110 … 22, 21, 20, 19. It was a
+  countdown, and the two branches were "almost always" and "the last frame", not two modes.
+  The listing cannot tell you these apart: a mode variable and a counter that happens to
+  pass through small values produce identical code. So before a byte gets a name that
+  asserts what it *means*, sample it across a run and say which shape it has — a handful of
+  values repeating is a selector, a monotone ramp is a counter, and the difference
+  reorders the control flow around it. Cheap to check, and the cost of not checking is that
+  everything downstream is confidently built on the wrong axis.
 - **A launcher that picks a free port and a client that hardcodes the default is a silent
   cross-talk bug, not a cosmetic one.** If the launcher records what it chose somewhere the
   client never reads, then whenever the default is already taken the client connects to a
