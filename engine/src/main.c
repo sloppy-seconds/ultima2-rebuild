@@ -99,6 +99,11 @@ static void usage(const char *argv0)
         "  --dump-screen F  (SDL build) save the first presented frame to F as\n"
         "                    PPM and exit; with SDL_VIDEODRIVER=dummy this\n"
         "                    proves the window pixel path with no display\n"
+        "  --dump-screen-every N F\n"
+        "                    (SDL build) save every Nth presented frame to F, which\n"
+        "                    holds a %%d for the frame index (or the index is put\n"
+        "                    before the extension). Does not end the run: this is how\n"
+        "                    you look at an animation, e.g. the 509-frame warp.\n"
         "  --trace-rolls F   write one line per rand_byte() call: '<roll> <function>'. The roll"
         "                    COUNT matching the original was not the diagnosis — same count,"
         "                    different creature positions, so the rolls are spent on different"
@@ -596,6 +601,11 @@ int main(int argc, char **argv)
             ctx.dump_hilite = 1;
         } else if (strcmp(a, "--dump-screen") == 0 && i + 1 < argc) {
             ctx.dump_screen = argv[++i];
+        } else if (strcmp(a, "--dump-screen-every") == 0 && i + 2 < argc) {
+            ctx.dump_every = atoi(argv[++i]);
+            ctx.dump_screen = argv[++i];
+            if (ctx.dump_every <= 0)
+                return usage(argv[0]), 2;
         } else if (strcmp(a, "--debug") == 0) {
             /* `--debug cli`, matching the existing `--trace[=FILE]` shape: the mode
              * is an argument rather than a separate flag so a bare --debug can be

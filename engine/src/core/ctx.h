@@ -246,6 +246,13 @@ typedef struct u2_ctx {
                              * With SDL_VIDEODRIVER=dummy this makes the whole
                              * cell->font->upload path testable with no display. */
     int dump_screen_done;   /* set by the renderer after the dump */
+    /* --dump-screen-every N F: write every Nth presented frame to F, where F holds a %d
+     * for the frame index (or the index is inserted before the extension). Unlike
+     * --dump-screen this does NOT end the run, because the thing it exists to look at is an
+     * animation: the warp is 509 presented frames long and the first of them is not the
+     * interesting one. */
+    int dump_every;
+    int dump_frames;        /* how many the renderer has written so far */
     /* --debug cli: per-turn frame + state files. See debug/turnlog.h — this is the
      * answer to "how does an agent look at a game a person is playing right now",
      * which no combination of the startup dump flags can do. */

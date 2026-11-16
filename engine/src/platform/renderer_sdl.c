@@ -405,6 +405,37 @@ static void sdl_upload(u2_ctx *ctx, const struct u2_frame *f)
             ctx->dump_screen_done = 1;
         v->dumped = 1;
     }
+
+    /* --dump-screen-every: the animation case. A warp is 509 presented frames and every
+     * claim worth checking about it (does the trail accumulate, do the streaks radiate from
+     * the ship or from the screen centre, how fast does it read) is a claim about a frame in
+     * the middle, so a flag that can only ever write frame zero cannot see any of them.
+     * Deliberately does not set dump_screen_done: ending the run here would defeat the point. */
+    if (ctx->dump_every > 0 && v->frames % ctx->dump_every == 0) {
+        char path[512];
+        const char *dot = strstr(ctx->dump_screen ? ctx->dump_screen : "", "%d");
+        if (dot) {
+            size_t pre = (size_t)(dot - ctx->dump_screen);
+            snprintf(path, sizeof path, "%.*s%03d%s", (int)pre, ctx->dump_screen,
+                     ctx->dump_frames, dot + 2);
+        } else {
+            snprintf(path, sizeof path, "%s-%03d.ppm",
+                     ctx->dump_screen ? ctx->dump_screen : "frame", ctx->dump_frames);
+        }
+        int wrc;
+        if (ctx->art_mode == U2_ART_EGA) {
+            uint8_t pal[16][3];
+            if (ctx->theme_palette_set) memcpy(pal, ctx->theme_palette, sizeof pal);
+            else u2_frame_palette_ega(pal);
+            wrc = u2_frame_write_ppm16(fr, path, pal);
+        } else {
+            uint8_t pal[4][3];
+            u2_frame_palette(pal);
+            wrc = u2_frame_write_ppm(fr, path, pal);
+        }
+        if (wrc == 0)
+            ctx->dump_frames++;
+    }
 }
 
 static int sdl_present_frame(u2_ctx *ctx, const struct u2_frame *f)
