@@ -116,6 +116,7 @@ run "cmd_marker_gate" engine/src docs/phase4-state.md -- python3 tools/cmd_marke
 run "sdl_probe selftest" engine/tools/sdl_probe.sh -- bash engine/tests/sdl_probe_selftest.sh
 run "space_check selftest" engine/tests/space_check_selftest.sh -- bash engine/tests/space_check_selftest.sh
 run "warp_step selftest" engine/tests/warp_step_selftest.sh -- bash engine/tests/warp_step_selftest.sh
+run "shrine selftest" engine/tests/shrine_selftest.sh -- bash engine/tests/shrine_selftest.sh
 # The modifier table in the key injector. A wrong control byte does not error, it sends a
 # different command to the game and the capture reads a plausible wrong answer, so the
 # conventions are pinned against externally checkable values (Ctrl-Z = 0x1A is the DOS EOF

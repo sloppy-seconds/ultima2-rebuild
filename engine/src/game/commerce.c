@@ -855,6 +855,26 @@ u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, i
  * class question is settled. Adding a second test would be a new bug, exactly as it would in
  * cmd_C.
  */
+int u2_shrine_uses_sister(u2_fidelity fidelity, uint8_t sex)
+{
+    /* The cleric shrine's greeting word. Pure, so the gate can enumerate the whole table
+     * without a ctx, a screen, or a save file.
+     *
+     * CLASSIC MODE IS ALWAYS BROTHER. asm/1869 tests `[DS:46] == 1`, and [DS:46] only ever
+     * holds the typed letter 'M' or 'F' (written at file 0x5951, whose next three bytes are
+     * `cmp $0x4d,%al` into "MALE"), so the original's SISTER arm is dead and every visitor
+     * is called BROTHER. Matching the original here means reproducing a broken comparison,
+     * and that is exactly what classic mode does.
+     *
+     * ENHANCED MODE IS AN INVENTION, NOT A FIX (owner, 2026-11-16): it addresses the player
+     * by gender. Note the test is against 'F', the value the field actually holds, and NOT
+     * against 1 -- copying the original's `cmp $0x1` into enhanced mode would change nothing
+     * and would look like it had. */
+    if (fidelity != U2_FIDELITY_ENHANCED)
+        return 0;
+    return sex == 'F' || sex == 'f';
+}
+
 static u2_transact_result sell_spell(u2_ctx *ctx, int wizard)
 {
     u2_state *st = &ctx->state;
@@ -873,12 +893,19 @@ static u2_transact_result sell_spell(u2_ctx *ctx, int wizard)
          * the byte the create flow leaves there is the typed character -- 'M' or 'F' -- which
          * is what the Z screen compares against and what the API reports. An immediate 1 is
          * therefore never equal, and read literally the shrine calls every visitor BROTHER.
-         * INFERRED, not observed: no capture has stood a female cleric at a shrine. The
-         * comparison is written against the value the bytes test rather than against 'F',
-         * because making it say what the greeting is expected to mean would be the invention;
-         * if a capture ever shows SISTER, the thing that was wrong is [DS:46]'s meaning and
-         * this line changes with it. See docs/needs-gameplay.md. */
-        seam_str_out(ctx, st->sex == 1 ? U2_S_SHOP_CLERIC_SIS : U2_S_SHOP_CLERIC_BRO);
+         * Proven statically 2026-11-15 by reading the five fragments the shrine is split
+         * across; see asm/1869_cleric_shrine.asm and docs/needs-gameplay.md G80b.
+         *
+         * CLASSIC MODE MUST KEEP DOING THIS. Saying SISTER in classic mode would be a
+         * divergence wearing the costume of fidelity, and it would look like an improvement.
+         *
+         * ENHANCED MODE IS A RULING, NOT A FIX (owner, 2026-11-16): enhanced mode addresses
+         * the player by gender, so it says SISTER to a female character. The original has no
+         * behaviour here to copy -- the comparison is broken, not unknown -- so this is an
+         * invention and is gated as one, in both directions. The data was never missing:
+         * [DS:46] does hold 'M'/'F'; only the `cmp $0x1` is wrong. */
+        const int as_sister = u2_shrine_uses_sister(ctx->fidelity, st->sex);
+        seam_str_out(ctx, as_sister ? U2_S_SHOP_CLERIC_SIS : U2_S_SHOP_CLERIC_BRO);
         /* asm/1869 then calls L_00527a, which is asm/507A: bx := 0, then print DS:36+bx until
          * a NUL. DS:36 is the name field of the save record, so the greeting is
          * "BROTHER <name>". Proven statically 2026-11-15 by reading the five fragments the

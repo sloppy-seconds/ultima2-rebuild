@@ -627,6 +627,36 @@ int main(void)
           u2_cast_missile_amount(0x30) > u2_cast_missile_amount(0x20),
           "magic missile: monotone in the range a new character ever sees");
 
+    /* --- the cleric shrine's greeting word -------------------------------------- */
+    /* The direction that actually fails is the classic one: a "fix" that makes the shrine
+     * say SISTER in classic mode would look like an improvement and be a fidelity
+     * regression, because asm/1869's `cmp $0x1,%al` against a byte that only ever holds
+     * 'M'/'F' is dead and the original calls every visitor BROTHER. */
+    CHECK(u2_shrine_uses_sister(U2_FIDELITY_ORIGINAL, 'F') == 0,
+          "classic mode must say BROTHER even to a female character (the original's arm is dead)");
+    CHECK(u2_shrine_uses_sister(U2_FIDELITY_ORIGINAL, 'M') == 0,
+          "classic mode: male is BROTHER");
+    CHECK(u2_shrine_uses_sister(U2_FIDELITY_ORIGINAL, 0) == 0,
+          "classic mode: the blank pristine template (DS:46 == 0) is BROTHER");
+    CHECK(u2_shrine_uses_sister(U2_FIDELITY_ORIGINAL, 1) == 0,
+          "classic mode: even the value the original compares against stays BROTHER, "
+          "because the original does not branch on it either");
+
+    /* Enhanced mode is an owner-ruled divergence (2026-11-16), so it gets asserted in both
+     * directions too -- an invention that only ever goes one way has no gate. */
+    CHECK(u2_shrine_uses_sister(U2_FIDELITY_ENHANCED, 'F') == 1,
+          "enhanced mode: a female character is SISTER");
+    CHECK(u2_shrine_uses_sister(U2_FIDELITY_ENHANCED, 'f') == 1,
+          "enhanced mode: lower-case 'f' is also SISTER");
+    CHECK(u2_shrine_uses_sister(U2_FIDELITY_ENHANCED, 'M') == 0,
+          "enhanced mode: a male character is still BROTHER");
+    CHECK(u2_shrine_uses_sister(U2_FIDELITY_ENHANCED, 0) == 0,
+          "enhanced mode: a blank sex byte must not read as female");
+    /* The trap this pins: copying the original's `cmp $0x1` into enhanced mode would compile,
+     * pass a one-directional test, and change nothing. */
+    CHECK(u2_shrine_uses_sister(U2_FIDELITY_ENHANCED, 1) == 0,
+          "enhanced mode must test 'F', not the original's broken immediate 1");
+
     printf("commerce_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
 }

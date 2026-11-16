@@ -246,4 +246,11 @@ u2_offer_result u2_commerce_offer(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
 int u2_offer_raise_for(uint8_t roll, uint8_t hundreds, uint8_t cur_bcd,
                        int *stat_index, uint8_t *new_bcd);
 
+/* The cleric shrine's greeting word, as a pure predicate so a gate can enumerate the whole
+ * table. Returns 1 for SISTER, 0 for BROTHER. Classic mode is always 0 -- the original's
+ * SISTER arm is dead code and matching it means reproducing a broken comparison. Enhanced
+ * mode says SISTER to a female character, which is an owner-ruled divergence and not a fix.
+ * The test is against 'F' (what [DS:46] actually holds), never against the original's 1. */
+int u2_shrine_uses_sister(u2_fidelity fidelity, uint8_t sex);
+
 #endif /* U2_COMMERCE_H */
