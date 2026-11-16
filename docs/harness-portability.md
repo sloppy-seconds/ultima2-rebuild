@@ -2115,3 +2115,24 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   its own docstring agree before trusting either: the observation that would have caught this was
   already written in the same file's prose, two inches from constants that said otherwise.
   → Tier 1, tooling that fails loudly.
+- **A refusal with no positive control is not a finding, and a control placed before the thing
+  it controls can destroy its own precondition.** A passability probe asked whether a mounted
+  plane refuses forest. The first run mounted correctly, saw the refusal, and proved nothing:
+  every neighbour of that pad was forest or mountain, so "refused forest" was indistinguishable
+  from "a grounded plane cannot move at all". The second run added the missing control and put
+  it *before* the mount — the control step walked the player off the launch pad, the board key
+  then had nothing to board, the mode byte stayed on-foot, and every subsequent "mounted" probe
+  silently tested a foot character while looking like a pass. The fix was a synthetic map where
+  pad, forest and open grass are three mutually adjacent cells, with the mount sitting between
+  the two halves and an accepted step on the far side of the refusal. Generalise twice: a
+  negative result needs a positive run through the same apparatus, and ordering a control before
+  a state transition can invalidate the state it was meant to qualify.
+  → Tier 1, experiment design.
+- **A breakpoint that never fires, including on steps that demonstrably moved, is a fact about
+  the probe and not about the code.** Two addresses on a per-step dispatch path reported no hit
+  across several runs while the position bytes proved the step had executed. The temptation is
+  to read a silent breakpoint as evidence the code did not run; here the same run showed the
+  behaviour happening, so the only sound conclusion was that the probe was unreliable at those
+  addresses. Record which claims rest on a breakpoint and which rest on an observed state
+  change, and do not let the former borrow confidence from the latter. → Tier 1, tooling that
+  fails loudly.

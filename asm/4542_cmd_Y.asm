@@ -1,7 +1,7 @@
 # cmd_Y — command handler 'Y': prints "YELL WHAT?" and falls into its freeform yell loop
 # func 4542..4550  len 015 B  evidence: seed+reko (jump table cs:0730 entry Y)
 # provenance: live:cmd-letters-20261025; static
-#           entry executed in 4 of 274 harvests; confirmed by the capture of 2026-10-25, which
+#           entry executed in 4 of 277 harvests; confirmed by the capture of 2026-10-25, which
 #           also showed what the four-line body cannot say: after `YELL WHAT?` the command loop
 #           does NOT return to the prompt -- later letters accumulated as text on the CMD line
 #           and never dispatched. Was recorded as never executed against a 60-harvest corpus.
