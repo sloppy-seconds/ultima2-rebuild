@@ -156,6 +156,29 @@ python3 bot/target_check.py           # the gated version, no emulator needed
 `play_original.py` is a demonstration with output, not a gate. `target_check.py` is the gate
 and is wired into `check_all.sh`.
 
+## 7b. Sight: what the bot can read about the world
+
+`Spice86Target` gained three things, and one of them is an exception worth stating out loud.
+
+* **`read_grid()` / `tile_at(x, y)`** — the 64×64 stamped sector grid at `DS:1800`. This is the
+  one DS field the bot reads **raw rather than through the engine's decoder**, and the reason is
+  structural, not lazy: `u2_state` is 0x650 bytes and the grid sits at `0x1800`, so it is outside
+  the mirrored region entirely. Covering it would grow the state struct by ~5 KB and move the DS
+  blob contract that the save checks and CP2 evidence read through — a bigger decision than a bot
+  needs. The index math matches `u2_world_tile_index` in `core/world.h` and is pinned offline in
+  `target_check.py` (mask, stride, negative wrap), while a live run pinned the **offset**:
+  `tile_at(3,10)` on a real sector 41 returns the pad tile `0x4c`. Offline pins the arithmetic,
+  live pins the address; neither substitutes for the other.
+* **`sample(seconds)`** — polls at the API's limit (~1100–1350 Hz) and classifies every transition
+  as step / wrap / jump / unchanged instead of computing a distance. That classification is the
+  instrument behind G77's 82 ms figure.
+* **`key()` cannot drive a free-running vehicle.** It waits for quiescence — two consecutive reads
+  with the same digest — and during flight the world never goes quiescent, so the wait is never
+  satisfied and the launch never happens; a validation run came back with 3364 samples and zero
+  movement. The scripts that actually fly use raw key injection with sleeps. This is a limit of
+  the adapter, not the game: quiescence is the correct settle signal for a step-and-wait world and
+  the wrong one for a world that keeps moving.
+
 ## 8. Still open before the bot can reach the outstanding captures
 
 The adapter removed the *access* problem. What is left is the *scenario* problem — reaching a

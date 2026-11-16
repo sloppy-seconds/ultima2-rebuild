@@ -5,7 +5,7 @@
 #           CONTAINS ", gold / TRI-LITHIUM handling); returns to dispatcher 0xc33.
 # func 363B..3781  len 0147 B  evidence: seed+reko (jump table cs:0730 entry G)
 # provenance: live:airport32 (+1 other harvests), static
-#           entry executed in 3 of 277 harvests; derived by tools/provenance_from_traces.py
+#           entry executed in 3 of 282 harvests; derived by tools/provenance_from_traces.py
 # confidence: medium (flow + messages proven by bytes; NPC/quest semantics inferred)
 # RESOLVED 2026-11-09: the town/site arm is decoded, and the earlier note blaming "asm/361C's
 #           unread table" was wrong. asm/361C (L_00381c, filed inside asm/3611) is the CELL

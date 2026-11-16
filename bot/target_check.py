@@ -151,6 +151,29 @@ try:
 except Exception as ex:                       # noqa: BLE001 - report, do not crash the gate
     ok(False, "EngineTarget end-to-end failed: %s" % ex)
 
+# --- the grid index, without an emulator ----------------------------------------
+# tile_at takes a grid argument precisely so this can run offline. The live run proved the
+# OFFSET (tile_at(3,10) on a real sector 41 returns the pad tile 0x4c); what this pins is the
+# arithmetic, which a live run proves only for the one cell it happens to look at. A stride
+# slip or a dropped mask would be invisible at (3,10) and obvious here.
+try:
+    from target import Spice86Target, GRID_OFF, GRID_EDGE
+
+    ok(GRID_OFF == 0x1800 and GRID_EDGE == 64,
+       "grid is DS:0x1800 with edge 64 (got %#x / %d)" % (GRID_OFF, GRID_EDGE))
+    probe = bytes(range(256)) * 16          # 4096 bytes, byte i is i & 0xff
+    t0 = Spice86Target.__new__(Spice86Target)   # no session: tile_at only touches `grid`
+    ok(t0.tile_at(3, 10, grid=probe) == ((10 * 64) + 3) & 0xff,
+       "(3,10) indexes row-major at stride 64")
+    ok(t0.tile_at(67, 74, grid=probe) == t0.tile_at(3, 10, grid=probe),
+       "coordinates wrap by & 63, so (67,74) is (3,10)")
+    ok(t0.tile_at(-1, -1, grid=probe) == t0.tile_at(63, 63, grid=probe),
+       "negative coordinates wrap to the far corner, not off the end")
+    ok(t0.tile_at(0, 0, grid=probe) == 0 and t0.tile_at(63, 63, grid=probe) == (63 * 64 + 63) & 0xff,
+       "both corners index inside the 4096-byte grid")
+except Exception as ex:                       # noqa: BLE001
+    ok(False, "grid index checks failed: %s" % ex)
+
 if fails:
     print("  FAIL  %d checks passed, %d failed" % (checks, len(fails)))
     sys.exit(1)

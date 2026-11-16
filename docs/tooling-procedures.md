@@ -385,6 +385,32 @@ dungeon and dropping a coordinate into it produces a state the game never builds
 wilderness sector. `tools/u2_endgame_save.py` is the worked example of building a specific
 scenario end to end.
 
+**For a SITE sector, the entry pair wins, not `setpos`.** Discovered 2026-11-16 and it explains
+an earlier session that looked like a tool bug: when the sector's ones digit is non-zero the game
+restores `entry_x`/`entry_y` as the arrival position, so a `setpos` coordinate is silently
+overwritten on load. Nothing is broken in `u2_edit.py` — the record has two position fields and
+the site one takes precedence. To place a character *inside* a town, set the entry pair:
+
+```sh
+python3 tools/u2_edit.py set     FILE sector 41
+python3 tools/u2_edit.py set     FILE entry_x 3
+python3 tools/u2_edit.py set     FILE entry_y 10   # the plane pad, and where it starts
+```
+
+### The engine's equivalent: `--start-at`
+
+`--start-at X,Y[,SEC]` stages the character at a position on the **live state** rather than in
+the save file, and implies `--play-map`. It exists because `--load-ds` restores the DS mirror but
+not *which screen the engine is running* — with a DS blob loaded the engine still sits at its
+title menu. It is load-bearing, not a leftover: the engine frames in `captures/engine/g85-warp/`
+were rendered with it, and it is how a reproducible scenario gets expressed without editing a
+record. It refuses a malformed argument rather than defaulting.
+
+```sh
+./u2-sdl-static --data-dir DIR --save-dir DIR --start-at 33,4,41 \
+                --script keys.txt --dump-screen-every 20 'frame-%d.ppm'
+```
+
 ### The engine
 
 The engine reads a content dir and a save dir, so a scenario is a directory, not a patched binary:

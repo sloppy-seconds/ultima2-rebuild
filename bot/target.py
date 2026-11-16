@@ -41,6 +41,12 @@ U2_BIN = os.environ.get("U2_BIN", os.path.join(ENGINE_DIR, "u2"))
 DS_SEG = 0x08BE
 DS_LEN = 1616
 
+# The stamped sector grid. Outside the mirror (see read_grid for why that is a real exception
+# to the one-decoder rule rather than an oversight). Stride and mask match
+# u2_world_tile_index in engine/src/core/world.h.
+GRID_OFF = 0x1800
+GRID_EDGE = 64
+
 
 def _load_spice86_tools():
     """Reuse tools/spice86_type.py rather than writing a second MCP client.
@@ -183,6 +189,73 @@ class Spice86Target(Target):
         if len(vals) != self.ds_len:
             raise RuntimeError("read %d DS bytes, expected %d" % (len(vals), self.ds_len))
         return bytes(vals)
+
+    def read_grid(self) -> bytes:
+        """The 64x64 stamped sector grid, DS:0x1800.
+
+        Deliberately NOT routed through the engine's decoder, which is the one place every
+        other DS field is decoded. `u2_state` is 0x650 bytes and the grid sits at 0x1800, so it
+        is outside the mirrored region entirely; covering it would grow the state struct by
+        ~5 KB and move the DS blob contract that the save checks and CP2 evidence read through.
+        That is a bigger decision than a bot needs, so the grid is read raw here and indexed
+        with the same mask and stride as `u2_world_tile_index` in core/world.h.
+
+        This is the STAMPED grid: a creature's type byte, or 0x78 for the player, sits in the
+        cell and the terrain byte is gone until the game restamps. For "what is under my feet"
+        that is the correct thing to read, because it is what the game's own movement test
+        reads.
+        """
+        phys = self.ds_seg * 16 + GRID_OFF
+        with urllib.request.urlopen(
+                "http://127.0.0.1:%d/api/memory/%d/range/%d"
+                % (self.http_port, phys, GRID_EDGE * GRID_EDGE), timeout=10) as r:
+            vals = json.load(r)["values"]
+        if len(vals) != GRID_EDGE * GRID_EDGE:
+            raise RuntimeError("read %d grid bytes, expected %d"
+                               % (len(vals), GRID_EDGE * GRID_EDGE))
+        return bytes(vals)
+
+    def tile_at(self, x, y, grid=None) -> int:
+        """The stamped byte in cell (x, y), masked and strided exactly as the engine does."""
+        g = grid if grid is not None else self.read_grid()
+        return g[((y & (GRID_EDGE - 1)) * GRID_EDGE) + (x & (GRID_EDGE - 1))]
+
+    def sample(self, seconds=4.0, interval=0.0):
+        """Poll position as fast as the API allows and classify every transition.
+
+        Returns (steps, wraps, jumps, same, samples, elapsed). A `step` is a single-cell move
+        inside one sector, which is the only thing that is a march step. A wrap is a step
+        across the 0x3F seam, a jump is a sector change or teleport, `same` is an unchanged
+        sample. Counting them separately is the point: a distance computed across a wrap, or
+        across a sector reload, is fiction -- the first version of this measurement did exactly
+        that and reported an unverifiable number.
+
+        interval=0 polls at the API's own limit, which measured ~1350 Hz here.
+        """
+        t0 = time.time()
+        out = []
+        while time.time() - t0 < seconds:
+            s = self.state()
+            p = self.pos(s)
+            out.append((time.time() - t0, p[0], p[1], self.sector(s)))
+            if interval:
+                time.sleep(interval)
+        steps = wraps = jumps = same = 0
+        prev = out[0]
+        for cur in out[1:]:
+            if cur[1:3] == prev[1:3]:
+                same += 1
+            elif cur[3] != prev[3]:
+                jumps += 1
+            elif abs(cur[1] - prev[1]) + abs(cur[2] - prev[2]) == 1:
+                steps += 1
+            elif (abs(cur[1] - prev[1]) == 1 and prev[1] in (0, GRID_EDGE - 1)) or \
+                 (abs(cur[2] - prev[2]) == 1 and prev[2] in (0, GRID_EDGE - 1)):
+                wraps += 1
+            else:
+                jumps += 1
+            prev = cur
+        return steps, wraps, jumps, same, len(out), out[-1][0]
 
     def state(self) -> dict:
         """Raw DS -> the engine's own decode. No field knowledge lives here on purpose."""

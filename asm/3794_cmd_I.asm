@@ -10,7 +10,7 @@
 #           a torch and that spell share one light counter rather than running in parallel.
 # func 3794..3794  len 001 B  evidence: seed+reko (jump table cs:0730 entry I)
 # provenance: live:airport (+4 other harvests), static
-#           entry executed in 17 of 277 harvests; derived by tools/provenance_from_traces.py
+#           entry executed in 17 of 282 harvests; derived by tools/provenance_from_traces.py
 # confidence: high (handler role proven; split is a map-boundary artifact)
 # notes: stop-trunc — do not "fix" to `call`; operand bytes are outside range
 #           The emptiness of the overworld arm is the behaviour, not a stub: between the gate and
