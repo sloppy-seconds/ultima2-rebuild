@@ -1155,7 +1155,22 @@ static int u2_tile_passable(const u2_world *w, int x, int y)
  */
 int u2_mode_passable(const u2_world *w, int x, int y, uint8_t stamp)
 {
-    const unsigned raw = u2_world_tile_at(w, x, y) >> 1;
+    if (w == NULL) return 0;
+    return u2_grid_passable(w->map, x, y, stamp);
+}
+
+/* The same rule, one level down, so a caller that holds a grid rather than a world can still
+ * ask. The bot is that caller: it reads the stamped grid straight out of DS:1800 and has no
+ * u2_world, and the alternative — a second copy of the ladder and the default-deny set in
+ * Python — is the second-hand-maintained-rule failure this project keeps naming. Keeping the
+ * dispatch in one function means the engine and the bot cannot disagree about whether a step is
+ * legal, which is the whole point of a differential tester.
+ *
+ * `grid` is a 64x64 stamped grid, indexed exactly as u2_world_tile_at indexes one. */
+int u2_grid_passable(const uint8_t *grid, int x, int y, uint8_t stamp)
+{
+    if (grid == NULL) return 0;
+    const unsigned raw = grid[u2_world_tile_index(x, y)] >> 1;
     const unsigned mode = raw & 0x7Fu;
 
     switch (stamp) {

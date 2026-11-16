@@ -401,6 +401,7 @@ int main(int argc, char **argv)
      * Deliberately not ctx.load_ds_path: that one resumes a run in progress, this one is a
      * read-only decode and must not reach the game loop at all. */
     const char *ds_json_path = NULL;
+    int passmap_flag = 0;
     const char *map_dump_path = NULL;
     unsigned seed = U2_RNG_DEFAULT_SEED;
     int rng_probe = 0;
@@ -609,6 +610,10 @@ int main(int argc, char **argv)
             ctx.load_ds_path = argv[++i];
         } else if (strcmp(a, "--ds-json") == 0 && i + 1 < argc) {
             ds_json_path = argv[++i];
+        } else if (strcmp(a, "--passmap") == 0) {
+            /* Requires --ds-json: the map is a property of a sector, and only a loaded DS blob
+             * says which sector and which mount mode. */
+            passmap_flag = 1;
         } else if (strcmp(a, "--dump-ds") == 0 && i + 1 < argc) {
             dump_ds_path = argv[++i];
         } else if (strcmp(a, "--trace-rolls") == 0 && i + 1 < argc) {
@@ -1139,6 +1144,50 @@ int main(int argc, char **argv)
                 rc = u2_state_load_ds_buf(&ctx.state, raw, got);
         }
         if (rc != 0) rc = u2_state_load_ds(&ctx.state, ds_json_path);
+
+        if (passmap_flag) {
+            /* The passability map for the sector in this blob, at the mount mode in this blob.
+             *
+             * Why the engine answers this rather than the bot applying the rule: the verdict is
+             * asm/2423's mode dispatch plus a default-deny set and a threshold divert. A Python
+             * copy would be a second hand-maintained version of that, and the two would drift.
+             * The bot gets a bitmap and does search, which is the half it is good at.
+             *
+             * Needs a blob larger than the mirror, because the stamped grid lives at DS:1800 and
+             * u2_state stops at 0x650. A live read of the whole DS segment is 10240 bytes, so a
+             * caller that reads generously gets this; a caller that reads exactly the mirror gets
+             * a refusal rather than a map computed off the end of the buffer.
+             *
+             * 4096 cells, row-major, one bit each, MSB first: 512 bytes, 1024 hex chars. */
+            enum { PASS_GRID_OFF = 0x1800, PASS_GRID_LEN = 64 * 64 };
+            FILE *pf = fopen(ds_json_path, "rb");
+            if (pf == NULL) {
+                fprintf(stderr, "u2: --passmap could not re-read '%s'\n", ds_json_path);
+                return 2;
+            }
+            static unsigned char big[PASS_GRID_OFF + PASS_GRID_LEN];
+            size_t gotb = fread(big, 1, sizeof big, pf);
+            fclose(pf);
+            if (gotb < sizeof big) {
+                fprintf(stderr,
+                        "u2: --passmap needs %zu bytes of DS (the stamped grid is at 0x1800); "
+                        "the blob has %zu. Read the whole segment, not just the mirror.\n",
+                        sizeof big, gotb);
+                return 2;
+            }
+            const uint8_t stamp = ctx.state.player_stamp;
+            unsigned char bits[512];
+            memset(bits, 0, sizeof bits);
+            for (int i = 0; i < 4096; i++) {
+                if (u2_grid_passable(big + PASS_GRID_OFF, i % 64, i / 64, stamp))
+                    bits[i / 8] |= (unsigned char)(0x80 >> (i % 8));
+            }
+            printf("{\"u2api\":%d,\"event\":\"passmap\",\"stamp\":%u,\"cells\":4096,\"bits\":\"",
+                   U2_API_PROTO, (unsigned)stamp);
+            for (size_t k = 0; k < sizeof bits; k++) printf("%02x", bits[k]);
+            printf("\"}\n");
+            return 0;
+        }
         if (rc != 0) { release_backends(&ctx); u2_trace_close(&ctx); return 2; }
         if (ctx.state.name[0]) ctx.enter_world = 1;
         const int orc = u2_api_emit_observation(&ctx);

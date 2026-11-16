@@ -299,6 +299,11 @@ int u2_site_for_tile(uint8_t tile, const char **label, int *ax, int *ay);
  */
 int u2_mode_passable(const u2_world *w, int x, int y, uint8_t stamp);
 
+/* The same verdict, from a bare 64x64 stamped grid instead of a u2_world. One rule, two
+ * callers: the engine has a world, the bot has DS. See the definition for why a second copy of
+ * the ladder in the bot would be the wrong shape. */
+int u2_grid_passable(const uint8_t *grid, int x, int y, uint8_t stamp);
+
 /*
  * The per-step food charge for the mode the player is in, and the death check that
  * goes with it. asm/2599 subtracts 19 once on foot; asm/2626 (horse and plane) subtracts

@@ -40,6 +40,7 @@ U2_BIN = os.environ.get("U2_BIN", os.path.join(ENGINE_DIR, "u2"))
 # width is sizeof(u2_state), which --ds-json refuses to guess about.
 DS_SEG = 0x08BE
 DS_LEN = 1616
+DS_LEN_FULL = 10240          # the whole segment; the stamped grid at 0x1800 needs this
 
 # The stamped sector grid. Outside the mirror (see read_grid for why that is a real exception
 # to the one-decoder rule rather than an oversight). Stride and mask match
@@ -169,6 +170,8 @@ class Spice86Target(Target):
         self._st = None
         self._mcp = None
         self._tmp = None
+        self._passmap = None
+        self._passmap_key = None
 
     def start(self):
         self._st = _load_spice86_tools()
@@ -256,6 +259,53 @@ class Spice86Target(Target):
                 jumps += 1
             prev = cur
         return steps, wraps, jumps, same, len(out), out[-1][0]
+
+    def read_ds_full(self) -> bytes:
+        """The whole DS segment, not just the mirror.
+
+        `read_ds` deliberately reads sizeof(u2_state) because that is what the decoder refuses
+        anything else with. The stamped grid at 0x1800 is outside that, so anything wanting the
+        grid (passability, pathfinding) needs this wider read. Same base, wider span.
+        """
+        phys = self.ds_seg * 16
+        with urllib.request.urlopen(
+                "http://127.0.0.1:%d/api/memory/%d/range/%d"
+                % (self.http_port, phys, DS_LEN_FULL), timeout=10) as r:
+            vals = json.load(r)["values"]
+        if len(vals) != DS_LEN_FULL:
+            raise RuntimeError("read %d DS bytes, expected %d" % (len(vals), DS_LEN_FULL))
+        return bytes(vals)
+
+    def passmap(self, refresh=False):
+        """The 4096-cell passability bitmap for the current sector and mount mode.
+
+        The engine computes it (`u2 --passmap`); this only decodes bits. Cached, keyed on
+        (sector, stamp), because the map only changes when one of those changes — and both are
+        cheap to read, so the cache cannot go stale silently.
+        """
+        blob = self.read_ds_full()
+        key = (blob[0x49] * 10 + blob[0x4A], blob[0x13])
+        if not refresh and self._passmap_key == key:
+            return self._passmap
+        path = tempfile.mktemp(prefix="u2pm-", suffix=".bin")
+        with open(path, "wb") as f:
+            f.write(blob)
+        try:
+            p = subprocess.run([U2_BIN, "--headless", "--ds-json", path, "--passmap"],
+                               cwd=ENGINE_DIR, capture_output=True, text=True, timeout=60)
+        finally:
+            os.unlink(path)
+        for line in p.stdout.splitlines():
+            i = line.find('{"u2api"')
+            if i >= 0:
+                o = json.loads(line[i:])
+                hexs = o["bits"]
+                m = [(int(hexs[k:k + 2], 16) >> (7 - j)) & 1
+                     for k in range(0, len(hexs), 2) for j in range(8)]
+                self._passmap, self._passmap_key = m, key
+                return m
+        raise RuntimeError("--passmap produced no observation: %s %s"
+                           % (p.stdout[-160:], p.stderr[-160:]))
 
     def state(self) -> dict:
         """Raw DS -> the engine's own decode. No field knowledge lives here on purpose."""
