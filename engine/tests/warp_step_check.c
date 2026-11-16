@@ -38,85 +38,101 @@ int main(void)
 {
     printf("warp_step: asm/6B3D's radial step\n");
 
-    /* --- direction: away from the ship, on both arms ---------------------------- */
-    /* d = 50 -> di = 3 -> step 4 on both arms (the left arm measures ship-old-1 = 49,
-     * which is still bucket 3). */
-    CHECK(step_x(150, 100) == 154, "right of ship: expected 150 -> 154, got %d", step_x(150, 100));
-    CHECK(step_x(50, 100) == 46,   "left of ship:  expected 50 -> 46, got %d",  step_x(50, 100));
+    /* --- direction: everything is pulled TOWARD the ship ------------------------- */
+    /* The first version of this file had the arms swapped and the bucket uncomplemented,
+     * which made the field run away from the ship and pile up at an edge. The bytes branch
+     * `jb L_006d7f` on old < ship, so the fall-through (old >= ship) is the `sbb` arm, and
+     * the fall-through complements before shifting: di = (~(old-ship)) >> 4. */
+    CHECK(step_x(150, 100) == 137, "right of ship: 150 -> 137 (d=50, di=12, step 13), got %d", step_x(150, 100));
+    CHECK(step_x(50, 100) == 63,   "left of ship:  50 -> 63 (d=206, di=12, step 13), got %d",  step_x(50, 100));
 
-    /* --- magnitude: the step grows with distance -------------------------------- */
-    /* d = 8  -> di = 0  -> step 1 */
-    CHECK(step_x(108, 100) == 109, "d=8: expected step 1, got %d", step_x(108, 100) - 108);
-    /* d = 40 -> di = 2  -> step 3 */
-    CHECK(step_x(140, 100) == 143, "d=40: expected step 3, got %d", step_x(140, 100) - 140);
-    /* d = 144 -> di = 9 -> step 10 */
-    CHECK(step_x(244, 100) == 254, "d=144: expected step 10, got %d", step_x(244, 100) - 244);
-    /* The left arm measures ship - old - 1, so d = 8 there is step 1 too, and d = 9 is
-     * still step 1: the arms are deliberately asymmetric because the original complements
-     * a wrapped difference instead of taking an absolute value. */
-    CHECK(step_x(92, 100) == 91,   "left d=8: expected step 1, got %d", 92 - step_x(92, 100));
-    CHECK(step_x(91, 100) == 90,   "left d=9: expected step 1, got %d", 91 - step_x(91, 100));
-    CHECK(step_x(36, 100) == 32,   "left d=64: expected step 4, got %d", 36 - step_x(36, 100));
+    /* --- magnitude: the step GROWS as a star gets CLOSER to the ship ------------- */
+    /* This is the radial mechanism, and it is inverted from what you would guess. A star
+     * right next to the ship is thrown 16 px; one at the far edge creeps by 1. */
+    CHECK(step_x(108, 100) == 92,  "d=8: step 16 toward ship, got %d", step_x(108, 100) - 108);
+    CHECK(step_x(140, 100) == 126, "d=40: step 14 toward ship, got %d", step_x(140, 100) - 140);
+    CHECK(step_x(244, 100) == 237, "d=144: step 7 toward ship, got %d", step_x(244, 100) - 244);
+    /* The below-ship arm skips the complement, so it indexes the wrapped difference. */
+    CHECK(step_x(92, 100) == 108,  "below d=8: step 16 toward ship, got %d", step_x(92, 100) - 92);
+    CHECK(step_x(91, 100) == 107,  "below d=9: step 16 toward ship, got %d", step_x(91, 100) - 91);
+    CHECK(step_x(36, 100) == 49,   "below d=64: step 13 toward ship, got %d", step_x(36, 100) - 36);
 
     /* --- the two stores that WRAP and the two that refuse ------------------------ */
-    /* x add arm stores BEFORE its branch (L_006d98 then jae), so x wraps and is kept.
-     * This is the single fact that makes the original's field grow across a warp instead
-     * of draining: a star at 250 with step 10 lands at 4, not stuck at 250. */
-    CHECK(step_x(250, 100) == 4,   "x add arm must wrap (250+10 -> 4), got %d", step_x(250, 100));
-    /* x subtract arm stores AFTER its branch (jb L_006d79 then mov), so an underflow is
-     * refused and the star stays put. */
-    CHECK(step_x(1, 200) == 1,     "x sub arm must refuse an underflow, got %d", step_x(1, 200));
-    /* Exactly on the boundary: ship=200, old=12 gives di = (200-12-1)>>4 = 11 and step 12,
-     * so old == step and the star lands on 0 rather than being skipped. old=11 gives the
-     * same step 12 but 11 < 12, so that one IS skipped. The pair is what pins the `jb`. */
-    CHECK(step_x(12, 200) == 0,     "old == step must reach 0, got %d", step_x(12, 200));
-    CHECK(step_x(11, 200) == 11,    "old == step-1 must skip, got %d", step_x(11, 200));
+    /* x add arm (old < ship) stores BEFORE its branch (L_006d98 then jae), so x wraps and
+     * is kept. This is the single fact that makes the original's field grow across a warp
+     * instead of draining. */
+    CHECK(step_x(248, 250) == 8,   "x add arm must wrap (248+16 -> 8), got %d", step_x(248, 250));
+    /* x sub arm stores AFTER its branch (jb L_006d79 then mov), so an underflow is refused
+     * and the star stays put. */
+    CHECK(step_x(10, 10) == 10,    "x sub arm must refuse an underflow, got %d", step_x(10, 10));
+    /* Exactly at the boundary: ship=1, old=16 gives d=15, di=15, step 16, so old == step
+     * and the star lands on 0. old=15 gets the same step but 15 < 16, so that one IS
+     * skipped. The pair is what pins the `jb`. */
+    CHECK(step_x(16, 1) == 0,     "old == step must reach 0, got %d", step_x(16, 1));
+    CHECK(step_x(15, 1) == 15,    "old == step-1 must skip, got %d", step_x(15, 1));
 
     /* --- y: the mirror image, gated on the SIGN instead of the carry ------------- */
-    /* y add arm: adc then `jns` before the store, so a result at or past 0x80 is refused. */
+    /* y add arm (old < ship_y): adc then `jns` BEFORE the store, so a result at or past
+     * 0x80 is refused. y=68, ship_y=100 -> d=224, di=14, and bucket 14 is the code byte
+     * 0xa0 = 160, so 68+160 = 228 >= 0x80 and the store is skipped. */
     {
-        uint8_t sx[1] = { 100 }, sy[1] = { 127 };
+        uint8_t sx[1] = { 100 }, sy[1] = { 68 };
         u2_space_warp_advance(sx, sy, 1, 100, 100);
-        /* di = (127-100)>>4 = 1, step 2, so 127+2 = 129 which is >= 0x80 -> refused. */
-        CHECK(sy[0] == 127, "y add arm must refuse >= 0x80, got %d", sy[0]);
+        CHECK(sy[0] == 68, "y add arm must refuse >= 0x80, got %d", sy[0]);
     }
     {
-        uint8_t sx[1] = { 100 }, sy[1] = { 125 };
+        /* y=52, ship_y=100 -> d=208, di=13, bucket 13 is code byte 0x04 = 4 -> 56. */
+        uint8_t sx[1] = { 100 }, sy[1] = { 52 };
         u2_space_warp_advance(sx, sy, 1, 100, 100);
-        /* di = 1, step 2 -> 127, still under 0x80, so this one moves. */
-        CHECK(sy[0] == 127, "y add arm below 0x80 must move, got %d", sy[0]);
+        CHECK(sy[0] == 56, "y add arm below 0x80 must move, got %d", sy[0]);
     }
-    /* y sub arm: the store sits before the `jns`, so it wraps and is kept. */
+    /* y sub arm (old >= ship_y): the store sits BEFORE the `jns`, so a result that goes
+     * negative is kept. y=64, ship_y=64 -> d=0, di=15, bucket 15 is code byte 0x7c = 124,
+     * so 64-124 wraps to 196 and that is what gets stored. */
     {
-        uint8_t sx[1] = { 100 }, sy[1] = { 1 };
-        u2_space_warp_advance(sx, sy, 1, 100, 100);
-        /* di = (100-1-1)>>4 = 6, step 7, so 1-7 wraps to 250 */
-        CHECK(sy[0] == 250, "y sub arm must wrap (1-7 -> 250), got %d", sy[0]);
+        uint8_t sx[1] = { 100 }, sy[1] = { 64 };
+        u2_space_warp_advance(sx, sy, 1, 100, 64);
+        CHECK(sy[0] == 196, "y sub arm keeps a negative result (64-124 -> 196), got %d", sy[0]);
     }
-    /* The y table is eight deep and that is enough, because asm/6D3E seeds every y with
-     * `rand & 0x7f` and the ship sits at 0x40, so no y distance reaches bucket 8. A field
-     * seeded the way the original seeds it therefore never runs off the table. */
+    /* THE Y TABLE IS EIGHT ENTRIES AND THE ORIGINAL READS PAST IT. Read live at
+     * CS:0x17D:0x6cbc the table is 01..08 and the next eight bytes are program code
+     * (a0 7b 04 a2 79 04 a0 7c). asm/6D3E seeds every y with `rand & 0x7f` and the ship
+     * sits at 0x40, so on BOTH arms the bucket lands in 12..15 -- every y step the original
+     * takes comes out of its own instructions. Deterministic, because code bytes do not
+     * change; the steps are 121, 4, 160, 124. This is G89's y half. */
     {
         uint8_t sx[64], sy[64];
         u2_space_warp_seed(sx, sy, 64, 7u);
-        int maxy = 0;
-        for (int i = 0; i < 64; i++) if (sy[i] > maxy) maxy = sy[i];
+        int maxy = 0, bad = 0;
+        for (int i = 0; i < 64; i++) {
+            if (sy[i] > maxy) maxy = sy[i];
+            int d = (sy[i] - 0x40) & 0xff;
+            int di = (sy[i] >= 0x40) ? (((~d) & 0xff) >> 4) : (d >> 4);
+            if (di < 12 || di > 15) bad++;
+        }
         CHECK(maxy <= 0x7f, "seeded y must stay under 0x80 (asm/6D3E masks it), got %d", maxy);
+        CHECK(bad == 0, "every seeded y bucket must land in 12..15 (past the 8-entry "
+                        "table), %d did not", bad);
     }
 
-    /* --- a CHARACTERIZATION test, pinning a known divergence --------------------- */
-    /* This one asserts something the model gets WRONG, on purpose.
+    /* --- the field stays ALIVE but converges: a named, explained divergence ------ */
+    /* This block used to pin a freeze at frame 251. The rule was wrong in two places
+     * (swapped arms, uncomplemented bucket) and both are fixed, so the field no longer
+     * freezes -- but it still does not match the original, and the reason is now decoded
+     * rather than unknown.
      *
-     * Measured on the original (captures/spice86/g90-warp-table/): the live star table
-     * stays full-range across ~300 of the warp's ~509 frames and the screen's white-pixel
-     * count climbs from ~77 to ~6200 and back. This model does not: after 250 frames every
-     * star has fallen into the sub-arm's refuse case and the field is frozen. That is why
-     * the rule is implemented and tested but NOT wired into the renderer.
+     * What the bytes do on the paths that look like refusals: `L_006d76 jmp L_006e8c` and
+     * `L_006df0 jmp L_006e8c` are NOT skips. L_006e8c reloads the star's old x and y, calls
+     * L_006f68 -- which is the RNG, advancing the CS-side state word at cs:0x6996/0x6997
+     * with adc -- and stores the returned byte into DS:4C5. So a star whose arithmetic arm
+     * refuses gets a FRESH RANDOM POSITION, not no movement. That is why the original's
+     * table stays full-range: measured across 300 live samples its x spread never drops below
+     * 196 (mean 242), because the field is continuously re-stirred rather than converged.
      *
-     * Pinning the freeze rather than leaving it unasserted is deliberate: it goes red the
-     * moment someone fixes the model, which forces them to look at G90 and update this
-     * comment instead of shipping a half-fix that looks finished. If this fails, the
-     * divergence is closed — delete this block and wire the field in space_paint_mode(). */
+     * This model has no RNG arm, so it converges into a band around the ship's column. That
+     * is asserted here rather than hidden, and the fix is named: give the refuse paths the
+     * same RNG the engine already models elsewhere, and this check flips to the positive
+     * claim (spread > 128) when it lands. */
     {
         uint8_t sx[64], sy[64];
         u2_space_warp_seed(sx, sy, 64, 12345u);
@@ -127,10 +143,18 @@ int main(void)
         u2_space_warp_advance(sx, sy, 64, 128, 64);
         int moved = 0;
         for (int i = 0; i < 64; i++) if (sx[i] != px[i] || sy[i] != py[i]) moved++;
-        CHECK(moved == 0,
-              "KNOWN DIVERGENCE (G90): the model freezes by frame 251 but the original "
-              "does not; if this now moves, wire the field in and delete this check (moved=%d)",
-              moved);
+        CHECK(moved > 0,
+              "the field must still be moving at frame 251, as the original's is; moved=%d", moved);
+
+        int minx = 255, maxx = 0;
+        for (int i = 0; i < 64; i++) {
+            if (sx[i] < minx) minx = sx[i];
+            if (sx[i] > maxx) maxx = sx[i];
+        }
+        CHECK(maxx - minx < 64,
+              "KNOWN DIVERGENCE: without the L_006e8c RNG arm this model converges on the "
+              "ship's column (original spread is ~242, see the block comment); got %d..%d",
+              minx, maxx);
     }
 
     /* --- seeding is deterministic ------------------------------------------------- */

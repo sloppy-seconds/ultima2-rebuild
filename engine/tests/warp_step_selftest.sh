@@ -52,54 +52,57 @@ run_control() {
     fi
 }
 
-# Control 1: the step stops growing with distance. This is the single fact that makes the
-# field radial, so if the test cannot catch its absence the test is decorative.
+# Control 1: the two x arms are swapped. This is not hypothetical — it is the exact mistake
+# the first version of this function made, because `L_006d55 jb L_006d7f` branches on
+# old < ship, so the FALL-THROUGH is the >= case and the fall-through is the subtract arm.
+# Swapping them makes the field run away from the ship instead of toward it.
 cat > "$WORK/m1.py" <<'PY'
 import sys, pathlib
 src, dst = sys.argv[1], sys.argv[2]
 s = pathlib.Path(src).read_text()
-out = s.replace("            step = di + 1;\n            sx[i] = (uint8_t)(old + step);          /* wraps, stored unconditionally */",
-                "            step = 1;\n            sx[i] = (uint8_t)(old + step);")
+out = s.replace("        if (old >= ship_x) {", "        if (old < ship_x) {")
 if out == s: sys.exit(1)
 pathlib.Path(dst).write_text(out)
 PY
-run_control "step no longer grows with distance" "$WORK/m1.py"
+run_control "x arms swapped" "$WORK/m1.py"
 
-# Control 2: both arms add, so stars no longer move away from the ship on the left.
+# Control 2: the bucket complement dropped. `L_006d57 xor $0xff,%al` before the four rcr is
+# what makes the step GROW as a star approaches the ship; without it the step shrinks and
+# the field is a drift, not a radial pull.
 cat > "$WORK/m2.py" <<'PY'
 import sys, pathlib
 src, dst = sys.argv[1], sys.argv[2]
 s = pathlib.Path(src).read_text()
-out = s.replace("            if (old >= step) sx[i] = (uint8_t)(old - step);",
-                "            if (old >= step) sx[i] = (uint8_t)(old + step);")
+out = s.replace("            d = (old - ship_x) & 0xff;\n            di = ((~d) & 0xff) >> 4;",
+                "            d = (old - ship_x) & 0xff;\n            di = d >> 4;")
 if out == s: sys.exit(1)
 pathlib.Path(dst).write_text(out)
 PY
-run_control "left arm steps toward the ship" "$WORK/m2.py"
+run_control "x bucket no longer complemented" "$WORK/m2.py"
 
 # Control 3: the y add arm's sign gate is removed, so a result at or past 0x80 is stored.
-# asm/6B3D puts the store AFTER `jns` on this arm, so the gate is the byte-verified fact.
+# asm/6B3D puts the store AFTER `jns` on this arm (L_006de9 adc, jns, L_006df3 mov), so the
+# gate is the byte-verified fact.
 cat > "$WORK/m3.py" <<'PY'
 import sys, pathlib
 src, dst = sys.argv[1], sys.argv[2]
 s = pathlib.Path(src).read_text()
-out = s.replace("            if ((old + step) < 0x80) sy[i] = (uint8_t)(old + step);",
-                "            sy[i] = (uint8_t)(old + step);")
+out = s.replace("            if (nv < 0x80) sy[i] = (uint8_t)nv;",
+                "            sy[i] = (uint8_t)nv;")
 if out == s: sys.exit(1)
 pathlib.Path(dst).write_text(out)
 PY
 run_control "y add-arm sign gate removed" "$WORK/m3.py"
 
-# Control 4: the x add arm's store is put back under an overflow guard. This is not a
-# hypothetical -- it is the exact mistake the first version of this function made, and it is
-# what made the field drain to the x edges while every individual step still looked right.
-# The original stores at L_006d98 BEFORE the `jae`, so the wrap is kept.
+# Control 4: the x add arm's store is put back under an overflow guard. The original stores
+# at L_006d98 BEFORE the `jae`, so the wrap is kept — gating it is what makes a field drain
+# to the edges while every individual step still looks right.
 cat > "$WORK/m4.py" <<'PY'
 import sys, pathlib
 src, dst = sys.argv[1], sys.argv[2]
 s = pathlib.Path(src).read_text()
-out = s.replace("            sx[i] = (uint8_t)(old + step);          /* wraps, stored unconditionally */",
-                "            if (old + step <= 0xff) sx[i] = (uint8_t)(old + step);")
+out = s.replace("            sx[i] = (uint8_t)((old + step) & 0xff);",
+                "            if (old + step <= 0xff) sx[i] = (uint8_t)((old + step) & 0xff);")
 if out == s: sys.exit(1)
 pathlib.Path(dst).write_text(out)
 PY

@@ -101,24 +101,37 @@
 #           threshold and offset against a global counter at DS:4C3** — a stagger, and the
 #           mechanism by which only part of the field updates on a given pass, which is what
 #           makes the original's rays read as sparse dots rather than solid lines.
-#           The consequence for the new x is direct: `L_006e1c` stores `0x4c5` into the table,
-#           and `0x4c5` is `DS:4C3 + table[di]`. **And `DS:4C3` is the star's own old x** —
-#           `L_006d47` loads `0x4cd(%si)` and stores it to `0x4c3`, and nothing outside this
-#           routine writes it (`grep -rn 0x4c3 asm/` finds only these four sites). So the step
-#           is not a global sweep at all: it is `new_x = old_x + table_x[bucket(old_x)]`, a
-#           **position-dependent increment**, and that is the radial mechanism. Because
-#           `bucket(v) = (v ^ 0xff) >> 4`, a star near 0 gets bucket 15 and steps 16, a star
-#           near 255 gets bucket 0 and steps 1 — so the step shrinks with distance, which is
-#           what turns a uniform drift into rays.
-#           The y path at `L_006da0` is the same shape with a second table: `DS:4C4` is the
-#           star's old y, `di` is `bucket(old_y)`, and `L_006dc7` computes `0x4c4 -
-#           %cs:0x6cbc(%di)` into `DS:4C6`, gated by `jns` so a negative result is skipped.
-#           **The y table is where this stops being settled.** `cs:0x6cbc` live is `01 02 03
-#           04 05 06 07 08` and then code resumes — eight entries, not sixteen — while the
-#           bucket for any y below 128 lands in 8..15, which would mean most stars take their y
-#           step out of the program's own instructions. Either the y bucket is narrower than
-#           the code above reads, or that really is what happens. Settling it needs `%di`
-#           sampled at `L_006dc7` during a warp, not more reading of the listing.
+#           The consequence for the new x is direct: `L_006e1c` stores `0x4c5` into the table.
+#           **Corrected 2026-11-16: an earlier note here said `new_x = old_x +
+#           table_x[bucket(old_x)]`, and that was wrong on both counts.** The bucket is not
+#           `bucket(old_x)`, it is `bucket(old_x - ship_x)`: `L_006d50` does `sbb 0x47b,%al`
+#           (the ship's x) *before* the `xor $0xff` and the four `clc; rcr` (a logical shift,
+#           not an arithmetic one), so `di = (~(old - ship)) >> 4`. And the sign depends on
+#           which arm you are on, because `L_006d55 jb L_006d7f` branches when `old < ship`,
+#           so the **fall-through is the `sbb` (subtract) arm** and the branch target is the
+#           `adc` (add) arm with `di = ((old - ship) mod 256) >> 4`. Net effect: every star is
+#           pulled **toward** the ship's column, by up to 16 when it is next to it and by 1
+#           when it is at the far edge. That is the radial mechanism, and it is the opposite
+#           sign to what was written here before.
+#           The y path at `L_006da0` is the same shape with a second table and the same arm
+#           swap (`L_006dae jb L_006dd5`).
+#           **The y table question is now closed, and the answer is that the original reads
+#           past its own table.** `cs:0x6cbc` live is `01 02 03 04 05 06 07 08` and then the
+#           program's own code follows (`a0 7b 04 a2 79 04 a0 7c`) — eight entries, not
+#           sixteen. And the bucket is never below 12 for a field seeded by `asm/6D3E`
+#           (`y = rand & 0x7f`, ship at `0x40`): on the `>=` arm `d` is 0..63 so `(~d)>>4` is
+#           12..15, and on the `<` arm the wrapped difference is 192..255 so `>>4` is also
+#           12..15. **Every y step the original takes comes out of its own instructions**, at
+#           the fixed values 121, 4, 160, 124 for buckets 12..15. It is a bug in the game,
+#           and a deterministic one, because code bytes do not change.
+#           **And the paths that look like refusals are not refusals.** `L_006d76
+#           jmp L_006e8c` and `L_006df0 jmp L_006e8c` reload the star's old x and y, call
+#           `L_006f68` — which is the RNG, advancing the CS-side state word at
+#           `cs:0x6996/0x6997` — and store the returned byte into `0x4c5`. A star whose
+#           arithmetic arm refuses therefore gets a **fresh random position**, which is why
+#           the live table never converges: across 300 samples its x spread stays between 196
+#           and 254 (mean 242). Without that arm a model of the four arithmetic arms alone
+#           collapses into a band around the ship's column.
 #           **One correction to how the mapping was pinned.** The `cs:0x6990 = 0x2200` and
 #           `cs:0x6998 = 0xFF` readings that retired the skew question were taken on a session
 #           left up by an earlier warp, so they were residue from `asm/6DFD` having run, not

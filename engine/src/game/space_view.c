@@ -150,54 +150,84 @@ u2_warp_sweep u2_space_warp_sweep(int frame)
     return s;
 }
 
+/* asm/6B3D reads two step tables off the CS segment. Both were read live at CS:0x17D:0x6cac
+ * and CS:0x17D:0x6cbc (linear 0x0847C / 0x0848C) and both are constant across a title screen
+ * and a live orbit.
+ *
+ * The x table is 16 entries, value = index + 1.
+ *
+ * The y table is EIGHT entries, value = index + 1 -- and the bytes after it are the program's
+ * own instructions: `a0 7b 04 a2 79 04 a0 7c`. The y bucket is never below 12 for a star
+ * seeded by asm/6D3E (`y = rand & 0x7f`, ship at 0x40), so **every y step the original takes
+ * comes from reading past the end of its own table into its own code.** That is a bug in the
+ * game, but it is a deterministic bug: the code bytes do not change, so the steps are fixed
+ * at 121, 4, 160, 124 for buckets 12, 13, 14, 15. This is G89's y half, closed by reading
+ * the table width instead of inferring it -- the listing cannot say where a table ends.
+ */
+static const uint8_t u2_warp_step_y[16] = {
+    1, 2, 3, 4, 5, 6, 7, 8,                 /* cs:0x6cbc..0x6cc3, the table proper */
+    0xa0, 0x7b, 0x04, 0xa2,                 /* cs:0x6cc4..0x6cc7, code */
+    0x79, 0x04, 0xa0, 0x7c                  /* cs:0x6cc8..0x6ccb, code */
+};
+
 int u2_space_warp_advance(uint8_t *sx, uint8_t *sy, int n, int ship_x, int ship_y)
 {
-    /* asm/6B3D's four arms. The stores are NOT all gated the same way, and that asymmetry
-     * is the whole difference between a field that sweeps forever and one that drains:
+    /* asm/6B3D's four arms, transcribed. Two things the first version of this function got
+     * backwards, both of which matter:
      *
-     *   x, old >= ship : L_006d93 adc ; L_006d98 mov %al,0x4c5 ; L_006d9b jae
-     *                    store BEFORE the branch, so x WRAPS and is kept.
-     *   x, old <  ship : L_006d6e sbb ; cmc ; jb L_006d79 ; L_006d79 mov %al,0x4c5
-     *                    store AFTER the branch, so an underflow is refused.
-     *   y, old >= ship : L_006de9 adc ; jns L_006df3 ; L_006df3 mov %al,0x4c6
-     *                    store AFTER the branch, gated on the result being < 0x80.
-     *   y, old <  ship : L_006dc7 sbb ; cmc ; L_006dcd mov %al,0x4c6 ; jns
-     *                    store BEFORE the branch, so it WRAPS and is kept.
+     * 1. THE ARMS WERE SWAPPED. `L_006d55 jb L_006d7f` branches when old < ship, so the
+     *    FALL-THROUGH is the old >= ship case, and the fall-through is the `sbb` (subtract)
+     *    arm. The engine had >= as the add arm.
+     * 2. THE BUCKET IS THE COMPLEMENT OF THE DISTANCE, NOT THE DISTANCE. `L_006d57
+     *    xor $0xff,%al` then four `rcr` with `clc` before each (so a logical shift, not an
+     *    arithmetic one) gives di = (~(old - ship)) >> 4 on the >= arm, and the < arm skips
+     *    the xor, giving di = ((old - ship) mod 256) >> 4.
      *
-     * So x wraps upward and y wraps downward and neither one strands a star at an edge.
-     * The first version of this function gated the two unconditional stores, which made
-     * every star crawl to 255 and freeze; measured against the original that is exactly
-     * backwards, because the original's field GROWS across a warp (77 white px in orbit,
-     * peaking near 6200 mid-warp, back to ~80 after) rather than draining.
+     * The stores are still not all gated the same way, and that asymmetry is what separates
+     * a field that runs forever from one that drains:
      *
-     * The y table is eight entries because eight is enough: the initialiser asm/6D3E
-     * stores `rand & 0x7f` into every y, and the ship sits at 0x40, so a y distance never
-     * exceeds 127 and the bucket never exceeds 7. No guard is needed and none is wanted —
-     * a guard here would hide a seeding bug rather than reveal it.
+     *   x, old >= ship : L_006d6e sbb ; cmc ; jb L_006d79 ; L_006d79 mov %al,0x4c5
+     *                    store AFTER the branch -> an underflow is refused.
+     *   x, old <  ship : L_006d93 adc ; L_006d98 mov %al,0x4c5 ; L_006d9b jae
+     *                    store BEFORE the branch -> it wraps and is kept.
+     *   y, old >= ship : L_006dc7 sbb ; cmc ; L_006dcd mov %al,0x4c6 ; jns
+     *                    store BEFORE the branch -> kept even when the result goes negative.
+     *   y, old <  ship : L_006de9 adc ; jns L_006df3 ; L_006df3 mov %al,0x4c6
+     *                    store AFTER the branch -> refused once the result reaches 0x80.
+     *
+     * Net effect, with the ship at 0x80/0x40: every star's x is pulled toward the ship's
+     * column (down by 8..16 from above, up by 9..16 from below), and every star's y is
+     * scattered by a step of 4, 121, 124 or 160 depending on which code byte its bucket
+     * lands on. Whether the plotted position is the table value or a ship-relative one is a
+     * separate question from how the table moves; this function is only the table.
      */
     int moved = 0;
     for (int i = 0; i < n; i++) {
-        int old = sx[i];
-        int di, step;
+        int old = sx[i], d, di, step, nv;
         if (old >= ship_x) {
-            di = (old - ship_x) >> 4;
+            d = (old - ship_x) & 0xff;
+            di = ((~d) & 0xff) >> 4;
             step = di + 1;
-            sx[i] = (uint8_t)(old + step);          /* wraps, stored unconditionally */
+            if (old >= step) sx[i] = (uint8_t)((old - step) & 0xff);
         } else {
-            di = (ship_x - old - 1) >> 4;
+            d = (old - ship_x) & 0xff;
+            di = d >> 4;
             step = di + 1;
-            if (old >= step) sx[i] = (uint8_t)(old - step);
+            sx[i] = (uint8_t)((old + step) & 0xff);
         }
 
         old = sy[i];
         if (old >= ship_y) {
-            di = (old - ship_y) >> 4;
-            step = di + 1;
-            if ((old + step) < 0x80) sy[i] = (uint8_t)(old + step);
+            d = (old - ship_y) & 0xff;
+            di = ((~d) & 0xff) >> 4;
+            step = u2_warp_step_y[di];
+            sy[i] = (uint8_t)((old - step) & 0xff);
         } else {
-            di = (ship_y - old - 1) >> 4;
-            step = di + 1;
-            sy[i] = (uint8_t)(old - step);          /* wraps, stored unconditionally */
+            d = (old - ship_y) & 0xff;
+            di = d >> 4;
+            step = u2_warp_step_y[di];
+            nv = (old + step) & 0xff;
+            if (nv < 0x80) sy[i] = (uint8_t)nv;
         }
         moved++;
     }
