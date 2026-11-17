@@ -1,7 +1,7 @@
 # cmd_S — command handler 'S': prints "STEAL DIRECT-" then falls through
 # func 3F25..3F35  len 017 B  evidence: seed+reko (jump table cs:0730 entry S)
 # provenance: live:cmd-letters2-20261025; static
-#           entry executed in 3 of 282 harvests; confirmed by the capture of 2026-10-25. The
+#           entry executed in 3 of 283 harvests; confirmed by the capture of 2026-10-25. The
 #           capture proves the entry ran and nothing more -- what the following direction did
 #           with the aim is not established by these two harvests. Was recorded as never
 #           executed against a 60-harvest corpus that has since grown.

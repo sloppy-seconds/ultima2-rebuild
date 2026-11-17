@@ -2,7 +2,7 @@
 #           "-NOT HERE!" paths.
 # func 44D4..4541  len 006E B  evidence: seed+reko (jump table cs:0730 entry X)
 # provenance: live:airport32 (+2 other harvests), static
-#           entry executed in 4 of 282 harvests; derived by tools/provenance_from_traces.py
+#           entry executed in 5 of 283 harvests; derived by tools/provenance_from_traces.py
 # confidence: medium (flow + messages proven by bytes; NPC/quest semantics inferred)
 # notes: re-decoded with tools/decode_str.py (str_out-aware); gas re-encode diffs
 #        kept as .byte (disp8/disp16 and reg-op form choices)

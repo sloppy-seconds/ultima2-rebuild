@@ -25,7 +25,7 @@
 #         term of asm/1451's grid index, so a tower above its first floor still draws page 0.
 # func 334D..3380  len 052 B  evidence: seed+reko (jump table cs:0730 entry D)
 # provenance: live:d12-ladder-ds25; static
-#           entry executed in 2 of 282 harvests; confirmed by the capture of 2026-10-29, which is
+#           entry executed in 2 of 283 harvests; confirmed by the capture of 2026-10-29, which is
 #           the first time cmd_D appeared in ExecutedInstructions in any harvest.
 # confidence: high (structure read off the bytes; both gates and the outcome observed live
 #         2026-10-29; the two resume sites at 0x3570 are still a Phase 2 mis-align)
