@@ -2377,7 +2377,7 @@ bytes agree on the ship and disagree on both numbers.
 * **~~A cannon kill awards nothing.~~ WRONG, corrected 2026-11-11 by
   `captures/spice86/cannon-kill-live`.** This was the sentence "the cannon reaches `asm/2CA4`",
   and `asm/2CA4` was read as an ending because it is eleven bytes that end at a `call`. It has no
-  `ret`: the next byte is `asm/2CB5_combat_kill_minax_gate`, and the chain runs through the
+  `ret`: the next byte is `asm/2CB5_combat_kill_cell_restore`, and the chain runs through the
   kill-drop dispatch into `asm/2D8C_combat_kill_reward`. The original printed
   `KILLED--GOLD+13--EXP.+03` for a one-cell cannon kill. The `award` flag is gone from
   `apply_damage_to_slot` — both routes now share the whole tail, which is what the bytes say —

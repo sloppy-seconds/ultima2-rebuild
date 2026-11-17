@@ -116,7 +116,7 @@ and is now named there. This matters for the goal spec more than for any other f
 changes what W2 is even claiming.
 
 ```
-asm/2CB5_combat_kill_minax_gate     mov 0x197(%di),%al ; cmp $0x40,%al ; jne <kill-drop>
+asm/2CB5_combat_kill_cell_restore     mov 0x197(%di),%al ; cmp $0x40,%al ; jne <kill-drop>
       |                                                               |
       | type != 0x40 -------------------------------------------------+
       | type == 0x40 (fall through, no call edge)

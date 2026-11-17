@@ -1,4 +1,14 @@
-# combat_kill_stamp — a killed creature's cell is re-stamped, and the kill tail continues by FALL-THROUGH
+# combat_kill_cell_ptr — a kill points the cell pointer at the dead creature's cell; the WRITE is in asm/2CB5, not here
+# NAME CORRECTED: 2026-11-18 -- evidence: this file's own callee. `call L_0052b3` enters
+#           asm/50B3_map_tile_ptr, which computes y*64+x+DS:0472, leaves the address in DS:6,
+#           loads AL with the byte already there and RETURNS WITHOUT STORING. Nothing in these
+#           seventeen bytes writes to the map. The old name, `combat_kill_stamp`, asserted a
+#           store this file does not contain, and the engine implemented that misreading: it
+#           left the corpse's sprite stamped and the player walked past a monster he had
+#           already killed. The store is the next file down, asm/2CB5, which writes
+#           DS:1B7[slot] through the pointer this one computed.
+#           The name is kept as close as possible because the routine really is the kill path's
+#           cell addressing step; only the word `stamp` was a claim the bytes do not support.
 # name-evidence: `mov 0x137(%di),%al ; mov %al,0x23 ; mov 0x157(%di),%al ; mov %al,0x24 ;
 #           call L_0052b3` — the dead slot's mon_x/mon_y into the cursor pair DS:23/24 and
 #           then into asm/52B3, the cell stamper. Its only entry is `jae L_002ea4` from

@@ -7,7 +7,7 @@ nothing, on the static reading that asm/2C19's `jae` lands on asm/2CA4 (stamp th
 cell) and that "there is no reward roll anywhere on that path". The reading was wrong in
 the way this project keeps being wrong: the reward is reached by FALL-THROUGH, not by a
 call. asm/2CA4 ends at `call L_0052b3` and the very next bytes are
-asm/2CB5_combat_kill_minax_gate, then the drop dispatch at asm/2CD3 / asm/2D22, and both
+asm/2CB5_combat_kill_cell_restore, then the drop dispatch at asm/2CD3 / asm/2D22, and both
 of those arms tail-jump to combat_kill_reward at asm/2D8C.
 
 Settled live 2026-11-11 by captures/spice86/cannon-kill-live: one cell, a planted creature

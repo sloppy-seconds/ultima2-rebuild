@@ -1,4 +1,15 @@
-# combat_kill_minax_gate — the victory condition: a killed creature whose type is 0x40
+# combat_kill_cell_restore — the head of the kill tail writes DS:1B7[slot] back through the cell pointer, and then the Minax gate
+# NAME CORRECTED: 2026-11-18 -- evidence: the first five instructions of this body, read in
+#           order, are `mov $0x0,%bh ; mov $0x0,%bl ; mov %bx,%si ; mov 0x1b7(%di),%al ;
+#           mov 0x6,%bx` and then `mov %al,(%bx,%si)`. DS:6 is the cell pointer asm/2CA4 just
+#           computed, and DS:1B7 is the terrain byte saved at spawn — the same slot asm/2233
+#           restores on departure. So this file does not merely gate on Minax: it CLEARS the
+#           dead creature's cell off the map before the gate runs. The old name was not wrong,
+#           it was the second half of the file standing in for the whole of it, and the first
+#           half is the part the engine was missing.
+#           Consequence, measured: the original leaves no ghost where a creature died. The
+#           engine did, and a player reported walking past a monster he had already killed.
+#           Gate: engine/tests/attack_check.c, red with the write removed.
 # name-evidence: `mov 0x197(%di),%al ; cmp $0x40,%al ; jne L_002ed3`, where 0x197 is
 #           mon_type[32] (state.h:433, with its own note that DI is the slot index) and 0x40
 #           is Minax (asm/1040_minax_proximity_check, art 0x40>>2 == 0x10).
