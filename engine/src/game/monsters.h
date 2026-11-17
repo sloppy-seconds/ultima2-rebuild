@@ -143,6 +143,12 @@ void u2_monsters_clear_spawn_cells(u2_ctx *ctx, u2_world *w);
 
 int u2_monsters_ghost_cells(const u2_ctx *ctx, const u2_world *w);
 
+/* Whether a byte could be a creature's sprite: the nine spawn-arm types, Minax, or any type
+ * in a live slot. Used to tell a ghost a player can see from a cell where the grid and the
+ * sector file merely disagree about terrain, which is normal and invisible. The set's one
+ * blind spot is named in the definition. */
+int u2_monsters_creature_byte(const u2_ctx *ctx, uint8_t b);
+
 /*
  * How many creature slots are in the state table but NOT stamped into the grid — the mirror
  * image of u2_monsters_ghost_cells(), and the counter that catches an invisible monster.

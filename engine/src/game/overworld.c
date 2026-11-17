@@ -105,6 +105,9 @@ static void status_tick(u2_ctx *ctx)
     if (ctx->state.paral_sleep) ctx->state.paral_sleep--;
 }
 
+/* Per-sector, because a count of one sector printed against another is a wrong number. */
+static int s_terrain_reported = -1;
+
 /* Catch a ghost the moment it appears, not only when it reaches disk.
  *
  * The write-time note in core/world.c was not enough, and jarvis showed why: a fresh
@@ -128,6 +131,7 @@ static void ghost_watch(u2_ctx *ctx, const u2_world *w)
     if (sec != seen_sector) {
         memset(seen, 0, sizeof seen);
         seen_sector = sec;
+        s_terrain_reported = -1;   /* the count is per sector, so the report restarts */
     }
 
     uint8_t occupied[U2_SECTOR_TILES];
@@ -142,14 +146,37 @@ static void ghost_watch(u2_ctx *ctx, const u2_world *w)
         if (c >= 0 && c < U2_SECTOR_TILES)
             occupied[c] = 1;
     }
+
+    /* Two different things were being printed as one. A cell whose grid byte is a creature
+     * sprite with nothing standing on it is what a player calls a ghost. A cell whose grid
+     * byte merely disagrees with the sector file about the TERRAIN is invisible, and normal:
+     * DS:1B7 is a persisted byte saved when the creature spawned, and the original restores
+     * it whatever the file says. A classic session on jarvis produced two of those, 0x08
+     * over 0x0C and 0x0C over 0x08, and neither was the thing being looked for. So the
+     * sprites are named one by one and the terrain drift is reported as a count, once, when
+     * it changes. */
+    int terrain = 0;
     for (int c = 0; c < U2_SECTOR_TILES; c++) {
-        if (w->map[c] == w->map_base[c] || occupied[c] || seen[c])
+        if (w->map[c] == w->map_base[c] || occupied[c])
+            continue;
+        if (!u2_monsters_creature_byte(ctx, w->map[c])) {
+            terrain++;
+            continue;
+        }
+        if (seen[c])
             continue;
         seen[c] = 1;
         fprintf(stderr, "u2: NOTE ghost appeared in sector %d at (%d,%d): grid %#02x, "
                 "ground %#02x, nothing standing on it -- run with --trace and grep "
                 "mon_move for the slot that vacated it\n",
                 sec, c % U2_SECTOR_EDGE, c / U2_SECTOR_EDGE, w->map[c], w->map_base[c]);
+        fflush(stderr);
+    }
+    if (terrain != s_terrain_reported) {
+        s_terrain_reported = terrain;
+        fprintf(stderr, "u2: NOTE %d cell(s) in sector %d where the grid and the sector "
+                "file disagree about terrain (invisible, and expected: DS:1B7 is a "
+                "persisted byte)\n", terrain, sec);
         fflush(stderr);
     }
 }

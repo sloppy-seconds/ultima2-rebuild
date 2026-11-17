@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "core/ctx.h"
+#include "game/victory.h"     /* U2_MON_TYPE_MINAX: the one type that never spawns but is stamped */
 #include "core/rng.h"          /* u2_rand_byte: the spawner's two coordinate rolls */
 
 /* monx offset of each array. Kept as one table so a future re-measurement is a
@@ -527,4 +528,39 @@ int u2_monsters_wander(u2_ctx *ctx, u2_world *w)
     s->mon_hp[slot]   = arm.hp;
     w->map[cell]      = arm.type;   /* the stamp: asm/0D4F's `mov %al,(%bx,%si)` */
     return slot;
+}
+
+/* Could this byte be a creature's sprite?
+ *
+ * The set is the nine spawn-arm types above (docs/monster-spawn.md § 15.4 pinned all nine
+ * by forcing the selector and watching which arm ran), plus Minax, who never spawns but is
+ * stamped and is the win condition, plus every type currently in a slot in this sector,
+ * which is how a creature that arrived in a monx file rather than rolling is covered while
+ * it is alive.
+ *
+ * What it cannot see is a monx-only creature whose slot is now empty: its type is in none
+ * of the three sets, so a ghost it leaves would be filed as a terrain mismatch. That is
+ * stated rather than hidden because the alternative — a broad `map != map_base` test — was
+ * measured to be wrong in the other direction. A classic play session produced two such
+ * cells, 0x08 over 0x0C and 0x0C over 0x08, both terrain, both invisible, and neither was
+ * the ghost anyone was looking for.
+ *
+ * A terrain byte disagreeing with the sector file is normal and not a defect: DS:1B7 is a
+ * persisted byte in monx, saved when the creature spawned, and the original restores it
+ * whatever it says. The original has one grid, so nothing there is ever "wrong". */
+int u2_monsters_creature_byte(const u2_ctx *ctx, uint8_t b)
+{
+    if (b == 0)
+        return 0;
+    for (int i = 0; i < 9; i++)
+        if (kSpawnArms[i].type == b)
+            return 1;
+    if (b == U2_MON_TYPE_MINAX)
+        return 1;
+    if (ctx != NULL) {
+        for (int i = 0; i < U2_MON_SLOTS; i++)
+            if (ctx->state.mon_type[i] == b)
+                return 1;
+    }
+    return 0;
 }
