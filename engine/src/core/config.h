@@ -50,6 +50,14 @@ typedef struct {
     char saves[448];     /* [paths] saves  — where the player record goes */
     char themes[448];    /* [themes] dir   — the themes directory */
     char theme[64];      /* [themes] theme — the selected theme name */
+    /* [game] mode — "classic" or "enhanced", the presentation mode. Empty means
+     * the file says nothing and the engine's own default stands, which since the
+     * 2026-11-17 ruling is enhanced. A flag always wins, so `--classic` on the
+     * command line beats `mode = enhanced` here exactly as it beats nothing.
+     * Any value other than the two words is refused at startup rather than
+     * guessed, because a typo in a mode is the kind of mistake that otherwise
+     * plays for twenty minutes before anyone notices the wrong layout. */
+    char mode[16];
     /* [install] — the sources `--install` was given, recorded so the same command
      * works again with no flags from beside the game directory. The game never
      * reads these; the installer does, through core/install.h.

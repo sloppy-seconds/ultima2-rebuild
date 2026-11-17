@@ -760,6 +760,19 @@ static int write_config(const char *to, int have_themes, const u2_install_reques
                   "#              # auto-picks 10, then default, then fmtowns, then CGA\n",
                 U2_INSTALL_THEMES);
 
+    /* Written as a commented example rather than a pinned value, for the same reason
+     * the theme line is: a value here is an explicit choice that outranks the
+     * engine's own default and would have to be edited by hand to change again.
+     * Enhanced is the default, so the file says nothing and the default stands; the
+     * comment is there so a player who opens this file can find the knob at all. */
+    fputs("[game]\n"
+          "# mode = enhanced   # or classic. enhanced is the default: fan art, the\n"
+          "#                   # 640x480 layout, and the dead ends the original could\n"
+          "#                   # not avoid removed. classic is the original\n"
+          "#                   # presentation in one word, the same thing --classic\n"
+          "#                   # does on the command line.\n"
+          "\n", f);
+
     /* What --install was given, so running it again from here needs no flags.
      * `to` is this directory by construction; the sources are absolute because
      * they live outside it. A source that has since moved is reported by the next

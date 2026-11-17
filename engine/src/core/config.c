@@ -23,6 +23,10 @@
  * ignored is a player editing the wrong line forever. */
 static const char *const k_paths_keys[] = { "data", "saves" };
 static const char *const k_theme_keys[] = { "dir", "theme" };
+/* The presentation mode, which is neither a path nor an art choice, so it gets its
+ * own section rather than being filed under one that would make a reader guess. */
+static const char *const k_game_keys[] = { "mode" };
+static const char *const k_modes[] = { "classic", "enhanced" };
 /* What --install recorded about itself. `themes2..4` rather than one
  * comma-separated list because the ini grammar has one value per key and the
  * parser refuses rather than splits; four is U2_THEMES_MAX_SOURCES, asserted below
@@ -172,12 +176,21 @@ u2_config_result u2_config_load(const char *path, u2_config *out,
             break;
         }
     }
+    cur = 0;
+    while (r == U2_CONFIG_OK && u2_ini_next_key(buf, "game", &cur, key, sizeof key)) {
+        if (!known(k_game_keys, sizeof k_game_keys / sizeof k_game_keys[0], key)) {
+            snprintf(err, errsz, "%s: unknown key '%s' in [game]", path, key);
+            r = U2_CONFIG_REFUSED;
+            break;
+        }
+    }
     if (r == U2_CONFIG_OK &&
         count_keys(buf, NULL) !=
-            count_keys(buf, "paths") + count_keys(buf, "themes") + count_keys(buf, "install")) {
+            count_keys(buf, "paths") + count_keys(buf, "themes") +
+            count_keys(buf, "game") + count_keys(buf, "install")) {
         snprintf(err, errsz,
-                 "%s: a key sits outside [paths], [themes] and [install]; every setting "
-                 "belongs under one of them", path);
+                 "%s: a key sits outside [paths], [themes], [game] and [install]; every "
+                 "setting belongs under one of them", path);
         r = U2_CONFIG_REFUSED;
     }
 
@@ -198,6 +211,7 @@ u2_config_result u2_config_load(const char *path, u2_config *out,
             { "paths",   "saves",   out->saves, sizeof out->saves },
             { "themes",  "dir",     out->themes,sizeof out->themes},
             { "themes",  "theme",   out->theme, sizeof out->theme },
+            { "game",    "mode",    out->mode,  sizeof out->mode  },
             { "install", "to",      out->inst_to,      sizeof out->inst_to },
             { "install", "original",out->inst_original,sizeof out->inst_original },
             { "install", "updated", out->inst_updated, sizeof out->inst_updated },
@@ -229,6 +243,28 @@ u2_config_result u2_config_load(const char *path, u2_config *out,
         for (int i = 0; i < U2_INSTALL_MAX_RECORDED && r == U2_CONFIG_OK; i++) {
             if (*out->inst_themes[i])
                 out->n_inst_themes = i + 1;
+        }
+
+        /* [game] mode is one of two words, and a third word is a refusal rather
+         * than a shrug. A misspelt mode is the specific mistake that costs a whole
+         * play session: the game starts, it looks like a game, and the layout or the
+         * fidelity rules are quietly the other mode's. Case is not part of the
+         * meaning, so `Enhanced` is accepted and stored lower-case for the one
+         * reader below that compares it. */
+        if (r == U2_CONFIG_OK && *out->mode) {
+            int known_mode = 0;
+            for (size_t i = 0; i < sizeof k_modes / sizeof k_modes[0]; i++)
+                if (!strcasecmp(out->mode, k_modes[i]))
+                    known_mode = 1;
+            if (!known_mode) {
+                snprintf(err, errsz, "%s: [game] mode = %s is neither 'classic' "
+                         "nor 'enhanced'", path, out->mode);
+                r = U2_CONFIG_REFUSED;
+            } else {
+                for (char *c = out->mode; *c; c++)
+                    if (*c >= 'A' && *c <= 'Z')
+                        *c = (char)(*c + ('a' - 'A'));
+            }
         }
     }
 

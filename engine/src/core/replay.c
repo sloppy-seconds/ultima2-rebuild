@@ -93,6 +93,14 @@ int u2_replay_write(u2_ctx *ctx, const char *path)
     /* Which field set state_sha was computed over. Verification treats an absent field as scope 1, so
      * the evidence recorded before the split still verifies. Bumping this is a baseline move. */
     fputs("  \"digest_version\": 1,\n", f);
+    /* Which presentation mode produced this run, so a replay is not at the mercy of
+     * whatever the default happens to be this month. Enhanced became the default on
+     * 2026-11-17, and the committed CP2 evidence predates that, so it was recorded
+     * under original rules and must replay under them. An absent field therefore
+     * means classic, not "unknown": every report written before this line existed
+     * was written when original mode was the only default. */
+    fprintf(f, "  \"mode\": \"%s\",\n",
+            ctx->fidelity == U2_FIDELITY_ENHANCED ? "enhanced" : "classic");
     fprintf(f, "  \"engine_version\": "); emit_str(f, ver); fprintf(f, ",\n");
     fprintf(f, "  \"content_source\": ");
     emit_str(f, ctx->content_source ? ctx->content_source : "none");

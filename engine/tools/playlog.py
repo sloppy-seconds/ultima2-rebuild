@@ -53,6 +53,13 @@ def rerun(rep, out_path):
         cmd = [BIN, "--headless", "--seed", str(rep.get("seed", 0)),
                "--script", kpath, "--save-dir", savedir,
                "--replay-report", out_path]
+        # Replay under the mode the evidence was recorded under. Enhanced became the
+        # engine's default on 2026-11-17, and every committed report predates that,
+        # so an absent "mode" field means classic rather than "use the default":
+        # defaulting to the current default would silently re-record the baseline
+        # under different rules and then report a divergence as an engine bug.
+        if rep.get("mode") != "enhanced":
+            cmd.insert(1, "--classic")
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         if proc.returncode != 0:
             sys.exit(f"playlog: engine exit {proc.returncode}: {proc.stderr.strip()[:200]}")

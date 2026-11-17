@@ -698,10 +698,18 @@ void u2_demo_quiescent(u2_ctx *ctx, u2_demo_mode mode, const u2_world *world)
             fprintf(stderr, "u2: rules pinned from the demo: fidelity=%s\n",
                     ctx->fidelity == U2_FIDELITY_ENHANCED ? "enhanced" : "original");
         } else {
+            /* Absent means the file predates the line — and every file that predates the
+             * line also predates the day enhanced became the default (2026-11-17), so
+             * "no line" is not "unknown", it is original. Pinning it rather than leaving
+             * this build's mode in place is what keeps an old recording replaying the game
+             * it actually recorded: leaving it meant the same file silently replayed a
+             * different rule set the moment the default flipped, and the digest would have
+             * blamed the engine. Same reasoning, same date, as the `mode` field in the
+             * replay report (core/replay.c). */
+            ctx->fidelity = U2_FIDELITY_ORIGINAL;
             fprintf(stderr, "u2: this recording predates the fidelity header line, so it"
-                            " plays under this build's mode (%s). If a digest diverges on a"
-                            " kill, that may be the rule and not the engine.\n",
-                    ctx->fidelity == U2_FIDELITY_ENHANCED ? "enhanced" : "original");
+                            " plays under the original rules. If a digest diverges on a"
+                            " kill, that may be the rule and not the engine.\n");
         }
         if (u2_demo_mode_needs_world(d->mode))
             ctx->demo_restamp_pending = 1;

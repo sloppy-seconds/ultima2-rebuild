@@ -19,6 +19,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <string.h>
+#include <strings.h>          /* strcasecmp, for a mode word from any source */
 #include "core/api.h"
 #include "core/ctx.h"
 #include "core/version.h"
@@ -73,11 +74,18 @@ static void usage(const char *argv0)
         "  --dev           development affordances only (Ctrl-Q ends the run). Off by\n"
         "                  default, and it never changes game behaviour: without it the\n"
         "                  engine implements the game and nothing else.\n"
-        "  --enhanced      enhanced fidelity: same rules and state as the original, but\n"
-        "                  dead ends the original could not avoid are removed. Today that\n"
-        "                  means finishing character creation enters the world instead of\n"
-        "                  replaying the CP/M disk-swap restart. Default is original,\n"
-        "                  which is what the CP2 byte-comparison baseline measures.\n"
+        "  --enhanced      enhanced mode: the original's rules and state, with the dead\n"
+        "                  ends the original could not avoid removed, and the 640x480\n"
+        "                  layout. This is the DEFAULT (owner, 2026-11-17); the flag is\n"
+        "                  kept so a script written before it still says what it means.\n"
+        "                  --classic is the opt-out, and config.ini [game] mode is the\n"
+        "                  place to choose it without a flag.\n"
+        "  --classic       original mode: the original's CGA art AND the original screen\n"
+        "                  layout, in one flag (--cga is an alias). Opting out of the\n"
+        "                  presentation means opting out of all of it; art alone is\n"
+        "                  --ega in one direction and this in the other. This is also\n"
+        "                  the mode the CP2 byte-comparison baseline is recorded under,\n"
+        "                  so a replay of committed evidence asks for it explicitly.\n"
         "  --auto-pass-polls N\n"
         "                  idle polls before the engine auto-PASSes. 0 = the original's\n"
         "                  fixed value, -1 = disabled for pure turn-based play, N = that\n"
@@ -150,11 +158,14 @@ static void usage(const char *argv0)
         "                    PROVISIONAL: superseded by the graphics-set switch in the\n"
         "                    options menu (docs/options-menu.md).\n"
         "  --classic         the original 4-colour CGA art, and the way to force it when\n"
-        "                    a themes tree is installed (--cga is an alias). With neither\n"
-        "                    --ega nor --classic the engine picks from what is on disk:\n"
-        "                    the fan pack's `10` theme, then its `default`, then the\n"
-        "                    derived FM Towns theme, and CGA if it holds none. Which was\n"
-        "                    chosen, and whether it was automatic, is printed at startup.\n"
+        "                    a themes tree is installed (--cga is an alias). Since the\n"
+        "                    2026-11-17 ruling this is also the layout opt-out: it asks\n"
+        "                    for original fidelity and the original screen, not the art\n"
+        "                    alone. With neither --ega nor --classic the engine picks from\n"
+        "                    what is on disk: the fan pack's `10` theme, then its\n"
+        "                    `default`, then the derived FM Towns theme, and CGA if it\n"
+        "                    holds none. Which was chosen, and whether it was automatic,\n"
+        "                    is printed at startup.\n"
         "  --ega-theme NAME  which EGA tile theme to load: 10, default, alt, c64\n"
         "                    (default: 10). PROVISIONAL, as --ega.\n"
         "  --ega-theme-dir DIR  where to find EGATILES / EGATHEME.* and the PIC*-E\n"
@@ -392,6 +403,34 @@ static int parse_rng_state(const char *s, uint8_t out[6])
 /* The DS checkpoint itself lives in core/state.c (u2_state_load_ds) because it has to be applied
  * after the world and monx load, which is in the overworld, not here. */
 
+/* One mode, chosen from one of four places, applied by one rule.
+ *
+ * `classic` is the whole original presentation and so settles the art axis with the
+ * fidelity, exactly as --classic does on the command line. Leaving it unset for
+ * enhanced is deliberate: enhanced *prefers* themed art but must not require it, and
+ * the auto-detect further down is what grants that preference quietly when a theme is
+ * installed and falls back to CGA with a printed line when none is.
+ *
+ * Returns -1 for a word that is neither mode. Every source that can name a mode is
+ * checked with the same refusal, because a misspelt mode is the mistake that plays
+ * for twenty minutes before anyone notices the wrong layout. */
+static int apply_mode_name(u2_ctx *ctx, const char *name, int *art_forced)
+{
+    if (!name || !*name)
+        return 0;
+    if (!strcasecmp(name, "classic")) {
+        ctx->fidelity = U2_FIDELITY_ORIGINAL;
+        ctx->art_mode = U2_ART_CGA;
+        *art_forced = 1;
+        return 0;
+    }
+    if (!strcasecmp(name, "enhanced")) {
+        ctx->fidelity = U2_FIDELITY_ENHANCED;
+        return 0;
+    }
+    return -1;
+}
+
 int main(int argc, char **argv)
 {
     u2_ctx ctx;
@@ -419,6 +458,11 @@ int main(int argc, char **argv)
      *     but names no theme, so it still gets the preference. */
     int art_mode_forced = 0;
     int theme_named = 0;
+    /* Set when the player named a mode on the command line, either way. It is what
+     * lets config.ini fill the choice without overriding a flag: fidelity now has a
+     * non-zero default, so "did the flag fire" is no longer something you can infer
+     * from the value afterwards. */
+    int mode_given = 0;
     /* Set only when the player *demanded* themed art -- --ega, or a theme named by
      * flag or config. It is what makes the strict launch check fire, and the
      * distinction is load-bearing: --enhanced prefers EGA but must not require it.
@@ -437,6 +481,14 @@ int main(int argc, char **argv)
     u2_config cfg;
     memset(&ctx, 0, sizeof ctx);
     ctx.mode = U2_MODE_TERM;
+    /* Enhanced is the default mode (owner, 2026-11-17): the fan-art presentation and
+     * the 640x480 layout are what a player gets, and `--classic` or
+     * config.ini `[game] mode = classic` is the way back to the original
+     * presentation. The CP2 byte-comparison baseline is not affected by this, because
+     * the evidence carries the mode it was recorded under and `tools/playlog.py`
+     * replays it under that mode rather than under whatever the default happens to be
+     * this month. */
+    ctx.fidelity = U2_FIDELITY_ENHANCED;
     /* D5 is the default, not an option: a playback that recalibrated the speed
      * fields could diverge for a reason that looks like a deep bug, so pinning is
      * what playback means and --speed-pin only names it out loud. */
@@ -493,10 +545,12 @@ int main(int argc, char **argv)
              * change game behaviour. See u2_ctx::dev. */
             ctx.dev = 1;
         } else if (strcmp(a, "--enhanced") == 0) {
-            /* Same rules and state as the original; dead ends the original
-             * could not avoid are removed. Default is original, which is what
-             * the CP2 byte-comparison baseline is measured against. */
+            /* The default since 2026-11-17, and still an explicit statement of it.
+             * Same rules and state as the original; dead ends the original could not
+             * avoid are removed. Today that means finishing character creation enters
+             * the world instead of replaying the CP/M disk-swap restart. */
             ctx.fidelity = U2_FIDELITY_ENHANCED;
+            mode_given = 1;
         } else if (strcmp(a, "--auto-pass-polls") == 0 && i + 1 < argc) {
             /* Idle auto-PASS threshold. 0 restores the faithful default, -1
              * disables it for pure turn-based play. Only meaningful in enhanced
@@ -535,11 +589,13 @@ int main(int argc, char **argv)
             ctx.cleanroom = 1;
             art_mode_forced = 1;   /* substitute art is a named choice, not a default */
         } else if (strcmp(a, "--classic") == 0 || strcmp(a, "--cga") == 0) {
-            /* The opt-out: force the original 4-colour CGA art even when a themes
-             * tree is installed. --classic is the name; --cga is kept as an alias
-             * because it names the art and reads the way --ega reads. The default
-             * now picks the best EGA theme on its own, so this is the only way to
-             * get the original art on an install that has themes. */
+            /* The opt-out, and it is one flag for both halves: original fidelity and
+             * the original screen layout as well as the original 4-colour art. Making
+             * it art-only would leave "classic art in the enhanced layout" reachable
+             * as an accident of flag order, and nobody has drawn or gated that pair.
+             * --cga stays an alias of the same thing, not of art-only. */
+            ctx.fidelity = U2_FIDELITY_ORIGINAL;
+            mode_given = 1;
             art_mode_forced = 1;
             ctx.art_mode = U2_ART_CGA;
         } else if (strcmp(a, "--ega") == 0) {
@@ -787,6 +843,37 @@ int main(int argc, char **argv)
             return 2;
         }
         u2_config_apply(&ctx, &cfg);
+        /* The mode, from the three places that are not the command line, in the same
+         * precedence the paths follow: a flag outranks the environment, the
+         * environment outranks config.ini, and config.ini outranks the built-in
+         * default of enhanced. `mode_given` is why the flag has to be tracked
+         * separately now that the default is non-zero.
+         *
+         * U2_MODE exists for the test harness, and it is worth saying why a knob
+         * nobody plays with is in the shipped binary. CP5 is the original-fidelity
+         * checkpoint, and roughly a third of its gates drive the engine through the
+         * python helpers under tests/, which pass the binary down as one string;
+         * per-invocation flags would mean editing every one of those helpers, and a
+         * helper that quietly ran in the other mode is exactly the silent-wrong-verdict
+         * failure this project has already been bitten by twice. One exported variable
+         * at the top of run_cp5.sh pins the whole checkpoint, helpers included, and is
+         * greppable. A player never sets it. */
+        const char *mode_env = getenv("U2_MODE");
+        if (!mode_given) {
+            char mode_src[64];
+            const char *mode_word = *cfg.mode ? cfg.mode : NULL;
+            if (mode_env && *mode_env) {
+                snprintf(mode_src, sizeof mode_src, "%.60s", mode_env);
+                mode_word = mode_src;
+            }
+            if (mode_word &&
+                apply_mode_name(&ctx, mode_word, &art_mode_forced) != 0) {
+                fprintf(stderr, "u2: %s = %s is neither 'classic' nor 'enhanced'\n",
+                        (mode_env && *mode_env) ? "U2_MODE" : "[game] mode",
+                        mode_word);
+                return 2;
+            }
+        }
         /* A theme named in config.ini must behave exactly like --ega-theme on the
          * command line, and the first version of this only half did it: it set
          * theme_named, which suppresses auto-detection, without selecting the art
