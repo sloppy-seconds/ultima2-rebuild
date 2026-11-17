@@ -531,6 +531,43 @@ u2_world_result u2_world_store(u2_ctx *ctx, u2_world *w, int is_map)
     if (!id_of(w, is_map, &id))
         return U2_WORLD_ERROR;
 
+    /* The write-back's own diagnostic, and deliberately a MEASUREMENT and not a filter.
+     * A cell whose grid byte differs from the ground with no creature standing on it is a
+     * stamp about to be baked into the file, and that is the ghost the player sees: the
+     * overlay is read back ahead of content, so a baked footprint becomes authored ground
+     * on the next load and the next character walks past it as scenery.
+     *
+     * The first attempt here substituted `map_base` for such a cell, and it was wrong in a
+     * way the CP4 ghost gate caught immediately: the release maps ship with creature art
+     * baked into the spawn cells, so `map_base` is not a clean ground and substituting it
+     * can restore one ghost with another (the control found (31,33) = 0x38). The original
+     * writes its stamped grid — asm/2305 writes the buffer at [DS:472] — so the engine is
+     * not entitled to tidy it on the way out. What the original does have, and measurably,
+     * is no such cell at all: in a mapx the original wrote itself, every differing cell
+     * had a live creature on it (2 of 2), where the engine's had twelve differing and nine
+     * bare. So the producer is where the defect is, and this counter is how a gate can see
+     * it from here. */
+    if (is_map && w->map_loaded && want >= U2_SECTOR_TILES) {
+        uint8_t occupied[U2_SECTOR_TILES];
+        const size_t slots = sizeof ctx->state.mon_type / sizeof ctx->state.mon_type[0];
+        memset(occupied, 0, sizeof occupied);
+        for (size_t i = 0; i < slots; i++) {
+            if (ctx->state.mon_type[i] == 0)
+                continue;
+            if (!(ctx->state.mon_x[i] || ctx->state.mon_y[i]))
+                continue;   /* the (0,0) unused-slot convention, same as the stamp paths */
+            const int cell = (int)ctx->state.mon_y[i] * U2_SECTOR_EDGE
+                           + (int)ctx->state.mon_x[i];
+            if (cell >= 0 && cell < U2_SECTOR_TILES)
+                occupied[cell] = 1;
+        }
+        int unowned = 0;
+        for (int i = 0; i < U2_SECTOR_TILES; i++)
+            if (buf[i] != w->map_base[i] && !occupied[i])
+                unowned++;
+        ctx->diag_baked_unowned = unowned;
+    }
+
     /* The write target is the save slot, always, and never a content directory.
      * This is the whole point of docs/save-scoped-worlds.md: the original does
      * bake creature bytes into its sector files (asm/2305 writes the stamped

@@ -429,6 +429,33 @@ else
     sed 's/^/        /' "$WORK/ai.build"
 fi
 
+# --- 1g3. the map write-back must see what it is baking -----------------------
+# The property is the original's own: in a mapx the original wrote, every cell that
+# differed from the release map had a live creature on it (2 of 2). The engine's overlay
+# for the same sector had twelve differing and nine bare, and a bare one is permanent —
+# the overlay is read back ahead of content, so the footprint becomes authored ground and
+# the next character walks past it as scenery. This gate enforces that the save path can
+# SEE the class (control: remove the counter in core/world.c and it goes red); the fix
+# itself belongs to the producer, and docs/map-format.md says why it is not the writer.
+if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/baked_cells_check" \
+        tests/baked_cells_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/baked.build"; then
+    mkdir -p "$WORK/baked"
+    if "$WORK/baked_cells_check" "$WORK/baked" > "$WORK/baked.out" 2>&1; then
+        n=$(sed -n 's/^baked-cells ok: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/baked.out")
+        if [ "${n:-0}" -eq 0 ]; then
+            bad "CP5 baked-cell run executed 0 checks — the test is not running"
+        else
+            ok "CP5 stamps: the saved grid carries only what a creature stands on ($n checks)"
+        fi
+    else
+        bad "CP5 baked-cell check failed:"
+        sed 's/^/        /' "$WORK/baked.out"
+    fi
+else
+    bad "CP5 baked-cell harness did not build:"
+    sed 's/^/        /' "$WORK/baked.build"
+fi
+
 # --- 1g2. the speed model (asm/06ED rescale, F7/F8) ---------------------------
 # The control is a live memory dump, not a hand-written expectation: captures/spice86/
 # g30-clockcal/ gives DS:74, DS:554 and the DS:558 multiplier table, and the engine must

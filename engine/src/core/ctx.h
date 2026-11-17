@@ -215,6 +215,14 @@ typedef struct u2_ctx {
      * it. Without the latch a gate cannot distinguish "stamped on load" from "stamped by the
      * first sweep", which is exactly how a town-entry defect survived a passing test. */
     int diag_unstamped_at_load;
+    /* Stamps the map write-back refused to bake: cells whose grid byte differs from the
+     * ground with no creature standing on them. The original's own saved sector has no
+     * such cell (measured against a file the original wrote itself), so every one of these
+     * is the engine about to turn a creature's footprint into permanent terrain. Counted
+     * in core/world.c at the moment of the store, which is the only place the number is
+     * worth having: diag_ghosts measured on a live frame can be 0 while the buffer about
+     * to be written is full of them. */
+    int diag_baked_unowned;
     /* CP8 1d ending animation, measured by captures/spice86/victory-live/. The fade is
      * 64x64 random-cell writes of the black tile, so with repeats it blackens ~63% of the
      * 4096 cells; the count makes "the fade ran and painted randomly" assertable without
