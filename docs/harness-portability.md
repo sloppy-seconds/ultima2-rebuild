@@ -2220,3 +2220,17 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   human player" is what sent it back to be measured; the number survived and the method did
   not, which is the good outcome. A plausible figure nobody questions is the dangerous one. →
   Tier 1, tooling that fails loudly.
+
+- **2026-11-17 — a save location that holds derived state as well as the record makes the
+  previous game the next game's ground.** The engine writes the world it has mutated into the
+  same directory as the character record, which is correct for resuming one game and wrong for
+  starting the next: the overlay is read ahead of the release content, so anything the last
+  character left behind is authored terrain for whoever creates a character next. The general
+  form is that "resume" and "start fresh" are two different questions, and a layout that answers
+  only the first silently answers the second with the wrong game. Two things worth carrying to
+  any harness with one default save location: a new game should rotate the old one aside rather
+  than overwrite it, because the old one is evidence and somebody's afternoon; and the counter
+  that would have caught this has to run at the moment of the write, not on a live frame — a
+  diagnostic that measures the running state cannot see a file, and this one printed zero while
+  the player was walking past nine. → Tier 1, save/derived-state layout and diagnostics that
+  measure the artefact rather than the session.
