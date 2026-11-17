@@ -5,6 +5,12 @@ FM Towns side-by-side layout to become our enhanced-mode layout, and asked that 
 layout be validated against the reference screenshots first. It has been, and the
 measurements are below.
 
+> **Corrected 2026-11-17, in part.** "No engine code has been changed" is no longer true of the
+> question of *when* the layout turns on: D4 is ruled and implemented, enhanced is the engine's
+> default mode, and `--classic` plus `config.ini [game] mode = classic` are the opt-out. What is
+> still plan is the FM Towns side-by-side arrangement itself — the enhanced layout that ships is
+> the earlier one, not this document's § 3. Read D4 as settled and the rest as unbuilt.
+
 > **Added 2026-11-15 — a fifth item, owner-ruled, not a decision: enhanced mode should address
 > the player according to gender in its speech.** Tracked in `docs/outstanding.md` § 1. It lives
 > here because it is enhanced-only work, and it is a deliberate divergence rather than a fidelity
@@ -151,6 +157,15 @@ precedent already set: frame scale is a property of the **art mode**, not the th
 specifically so a Ctrl-T cycle cannot resize the window. A layout that changes with
 the theme would reopen exactly that problem, which argues for tying it to the mode or
 to an explicit flag, not to the theme.
+
+**D4 is ruled, 2026-11-17, and it went further than any of the three candidates.** The
+layout belongs to the *mode*, and the mode now defaults to enhanced with `--classic` as
+the one-word opt-out for the whole presentation; `config.ini` carries `[game] mode =
+classic` for a tree that should always open the original way. No `--layout` flag was
+added, because with the mode owning it there is nothing left for a second flag to say.
+The art axis stayed separable, and the measured consequence is the third canvas: classic
+with fan art is 640x400, the EGA mode the art pack was drawn for, not 320x200. Enhanced is
+1024x512 whatever the art. See `docs/phase4-implementation.md`, 2026-11-17.
 
 ## 5. What already exists to reuse
 

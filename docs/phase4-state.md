@@ -1447,11 +1447,12 @@ message, not which tile is passable."* That sentence rules out the two most desi
 name, in the same terms, and `--dev` exists precisely because unrequested behaviour once masqueraded
 as fidelity. Cheats are the loudest possible version of that mistake.
 
-**So it needs its own flag, off by default.** `--enhanced` is not the right home either as things
-stand: enhanced is currently "same rules and state as the original, but better presented", and a
-god mode is not better presentation, it is new gameplay. Naming that honestly beats stretching the
-existing category, and off-by-default keeps every gate and the CP2 byte-comparison baseline exactly
-where they are.
+**So it needs its own flag, off by default.** `--enhanced` is not the right home even now that
+enhanced is the engine's default mode (2026-11-17): enhanced is "same rules and state as the
+original, but better presented", and a god mode is not better presentation, it is new gameplay.
+Naming that honestly beats stretching the existing category, and a flag nobody has to think about
+keeps every gate and the CP2 byte-comparison baseline exactly where they are — the baseline is
+recorded under `--classic` now, which is the same protection wearing a different name.
 
 **The mapping, with honest verdicts.** Doom codes, and what Ultima II can actually back:
 

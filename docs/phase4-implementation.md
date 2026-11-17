@@ -2280,3 +2280,84 @@ Gates, both red-controlled:
 
 `make test`: CP0..CP7 PASS.
 
+
+## 2026-11-17 — enhanced is the default mode; `--classic` is the opt-out for the whole presentation
+
+Owner ruling. The 2026-11-13 entry reversed the *art* axis and stopped there, so a player
+on a full install got fan art inside the original 320x200 layout unless they remembered
+`--enhanced`. That split was never intended to be permanent. Now the mode itself defaults to
+enhanced, and `--classic` means the original presentation in one word: original CGA tiles
+**and** the original screen, not the art alone.
+
+### Code
+
+* `core/config.c` / `config.h`: a `[game]` section with one key, `mode`, validated against
+  `classic` / `enhanced` at load, stored lowercase, and an unknown value refused at startup
+  with exit 2 rather than guessed.
+* `main.c`: `apply_mode_name()` applies a mode word from any of four places, so the words
+  `classic` cannot mean different things depending on where they were typed. Precedence is
+  flag > `U2_MODE` > `config.ini` > built-in enhanced. `--classic` now sets fidelity, CGA
+  art and `art_mode_forced`; the last of those is load-bearing, because without it the
+  auto-detect further down sees an unfilled art mode, finds the installed themes, and hands
+  the fan art straight back to a player who just declined it. That is not a hypothetical:
+  it is what happened on the first run of the gate below.
+* `core/replay.c` + `engine/tools/playlog.py`: the replay report now carries a `mode` field,
+  and an absent field means classic, because every committed byte-comparison record predates
+  this flip. `playlog.py` inserts `--classic` for exactly those records, so the CP2 baseline
+  keeps replaying under the mode it was recorded under and not under the new default.
+* `core/demo.c`: same reasoning, same date. A recording with no `fidelity` header line used
+  to play "under this build's mode", which was a sentence that meant something while the
+  default was original and meant nothing after the flip. It now pins original and says so.
+* `core/install.c`: the generated `config.ini` carries a commented `[game] mode` example, so
+  the knob is findable from the file a player actually opens.
+
+### The three canvases, measured rather than assumed
+
+Enhanced is 1024x512 whatever the art. Classic is 320x200 on CGA and 640x400 with the fan
+art — the *Ultima II Upgrade* pack was made for EGA 640x400, so the art axis legitimately
+owns that third geometry. `--classic --ega` is therefore original layout with fan art, and
+the art flag wins the art half because it is the more specific request.
+
+### Gates
+
+* `run_cp4.sh` gained a `[game] mode` block: no flag in a themes tree is enhanced; `mode =
+  classic` opts out; `Enhanced` is accepted case-insensitively; `--classic` beats a config
+  that asks for enhanced; `mode = turbo` is refused with a named message; and `--classic
+  --ega` keeps the art axis separable from the mode axis. The flag-beats-file check is
+  deliberately written in the direction where the file asks for the opposite of the flag,
+  because that is the half that goes silently wrong if the ini is applied after the flags
+  instead of filling only what they left unset.
+* `run_cp4.sh` also asserts the canvas on pixels and not only on a log line: no flag must
+  give 1024x512, `--classic --ega` must give 640x400. Without the first of those the default
+  could silently revert and every classic-pinned gate would stay green, because none of them
+  looks at an unflagged run.
+* Four CP4 gates that assert original geometry (`--dump-map` twice, the play-shot screenshot
+  diff, the completed-creation restarts-to-title check) now pass `--classic` explicitly, and
+  `tests/site_viewport_gate.py` pins it too — it asserts the 320x200 site viewport and would
+  otherwise fail for a reason unrelated to what it is about.
+* `run_cp5.sh` and `run_cp7.sh` pin the mode once at the head with `export U2_MODE=classic`.
+  Per-invocation flags could not reach CP5: about a third of its gates drive the engine
+  through `tests/*.py` helpers that receive the binary as a single string, and a helper
+  quietly running in the other mode is a gate that cannot fail where it enforces.
+* `tests/prompt_gate.py` now runs each of its three cases in both modes. Enhanced `W` prints
+  `WEAR ARMOUR:` where the original printed a bare `WHICH?` (the owner-requested enhanced
+  announcements, 2026-11-11), and the gate is about ordering, not wording.
+* `tests/cp6_commerce_seed.py` seeds `armour_owned[CLOTH] = 1`. Enhanced `W` lists only armour
+  the character owns and prints its refusal instead of a menu when that list is empty, so with
+  nothing owned there was no blocking read left to order-check — the enhanced half of the gate
+  above would otherwise have been vacuous.
+
+### What it cost
+
+Eleven assertions across five files were written against original behaviour and had never
+said so out loud. Every one of them went red in sequence — CP4 geometry, then CP5's EXP/GOLD
+wrap and melee-wound silence and `LEATHER NOT OWNED!`, then CP6's prompt gate, then CP7's
+dungeon wireframe, then the demo subsystem's W25 control — which is the good news buried in
+the churn: the suite noticed the change on its own and named each site. The bad news is that
+none of them had a mode in its name or its header, so the failures looked like rendering bugs
+rather than a mode flip until each was opened.
+
+One thing this change leaves genuinely un-gated, said rather than left implied: the enhanced
+layout's dungeon view has no assertion of its own. CP7 measures the original geometry.
+
+`make test`: CP0..CP7, CP6, demo PASS. `tools/check_all.sh --fast` green.

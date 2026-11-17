@@ -185,9 +185,29 @@ reads the sources back out of `[install]`, completes anything missing, migrates 
 older layout, and reports a source that has moved rather than skipping it.
 `./u2 --install --check` verifies the tree against its manifest and writes nothing.
 
+**Two presentations: enhanced (the default) and classic.** The engine has one set of rules
+and two ways of presenting them. Enhanced is what you get if you say nothing: the fan art
+if any is installed, the larger screen layout, and the dead ends the original could not
+avoid removed — a command that could only ever have answered `INVALID MOVE!` now says why.
+To play it the way the original did, say one word:
+
+```sh
+./u2 --classic
+```
+
+`--classic` is the whole original presentation, not the art alone: original CGA tiles and
+the original screen together. `--enhanced` still exists so an older script says what it
+means, and `config.ini` has `[game] mode = classic` for a tree you always want in the
+original mode without typing it. A command-line flag outranks the file, and the file
+outranks the default. If you want the original layout *with* the fan art, that is
+`--classic --ega`; the art flag is the more specific request and wins the art half.
+
 **Optional: EGA graphics.** `--ega` draws the map and pictures in 16 colours using the
-fan-made *Ultima II Upgrade* art instead of the original CGA's 4. It changes no rules and
-works with or without `--enhanced`; CGA stays the default. The art is not in this repo — you
+fan-made *Ultima II Upgrade* art instead of the original CGA's 4. It changes no rules.
+With no flag at all the engine now picks the best theme it can find on its own — the fan
+pack's `10`, then its `default`, then the derived FM Towns theme — and falls back to CGA
+with a printed line if there is nothing to find; `--classic` is the way back to CGA when a
+themes tree *is* installed. The art is not in this repo — you
 supply it from your own copy: point `--ega-theme-dir` at the folder holding `EGATILES`, choose
 a set with `--ega-theme`, and press **Ctrl-T** in play to cycle themes live. `--ega` is strict,
 so it refuses to start (rather than silently drawing CGA) when the art is missing. Full detail

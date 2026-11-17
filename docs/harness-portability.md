@@ -1790,6 +1790,23 @@ Newest first. One line per learning; the detail stays in the owning document.
   fallback to a default is the same failure wearing a different hat. The control that proves
   it works is starting a session on deliberately non-default ports and showing the defaults
   are closed while the tools still succeed. → Tier 2, harness contract.
+- **A default that flips is a corpus event, and the gates that assumed the old one are invisible
+  until it moves.** A harness that grows a second presentation or rule mode usually makes the
+  new one opt-in, and then someone rules it should be the default — at which point every
+  assertion written against the old behaviour fails in sequence, in files that never named the
+  mode in their title, their header, or their invocation, so each failure reads as a rendering
+  bug rather than as what it is. Two contracts follow. First, a gate that measures the original
+  says so in the invocation, even when the default currently agrees with it: an unflagged run
+  that happens to be in the right mode is a gate waiting to measure the wrong thing quietly.
+  Second, pin the mode once per checkpoint rather than once per call, and make the pin reach the
+  helpers — a suite that drives the binary through wrapper scripts which receive the executable
+  as a single string cannot be pinned by adding a flag to the shell line, so the pin has to be
+  an environment value the process inherits. Then add one assertion that only the *new* default
+  can satisfy, because every pinned gate is now structurally incapable of noticing the default
+  silently reverting. The replay side owes the same honesty in the other direction: a recording
+  or committed evidence with no mode field does not mean "whatever this build defaults to", it
+  means the mode that was the default when the file was written, and reading it any other way
+  makes the same file replay a different game the day the default moves.
 
 ---
 
