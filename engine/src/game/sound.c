@@ -19,6 +19,8 @@
  * that is a little short is a slightly brisk game; it is not a wrong sound. */
 #include "game/sound.h"
 
+#include "game/sound.h"
+#include "game/feedback.h"
 #include "core/seam.h"
 
 /* asm/5D09's sequence 0, record at CS:5D5D: {count 0x05, divisor 0x4000}.
@@ -52,4 +54,24 @@ void u2_sound_step(u2_ctx *ctx)
 void u2_sound_refusal(u2_ctx *ctx)
 {
     seam_tone(ctx, U2_REFUSE_DIVISOR, U2_REFUSE_MS);
+}
+
+int u2_sound_audible(const u2_ctx *ctx)
+{
+    return ctx->sound_off == 0;
+}
+
+int u2_sound_toggle(u2_ctx *ctx)
+{
+    /* xorb $0xff, DS:54D -- asm/4F7B, the only write site in the game. XOR rather
+     * than a boolean flip because that is the instruction: the flag has always been
+     * either 0 or 0xFF, and keeping the byte shape means a future read of the real
+     * DS byte and a read of this field agree. */
+    ctx->sound_off ^= 0xff;
+    /* The original prints nothing here; asm/4F7B is five bytes and none of them is
+     * output. Classic mode therefore stays silent, and this is the citation AGENTS.md
+     * § 3 asks for at a silent mutation site. Enhanced announces through the one seam
+     * that invents text, which resolves to nothing in original mode anyway. */
+    u2_feedback(ctx, ctx->sound_off ? "[sound off]" : "[sound on]");
+    return ctx->sound_off != 0;
 }

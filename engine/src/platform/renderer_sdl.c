@@ -444,7 +444,7 @@ static int sdl_present_frame(u2_ctx *ctx, const struct u2_frame *f)
     return 0;
 }
 
-/* Ctrl-S. The point is a bug the player can see but a log cannot show, so this
+/* Ctrl-X. The point is a bug the player can see but a log cannot show, so this
  * captures the frame that was actually presented, not the grid the game thinks it
  * drew -- the same distinction that made the invisible-cursor bug invisible to
  * every text assertion. BMP because the writer already exists in core/frame.c and

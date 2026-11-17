@@ -24,6 +24,12 @@
 #include "core/rng.h"
 #include "core/replay.h"
 #include "core/timer.h"
+/* The one core -> game include in this file, and it is here because Ctrl-S lives in the
+ * key poll (asm/4F76) and the mute is sound policy, not key policy. Routing the notice
+ * through u2_sound_toggle keeps the single-audit-point rule in game/feedback.h intact;
+ * the alternative was a second hand-written enhanced-only print path in the seam, which
+ * is exactly the divergence that seam was designed to prevent. */
+#include "game/sound.h"
 #include "debug/dump_state.h"
 #include "debug/trace.h"
 
@@ -178,13 +184,29 @@ static void key_uppercase_fold(u2_key *k)
         k->ch = (uint8_t)(k->ch & 0xDF);
 }
 
-/* Ctrl-S: save the frame that is on screen and swallow the keystroke, so no game
+/* Ctrl-X: save the frame that is on screen and swallow the keystroke, so no game
  * handler ever sees it and no letter shortcut is displaced. Handled here rather
  * than in each screen because this is the one place every screen's input passes --
  * title, creation, overworld and dungeon alike -- and a bug can be on any of them.
  * A backend with no pixels leaves the hook NULL, and the key then reaches the game
- * as the control byte it is, which is what happened before it meant anything. */
-#define U2_KEY_SCREENSHOT 0x13
+ * as the control byte it is, which is what happened before it meant anything.
+ *
+ * It used to be Ctrl-S, and moving it is not a whim: 0x13 is the game's own sound
+ * key (see U2_KEY_SOUND below and asm/4F76 / asm/4F7B), so an engine invention had
+ * taken a byte the original spends. Fidelity wins the byte.
+ *
+ * Why 0x18 and not a nicer letter: tools/demo_key_gate.py refuses any engine claim on
+ * a byte asm/ compares against, and it went red on the first two candidates. Ctrl-G
+ * (0x07) looked ideal and is a range-check operand in cmd_W, the cleric shrine, the
+ * cast-spell flow and eight more sites; Ctrl-P (0x10) is compared four times. 0x18 has
+ * zero comparison sites, so Ctrl-X is the mnemonic that is actually free. */
+#define U2_KEY_SCREENSHOT 0x18
+
+/* Ctrl-S, the byte the game itself uses to mute. asm/4F76 compares AL against it and
+ * asm/4F7B toggles DS:54D, so this is not an engine claim about a free byte — it is
+ * the opposite, a byte the original demonstrably spends, which is why the screenshot
+ * moved. tools/demo_key_gate.py already gates that this site exists. */
+#define U2_KEY_SOUND 0x13
 
 /* Returns 1 when the key was consumed here and the caller must not deliver it. */
 static int take_screenshot_key(u2_ctx *ctx, const u2_key *out)
@@ -192,6 +214,19 @@ static int take_screenshot_key(u2_ctx *ctx, const u2_key *out)
     if (out->ch != U2_KEY_SCREENSHOT) return 0;
     if (!ctx->renderer || !ctx->renderer->screenshot) return 0;
     ctx->renderer->screenshot(ctx);
+    return 1;
+}
+
+/* Ctrl-S: the original's own sound toggle, and the reason the screenshot moved off
+ * this byte. asm/4F76 is the key poll comparing AL against 0x13; asm/4F7B is the
+ * handler, five bytes, `xorb $0xff,0x54d` and back into the poll with AH=0 — so the
+ * byte is consumed, no command ever sees it, and nothing is printed. Swallowing it
+ * here rather than in the overworld loop is what makes it work in a menu, a shop and
+ * a dungeon, which is where the original's single poll puts it. */
+static int take_sound_key(u2_ctx *ctx, const u2_key *out)
+{
+    if (out->ch != U2_KEY_SOUND) return 0;
+    u2_sound_toggle(ctx);
     return 1;
 }
 
@@ -250,7 +285,7 @@ int seam_key_poll(u2_ctx *ctx, u2_key *out)
     int got = ctx->input->poll(ctx, out);
     if (got > 0 && swallow_direction_control_bytes(out))
         return 0;
-    if (got > 0 && take_screenshot_key(ctx, out))
+    if (got > 0 && (take_screenshot_key(ctx, out) || take_sound_key(ctx, out)))
         return 0;
     if (got > 0) {
         key_uppercase_fold(out);
@@ -287,7 +322,8 @@ int seam_key_wait(u2_ctx *ctx, u2_key *out)
          * waiting for a key the game should actually see. The fold moved above this
          * line so both seam entries tap the recorder at the same point in the
          * pipeline; it is inert for both control bytes, which sit below 0x61. */
-        if (!take_screenshot_key(ctx, out) && !u2_demo_key(ctx, out)) break;
+        if (!take_screenshot_key(ctx, out) && !take_sound_key(ctx, out)
+            && !u2_demo_key(ctx, out)) break;
         /* A Ctrl-R consumed just above left a transition pending, and on a blocking
          * backend this loop never returns to the caller, so the caller's own quiescent
          * point is never reached and the stop sits pending forever. That is why Ctrl-R
@@ -363,12 +399,34 @@ void seam_wait_ms(u2_ctx *ctx, uint32_t ms)
 
 void seam_tone(u2_ctx *ctx, uint16_t divisor, uint32_t ms)
 {
+    /* asm/5CB2_speaker_start is the primitive that raises the speaker gate, and its
+     * first instruction is the mute guard: `cmpb $0x0,0x54d` then `jne` past the port
+     * write. asm/5C95 and asm/5D09 guard the same byte above it, so the original
+     * checks at every level it has; checking here, at the engine's single tone seam,
+     * is what lets a tone wired later inherit the mute instead of forgetting it.
+     *
+     * The guard is traced and the tone is not, on purpose. A run that swallowed its
+     * tones and a run that played them have to look different in the trace, or a gate
+     * over the mute could not tell them apart — which is the same reasoning behind
+     * seam_silence tracing before it asks the backend. */
+    if (!u2_sound_audible(ctx)) {
+        u2_trace(ctx, "speaker_mute", "5CB2", "divisor=%u ms=%u", divisor, ms);
+        return;
+    }
     u2_trace(ctx, "speaker_freq", "5CD2", "divisor=%u ms=%u", divisor, ms);
     ctx->audio->tone(ctx, divisor, ms);
 }
 
 void seam_silence(u2_ctx *ctx, uint32_t ms)
 {
+    /* Muted means the whole sequence is skipped, gap included: the original's guard
+     * jumps past the port write, and the gap only exists to separate two port writes.
+     * Leaving the 121 ms pause in place would make a muted step slower than a loud
+     * one, which is a behaviour change wearing a sound change's clothes. */
+    if (!u2_sound_audible(ctx)) {
+        u2_trace(ctx, "speaker_mute", "5CE4", "ms=%u", ms);
+        return;
+    }
     /* Traced before the backend is consulted, because the gap is a fact about the
      * game's timing and not about what this machine can play: the terminal bell has
      * no way to be quiet on purpose, and a gate that reads the trace must see the

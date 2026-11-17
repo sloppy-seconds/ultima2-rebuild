@@ -425,6 +425,21 @@ typedef struct u2_ctx {
                               * broke on Escape outright. Neither was the original -- nothing
                               * in asm/ compares against 0x1b or 0x11 -- they were dev
                               * conveniences with no sanctioned home, which is what this is. */
+    /* The original's sound-off flag, DS:54D. 0 means sound ON; anything else means
+     * silence. That polarity is what the bytes say and it is the opposite of the
+     * name a reader would pick: every tone site guards with `cmpb $0x0,0x54d` and
+     * jumps away on `jne` -- asm/5CB2_speaker_start at the port write, asm/5C95 and
+     * asm/5D09 above it -- so non-zero is the muted state.
+     *
+     * Exactly one instruction in the whole binary writes it: `xorb $0xff,0x54d` in
+     * asm/4F7B, reached when the key poll sees 0x13 (asm/4F76). Ctrl-S is therefore
+     * the game's own sound key, in both of our modes, and the segment is zero-
+     * initialised so the game starts with sound on. No save byte, no init site.
+     *
+     * Kept on ctx and not in the DS mirror in state.h because it is outside the
+     * saved span (DS:36..0x135) and no capture has ever seen it saved or restored. */
+    uint8_t sound_off;
+
     int cleanroom;           /* --cleanroom: use the engine's own independently
                               * created assets instead of the game's — tiles now,
                               * sound and other media as they land. One axis, so a

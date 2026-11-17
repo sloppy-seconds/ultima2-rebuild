@@ -32,4 +32,21 @@ void u2_sound_step(u2_ctx *ctx);
  * The engine currently sounds it only where the refusal has been measured. */
 void u2_sound_refusal(u2_ctx *ctx);
 
+/* Ctrl-S, the game's own sound key. asm/4F76 is the key poll comparing AL against
+ * 0x13 and asm/4F7B is the whole handler: `xorb $0xff,0x54d`, then back into the poll
+ * with AH=0, so the byte is consumed and no command ever sees it. It prints nothing:
+ * the muting is the feedback, and in classic mode it stays that way.
+ *
+ * The bracketed notice is the enhanced seam's, and it is the only invented line here;
+ * original mode resolves it to nothing inside u2_feedback, which is why this is one
+ * call and not a branch. Returns the new muted state, for the caller's trace.
+ *
+ * Both modes get the toggle because the original has it in both: it lives in the key
+ * poll, above any mode, and there is exactly one write site for the flag in the game. */
+int u2_sound_toggle(u2_ctx *ctx);
+
+/* 1 when a tone may sound, 0 when the player has muted with Ctrl-S. Every emitter
+ * goes through seam_tone, which asks this, so a tone wired later cannot forget. */
+int u2_sound_audible(const u2_ctx *ctx);
+
 #endif /* U2_SOUND_H */
