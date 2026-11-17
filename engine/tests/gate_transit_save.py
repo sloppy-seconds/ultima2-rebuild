@@ -25,6 +25,7 @@ Everything is engine-authored filler from cp5_fight_seed.py in a throwaway dir, 
 runs in CI with no game media present.
 """
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -107,6 +108,42 @@ def main():
 
         check(os.path.exists(slot(work, "monx00")),
               "the transit wrote monx00 into the save slot (saves/PLAYER/monx00)")
+
+        # The pairing invariant, stated generally rather than for one sector. A map
+        # overlay with no creature overlay beside it is a ghost on the next load: the
+        # overlay is read ahead of content, so its stamps become terrain while the
+        # creatures come back from the release monx and own nothing. A real save had
+        # exactly this shape -- mapx00 and mapx10 present, monx00 and monx10 absent, ten
+        # bare stamps including three sea serpents. save_body pairs the two writes; this
+        # is the property that protects, and it is checked over the whole slot rather than
+        # the one sector this scenario happens to touch.
+        slotdir = os.path.dirname(slot(work, "monx00"))
+        present = {f.lower() for f in os.listdir(slotdir)}
+        orphans = [f for f in sorted(os.listdir(slotdir))
+                   if re.fullmatch(r"map[xg]\d\d", f.lower())
+                   and ("mon" + f.lower()[3:]) not in present]
+        check(not orphans,
+              "every map overlay in the slot has a creature overlay beside it (%s)"
+              % (", ".join(orphans) if orphans else "none orphaned"))
+
+        # The control for that check. No scripted scenario in this suite can produce an
+        # orphan -- every path that dirties a map also syncs the table -- so the check is
+        # proven red the direct way: plant the shape a real save had, a map overlay with no
+        # creature overlay beside it, and require the scan to name it. Without this the
+        # check above could only ever print "none orphaned".
+        plant = os.path.join(slotdir, "mapx99")
+        try:
+            open(plant, "wb").write(b"\x00" * 4096)
+            present = {f.lower() for f in os.listdir(slotdir)}
+            caught = [f for f in os.listdir(slotdir)
+                      if re.fullmatch(r"map[xg]\d\d", f.lower())
+                      and ("mon" + f.lower()[3:]) not in present]
+            check("mapx99" in caught,
+                  "CONTROL: a planted orphaned map overlay is caught (%s)"
+                  % (", ".join(sorted(caught)) if caught else "nothing caught"))
+        finally:
+            if os.path.exists(plant):
+                os.remove(plant)
 
         kept = open(os.path.join(work, "content", "monx00"), "rb").read()
         check(kept == before["monx00"],

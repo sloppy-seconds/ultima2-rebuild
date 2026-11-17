@@ -525,7 +525,8 @@ if [ ! -f src/game/combat.c ]; then
 fi
 
 cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/combat_check" \
-   tests/combat_check.c src/game/combat.c src/game/kill_drop.c src/core/rng.c src/core/state.c \
+   tests/combat_check.c src/game/combat.c src/game/kill_drop.c src/game/monsters.c \
+   src/core/rng.c src/core/state.c \
    2>"$WORK/cc.err"
 if [ $? -ne 0 ]; then
     bad "CP5 combat harness did not build (combat.c present but does not link):"

@@ -289,6 +289,15 @@ static int apply_damage_to_slot(u2_ctx *ctx, u2_world *w, int slot, unsigned dmg
         ctx->state.mon_type[slot] = 0;
         ctx->state.mon_kind[slot] = 0;
 
+        /* The table changed, so the table has to reach the disk. apply_damage_to_slot is
+         * the only place a creature dies, and it used to leave mon_dirty unset: a kill
+         * dirtied the grid with the corpse restore and dirtied nothing else, so the save
+         * wrote the map and not the creatures. On reload the dead creature came back from
+         * the release monx while its restored cell stayed restored. u2_monsters_store is
+         * the same sync gates.c does before a transit save. */
+        if (w != NULL)
+            u2_monsters_store(ctx, w);
+
         /* asm/2CE5..2D21 and asm/2D22..2D8B: the kill-drop dispatch, keyed on the TYPE of
          * the creature that just died. asm/2CE5 is `cmp $0xfc,%al ; jne L_002f22`, so a
          * THIEF takes the fall-through and every other type jumps to the type table. Both

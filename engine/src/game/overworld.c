@@ -841,6 +841,22 @@ static int save_body(u2_ctx *ctx, u2_overworld *ow)
      * change in silence while the record still wrote. Now it counts as a failed
      * save, because a change that did not reach the disk has to be said out loud. */
     int failed = 0;
+    /* The two sector writes are paired in this direction, and the reason is a ghost
+     * factory. A map is dirty in this engine because creatures are stamped into it, or a
+     * stamp was restored out of it. Persist those stamps without the creature table that
+     * explains them and the next load reads the overlay as ground truth while the
+     * creatures come back from the release monx — which is a bare sprite at every cell the
+     * overlay baked and nothing owns. A real save on jarvis had exactly that shape:
+     * mapx00 and mapx10 present, monx00 and monx10 absent, and ten bare stamps including
+     * three sea serpents. The original does not have this failure available to it: the
+     * transit autosave writes record + mapx + monx together (gates.c, measured in
+     * captures/spice86/g64-timedoor-autosave).
+     *
+     * Pairing one way only. Writing the creature table is always the current truth about
+     * creatures; writing the grid when only the table changed would bake whatever stamps
+     * happen to be standing at that instant. */
+    if (ow->world.map_dirty)
+        u2_monsters_store(ctx, &ow->world);
     if (ow->world.map_dirty && u2_world_store(ctx, &ow->world, 1) != U2_WORLD_OK)
         failed = 1;
     if (ow->world.mon_dirty && u2_world_store(ctx, &ow->world, 0) != U2_WORLD_OK)

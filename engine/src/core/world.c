@@ -634,6 +634,30 @@ u2_world_result u2_world_store(u2_ctx *ctx, u2_world *w, int is_map)
              (unsigned)(id.hi & 0x0F), (unsigned)(id.lo & 0x0F));
     snprintf(tmp, sizeof tmp, "%.575s.u2tmp", path);
 
+    /* The pairing detector, and it is here rather than in a harness because a real save
+     * produced the shape it looks for without any script involved. A sector overlay whose
+     * map half exists and whose creature half does not is a ghost on the next load: the
+     * overlay is read ahead of content, so its stamps become terrain, while the creatures
+     * come back from the release monx and no longer own those cells. save_body now pairs
+     * the two writes, so this firing means some other path stored a map on its own — and it
+     * names which. */
+    if (is_map) {
+        char sib[448];
+        snprintf(sib, sizeof sib, "%.437s/%.4s%u%u", slot,
+                 w->mon_prefix ? w->mon_prefix : "monx",
+                 (unsigned)(id.hi & 0x0F), (unsigned)(id.lo & 0x0F));
+        FILE *probe = fopen(sib, "rb");
+        if (probe) {
+            fclose(probe);
+        } else {
+            fprintf(stderr, "u2: NOTE wrote a map overlay with no creature table beside it "
+                    "(%s is absent) -- these stamps will be terrain on the next load with "
+                    "nothing owning them. Path: %s\n", sib,
+                    ctx->store_reason ? ctx->store_reason : "unknown");
+            fflush(stderr);
+        }
+    }
+
     dst = fopen(tmp, "wb");
     if (!dst)
         return U2_WORLD_ERROR;
