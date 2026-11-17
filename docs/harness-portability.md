@@ -189,6 +189,25 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-17 — A filename in a shipped data pack is not a promise about its contents, and
+  "the file exists and parses" is not evidence it holds the thing it is named after.** A
+  third-party pack turned out to ship seventeen of its thirty-three sector files as
+  byte-identical copies of a different file in the same pack, with a clean rule underneath
+  (only one of the four site kinds ships a table at all). The symptom read as a loader bug
+  producing nonsense entities; the honest answer was that the file carries no data and the
+  correct decode is the empty one. Before concluding a loader misreads a field, compare the
+  file against the other files in the pack — a whole-file md5 match with something unrelated
+  is a pack fact, not a parse failure, and inventing a spawn table to explain it would have
+  been the worse error.
+* **2026-11-17 — Repair a tree against its source, and verify the source against the original
+  archive first, because a played-in source makes every repair a half-repair.** An installer's
+  migrate-and-restore step correctly refused to move a dirty content file whose recorded source
+  had *also* changed — a half-repair is worse than a reported one — which read as the tool being
+  unhelpful. The source directory had been played in, so it was dirty in the same way the tree
+  was. The fix was to md5 the whole source pack against the archive it came from rather than the
+  three suspicious files: that showed exactly three differences and proved the archive was the
+  same pack, which made the restore safe and made the refusal disappear. A provenance check over
+  every file is cheaper than arguing about three.
 * **2026-11-17 — The emulator's own audio-device state is a duration instrument, and it
   needs no decode at all.** Tone routines in hand-written 8088 are frequently unreadable
   (self-modifying parameter storage, arithmetic no static reader can pin), which had this

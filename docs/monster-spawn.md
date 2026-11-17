@@ -1288,3 +1288,52 @@ behaviourally, but nobody has read a byte that says "this creature is hostile". 
 implementing aggro should find that byte rather than invent one, and should re-run this
 comparison as the control: if aggro has a home in DS, it must be a field that resets on entry
 for the right reason and not one that happens to look clean.
+
+## 17. Seventeen of the pack's `monxNN` files are copies of the player record (2026-11-17)
+
+Raised while repairing a shipped tree, because it looked like stale content and is not.
+
+The Internet Archive pack ships 33 `monxNN` files. **Seventeen of them are byte-identical
+to the pack's own `player` record**, 384 bytes, same md5:
+
+```
+monx10 monx15 monx20 monx24 monx25 monx30 monx34 monx35 monx40
+monx44 monx45 monx50 monx60 monx70 monx80 monx85 monx90
+```
+
+The other sixteen carry creature data: `monx00`, and every sector whose ones digit is 1, 2
+or 3 (`03 11 21 22 23 31 32 33 41 61 71 81 82 92 93`). Read against the site-kind rule —
+the ones digit is `0` wilderness, `1..3` town, `4` tower, `5` dungeon — the split is clean:
+**towns ship a placed-creature table, and wilderness, towers and dungeons ship a copy of the
+player record instead.** Sector 00 is the exception on the wilderness side and does have one.
+
+The Galaxy patch agrees rather than contradicting it. `updated/MONG10`, `MONG15`, `MONG20`,
+`MONG30`, `MONG40` and `MONG45` are **256 bytes of zeros** — an empty table, which is the
+same answer in the patch's own format. `MONG32` and `MONG41` are 256 bytes of data and the
+rest of the `MONG` set is 384 bytes of data.
+
+Two things follow, and one does not.
+
+* **An engine that reads one of these files as 32 creature slots is reading a character
+  sheet, and the honest result is no creatures.** The engine does produce that: seeded into
+  sector 20 with the pack's own `monx20`, `--dump-state` reports `0 creatures` and every
+  `mon_*` array reads zero. So a wilderness sector with no placed creatures is not a bug to
+  fix by inventing a spawn table.
+* **It does not follow that the tens-digit sectors have no monsters in play.** § 11 and § 15
+  established an overworld spawner that places creatures from terrain and a selector, and
+  nothing here touches that path. What this section closes is narrower: the file is not the
+  source of wilderness creatures, and anyone looking for them in `monxNN` is looking in a
+  copy of the player record.
+* **What it does look like, when it goes wrong.** A tree whose content was written by a
+  played-in pack shows these files as real creature data, because the original's sector
+  store writes 256 bytes at `DS:137` into `monxNN` and 256 at `DS:36` into `player`
+  (`asm/2305_sector_store`, G82). A `monx20` that differs from the player record is
+  therefore either a patched fix or a world somebody played in the original, and the
+  installer says exactly that in its own words when it patches one over.
+
+Recipe, because it is a one-liner and it is the control for anyone else who wonders:
+
+```bash
+cd references/ultima2 && p=$(md5sum < player)
+for f in monx*; do [ "$(md5sum < $f)" = "$p" ] && echo "$f is the player record"; done
+```
