@@ -574,10 +574,50 @@ and that a planted footprint is reported; its control is the counter zeroed, and
 only goes red once it compiles, which is the lesson from `docs/handoff-2026-11-12.md` § 4
 applied again.
 
-**Still open, deliberately.** Why the engine leaves nine where the original leaves none is not
-established. The move path already restores each vacated cell from the slot's saved terrain
-byte (`asm/2233`, `ai.c`), and in a controlled fixture with that byte correct the engine leaves
-zero — so the residue is a session path the fixture does not model, most likely a sector reload
-after a save reading its own stamps back as ground. Settling it needs a controlled A/B — same
-sector, same seed, both binaries, same key script — and not a patch. The capture worklist owns
-that as `docs/needs-gameplay.md`.
+**This section's headline was wrong, and the A/B is what caught it.** See § 10b: the claim
+that the original leaves zero bare footprints came from one played-in save, and a controlled
+run against the real binary refutes it.
+
+### 2026-11-17b: the controlled A/B, and the claim it retired
+
+`tools/g91_ab.py` drives both binaries over the same sector with the same scripted keys and
+scores only the sector files each one actually wrote, paired with the creature positions read
+at that instant. Both sides, same seed (a record the engine wrote, which the original loads —
+the same cross-load `tools/save_cross_load.py` proves), same sector 20.
+
+| side | writes scored | footprints | bare |
+| --- | --- | --- | --- |
+| engine, square walk | 9 | 1 | 0 |
+| engine, chase the creatures | 5 | 1 | 0 |
+| **original under Spice86** | 1 | 0 | **2** |
+
+So the property attributed to the original above — *no cell differs from the ground with
+nothing standing on it, at the moment of the save* — is **not** a property the original has.
+Its one scored write stamped `(13,17)` and `(57,20)` with `0x30` and `0xfc` while its live
+creatures were elsewhere, and the positions were read on both sides of the save and agreed,
+so the pairing is sound. The engine left none on the same script.
+
+Two things follow, and neither is a stamp bug.
+
+**The original writes the sector far less often than the engine does.** Ten rounds of scripted
+keys and one `q,y` per round produced exactly one `mapx20` rewrite; the engine rewrote it on
+nearly every save. A program that writes more often bakes more of its transient state, which is
+the honest difference between the two trees — not a missing restore. Whether the original's
+rarity is a dirtiness rule the engine should adopt is an open question this measurement raises
+but does not answer.
+
+**What made ghosts a problem was never the stamp, it was the inheritance.** A bare footprint is
+only permanent because the overlay is read back ahead of content, so the next load treats it as
+authored ground. That is closed by the slot rotation (`docs/save-scoped-worlds.md` § 5b): a new
+character now starts on the release world instead of the previous one's residue. The nine cells
+on the shipped tree predate both this measurement and the `asm/2233` restore fix recorded in
+`ai.c`, and there is no need to invent a producer for them now that the comparison shows the
+original leaves residue of its own.
+
+**What the harness got wrong first, because it is the trap.** A sector file lags: neither
+program rewrites it unless something dirtied it, so scoring an unchanged file against creature
+positions that have moved since invents a ghost at every cell vacated since the last write. The
+first version of the harness reported a ghost at almost every save for exactly this reason, and
+the numbers looked entirely plausible. `fresh_since()` now gates every checkpoint, and the
+original side additionally reads creature positions on both sides of the save and discards a
+checkpoint where they disagree, because `q` can hand the creatures a turn of their own.

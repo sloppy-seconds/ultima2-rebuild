@@ -2234,3 +2234,19 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   diagnostic that measures the running state cannot see a file, and this one printed zero while
   the player was walking past nine. → Tier 1, save/derived-state layout and diagnostics that
   measure the artefact rather than the session.
+
+- **2026-11-17 — score a written artefact only at the instant it was written, or you will
+  invent a defect.** A persistence layer that rewrites a file only when something dirtied it is
+  correct behaviour, and it turns a naive before/after comparison into a machine for producing
+  false positives: compare the file's bytes against state read *now* and every change since the
+  last write looks like a bug the program has right now. The harness that found this reported a
+  phantom at almost every checkpoint, and the numbers were entirely plausible — the endpoint
+  matched what a hand inspection of the saved file showed, which is what made it convincing.
+  Two guards fixed it, and both are worth copying: skip a checkpoint whose file bytes are
+  unchanged from the last one scored, and when the state has to be read over an interface the
+  action itself can advance (a save key that also hands the simulation a turn), read it on both
+  sides of the action and discard the checkpoint when the two disagree. Related and equally
+  generic: the same run showed the reference program writing the file about once per ten rounds
+  where the reimplementation wrote it on nearly every save, so "the reimplementation leaves more
+  residue" can be a difference in *when it writes* rather than in what it computes.
+  → Tier 1, measurement discipline for persistence.
