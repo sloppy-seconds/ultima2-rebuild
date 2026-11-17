@@ -622,15 +622,27 @@ the numbers looked entirely plausible. `fresh_since()` now gates every checkpoin
 original side additionally reads creature positions on both sides of the save and discards a
 checkpoint where they disagree, because `q` can hand the creatures a turn of their own.
 
-**Travel cannot bake a stamp, which closes the last suspected producer.** Sector and site
-transitions were the leading remaining hypothesis, and the answer turned out to be structural
-rather than sampled: a transition writes no sector file at all, in either program.
-`site_reload()` syncs the outgoing sector in memory and writes nothing unless
-`--keep-site-state` is set, which is off by default; the original was measured the same way on
-2026-10-29 across several town entries and exits, with `mapx31`, `monx31`, `mapx30` and
-`monx30` byte-identical to pristine and only `player` changed, and `engine/tests/site_state.py`
-gates it. The save path is the only writer of a sector file, so a transition cannot bake
-anything.
+**Travel is not a separate producer of ghosts, but not for the reason first written here, and
+the first reason was wrong.** The claim was that a transition writes no sector file. It does.
+The owner pointed straight at it: entering a town creates a save, and so does a time-door
+transit. What is actually true, all of it already implemented and gated:
+
+| transition | what it writes | evidence |
+| --- | --- | --- |
+| time-door transit | player record + outgoing `mapx` + `monx` | `captures/spice86/g64-timedoor-autosave`, gated by `tests/gate_transit_save.py` |
+| site entry | player record + any dirty sector, Earth-gated | `asm/22FD_sector_store_gate`, `site_enter()` |
+| site exit | player record only | KLIMB out of the sector-30 dungeon fired runtime `0x389d` and moved `player` and nothing else; gated by `tests/site_state.py` |
+
+What closes the question rather than reopening it is that **a transition save and a `Q` save
+are the same function**. `u2_overworld_autosave()` ends in `save_body()`, and `cmd_Q` goes
+`u2_overworld_save()` → `save_body()`. Same grid, same dirty flags, same write. The
+differences are the guards around it, not the bytes it emits: the autosave is Earth-gated and
+silent, `Q` prints and carries the save policy.
+
+So a town entry or a moongate cannot bake anything a `Q` at that same instant would not bake.
+A transition changes *when* a write happens, never *what* is written. It is one more
+opportunity for a bare stamp that already exists in the grid to reach disk, not a mechanism
+that makes one.
 
 What travel does is make a stamp permanent, which is the half of the hypothesis that held. A
 bare stamp in the overlay arrives through `u2_world_load` as authored terrain in `map_base`
@@ -640,7 +652,18 @@ A bare one has nothing to clean it. That is how nine cells survived many session
 why rotation rather than another save is the way out of a dirty tree.
 
 The legs driven after that, engine-side, scoring only fresh writes: stroll 11 writes and 0
-bare; chase 5 and 0; chase again over 60 rounds 5 and 0 with the creature count flat; site
-entry 0 writes, exactly as the no-write rule predicts. No leg produced a bare stamp, and the
-field is now narrowed to the legacy build that made the shipped overlay, not to any path in
-the current engine.
+bare; chase 5 and 0; chase again over 60 rounds 5 and 0 with the creature count flat. No leg
+produced a bare stamp, and the field is narrowed to the legacy build that made the shipped
+overlay, not to any path in the current engine.
+
+**What the scripted site and time-door legs could not prove, recorded so the next session does
+not retry it.** Both legs were built — a dungeon door seeded one cell from the start, and a
+corridor flattened to walkable grass running to the era-2 time door at `(16,16)`, because the
+created character starts in a pocket and every real door in sector 20 is 15+ cells away — and
+both were abandoned as evidence. The `--api` observation stream lags the key that produced it
+by an unpredictable amount, so a scripted walk cannot be trusted to have done what the script
+said, and a leg that silently never reached its door reports zero writes exactly like a leg
+that reached it and wrote nothing. That is a gate that cannot fail. The deterministic route is
+the `--play-map --script` shape `tests/site_state.py` and `tests/cp6_commerce_seed.py` already
+use, where a seeded record places the player on the cell under test and there is no stream to
+fall behind.

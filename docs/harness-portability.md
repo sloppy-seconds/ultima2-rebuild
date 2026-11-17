@@ -189,6 +189,21 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-17 — Before building a harness to find out whether a code path produces something,
+  check whether it shares a function with a path you already trust.** A persistence artefact was
+  attributed to a transition path, a scripted harness was built to drive it, and the question
+  was closed in one read instead: the transition's write and the explicit save's write are the
+  same function, so the transition changes *when* a write happens and cannot change *what* is
+  written. Two related lessons came out of the harness that was built first. A scripted driver
+  whose synchronisation with the program under test cannot be verified is a check that cannot
+  fail: a leg that silently never reached its target reported zero writes exactly like a leg
+  that reached it and wrote nothing, and both looked like a clean pass. Prefer a harness that
+  places the subject under test in a seeded state over one that navigates to it, because
+  navigation is a second program to debug and it fails silently. And an observed non-event is
+  not a rule about the code: "the file did not change" was read as "this path cannot write", and
+  the path could write and did — nothing had dirtied anything. Assert the write is possible
+  before treating its absence as a finding.
+  → Tier 1, evidence discipline and harness design.
 * **2026-11-17 — A filename in a shipped data pack is not a promise about its contents, and
   "the file exists and parses" is not evidence it holds the thing it is named after.** A
   third-party pack turned out to ship seventeen of its thirty-three sector files as

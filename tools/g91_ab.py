@@ -35,14 +35,20 @@ Usage:
 
 Scratch lives under /var/tmp by default: /tmp is tmpfs here and a run copy is RAM.
 
-Why there is no `site` result: sector/map travel was the leading hypothesis for where a ghost
-comes from, and it is refuted structurally rather than by sampling. **A transition writes no
-sector file at all**, in either program. `site_reload()` syncs the outgoing sector in memory
-and writes nothing unless `--keep-site-state` is set, which is off by default; the original was
-measured the same way on 2026-10-29 across several town entries and exits, with `mapx31`,
-`monx31`, `mapx30` and `monx30` byte-identical to pristine and only `player` changed, which
-`engine/tests/site_state.py` gates. The only writer of a sector file is the save path, so
-travel cannot bake a stamp.
+Why the `site` and `gate` legs are not evidence, and what replaced them: the claim first made
+here was that a transition writes no sector file. It does write one — a time-door transit
+writes the player record plus the outgoing sector's mapx and monx (g64-timedoor-autosave,
+gated by tests/gate_transit_save.py) and a site entry writes the record plus any dirty
+sector. What settles it is that u2_overworld_autosave() and cmd_Q both end in save_body(): a
+transition save and a Q save are the same bytes, so a transition changes when a write happens
+and never what is written. It cannot bake a stamp that a Q at that instant would not bake.
+
+The legs were abandoned anyway. The --api observation stream lags the key that produced it by
+an unpredictable amount, so a scripted walk cannot be trusted to have done what the script
+said, and a leg that never reached its door reports zero writes exactly like a leg that
+reached it and wrote nothing — a check that cannot fail. The deterministic route is the
+--play-map --script shape engine/tests/site_state.py uses, where a seeded record places the
+player on the cell under test and there is no stream to fall behind.
 
 What travel does is make a stamp permanent, and that is the half of the hypothesis that held.
 `site_reload()` calls `u2_world_load`, which reads the save overlay ahead of content, so a bare
@@ -235,7 +241,7 @@ def _wait_world(proc, obs, limit=12):
     return obs
 
 
-def _pick_key(policy, obs, r, i, target):
+def _pick_key(policy, obs, r, i, target, warmup=0):
     """The next key for a policy. Returns (key, note)."""
     creatures, st = _creatures_of(obs)
     pos = (st.get("pos") or {}).get("x"), (st.get("pos") or {}).get("y")
@@ -249,7 +255,17 @@ def _pick_key(policy, obs, r, i, target):
     if policy == "chase" and creatures and None not in pos:
         near = min(creatures, key=lambda c: abs(c[0]-pos[0]) + abs(c[1]-pos[1]))
         return (_toward(*pos, *near), "chase"), None
-    if policy in ("site", "kill") and target and None not in pos:
+    if policy in ("site", "gate", "kill") and target and None not in pos:
+        # Warm up first. The write that matters is the one a transition makes, and it only
+        # writes a sector that something dirtied — a sector nobody walked in has nothing to
+        # bake, so a cold transition scores nothing and proves nothing.
+        if r < warmup:
+            # Warm up first, and warm up even with nobody in range: the point is to dirty
+            # the sector, and a sector is dirtied by any walk, not only by a bump.
+            if creatures:
+                near = min(creatures, key=lambda c: abs(c[0]-pos[0]) + abs(c[1]-pos[1]))
+                return (_toward(*pos, *near), "warmup-dirty"), None
+            return (WALK[(r + i) % 4], "warmup-dirty"), None
         if policy == "site" and pos == target:
             # Standing on the door. Entry is the ENTER command, not a step: the walk loop
             # refuses the door tile and asm/3389's dispatch reads the tile UNDER the player.
@@ -258,17 +274,18 @@ def _pick_key(policy, obs, r, i, target):
     return (WALK[(r * 4 + i) % 4], "square"), None
 
 
-def seed_content(scratch, sector, cell, tile):
-    """A content tree with one cell of the sector map changed.
+def seed_content(scratch, sector, edits):
+    """A content tree with cells of the sector map changed.
 
     Why this exists rather than a walk: the created character starts in a pocket in
     sector 20 — north and east are `INVALID MOVE!` from the start cell — and every door
     the census lists for that sector is 15+ cells away, so a scripted walk cannot reach
     one. The CP6 commerce gate solves the same problem the same way: build a content
     directory whose map bytes put the geometry where the test needs it, and let the
-    engine's own rules do the rest. Nothing here invents a rule; it moves a door.
+    engine's own rules do the rest. Nothing here invents a rule; it moves a door and
+    flattens ground.
 
-    Returns the directory to pass as --data-dir.
+    `edits` is a list of (x, y, tile). Returns the directory to pass as --data-dir.
     """
     # Beside the scratch dir, not inside it: the run driver wipes the scratch tree to
     # start clean, and a content directory it deletes on the way is a content tree that
@@ -277,16 +294,16 @@ def seed_content(scratch, sector, cell, tile):
     if os.path.isdir(dst):
         shutil.rmtree(dst)
     shutil.copytree(os.path.join(REPO, "original"), dst)
-    x, y = cell
     path = os.path.join(dst, f"mapx{sector}")
     with open(path, "r+b") as fh:
-        fh.seek(y * MAP_W + x)
-        fh.write(bytes([tile]))
+        for (x, y, tile) in edits:
+            fh.seek(y * MAP_W + x)
+            fh.write(bytes([tile]))
     return dst
 
 
 def run_engine_play(scratch, sector, rounds, stride=8, policy="chase", target=None,
-                    data=None):
+                    data=None, warmup=0):
     """Stream commands and score every write the engine makes, whenever it makes it.
 
     Scoring is per key, not per save, because the writes that matter are not all saves:
@@ -348,7 +365,7 @@ def run_engine_play(scratch, sector, rounds, stride=8, policy="chase", target=No
 
     for r in range(rounds):
         for i in range(stride):
-            (key, note), _ = _pick_key(policy, obs, r, i, target)
+            (key, note), _ = _pick_key(policy, obs, r, i, target, warmup)
             _send(proc, {"cmd": "key", "key": key})
             obs = _obs(proc)
             if obs is None:
@@ -565,11 +582,13 @@ def main():
     ap.add_argument("--engine", default=None)
     ap.add_argument("--original", default=None)
     ap.add_argument("--policy", default="square",
-                    choices=["square", "chase", "site", "kill"],
-                    help="square: a fixed cycle. chase: walk into creatures. site: walk onto a "
-                         "door and come back out — scores nothing by design, because a "
-                         "transition writes no sector file (see the module docstring). "
-                         "kill: chase and keep going.")
+                    choices=["square", "chase", "site", "gate", "kill"],
+                    help="square: a fixed cycle. chase: walk into creatures. site: dirty the "
+                         "map, then enter a seeded door. gate: dirty the map, then step on a "
+                         "time door. kill: chase and keep going.")
+    ap.add_argument("--warmup", type=int, default=6,
+                    help="rounds of chasing before a site/gate leg, so the sector is "
+                         "actually dirty when the transition writes it")
     ap.add_argument("--target", default=None,
                     help="site policy: the cell to walk to, as x,y (default 35,22, "
                          "the castle door in sector 20)")
@@ -602,10 +621,22 @@ def main():
     if a.policy == "site" and not a.target:
         # A dungeon entrance one step east of the start cell, in a copy of the content
         # tree. `original/` is never written: this is the player's release data.
-        data = seed_content(a.scratch, a.sector, (20, 21), 0x24)
+        data = seed_content(a.scratch, a.sector, [(20, 20, 0x24)])
         tgt = (20, 21)
         print("seeded: dungeon entrance at (20,21) in a copy of the content tree")
-    tl = run_engine_play(a.scratch, a.sector, a.rounds, a.stride, a.policy, tgt, data) \
+    if a.policy == "gate":
+        # The time door for this era is a coordinate, not a tile: k_gates in gates.c, and
+        # for era index 2 (sector 2x) slot 0 it is (16,16). The ground between it and the
+        # start is 0x08, which the walk loop refuses, so the corridor is flattened to the
+        # same 0x0c the start pocket is made of. The door itself is untouched: it is a cell,
+        # and nothing about it depends on the tile under it.
+        corridor = [(x, 20, 0x0c) for x in range(16, 20)] + \
+                   [(16, y, 0x0c) for y in range(16, 20)]
+        data = seed_content(a.scratch, a.sector, corridor + [(16, 16, 0x0c)])
+        tgt = (16, 16)
+        print("seeded: walkable corridor to the era-2 time door at (16,16)")
+    tl = run_engine_play(a.scratch, a.sector, a.rounds, a.stride, a.policy, tgt, data,
+                         a.warmup) \
         if a.mode == "engine" else run_original(a.scratch, a.sector, a.rounds,
                                                 a.stride, a.policy)
     out = a.out or os.path.join(a.scratch, f"{a.mode}.jsonl")
