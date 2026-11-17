@@ -98,6 +98,35 @@ fi
     && ok "AP2: the created character is written to the save, so a session is resumable" \
     || bad "AP2: create left no save record"
 
+# --- AP2d: BOTH creation paths archive, not just the one the gate can drive -------
+# Structural, and labelled as such so nobody mistakes it for a behavioural arm. AP2c drives
+# the declarative route (--api create -> u2_creation_apply). The route a player takes is the
+# title screen's 'C' -> u2_creation_flow, and that one cannot be driven from a script here:
+# the creation form is a cursor-driven screen and a blind key script never completes it, so
+# every attempt just fell back to the splash and reported nothing.
+#
+# That gap is how this shipped broken. The rotation was wired into u2_creation_apply only,
+# AP2c was green, and no player ever got a clean world. This check exists so the same hole
+# cannot reopen quietly: it fails if either caller stops reaching the shared helper.
+# It does NOT prove the interactive form completes a creation; only a person or a real
+# scripted form driver can show that.
+for fn in u2_creation_apply u2_creation_flow; do
+    # Anchor on the definition line, not on the name anywhere. The first draft matched
+    # index($0, "creation_flow()") and hit a sentence in a comment above the helper, then ran
+    # to the helper's own closing brace — so it reported the helper reaching itself and passed
+    # with the real call deleted. The control found it; a control that is not run is not a
+    # control.
+    body=$(awk -v f="$fn" '$0 ~ "^int " f "\\(" {on=1} on {print} on && /^}/ {exit}' \
+              src/game/creation.c)
+    case "$body" in
+        *creation_archive_previous*)
+            ok "AP2d: $fn reaches creation_archive_previous, so a new character gets a new world" ;;
+        *)
+            bad "AP2d: $fn does NOT archive the previous slot — one of the two creation paths " \
+                "is creating a character into the old character's mutated world" ;;
+    esac
+done
+
 # --- AP2c: a new character gets a new world, and the old one is kept ------------
 # One slot exists (D5 defers --save NAME) and the slot holds the sector overlay as well
 # as the record, so without a rotation the previous character's mutated and stamped

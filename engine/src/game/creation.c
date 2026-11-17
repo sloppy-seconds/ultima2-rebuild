@@ -658,6 +658,37 @@ static void refuse(char *why, int whysize, const char *fmt, ...)
     va_end(ap);
 }
 
+/* A new character gets a new world, not the one the last character left.
+ * There is one slot (D5 defers --save NAME) and the slot holds the sector overlay as well
+ * as the record, so without this the previous character's stamped and mutated sectors are
+ * the ground this one loads — which is how a brand new character was met on the shipped
+ * tree walking past monsters that are not there. The rotation is a rename inside the save
+ * directory, so the old game is preserved rather than deleted.
+ *
+ * Shared by both creation paths on purpose. It was first wired into the declarative
+ * u2_creation_apply() only, which is the --api route, and the AP2c gate drove that route —
+ * so the gate stayed green through a whole release in which no player ever got a clean
+ * world, because the title screen's 'C' goes through creation_flow() and never came near
+ * this code. A gate that exercises one of two callers is not a gate for the feature. */
+static int creation_archive_previous(u2_ctx *ctx, char *why, int whysize)
+{
+    char archived[512];
+    const int rot = u2_slot_rotate(ctx, archived, sizeof archived);
+    if (rot < 0) {
+        if (why && whysize > 0)
+            refuse(why, whysize, "the previous save could not be moved aside");
+        else
+            fprintf(stderr, "[engine] refusing to create: the previous save could not "
+                    "be moved aside\n");
+        return -1;
+    }
+    if (rot > 0) {
+        fprintf(stderr, "[engine] archived the previous save to %s\n", archived);
+        fflush(stderr);
+    }
+    return rot;
+}
+
 int u2_creation_apply(u2_ctx *ctx, const u2_character *c, char *why, int whysize)
 {
     form f;
@@ -730,15 +761,10 @@ int u2_creation_apply(u2_ctx *ctx, const u2_character *c, char *why, int whysize
      * at the top of the function because every validation above has to have
      * passed first: a refused form must not cost anyone their save. */
     char archived[512];
-    int rot = u2_slot_rotate(ctx, archived, sizeof archived);
-    if (rot < 0) {
-        refuse(why, whysize, "the previous save could not be moved aside");
+    int rot = creation_archive_previous(ctx, why, whysize);
+    if (rot < 0)
         return -1;
-    }
-    if (rot > 0) {
-        fprintf(stderr, "[engine] archived the previous save to %s\n", archived);
-        fflush(stderr);
-    }
+    (void)archived;
 
     /* The same write the form's [S]AVE does, so a created character is resumable by
      * --play-map and by a later API session rather than living only in this process. */
@@ -868,6 +894,12 @@ int u2_creation_flow(u2_ctx *ctx)
             }
         }
         if (done == 1) {
+            /* The same rotation the declarative path does, and this is the arm a player
+             * actually takes: the title screen's 'C' lands here, not in
+             * u2_creation_apply(). Before this line the interactive path wrote the new
+             * record over the old slot and inherited its sector overlay wholesale. */
+            if (creation_archive_previous(ctx, NULL, 0) < 0)
+                return -1;
             if (u2_save_store(ctx) != U2_SAVE_OK) return -1;
             return 1;
         }
