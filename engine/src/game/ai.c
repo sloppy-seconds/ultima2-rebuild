@@ -305,6 +305,7 @@ static int creature_step(u2_ctx *ctx, u2_world *w, int slot, int dx, int dy,
          * phantom 618 times while standing on open grass. The slot byte cannot lie that
          * way -- asm/225A only ever writes it from a cell the creature is genuinely
          * entering, and a creature loaded from monx arrives naming its own terrain. */
+        const uint8_t restore_byte = st->mon_kind[slot];
         u2_world_tile_put(w, ox, oy, st->mon_kind[slot]);
         /* asm/225A: save the NEW cell's terrain into the slot, then stamp.
          * asm/2233 fetches the destination tile and asm/225a stores it into
@@ -317,8 +318,10 @@ static int creature_step(u2_ctx *ctx, u2_world *w, int slot, int dx, int dy,
          * under a creature that moved before saving. */
         st->mon_kind[slot] = w->map[u2_world_tile_index(nx, ny)];
         u2_world_tile_put(w, nx, ny, st->mon_type[slot]);
-        u2_trace(ctx, "mon_move", "225A", "slot=%d type=%02x (%d,%d)->(%d,%d)",
-                 slot, st->mon_type[slot], ox, oy, nx, ny);
+        u2_trace(ctx, "mon_move", "225A", "slot=%d type=%02x (%d,%d)->(%d,%d) "
+                 "restored=%02x dest_was=%02x",
+                 slot, st->mon_type[slot], ox, oy, nx, ny,
+                 restore_byte, st->mon_kind[slot]);
         return 1;
     }
     u2_trace(ctx, "mon_stay", "2260", "slot=%d type=%02x at=(%d,%d) every candidate refused",
