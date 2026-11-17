@@ -105,6 +105,55 @@ static void status_tick(u2_ctx *ctx)
     if (ctx->state.paral_sleep) ctx->state.paral_sleep--;
 }
 
+/* Catch a ghost the moment it appears, not only when it reaches disk.
+ *
+ * The write-time note in core/world.c was not enough, and jarvis showed why: a fresh
+ * character walked into Towne Linda, came back, and the overlay held a cell stamped with a
+ * creature that was no longer there — while the log had no note at all. Both are correct.
+ * At the instant of the write the creature was standing on its own stamp, so there was
+ * nothing to report; it was the departure afterwards that failed to restore the cell. A
+ * check that only looks at the file is checking the past.
+ *
+ * So this runs after the creatures' turn, when the grid is settled, and prints once per
+ * cell per sector: the cell, the byte, the ground under it, and where to look for the move
+ * that left it. Once per cell rather than every turn, because a live session drowns
+ * otherwise and the first occurrence is the one that names the cause. */
+static void ghost_watch(u2_ctx *ctx, const u2_world *w)
+{
+    static uint8_t seen[U2_SECTOR_TILES];
+    static int seen_sector = -1;
+    if (!w->map_loaded)
+        return;
+    const int sec = ctx->state.sector_first * 10 + ctx->state.sector_second;
+    if (sec != seen_sector) {
+        memset(seen, 0, sizeof seen);
+        seen_sector = sec;
+    }
+
+    uint8_t occupied[U2_SECTOR_TILES];
+    memset(occupied, 0, sizeof occupied);
+    for (int i = 0; i < U2_MON_SLOTS; i++) {
+        if (ctx->state.mon_type[i] == 0)
+            continue;
+        if (!(ctx->state.mon_x[i] || ctx->state.mon_y[i]))
+            continue;
+        const int c = (int)ctx->state.mon_y[i] * U2_SECTOR_EDGE
+                     + (int)ctx->state.mon_x[i];
+        if (c >= 0 && c < U2_SECTOR_TILES)
+            occupied[c] = 1;
+    }
+    for (int c = 0; c < U2_SECTOR_TILES; c++) {
+        if (w->map[c] == w->map_base[c] || occupied[c] || seen[c])
+            continue;
+        seen[c] = 1;
+        fprintf(stderr, "u2: NOTE ghost appeared in sector %d at (%d,%d): grid %#02x, "
+                "ground %#02x, nothing standing on it -- run with --trace and grep "
+                "mon_move for the slot that vacated it\n",
+                sec, c % U2_SECTOR_EDGE, c / U2_SECTOR_EDGE, w->map[c], w->map_base[c]);
+        fflush(stderr);
+    }
+}
+
 static void creature_turn(u2_ctx *ctx, u2_overworld *ow)
 {
     ow->turns++;   /* one resolved turn; --debug cli keys off this */
@@ -145,6 +194,7 @@ static void creature_turn(u2_ctx *ctx, u2_overworld *ow)
      * apart. */
     if (rep.moved || rep.stolen)
         u2_monsters_store(ctx, &ow->world);
+    ghost_watch(ctx, &ow->world);
 
     /* The wandering spawn, once per completed command, on the world map only.
      *
