@@ -148,6 +148,44 @@ rather than the directory. Both are asserted separately.
 | **D5** | Multi-save UI now or later? The layout enables it; a `--save NAME` flag and a slot picker are separate work. | Layout now, flag later. Building the layout without the flag costs nothing extra and the flag is then small. |
 | **D6** | Who creates the default slot directory — the installer, or the engine on first save? | The engine, lazily, the same way `ensure_cache_dir()` already does. A slot that exists but holds nothing is a lie about having a game. The installer only migrates existing ones. **Amended same day, owner approved:** the engine also *adopts* a record the pre-slot layout left behind — see § 4b. It still creates nothing on its own, and it still never touches content. |
 
+### 5b. Amendment, 2026-11-17, owner ruled: a new character rotates the slot
+
+D5 deferred `--save NAME`, and that deferral had a consequence nobody had priced: there is
+**one** slot, and a slot holds the sector overlay as well as the record. So a brand new
+character loaded the previous character's world — including, as it happened, nine cells a
+creature had walked off and left stamped, which the next character met as scenery. The
+owner's report was "there's still ghosts in the game, and it's from a brand new character";
+the bytes were in `saves/PLAYER/mapx20`, and the new character had nothing to do with them.
+
+The ruling is the owner's: **on character creation, archive the old slot and start a new
+one.** Not delete — archive, so the evidence and the old game both survive.
+
+`u2_slot_rotate()` (core/slot.c) renames `saves/PLAYER` to `saves/PLAYER.<YYYYMMDDTHHMMSS>`,
+with a `.NN` counter if two creations land in one second, and it is called from
+`u2_creation_apply()` after every validation and immediately before the first save of the new
+character — so a refused form never costs anyone their save, and a rotation always has a
+character to replace what it moved. Three rules come with it:
+
+* **Only a game rotates.** A slot with no record, or a zero-length record, rotates to nothing.
+  That is D6 again: an empty slot is not a game, and rotating one would leave a timestamped
+  directory for every launch that never reached a save. Gated, not assumed.
+* **A real record always rotates**, overlay or not. Creating a second character archives the
+  first, which is the point — a character is worth keeping.
+* **An archive is never a slot.** Nothing enumerates slots today, so the suffix is inert; when
+  D5 lands and something does scan the save directory, it must skip the suffix or a rotated
+  world becomes a selectable save that is really a corpse. The rule is written at
+  `core/slot.h` where D5 will have to read it.
+
+This is containment, not a cure. A fresh character starts on the release world and will
+still accumulate its own footprints; why the engine leaves nine where the original leaves
+none is `docs/needs-gameplay.md` G91, and it needs a controlled A/B before anyone patches
+the producer. What the rotation removes is the *inheritance*, which is the half the owner
+could see.
+
+Gated in `engine/tests/run_api.sh` as AP2c: the overlay moves, the new slot holds a record
+and no overlay, a real record is worth an archive, and an empty slot is not. Control:
+stubbing out the rotate call goes red on the first three.
+
 ## 4a. What `--install` has to do
 
 This is not a small part of the change, and it is where a careless version loses someone's
