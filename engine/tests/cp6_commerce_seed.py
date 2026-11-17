@@ -192,6 +192,12 @@ def main(out_dir: str, case: str) -> int:
         if i == 7:
             continue                         # leave one unowned so the NOT OWNED branch is
         p[0x76 + i - 0x36] = 1               # reachable in a scripted run (7-LI)
+    p[0x97 - 0x36] = 1                       # armour_owned[CLOTH]. Enhanced mode lists only
+    #                                       # armour the character actually owns (owner's call,
+    #                                       # 2026-10-26) and prints its refusal instead of a menu
+    #                                       # when that list is empty, so with nothing owned the W
+    #                                       # prompt never appears in enhanced mode and
+    #                                       # tests/prompt_gate.py has no blocking read to order.
     p[0xE3 - 0x36] = 1                       # items_held[13] = STRANGE COIN, which is what
     #                                       # NEGATE TIME spends. DS:E3 is inside items_held;
     #                                       # it is not a separate counter (see commands.c).

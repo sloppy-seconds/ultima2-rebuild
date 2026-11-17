@@ -28,6 +28,21 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
+
+# CP5 is the original-fidelity checkpoint: nearly every gate below asserts what the
+# bytes say the ORIGINAL did — EXP and GOLD wrapping past 9999 rather than clamping,
+# the melee wound printing nothing, `LEATHER NOT OWNED!`, the save guards. Enhanced
+# became the engine's default on 2026-11-17, so an unflagged run is no longer the
+# original's behaviour, and the gates would otherwise be measuring the mode the
+# player did not ask them to measure.
+#
+# Pinned once here rather than per invocation because about a third of these gates
+# drive the engine through tests/*.py helpers that receive the binary as a single
+# string; a flag on the shell line never reaches them, and a helper quietly running in
+# the other mode is a gate that cannot fail where it enforces. Gates that want
+# enhanced pass --enhanced, which outranks this.
+export U2_MODE=classic
+
 fail=0
 ok()   { printf '  PASS  %s\n' "$1"; }
 bad()  { printf '  FAIL  %s\n' "$1"; fail=1; }

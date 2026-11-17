@@ -163,7 +163,11 @@ def run_gate():
         saves = os.path.join(tmp, 'saves')
         build_town_save(saves, os.path.join(data, 'player'))
         out = os.path.join(tmp, 'town.ppm')
-        proc = subprocess.run([binary, '--headless', '--play-map',
+        # --classic, because everything below asserts the original 320x200 geometry.
+        # Enhanced became the default on 2026-11-17 and its canvas is 1024x512, so an
+        # unflagged run here would fail for a reason that has nothing to do with the
+        # site viewport. The enhanced canvas is gated in run_cp4.sh, not here.
+        proc = subprocess.run([binary, '--classic', '--headless', '--play-map',
                                '--data-dir', data, '--save-dir', saves,
                                '--dump-map', out],
                               cwd=ENGINE, capture_output=True, text=True)

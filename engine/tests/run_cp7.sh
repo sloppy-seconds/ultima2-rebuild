@@ -20,6 +20,16 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
+
+# Pinned to the original mode, for the same reason as run_cp5.sh and with a sharper
+# edge here: the dungeon renderer is geometry, and the gates below look for ink in
+# the map window at the original's 320x200 coordinates. Enhanced mode draws the same
+# wireframe into a 1024x512 frame — measured 2026-11-17, both frames carry geometry —
+# so an unflagged run did not mean the renderer was broken, it meant the gate was
+# looking in the wrong place. What is NOT gated as a result, and should be said rather
+# than left implied: the enhanced layout's dungeon view has no assertion of its own.
+export U2_MODE=classic
+
 fail=0
 ok()   { printf '  PASS  %s\n' "$1"; }
 bad()  { printf '  FAIL  %s\n' "$1"; fail=1; }

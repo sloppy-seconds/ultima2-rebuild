@@ -561,8 +561,13 @@ printf '%s\n' "$OUT" | grep -q "predates the fidelity header line" \
 # by a viewer who runs --enhanced as a habit. Fresh world, same rule as every other
 # recording in this file: a run that writes a sector overlay must not decide what a later
 # run reads.
+#
+# `--classic` on the record line is not decoration. Enhanced became the default on
+# 2026-11-17, so an unflagged recording is an enhanced recording and would pin enhanced;
+# the case this block is about is a file whose declared rule is the original one, and the
+# only honest way to make one now is to ask for it.
 python3 tests/demo_kill_fixture.py "$WORK/wk2" >/dev/null 2>&1
-record killorig "$WORK/wk2" "$WORK/kill.keys"
+record killorig "$WORK/wk2" "$WORK/kill.keys" --classic
 RC=0
 OUT=$("$U2" --headless --enhanced --cleanroom --data-dir "$WORK/wk2/content" \
            --save-dir "$WORK/wk2/save" --playback "$WORK/d_killorig/killorig.demo" 2>&1) || RC=$?

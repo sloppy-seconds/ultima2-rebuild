@@ -30,12 +30,24 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ENGINE = os.path.dirname(HERE)
 ROOT = os.path.dirname(ENGINE)
 
-# (label, seed case, keys, the token the prompt prints, the digit the player answers with)
+# (label, seed case, keys, the token the prompt prints per mode, the digit the player answers)
+#
+# The token differs by mode in one case, and that is a real difference rather than a
+# sloppy expectation: enhanced mode announces through feedback.h where the original was
+# terse, so `W` prints `WEAR ARMOUR:` instead of the original's bare `WHICH?` (owner
+# request, 2026-11-11). What this gate is about is the ORDER — menu on screen before the
+# loop blocks for the digit — and that property has to hold in both modes, so both run
+# and each is asked for the words that mode actually prints.
 CASES = [
-    ("R ready weapon", "armour", "R\n3\n", "READY WEAPON:"),
-    ("W wear armour",  "armour", "W\n1\n", "WHICH?"),
-    ("M ready spell",  "armour", "M\n1\n", "MAGIC SPELL READY #"),
+    ("R ready weapon", "armour", "R\n3\n",
+     {"classic": "READY WEAPON:", "enhanced": "READY WEAPON:"}),
+    ("W wear armour",  "armour", "W\n1\n",
+     {"classic": "WHICH?", "enhanced": "WEAR ARMOUR:"}),
+    ("M ready spell",  "armour", "M\n1\n",
+     {"classic": "MAGIC SPELL READY #", "enhanced": "MAGIC SPELL READY #"}),
 ]
+
+MODES = ("classic", "enhanced")
 
 
 def check(trace_lines, token):
@@ -64,8 +76,8 @@ def check(trace_lines, token):
                    "the player types blind" % (prompt + 1, wait + 1))
 
 
-def run_case(label, seed, keys, token, workdir):
-    case_dir = os.path.join(workdir, label.replace(" ", "_"))
+def run_case(label, seed, keys, token, workdir, mode):
+    case_dir = os.path.join(workdir, "%s.%s" % (label.replace(" ", "_"), mode))
     if subprocess.run([sys.executable, os.path.join(HERE, "cp6_commerce_seed.py"),
                        case_dir, seed], capture_output=True).returncode != 0:
         return False, "seed failed"
@@ -73,11 +85,15 @@ def run_case(label, seed, keys, token, workdir):
     with open(keyfile, "w") as f:
         f.write(keys)
     trace = os.path.join(case_dir, "k.trace")
+    # The mode is passed in the child's environment rather than as a flag so this gate
+    # measures the same thing the player's default does, and so it keeps working when
+    # the caller has pinned U2_MODE for a whole checkpoint.
+    env = dict(os.environ, U2_MODE=mode)
     subprocess.run([os.path.join(ENGINE, "u2"), "--headless", "--play-map", "--cleanroom",
                     "--data-dir", os.path.join(case_dir, "content"),
                     "--save-dir", os.path.join(case_dir, "save"),
                     "--script", keyfile, "--trace=" + trace],
-                   cwd=ENGINE, capture_output=True)
+                   cwd=ENGINE, capture_output=True, env=env)
     if not os.path.isfile(trace):
         return False, "no trace written"
     with open(trace, "r", errors="replace") as f:
@@ -91,11 +107,13 @@ def run_gate():
         return 0
     bad = 0
     with tempfile.TemporaryDirectory(prefix="u2-promptgate-") as tmp:
-        for label, seed, keys, token in CASES:
-            ok, why = run_case(label, seed, keys, token, tmp)
-            print("%s  %s: %s" % ("PASS" if ok else "FAIL", label, why))
-            if not ok:
-                bad += 1
+        for label, seed, keys, tokens in CASES:
+            for mode in MODES:
+                ok, why = run_case(label, seed, keys, tokens[mode], tmp, mode)
+                print("%s  %s [%s]: %s"
+                      % ("PASS" if ok else "FAIL", label, mode, why))
+                if not ok:
+                    bad += 1
     print("PROMPT GATE: %s" % ("PASS" if bad == 0 else "FAIL (%d)" % bad))
     return 0 if bad == 0 else 1
 

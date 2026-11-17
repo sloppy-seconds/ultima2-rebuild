@@ -400,7 +400,7 @@ for c in ../original ../original/updated; do
     if [ -r "$c/ultimaii.exe" ] && [ -r "$c/mapx30" ]; then MAPDIR="$c"; break; fi
 done
 if [ -n "$MAPDIR" ]; then
-    if ./u2 --data-dir "$MAPDIR" --save-dir "$WORK/saves" \
+    if ./u2 --classic --data-dir "$MAPDIR" --save-dir "$WORK/saves" \
             --dump-map "$WORK/map.ppm" >"$WORK/dump.err" 2>&1; then
         sz=$(wc -c < "$WORK/map.ppm" 2>/dev/null || echo 0)
         if [ "$sz" -eq 192015 ]; then
@@ -409,7 +409,7 @@ if [ -n "$MAPDIR" ]; then
             bad "--dump-map wrote $sz bytes, expected 192015 for a 320x200 PPM"
         fi
         # Second run must come from the cache the first run created.
-        if grep -q 'tiles from cache' <(./u2 --data-dir "$MAPDIR" \
+        if grep -q 'tiles from cache' <(./u2 --classic --data-dir "$MAPDIR" \
                 --save-dir "$WORK/saves" --dump-map "$WORK/map2.ppm" 2>&1); then
             ok "second run serves tiles from the cache it bootstrapped"
             cmp -s "$WORK/map.ppm" "$WORK/map2.ppm" \
@@ -417,6 +417,36 @@ if [ -n "$MAPDIR" ]; then
                 || bad "cached frame differs from the extracted one"
         else
             bad "second run re-extracted: the cache did not bootstrap"
+        fi
+        # The layout half of the mode, asserted on pixels rather than on a log line:
+        # enhanced is the default since 2026-11-17 and its canvas is 1024x512, so an
+        # unflagged run must NOT produce the 320x200 original frame. Without this the
+        # default could silently revert and every classic-pinned gate above would stay
+        # green, because none of them looks at the unflagged run.
+        if ./u2 --headless --data-dir "$MAPDIR" --save-dir "$WORK/saves" \
+                --dump-map "$WORK/map3.ppm" >/dev/null 2>&1; then
+            if head -2 "$WORK/map3.ppm" | tail -1 | grep -q '1024 512'; then
+                ok "no flag renders the enhanced canvas ($(head -2 "$WORK/map3.ppm" | tail -1))"
+            else
+                bad "no flag did not render the enhanced canvas: got $(head -2 "$WORK/map3.ppm" | tail -1)"
+            fi
+        else
+            bad "--dump-map with no flag failed; the enhanced canvas was never checked"
+        fi
+        # ...and the layout half does not come back just because the art flag is set.
+        # Measured here rather than assumed, because there are three canvases and not two:
+        # enhanced is 1024x512 whatever the art, and classic is 320x200 on CGA but the
+        # original-era EGA canvas of 640x400 when the fan art is asked for — the art pack
+        # was made for that mode, so the art axis legitimately owns that one. What this
+        # asserts is the thing that must not drift: fan art with --classic must NOT land on
+        # the enhanced layout.
+        if ./u2 --classic --ega --data-dir "$MAPDIR" --save-dir "$WORK/saves" \
+                --dump-map "$WORK/map4.ppm" >/dev/null 2>&1; then
+            head -2 "$WORK/map4.ppm" | tail -1 | grep -q '640 400' \
+                && ok "--classic --ega keeps the original EGA canvas, not the enhanced layout" \
+                || bad "--classic --ega did not keep the original EGA canvas: got $(head -2 "$WORK/map4.ppm" | tail -1)"
+        else
+            printf '  SKIP  --classic --ega could not render here (no theme in the content dir)\n'
         fi
     else
         bad "--dump-map failed: $(tail -2 "$WORK/dump.err")"
@@ -559,6 +589,67 @@ if [ -s "$WORK/classic/themes/default/TILES" ]; then
     esac
 else
     printf '  SKIP  no ../themes/default to build a --classic fixture from\n'
+fi
+
+# --- [game] mode -----------------------------------------------------------
+# Enhanced is the default mode and `--classic` is the opt-out for the whole
+# presentation, not just the art (owner, 2026-11-17). The observable here is the art
+# line in a tree that HAS themes, which makes each direction a real override rather
+# than a coincidence of nothing being installed: enhanced must take the theme, and
+# classic must refuse it. The flag-beats-file half is the precedence rule the whole
+# config file exists to hold, so it is asserted in both directions.
+rm -rf "$WORK/mode"; mkdir -p "$WORK/mode/themes/default"
+cp ../themes/default/THEME.INI ../themes/default/TILES "$WORK/mode/themes/default/" 2>/dev/null
+if [ -s "$WORK/mode/themes/default/TILES" ]; then
+    U2_ABS="$PWD/u2"
+    artline() { (cd "$WORK/mode" && "$U2_ABS" --headless "$@" 2>&1 | grep '^u2: art mode' | head -1); }
+
+    case "$(artline)" in
+        *ega*) ok "mode default: no flag in a themes tree is enhanced (takes the theme)" ;;
+        *)     bad "mode default: no flag should be enhanced and take the theme: got '$(artline)'" ;;
+    esac
+
+    printf '[game]\nmode = classic\n' > "$WORK/mode/config.ini"
+    case "$(artline)" in
+        *cga*) ok "config [game] mode = classic opts out of the presentation" ;;
+        *)     bad "config mode = classic was ignored: got '$(artline)'" ;;
+    esac
+
+    printf '[game]\nmode = Enhanced\n' > "$WORK/mode/config.ini"
+    case "$(artline)" in
+        *ega*) ok "config mode is case-insensitive (Enhanced accepted)" ;;
+        *)     bad "config mode = Enhanced was not accepted: got '$(artline)'" ;;
+    esac
+
+    # The flag must beat the file, in the direction where the file asks for the
+    # opposite of the flag. This is the half that goes silently wrong if the ini is
+    # applied after the flags instead of filling only what they left unset.
+    printf '[game]\nmode = enhanced\n' > "$WORK/mode/config.ini"
+    case "$(artline --classic)" in
+        *cga*) ok "--classic beats config [game] mode = enhanced" ;;
+        *)     bad "--classic lost to config.ini: got '$(artline --classic)'" ;;
+    esac
+
+    printf '[game]\nmode = turbo\n' > "$WORK/mode/config.ini"
+    modeerr=$( (cd "$WORK/mode" && "$U2_ABS" --headless 2>&1); printf 'rc=%d' "$?" )
+    case "$modeerr" in
+        *"rc=0"*) bad "a third mode value started anyway; it must be refused" ;;
+        *"'classic' nor 'enhanced'"*) ok "config mode = turbo is refused at startup, not guessed" ;;
+        *)        bad "config mode = turbo was refused with an unclear message: $(printf '%s' "$modeerr" | tail -1)" ;;
+    esac
+    rm -f "$WORK/mode/config.ini"
+
+    # The two axes are independent, and `--classic --ega` is the combination that proves
+    # it: the mode says original presentation, the art flag says fan art, and the art
+    # flag — being the more specific request and the later one — wins the art half while
+    # leaving the layout alone. A build that folded the two axes into one switch would
+    # answer this with CGA, and nothing else here would notice.
+    case "$(artline --classic --ega)" in
+        *ega*) ok "--classic --ega: the art axis stays separable from the mode axis" ;;
+        *)     bad "--classic --ega lost the art flag: got '$(artline --classic --ega)'" ;;
+    esac
+else
+    printf '  SKIP  no ../themes/default to build a [game] mode fixture from\n'
 fi
 
 # --- config.ini -------------------------------------------------------------
@@ -849,7 +940,7 @@ fi
 # header). The engine frame is rendered here so both sides come from one run.
 SHOT="../captures/screenshots/move-after.png"
 if python3 -c "import PIL" 2>/dev/null && [ -f "$SHOT" ] && [ -x ./u2 ]; then
-    ./u2 --headless --dump-map "$WORK/t7-engine.ppm" --data-dir "$CONTENT" \
+    ./u2 --classic --headless --dump-map "$WORK/t7-engine.ppm" --data-dir "$CONTENT" \
         >/dev/null 2>&1 || true
     if [ ! -s "$WORK/t7-engine.ppm" ] && [ -z "$CONTENT" ]; then
         printf '  SKIP  no content dir for the engine frame in the screenshot diff\n'
@@ -888,7 +979,7 @@ if [ -n "$CONTENT" ]; then
     printf 'B\nR\nI\nT\nI\nS\nH\n0x0d\n0x0d\n0x0d\n0x0d\n' >> "$T5KEYS"
 
     rm -rf "$WORK/t5orig"; mkdir -p "$WORK/t5orig"
-    ./u2 --headless --data-dir "$CONTENT" --save-dir "$WORK/t5orig" \
+    ./u2 --classic --headless --data-dir "$CONTENT" --save-dir "$WORK/t5orig" \
          --script "$T5KEYS" --dump-each > "$WORK/t5orig.out" 2>&1
     grep -q "CMD:" "$WORK/t5orig.out" \
         && bad "original mode entered the world after creation; it must restart to the title" \
