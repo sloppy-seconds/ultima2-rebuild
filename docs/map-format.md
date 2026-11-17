@@ -534,3 +534,50 @@ the bytes are silent about rather than a divergence from them, which is a materi
 be. Two rebuild sites remain deliberately: the sector-load paths, and the kill path, where the terrain
 byte is zeroed by the record clear before the site runs and a targeted restore would write water into
 the cell. Both are documented at their call sites.
+
+### 2026-11-17: the ghosts a new character inherits, and why the writer is not the fix
+
+The owner reported stamped monsters on the shipped tree **from a brand new character**. Two
+separate things were going on, and only one of them is about bytes.
+
+**The inheritance is the save slot.** `core/slot.h` D5 defers `--save NAME`, so there is one
+slot and every character shares it. The overlay is read back ahead of content, so whatever the
+previous character's saves baked is authored ground for the next one. That is why a fresh
+character walked into a haunted sector: nothing about the new character was involved.
+
+**The bytes are footprints, and the two programs differ in how many they leave.** Same sector,
+two files each program wrote itself:
+
+| file | cells differing from the release map | with a live creature on them | bare |
+| --- | --- | --- | --- |
+| `mapx20` written by the original | 2 | 2 | **0** |
+| `mapx20` written by the engine | 12 | 3 | **9** |
+
+The bare bytes (`0x30`, `0x34`, `0x2C`, `0xFC`) are the type bytes of that sector's creatures,
+sitting on cells those creatures no longer occupy. So the property the original has and the
+engine does not is narrow and checkable: **at the moment of the save, no cell differs from the
+ground with nothing standing on it.**
+
+**A write filter is the wrong place to enforce it, and the existing gate proved it.** The first
+attempt dropped any such cell in `u2_world_store` and substituted `map_base`. It passed its own
+new test and then broke CP4's ghost-stamp assertion, because § 9 is exactly right that the
+release maps ship with creature art baked into the spawn cells — `map_base` is not a clean
+ground, so the substitution restored one ghost with another, at `(31,33) = 0x38`. The original
+writes its stamped grid and is not entitled to be tidied on the way out.
+
+What shipped instead is the measurement, because a fix to the producer without it would be a
+guess: `ctx->diag_baked_unowned`, counted in `u2_world_store` at the moment of the write and
+printed by `--dump-state` as `baked_unowned`. `--dump-state` had reported `ghosts: 0` on the
+save above — `u2_monsters_ghost_cells` is measured on a live frame and cannot see a save. The
+gate is `engine/tests/baked_cells_check.c` (CP5), which asserts a clean producer reports zero
+and that a planted footprint is reported; its control is the counter zeroed, and that control
+only goes red once it compiles, which is the lesson from `docs/handoff-2026-11-12.md` § 4
+applied again.
+
+**Still open, deliberately.** Why the engine leaves nine where the original leaves none is not
+established. The move path already restores each vacated cell from the slot's saved terrain
+byte (`asm/2233`, `ai.c`), and in a controlled fixture with that byte correct the engine leaves
+zero — so the residue is a session path the fixture does not model, most likely a sector reload
+after a save reading its own stamps back as ground. Settling it needs a controlled A/B — same
+sector, same seed, both binaries, same key script — and not a patch. The capture worklist owns
+that as `docs/needs-gameplay.md`.
