@@ -717,3 +717,38 @@ The gate is `engine/tests/gate_transit_save.py`: every map overlay in the slot m
 creature overlay beside it. No scripted scenario in the suite can produce an orphan — every
 path that dirties a map also syncs the table — so the gate plants the shape and requires the
 scan to name it, which is the only honest way to show the check can go red.
+
+## 12. A time-door transit reloaded the map but not the creatures (2026-11-18)
+
+Owner-observed: crossing a time door into Time of Legends brought the previous era's monsters
+along, and they were all standing in the new sector.
+
+The cause is visible in the code once you know to look at what the door loads. Entering a
+sector normally goes through one of two paths, and both load the map *and* the creature table
+and then spawn, clear spawn cells and restamp. `u2_gate_transit` loaded only the map:
+
+```c
+const u2_sector_id id = { (uint8_t)partner, (uint8_t)ow->sector_lo };
+(void)u2_world_load(ctx, &ow->world, 1, id);   /* is_map = 1, and that was all */
+```
+
+`ctx->state.mon_*` is the live creature table, and nothing replaced it, so the era you left
+stayed resident. The damage is not only that you see them: the next save writes the live table
+into the **destination's** `monx`, so a population leaks between eras and the leak is
+persistent. The sector's dialogue was left behind by the same omission, which is the smaller
+version of the same mistake.
+
+The fix runs the creature half of sector entry after the map load — `u2_monsters_spawn`
+memcpy's all 32 slots from the file it is given, so no clear is needed first — and reloads
+`tlkx`.
+
+**This one is not gated, and the attempt is worth recording.** A check was written into
+`gate_transit_save.py` and then removed, because it could not fail: with the fix disabled the
+scenario produced a creature list *identical* to the one with the fix in place, so the
+scenario cannot see the difference at all. Two earlier drafts failed for unrelated reasons and
+looked like findings while doing it — "state creature count equals destination file count" is
+not a property, because the spawner populates a sector whose `monx` is empty. A gate for this
+needs a scenario where the origin's population is provably still resident at the moment of the
+transit, which means the deterministic `--play-map --script` route rather than a scripted key
+walk. Until then the evidence is the owner's observation, graded observed, and the code change
+stands on the shape of the two entry paths agreeing with each other.

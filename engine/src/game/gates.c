@@ -197,6 +197,27 @@ int u2_gate_transit(u2_ctx *ctx, struct u2_overworld *ow)
     const u2_sector_id id = { (uint8_t)partner, (uint8_t)ow->sector_lo };
     (void)u2_world_load(ctx, &ow->world, 1, id);
 
+    /* The creature table belongs to the sector, not to the player, and it has to be
+     * reloaded with the map or the era you left rides through the door with you. This
+     * path loaded only the map, so every creature from the outgoing sector stayed in the
+     * live table, got stamped into the destination's grid, and was then written into the
+     * destination's monx by the next save — which spreads a population across eras rather
+     * than merely showing it. Reported by the owner 2026-11-18: crossing into Time of
+     * Legends carried the previous era's monsters with them.
+     *
+     * This is the creature half of what site_reload() and overworld_open() do when a
+     * sector becomes resident, and it needs no clear first: u2_monsters_spawn() memcpy's
+     * all 32 slots from the file it was given, so the old table cannot survive it. The
+     * dialogue is per-sector for the same reason and was also left behind. */
+    if (u2_world_load(ctx, &ow->world, 0, id) == U2_WORLD_OK) {
+        (void)u2_monsters_spawn(ctx, &ow->world);
+        u2_monsters_clear_spawn_cells(ctx, &ow->world);
+        u2_monsters_restamp(ctx, &ow->world);
+    }
+
+    ow->world.tlkx_loaded = 0;
+    (void)u2_world_load_tlkx(ctx, &ow->world, id);
+
     ow->x = px;
     ow->y = py;
 

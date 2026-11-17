@@ -38,7 +38,7 @@ fi
 # Evidence: docs/moongates.md sections 3 and 3b, captures/spice86/moongate-cycle,
 # tools/gate_graph.py.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/gate_check" \
-   tests/gate_check.c src/game/gates.c src/core/world.c src/core/roots.c src/core/slot.c src/core/state.c 2>"$WORK/cc-gate.err"
+   tests/gate_check.c src/game/gates.c src/game/monsters.c src/core/rng.c src/core/world.c src/core/roots.c src/core/slot.c src/core/state.c 2>"$WORK/cc-gate.err"
 if [ $? -ne 0 ]; then
     bad "gate test harness did not build: $(head -5 "$WORK/cc-gate.err")"
 else

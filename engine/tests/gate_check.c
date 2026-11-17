@@ -28,10 +28,16 @@ static int checks, fails;
  * sector before the era digit moves (the G64 save-on-transit fix). This harness links
  * gates.c + world.c + roots.c + slot.c + state.c only -- not monsters.c or overworld.c --
  * and every transit leg here returns before that autosave (the refusals at the two
- * early returns), so these two symbols are never called. They exist to satisfy the
- * linker, and the sector-write behaviour they stand in for is gated end-to-end by
- * tests/gate_transit_save.py, not here. */
-void u2_monsters_store(u2_ctx *ctx, u2_world *w) { (void)ctx; (void)w; }
+ * early returns), so this symbol is never called. It exists to satisfy the linker, and
+ * the sector-write behaviour it stands in for is gated end-to-end by
+ * tests/gate_transit_save.py, not here.
+ *
+ * u2_monsters_store used to have a stub here as well and no longer can: u2_gate_transit
+ * now reloads the destination's creature table, so gates.c calls into monsters.c for real
+ * and the real file is linked instead (run_cp4.sh). A stub that shadows a function the code
+ * under test genuinely calls is worse than no stub, because the harness passes while the
+ * call does nothing.
+ */
 int u2_overworld_autosave(u2_ctx *ctx, u2_overworld *ow) { (void)ctx; (void)ow; return 0; }
 
 #define CHECK(cond, ...) do {                                  \
