@@ -98,6 +98,53 @@ fi
     && ok "AP2: the created character is written to the save, so a session is resumable" \
     || bad "AP2: create left no save record"
 
+# --- AP2c: a new character gets a new world, and the old one is kept ------------
+# One slot exists (D5 defers --save NAME) and the slot holds the sector overlay as well
+# as the record, so without a rotation the previous character's mutated and stamped
+# sectors are the ground the next character loads. That is how a brand new character on
+# the shipped tree was walking past monsters that are not there.
+# The fixture is a slot holding a record and an overlay, which is exactly what a played
+# slot looks like; the overlay here is a stub, because the gate is about where files go.
+mkdir -p "$WORK/ap2c.save/PLAYER"
+cp "$WORK/ap2.save/PLAYER/PLAYER" "$WORK/ap2c.save/PLAYER/PLAYER"
+: > "$WORK/ap2c.save/PLAYER/mapx20"
+printf '{"cmd":"create","name":"FRESH","sex":"M","race":1,"class":1,"stats":[10,10,10,10,10,40]}\n{"cmd":"quit"}\n' \
+    | session ap2c
+arch=$(find "$WORK/ap2c.save" -maxdepth 1 -name 'PLAYER.*' -type d | head -1)
+if [ -n "$arch" ] && [ -f "$arch/mapx20" ]; then
+    ok "AP2c: create rotated the previous slot aside with its overlay ($(basename "$arch"))"
+else
+    bad "AP2c: create did not archive the slot that held a game (archives: $(find "$WORK/ap2c.save" -maxdepth 1 -name 'PLAYER.*' | tr '\n' ' '))"
+fi
+if [ -f "$WORK/ap2c.save/PLAYER/PLAYER" ] && [ -z "$(find "$WORK/ap2c.save/PLAYER" -name 'mapx*' -o -name 'monx*' 2>/dev/null)" ]; then
+    ok "AP2c: the new slot holds a record and no sector overlay, so the new world is the release world"
+else
+    bad "AP2c: the new slot is not clean: $(find "$WORK/ap2c.save/PLAYER" -type f | tr '\n' ' ')"
+fi
+# Control: a slot with no record is not a game (D6: an empty slot is a lie about a save),
+# and rotating one would put a timestamped directory in the save directory for every
+# launch that never got as far as a save. The second create above DID rotate — the slot
+# held a real record — which is the other half of the rule: a character is worth keeping.
+before=$(find "$WORK/ap2c.save" -maxdepth 1 -name 'PLAYER.*' -type d | wc -l)
+printf '{"cmd":"create","name":"AGAIN","sex":"M","race":1,"class":1,"stats":[10,10,10,10,10,40]}\n{"cmd":"quit"}\n' \
+    | "$U2" --headless --api --cleanroom $DATA --save-dir "$WORK/ap2c.save" \
+             --demo-dir "$WORK/ap2c2.demos" > "$WORK/ap2c2.out" 2>"$WORK/ap2c2.err"
+after=$(find "$WORK/ap2c.save" -maxdepth 1 -name 'PLAYER.*' -type d | wc -l)
+if [ "$after" = "$((before + 1))" ]; then
+    ok "AP2c control: a slot holding a real record is worth an archive ($before -> $after)"
+else
+    bad "AP2c control: creating over a real save left the archive count at $before -> $after"
+fi
+mkdir -p "$WORK/ap2d.save/PLAYER"
+printf '{"cmd":"create","name":"BLANK","sex":"M","race":1,"class":1,"stats":[10,10,10,10,10,40]}\n{"cmd":"quit"}\n' \
+    | session ap2d
+n=$(find "$WORK/ap2d.save" -maxdepth 1 -name 'PLAYER.*' -type d | wc -l)
+if [ "$n" = "0" ]; then
+    ok "AP2c control: an empty slot is not a game and rotates to nothing (archives: $n)"
+else
+    bad "AP2c control: an empty slot produced $n archive director$([ "$n" = 1 ] && echo y || echo ies)"
+fi
+
 # AP2b: the numbering round-trips. The state stores race/class 0..3 and create takes 1..4,
 # so a caller that sends race 2 must read race 2 back and not 1.
 printf '{"cmd":"create","name":"ROUNDTRIP","sex":"F","race":2,"class":3,"stats":[10,10,10,10,10,40]}\n{"cmd":"quit"}\n' \

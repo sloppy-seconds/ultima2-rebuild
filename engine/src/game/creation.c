@@ -83,6 +83,7 @@
 #include <string.h>
 #include "game/creation.h"
 #include "core/save.h"
+#include "core/slot.h"
 #include "core/seam.h"
 #include "core/demo.h"
 #include "gen_content.h"
@@ -718,6 +719,26 @@ int u2_creation_apply(u2_ctx *ctx, const u2_character *c, char *why, int whysize
     f.name_len = (int)nlen;
 
     commit(ctx, &f);
+
+    /* A new character gets a new world, not the one the last character left.
+     * There is one slot (D5 defers --save NAME) and the slot holds the sector
+     * overlay as well as the record, so without this the previous character's
+     * stamped and mutated sectors are the ground this one loads — which is how a
+     * brand new character was met on the shipped tree walking past monsters that
+     * are not there. The rotation is a rename inside the save directory, so the
+     * old game is preserved rather than deleted, and it happens here rather than
+     * at the top of the function because every validation above has to have
+     * passed first: a refused form must not cost anyone their save. */
+    char archived[512];
+    int rot = u2_slot_rotate(ctx, archived, sizeof archived);
+    if (rot < 0) {
+        refuse(why, whysize, "the previous save could not be moved aside");
+        return -1;
+    }
+    if (rot > 0) {
+        fprintf(stderr, "[engine] archived the previous save to %s\n", archived);
+        fflush(stderr);
+    }
 
     /* The same write the form's [S]AVE does, so a created character is resumable by
      * --play-map and by a later API session rather than living only in this process. */

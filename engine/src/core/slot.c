@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "core/compat.h"
@@ -165,4 +166,56 @@ int u2_slot_find(const u2_ctx *ctx, const char *name, char *out, size_t bufsz)
         return 1;
     out[0] = '\0';
     return 0;
+}
+
+int u2_slot_rotate(u2_ctx *ctx, char *out, size_t outsz)
+{
+    char dir[430], slot[448], rec[464], arch[512];
+    struct stat st;
+    struct tm lt;
+    time_t now;
+    char stamp[24];
+
+    if (out && outsz > 0)
+        out[0] = '\0';
+
+    u2_save_dir(ctx, dir, sizeof dir);
+    u2_slot_dir(ctx, slot, sizeof slot);
+    if (stat(slot, &st) != 0 || !S_ISDIR(st.st_mode))
+        return 0;                   /* no slot at all: there is no world to inherit */
+
+    /* A directory that holds no record is not a game. D6 says an empty slot is a
+     * lie about a save, and rotating one would put a timestamped empty directory
+     * in the save directory for every launch that never got as far as a save. */
+    snprintf(rec, sizeof rec, "%.447s/PLAYER", slot);
+    if (stat(rec, &st) != 0 || st.st_size == 0)
+        return 0;
+
+    now = time(NULL);
+    localtime_r(&now, &lt);
+    strftime(stamp, sizeof stamp, "%Y%m%dT%H%M%S", &lt);
+
+    /* Two saves in the same second are possible — a scripted harness does it — so
+     * the suffix gets a counter rather than the rename failing or, worse, silently
+     * landing on the archive that already exists. */
+    int taken = 0;
+    for (int n = 0; n < 100; n++) {
+        if (n == 0)
+            snprintf(arch, sizeof arch, "%.429s/%.8s.%.16s",
+                     dir, u2_slot_name(ctx), stamp);
+        else
+            snprintf(arch, sizeof arch, "%.429s/%.8s.%.16s.%02d",
+                     dir, u2_slot_name(ctx), stamp, n);
+        if (stat(arch, &st) != 0) { taken = 0; break; }
+        taken = 1;
+    }
+    if (taken)
+        return -1;                  /* a hundred archives in one second is not a race */
+
+    if (rename(slot, arch) != 0)
+        return -1;
+
+    if (out && outsz > 0)
+        snprintf(out, outsz, "%.511s", arch);
+    return 1;
 }

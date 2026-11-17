@@ -88,4 +88,33 @@ void u2_slot_path(char *buf, size_t bufsz, const u2_ctx *ctx, const char *name);
 /* 1 and the full path when the slot holds `name`, else 0 and `out` is empty. */
 int u2_slot_find(const u2_ctx *ctx, const char *name, char *out, size_t bufsz);
 
+/* Rotate the active slot aside so a new character starts on a clean world.
+ *
+ * WHY. There is one slot (D5 defers `--save NAME`), and a slot holds the sector
+ * overlay as well as the record. So the previous character's world is the next
+ * character's ground: the overlay is read ahead of content, and a sector the last
+ * save stamped is authored terrain for whoever loads it next. That is how a brand
+ * new character was found walking past monsters that are not there.
+ *
+ * WHEN. Called by the creation path after every validation has passed and
+ * immediately before the first save of the new character, so a refused form never
+ * rotates anything and a rotation always has a character to replace it.
+ *
+ * WHAT COUNTS AS A GAME. A slot holding a non-empty record. An absent slot, an
+ * empty directory or a zero-length record rotates to nothing, because D6's rule
+ * that an empty slot is a lie means there is no game to preserve and a rotation
+ * per failed launch would litter the save directory.
+ *
+ * THE ARCHIVE IS NOT A SLOT. The rotated directory keeps the slot's name with a
+ * timestamp suffix and stays inside the save directory, which is inert today only
+ * because nothing enumerates slots — `u2_slot_find` takes a name, it does not
+ * scan. When D5 lands and something does scan, it must skip anything whose name
+ * carries the suffix, or a rotated world becomes a selectable save that is really
+ * a corpse. That is the rule this comment exists to hand on.
+ *
+ * Writes the archive path to `out` when it moved something. Returns 1 when it
+ * rotated, 0 when there was nothing to rotate, -1 on a failure the caller must
+ * say out loud rather than save over. */
+int u2_slot_rotate(u2_ctx *ctx, char *out, size_t outsz);
+
 #endif
