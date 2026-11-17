@@ -621,3 +621,26 @@ first version of the harness reported a ghost at almost every save for exactly t
 the numbers looked entirely plausible. `fresh_since()` now gates every checkpoint, and the
 original side additionally reads creature positions on both sides of the save and discards a
 checkpoint where they disagree, because `q` can hand the creatures a turn of their own.
+
+**Travel cannot bake a stamp, which closes the last suspected producer.** Sector and site
+transitions were the leading remaining hypothesis, and the answer turned out to be structural
+rather than sampled: a transition writes no sector file at all, in either program.
+`site_reload()` syncs the outgoing sector in memory and writes nothing unless
+`--keep-site-state` is set, which is off by default; the original was measured the same way on
+2026-10-29 across several town entries and exits, with `mapx31`, `monx31`, `mapx30` and
+`monx30` byte-identical to pristine and only `player` changed, and `engine/tests/site_state.py`
+gates it. The save path is the only writer of a sector file, so a transition cannot bake
+anything.
+
+What travel does is make a stamp permanent, which is the half of the hypothesis that held. A
+bare stamp in the overlay arrives through `u2_world_load` as authored terrain in `map_base`
+and is then recreated by every restamp and rewritten by every save, whereas a stamp under its
+own creature is cleaned at load by `clear_spawn_cells` reading that creature's terrain byte.
+A bare one has nothing to clean it. That is how nine cells survived many sessions, and it is
+why rotation rather than another save is the way out of a dirty tree.
+
+The legs driven after that, engine-side, scoring only fresh writes: stroll 11 writes and 0
+bare; chase 5 and 0; chase again over 60 rounds 5 and 0 with the creature count flat; site
+entry 0 writes, exactly as the no-write rule predicts. No leg produced a bare stamp, and the
+field is now narrowed to the legacy build that made the shipped overlay, not to any path in
+the current engine.

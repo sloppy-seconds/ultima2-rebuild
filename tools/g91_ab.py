@@ -34,6 +34,22 @@ Usage:
   python3 tools/g91_ab.py --selftest
 
 Scratch lives under /var/tmp by default: /tmp is tmpfs here and a run copy is RAM.
+
+Why there is no `site` result: sector/map travel was the leading hypothesis for where a ghost
+comes from, and it is refuted structurally rather than by sampling. **A transition writes no
+sector file at all**, in either program. `site_reload()` syncs the outgoing sector in memory
+and writes nothing unless `--keep-site-state` is set, which is off by default; the original was
+measured the same way on 2026-10-29 across several town entries and exits, with `mapx31`,
+`monx31`, `mapx30` and `monx30` byte-identical to pristine and only `player` changed, which
+`engine/tests/site_state.py` gates. The only writer of a sector file is the save path, so
+travel cannot bake a stamp.
+
+What travel does is make a stamp permanent, and that is the half of the hypothesis that held.
+`site_reload()` calls `u2_world_load`, which reads the save overlay ahead of content, so a bare
+stamp in the overlay arrives as authored terrain in `map_base` and is recreated by every
+restamp and rewritten by every save. A stamp under its own creature is cleaned at that moment
+by `clear_spawn_cells` reading the creature's terrain byte; a bare one has no creature to clean
+it. That is how nine cells survived many sessions on a shipped tree.
 """
 
 import argparse
@@ -197,13 +213,90 @@ def run_engine(scratch, sector, rounds, keep=False):
     sys.exit("run_engine is retired; use run_engine_play(policy=...)")
 
 
-def run_engine_play(scratch, sector, rounds, stride=8, policy="chase"):
-    """Stream commands and read the sector file between the write and the next reply.
+def _mode(o):
+    return (o.get("obs") or {}).get("mode")
 
-    The ordering is the whole point. A save is only evidence about the instant it was
-    written, so the file is read after the engine has answered for the save and before
-    it is given another key, and a file whose bytes did not change is skipped: nothing
-    was written, so there is nothing to score.
+
+def _wait_world(proc, obs, limit=12):
+    """Drain the title splash before driving anything.
+
+    The splash emits its own observations on the script clock, and a key sent while it is
+    still running is buffered and lands one step late in the world — which in a harness
+    means every key is aimed at the cell the player left behind. Read until the mode says
+    world, and say so if it never does rather than driving a title screen.
+    """
+    n = 0
+    while _mode(obs) != "world" and n < limit:
+        nxt = _obs(proc)
+        if nxt is None:
+            break
+        obs = nxt
+        n += 1
+    return obs
+
+
+def _pick_key(policy, obs, r, i, target):
+    """The next key for a policy. Returns (key, note)."""
+    creatures, st = _creatures_of(obs)
+    pos = (st.get("pos") or {}).get("x"), (st.get("pos") or {}).get("y")
+    mode = _mode(obs)
+    if mode in ("dungeon", "site"):
+        # Indoors, the way out is a command rather than a step: KLIMB at dungeon floor 0,
+        # DESCEND out of a tower. Try both with a step between, which is what a player does.
+        return (("K", "exit-attempt") if (r + i) % 3 == 0 else
+                ("D", "exit-attempt") if (r + i) % 3 == 1 else
+                (WALK[(r + i) % 4], "indoor-step")), None
+    if policy == "chase" and creatures and None not in pos:
+        near = min(creatures, key=lambda c: abs(c[0]-pos[0]) + abs(c[1]-pos[1]))
+        return (_toward(*pos, *near), "chase"), None
+    if policy in ("site", "kill") and target and None not in pos:
+        if policy == "site" and pos == target:
+            # Standing on the door. Entry is the ENTER command, not a step: the walk loop
+            # refuses the door tile and asm/3389's dispatch reads the tile UNDER the player.
+            return ("E", "enter-door"), None
+        return (_toward(*pos, *target), f"toward-{target}"), None
+    return (WALK[(r * 4 + i) % 4], "square"), None
+
+
+def seed_content(scratch, sector, cell, tile):
+    """A content tree with one cell of the sector map changed.
+
+    Why this exists rather than a walk: the created character starts in a pocket in
+    sector 20 — north and east are `INVALID MOVE!` from the start cell — and every door
+    the census lists for that sector is 15+ cells away, so a scripted walk cannot reach
+    one. The CP6 commerce gate solves the same problem the same way: build a content
+    directory whose map bytes put the geometry where the test needs it, and let the
+    engine's own rules do the rest. Nothing here invents a rule; it moves a door.
+
+    Returns the directory to pass as --data-dir.
+    """
+    # Beside the scratch dir, not inside it: the run driver wipes the scratch tree to
+    # start clean, and a content directory it deletes on the way is a content tree that
+    # never existed by the time anything reads it.
+    dst = os.path.join(scratch + "-content", "content")
+    if os.path.isdir(dst):
+        shutil.rmtree(dst)
+    shutil.copytree(os.path.join(REPO, "original"), dst)
+    x, y = cell
+    path = os.path.join(dst, f"mapx{sector}")
+    with open(path, "r+b") as fh:
+        fh.seek(y * MAP_W + x)
+        fh.write(bytes([tile]))
+    return dst
+
+
+def run_engine_play(scratch, sector, rounds, stride=8, policy="chase", target=None,
+                    data=None):
+    """Stream commands and score every write the engine makes, whenever it makes it.
+
+    Scoring is per key, not per save, because the writes that matter are not all saves:
+    entering a site autosaves the sector being left, and that is the write the entry
+    path makes *before* it reloads the sector from disk. A harness that only looks after
+    an explicit `Q` never sees it.
+
+    The ordering is still the whole point: the file is read after the engine has answered
+    for the key that caused the write and before it is given another, and a file whose
+    bytes did not change is skipped — nothing was written, so there is nothing to score.
     """
     save = os.path.join(scratch, "save")
     demos = os.path.join(scratch, "demos")
@@ -213,51 +306,65 @@ def run_engine_play(scratch, sector, rounds, stride=8, policy="chase"):
     exe = os.path.join(REPO, "engine", "u2")
     if not os.path.exists(exe):
         sys.exit("engine not built: run make -C engine first")
-    data = os.path.join(REPO, "original")
+    data = data or os.path.join(REPO, "original")
     if not os.path.isdir(data):
-        sys.exit("no original/ content tree; the A/B needs the real sector")
+        sys.exit("no content tree; the A/B needs the real sector")
 
     proc = subprocess.Popen(
         [exe, "--headless", "--api", "--data-dir", data,
          "--save-dir", save, "--demo-dir", demos],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
     _send(proc, CREATE)
-    obs = _obs(proc)
+    obs = _wait_world(proc, _obs(proc))
+    if _mode(obs) != "world":
+        _send(proc, {"cmd": "quit"})
+        try:
+            proc.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        sys.exit("the engine never reached the world; nothing was measured")
     pristine = read_map(os.path.join(data, f"mapx{sector}"))
+    saved_path = os.path.join(save, "PLAYER", f"mapx{sector}")
 
     timeline, prev, step = [], [], 0
     last_bytes = None
+    last_mode = _mode(obs)
+
+    def score(note):
+        nonlocal step, last_bytes, prev
+        buf, changed = fresh_since(saved_path, last_bytes)
+        if not changed:
+            return
+        last_bytes = buf
+        creatures, _ = _creatures_of(obs)
+        owned, ghosts = classify(pristine, buf, creatures)
+        step += 1
+        timeline.append({"side": "engine", "step": step, "policy": policy, "note": note,
+                         "mode": last_mode, "creatures": creatures,
+                         "owned": owned, "ghosts": ghosts,
+                         "moved": {str(k): v for k, v in vacated(prev, creatures).items()},
+                         "n_creatures": len(creatures)})
+        prev = creatures
+
     for r in range(rounds):
         for i in range(stride):
-            creatures, st = _creatures_of(obs)
-            pos = (st.get("pos") or {}).get("x"), (st.get("pos") or {}).get("y")
-            if policy == "chase" and creatures and None not in pos:
-                near = min(creatures, key=lambda c: abs(c[0]-pos[0]) + abs(c[1]-pos[1]))
-                key = _toward(*pos, *near)
-            else:
-                key = WALK[(r * stride + i) % 4]
+            (key, note), _ = _pick_key(policy, obs, r, i, target)
             _send(proc, {"cmd": "key", "key": key})
             obs = _obs(proc)
             if obs is None:
                 break
+            m = _mode(obs)
+            if m != last_mode:
+                note = f"{note}-mode-{m}"
+                last_mode = m
+            score(note)
         _send(proc, {"cmd": "key", "key": "Q"})
         _send(proc, {"cmd": "state"})
         obs = _obs(proc)
         if obs is None:
             break
-        creatures, _ = _creatures_of(obs)
-        step += 1
-        buf, changed = fresh_since(os.path.join(save, "PLAYER", f"mapx{sector}"),
-                                   last_bytes)
-        if not changed:
-            continue        # nothing was written; the old bytes are not a new measurement
-        last_bytes = buf
-        owned, ghosts = classify(pristine, buf, creatures)
-        timeline.append({"side": "engine", "step": step, "policy": policy,
-                         "creatures": creatures, "owned": owned, "ghosts": ghosts,
-                         "moved": {str(k): v for k, v in vacated(prev, creatures).items()},
-                         "n_creatures": len(creatures)})
-        prev = creatures
+        last_mode = _mode(obs)
+        score("save")
     _send(proc, {"cmd": "quit"})
     try:
         proc.wait(timeout=30)
@@ -457,8 +564,15 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--engine", default=None)
     ap.add_argument("--original", default=None)
-    ap.add_argument("--policy", default="square", choices=["square", "chase"],
-                    help="engine side: stroll a square, or walk into creatures (combat)")
+    ap.add_argument("--policy", default="square",
+                    choices=["square", "chase", "site", "kill"],
+                    help="square: a fixed cycle. chase: walk into creatures. site: walk onto a "
+                         "door and come back out — scores nothing by design, because a "
+                         "transition writes no sector file (see the module docstring). "
+                         "kill: chase and keep going.")
+    ap.add_argument("--target", default=None,
+                    help="site policy: the cell to walk to, as x,y (default 35,22, "
+                         "the castle door in sector 20)")
     ap.add_argument("--stride", type=int, default=8, help="chase: moves between saves")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
@@ -478,7 +592,20 @@ def main():
             print(line)
         return 0
 
-    tl = run_engine_play(a.scratch, a.sector, a.rounds, a.stride, a.policy) \
+    tgt = None
+    if a.target:
+        xs, ys = a.target.split(",")
+        tgt = (int(xs), int(ys))
+    elif a.policy == "site":
+        tgt = (35, 22)
+    data = None
+    if a.policy == "site" and not a.target:
+        # A dungeon entrance one step east of the start cell, in a copy of the content
+        # tree. `original/` is never written: this is the player's release data.
+        data = seed_content(a.scratch, a.sector, (20, 21), 0x24)
+        tgt = (20, 21)
+        print("seeded: dungeon entrance at (20,21) in a copy of the content tree")
+    tl = run_engine_play(a.scratch, a.sector, a.rounds, a.stride, a.policy, tgt, data) \
         if a.mode == "engine" else run_original(a.scratch, a.sector, a.rounds,
                                                 a.stride, a.policy)
     out = a.out or os.path.join(a.scratch, f"{a.mode}.jsonl")
