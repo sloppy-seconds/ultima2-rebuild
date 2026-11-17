@@ -186,6 +186,7 @@ int u2_gate_transit(u2_ctx *ctx, struct u2_overworld *ow)
      * This must run BEFORE the era digit moves, or it checkpoints the destination.
      * Gate: tests/gate_transit_save.py. */
     u2_monsters_store(ctx, &ow->world);
+    ctx->store_reason = "time-door transit";
     (void)u2_overworld_autosave(ctx, ow);
 
     /* The era digit moves and the world byte does not — that is the whole content of

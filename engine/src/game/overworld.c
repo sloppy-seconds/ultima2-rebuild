@@ -444,6 +444,7 @@ static void site_enter(u2_ctx *ctx, u2_overworld *ow, int digit,
      * off Earth this call writes nothing. Corrected 2026-11-15: this comment used to say
      * the autosave "fires off-Earth too, which is what makes a bad planetary trip
      * permanent", and a real Planet X playthrough refuted it — nothing writes off Earth. */
+    ctx->store_reason = "site entry";
     (void)u2_overworld_autosave(ctx, ow);
 
     /* Sync the creature table into the world buffer so a later save sees current state.
@@ -2791,6 +2792,7 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
              * the record alone, no sector file. Breakpoint-confirmed 2026-11-15; the
              * only capture where runtime 0x2474 has ever been seen execute is
              * captures/spice86/s31-south-edge, which is this walk. */
+            ctx->store_reason = "site exit";
             (void)u2_overworld_autosave_record(ctx, ow);
             continue;
         }

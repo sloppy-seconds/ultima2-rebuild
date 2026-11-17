@@ -566,6 +566,27 @@ u2_world_result u2_world_store(u2_ctx *ctx, u2_world *w, int is_map)
             if (buf[i] != w->map_base[i] && !occupied[i])
                 unowned++;
         ctx->diag_baked_unowned = unowned;
+        /* Catch it in the act. Every other way of finding this number needs a harness and a
+         * known script; this one needs a person playing the game. A bare stamp about to be
+         * written is printed with the cell, the byte, the ground it replaced and which path
+         * asked for the write, so a live session that produces one names its own cause
+         * instead of leaving a residue for the next session to guess at. Printed to stderr
+         * and never to the message band: the original has no such notice, and inventing text
+         * in the player's face is not what the message rule asks for. */
+        if (unowned > 0) {
+            int shown = 0;
+            for (int i = 0; i < U2_SECTOR_TILES && shown < 8; i++) {
+                if (buf[i] == w->map_base[i] || occupied[i])
+                    continue;
+                fprintf(stderr, "u2: NOTE bare stamp #%d written by %s: sector %s cell (%d,%d) "
+                        "is %#02x, ground is %#02x, nothing is standing on it\n",
+                        ++shown, ctx->store_reason ? ctx->store_reason : "unknown",
+                        w->map_prefix ? w->map_prefix : "mapx",
+                        i % U2_SECTOR_EDGE, i / U2_SECTOR_EDGE, buf[i], w->map_base[i]);
+            }
+            if (unowned > shown)
+                fprintf(stderr, "u2: NOTE ... and %d more\n", unowned - shown);
+        }
     }
 
     /* The write target is the save slot, always, and never a content directory.

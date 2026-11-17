@@ -453,18 +453,21 @@ else:
                            if px[i] + px[i + 1] + px[i + 2] > 60)
 
             # --play-map because the SDL route has no title to click through, and the two
-            # WAITs because Ctrl-S is swallowed inside seam_key_poll -- the screenshot is
-            # taken before the poll that consumed it can paint, so a script that goes
-            # straight from H to Ctrl-S captures the frame as of before the prompt. The
-            # WAIT is what forces the empty poll that paints and presents. Both frames are
+            # WAITs because the screenshot key is swallowed inside seam_key_poll -- the
+            # screenshot is taken before the poll that consumed it can paint, so a script that
+            # goes straight from H to the screenshot key captures the frame as of before the
+            # prompt. The WAIT is what forces the empty poll that paints and presents. The key
+            # is 0x18, not 0x13: 0x13 is Ctrl-S, which the original spends on the sound toggle
+            # (asm/4F76 polls it, asm/4F7B toggles DS:54D), so the engine gave screenshots to
+            # Ctrl-X and this leg moved with it. Both frames are
             # also required to differ: identical bytes are exactly the defect, and the
             # first draft of this leg passed while measuring two title screens, because
             # without --play-map the menu ate every key and the screenshot was of the
             # splash. The control caught that; a leg that cannot go red is not a leg.
-            orbit = presented("B\nL\nWAIT\nWAIT\n\x13\n", "orbit-shot")
-            prompt = presented("B\nL\nH\nWAIT\nWAIT\n\x13\n", "prompt-shot")
+            orbit = presented("B\nL\nWAIT\nWAIT\n\x18\n", "orbit-shot")
+            prompt = presented("B\nL\nH\nWAIT\nWAIT\n\x18\n", "prompt-shot")
             if orbit is None or prompt is None:
-                check(False, "the SDL run wrote a Ctrl-S screenshot of the presented frame "
+                check(False, "the SDL run wrote a Ctrl-X screenshot of the presented frame "
                              f"(got {orbit!r} and {prompt!r})")
             else:
                 i_orbit, i_prompt = ink(orbit), ink(prompt)

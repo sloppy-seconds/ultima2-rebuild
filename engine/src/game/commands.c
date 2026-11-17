@@ -164,6 +164,7 @@ static u2_cmd_result cmd_Q(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
     const u2_save_policy *pol = (ctx->fidelity == U2_FIDELITY_ENHANCED)
                                     ? &U2_SAVE_POLICY_ENHANCED
                                     : &U2_SAVE_POLICY_ORIGINAL;
+    ctx->store_reason = "Q";
     (void)u2_overworld_save(ctx, ow, pol);
     return U2_CMD_DONE;
 }
@@ -2058,6 +2059,7 @@ static u2_cmd_result site_shift(u2_ctx *ctx, u2_overworld *ow, bool down)
              * saves the game, and it is modelled by the call below: the record only, no
              * sector, Earth only. Observed 2026-11-15 by breakpoint at runtime 0x389d, which
              * fired on the KLIMB and moved `player` and nothing else. */
+            ctx->store_reason = "site exit";
             u2_overworld_site_leave(ctx, ow);
             (void)u2_overworld_autosave_record(ctx, ow);
             cmd_done(ctx);

@@ -223,6 +223,13 @@ typedef struct u2_ctx {
      * worth having: diag_ghosts measured on a live frame can be 0 while the buffer about
      * to be written is full of them. */
     int diag_baked_unowned;
+    /* Which path is asking for the write, named for the NOTE below and nothing else.
+     * A bare stamp reaching disk is the same event whoever triggers it, so the only thing
+     * the reason adds is which of the four silent write paths was open at the time: an
+     * explicit Q, a site entry, a site exit, or a time-door transit. Set at the call site
+     * immediately before the store, never inferred, because an inferred cause in a log line
+     * is exactly the kind of confident wrong answer this project keeps having to retract. */
+    const char *store_reason;
     /* CP8 1d ending animation, measured by captures/spice86/victory-live/. The fade is
      * 64x64 random-cell writes of the black tile, so with repeats it blackens ~63% of the
      * 4096 cells; the count makes "the fade ran and painted randomly" assertable without
