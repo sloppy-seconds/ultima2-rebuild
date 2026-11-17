@@ -25,6 +25,11 @@
 #include "game/combat.h"
 
 static int checks, fails;
+
+/* No grid here: these tests assert the BCD saturation of gold and exp. A kill restores the
+ * corpse's cell only when there is a world to restore it into (asm/2CB5); NULL says so, and
+ * monsters_check.c carries the arm that has a real world. */
+#define u2_combat_attack(c, slot, out) u2_combat_attack((c), NULL, (slot), (out))
 #define CHECK(cond, ...) do {                                        \
         ++checks;                                                    \
         if (cond) { printf("  ok    "); }                            \

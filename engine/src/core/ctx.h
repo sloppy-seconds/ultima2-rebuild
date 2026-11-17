@@ -237,11 +237,13 @@ typedef struct u2_ctx {
      * engine bounds it, and this counts the steps it actually drew before the run ended. */
     int victory_fade_black;
     int victory_flight_steps;
-    /* The world's dirty flag as the fade left it. MUST be 0: the original's fade is
-     * screen-only (G75a, 0 of 90 content files changed), so a dirty flag here is the
-     * engine promising a write-back the original never makes. The md5 check in
-     * tests/victory_end.py cannot see this on its own -- nothing stores after victory in
-     * that run -- so this flag is the discriminating assertion. */
+    /* Whether the ENDING dirtied the map. MUST be 0: the original's fade is screen-only
+     * (G75a, 0 of 90 content files changed), so a dirty flag raised by the ending is the
+     * engine promising a write-back the original never makes. Note this is measured against
+     * the state at the fade's entry, not absolutely: the Minax kill itself legitimately
+     * dirties the grid, because asm/2CB5 writes DS:1B7 back into the corpse's cell. The md5
+     * check in tests/victory_end.py cannot see this on its own -- nothing stores after
+     * victory in that run -- so this flag is the discriminating assertion. */
     int victory_map_dirty;
 
     /* Set by the overworld loop to a function that composites and presents a whole frame.

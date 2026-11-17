@@ -16,6 +16,7 @@
 
 #include "core/seam.h"
 #include "core/rng.h"
+#include "core/world.h"   /* u2_combat_* now take the world: a kill restores the corpse's cell */
 #include "core/frame.h"
 #include "core/font.h"
 #include "game/status.h"
@@ -2388,7 +2389,7 @@ static u2_cmd_result cmd_C(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
         const int slot = cast_target(ctx, ow);
         if (slot < 0) return cast_failed(ctx);
         u2_attack a;
-        u2_combat_cast_kill(ctx, slot, &a);
+        u2_combat_cast_kill(ctx, &ow->world, slot, &a);
         u2_announce_kill(ctx, ow, &a);
         return U2_CMD_DONE;
     }
@@ -2411,7 +2412,7 @@ static u2_cmd_result cmd_C(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
         u2_attack a;
         /* DS:56 is state.h's `exp_lo` and is the HIGH byte; the naming wart is documented in
          * state.h and the field name is an address, not a significance. */
-        const int r = u2_combat_cast_damage(ctx, slot, amount, &a);
+        const int r = u2_combat_cast_damage(ctx, &ow->world, slot, amount, &a);
         /* Survived: the slot keeps the reduced HP and NOTHING prints. That silence is the
          * original's, cited to asm/3139 L_0034ca, where the `jb` after the second `cmc` is
          * taken on survival — the opposite of how the idiom reads at a glance. */

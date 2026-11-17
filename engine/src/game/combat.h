@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include "core/ctx.h"
 
+struct u2_world;   /* forward: the world is by pointer only here; core/world.h owns the body */
+
 /* Run one special-effect event against `counter_ds` (0x26B legs, 0x26C arms,
  * 0x26D sleep). Returns 1 if the effect landed and the counter was set, 0 if it
  * was resisted. spec: asm/0E70, asm/0EC2, asm/0F48 */
@@ -52,7 +54,13 @@ typedef struct u2_attack {
     uint8_t exp;      /* BCD amount added to exp on a kill, else 0 */
 } u2_attack;
 
-int u2_combat_attack(u2_ctx *ctx, int slot, u2_attack *out);
+/* Every one of these takes the world, and takes it because asm/2CB5 does: the kill path
+ * points the cell pointer at the dead creature's cell (asm/2CA4 -> asm/50B3, which only
+ * computes an address) and then writes DS:1B7[slot] — the terrain byte saved at spawn —
+ * through it. The original therefore CLEARS the corpse's cell on the kill and leaves no
+ * ghost on the map. A kill with w == NULL skips that write, which is what the arithmetic
+ * tests pass; it is not a valid game call. */
+int u2_combat_attack(u2_ctx *ctx, struct u2_world *w, int slot, u2_attack *out);
 
 /*
  * The frigate's cannon. spec: asm/35ED..asm/3611, damage via asm/2C19.
@@ -65,14 +73,14 @@ int u2_combat_attack(u2_ctx *ctx, int slot, u2_attack *out);
  * "--MISS"), 1 = hit and it survived, 2 = killed. out->damage is the rolled byte, rand|0x20,
  * which is 32..63 and is NOT the melee formula.
  */
-int u2_combat_cannon(u2_ctx *ctx, int cx, int cy, u2_attack *out);
+int u2_combat_cannon(u2_ctx *ctx, struct u2_world *w, int cx, int cy, u2_attack *out);
 
 
 /* asm/3139 slot 7: MAGIC MISSILE applies a caller-computed amount to one slot.
  * Same three return codes as u2_combat_attack. The amount is computed by the spell, not here:
  * DS:20 = 2*DS:56 + 0x1e + CF and the `cmc ; sbb` idiom then subtracts DS:20 + 1, which is
  * arithmetic with a shape worth reading in cmd_C before trusting it. */
-int u2_combat_cast_damage(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *out);
+int u2_combat_cast_damage(u2_ctx *ctx, struct u2_world *w, int slot, unsigned dmg, u2_attack *out);
 
 /* asm/3139 L_0034b2: the MAGIC MISSILE amount as a pure function of [DS:56], the HIGH
  * packed-decimal byte of total experience. Doubling a BCD byte with no `daa` is a sawtooth,
@@ -83,7 +91,7 @@ unsigned u2_cast_missile_amount(uint8_t exp_hi);
 
 /* asm/3139 slots 6 and 9: PRAYER and KILL reach asm/30D1 with no damage step, so the creature
  * dies at any HP and the reward block runs as it does for melee. Always returns 2. */
-int u2_combat_cast_kill(u2_ctx *ctx, int slot, u2_attack *out);
+int u2_combat_cast_kill(u2_ctx *ctx, struct u2_world *w, int slot, u2_attack *out);
 
 
 /* asm/2CE5..2D8B: which item a kill grants, keyed on the TYPE of the creature that died.

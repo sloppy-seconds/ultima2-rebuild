@@ -20,10 +20,18 @@
 
 #include "core/ctx.h"
 #include "core/rng.h"
+#include "core/world.h"   /* the kill restores the corpse's cell, so the grid is in scope */
 #include "game/combat.h"
 #include "game/monsters.h"
 
 static int fails, checks;
+
+/* These tests assert arithmetic — damage, hit chance, gold, exp — and there is no grid
+ * behind them. A kill restores the corpse's cell only when there is a world to restore it
+ * into (asm/2CB5), so NULL is the honest argument here rather than a shortcut, and the
+ * kill-restore arm lives in monsters_check.c with a real world. The macro keeps seventeen
+ * call sites from each having to say it. */
+#define u2_combat_attack(c, slot, out) u2_combat_attack((c), NULL, (slot), (out))
 
 /* CP8: the kill gate hands off to game/victory.c, which prints through the platform seam and
  * so cannot be linked into this minimal harness. It is stubbed here instead -- and the stub IS
@@ -225,7 +233,7 @@ int main(void)
     for (int s = 0; s < 256; s++) {
         arm(&c, (uint8_t)s, 0x40, 0x40, 3);
         u2_attack g;
-        int cr = u2_combat_cannon(&c, 10, 12, &g);
+        int cr = u2_combat_cannon(&c, NULL, 10, 12, &g);
         if (cr == 0) continue;
         c_hits++;
         if (g.damage < c_lo) c_lo = g.damage;
@@ -241,7 +249,7 @@ int main(void)
 
     /* No creature at the cell -> asm/2E09's --MISS, and nothing is hurt. */
     arm(&c, 7, 0x40, 0x40, 3);
-    CHECK(u2_combat_cannon(&c, 11, 12, &a) == 0 && c.state.mon_hp[4] == 200,
+    CHECK(u2_combat_cannon(&c, NULL, 11, 12, &a) == 0 && c.state.mon_hp[4] == 200,
           "cannon at an empty cell misses and hurts nothing");
 
     /* A cannon kill pays, and this is the assertion that used to claim the opposite.
@@ -260,7 +268,7 @@ int main(void)
      * a small reward from zero lands entirely in the _hi fields. */
     c.state.gold_lo = c.state.gold_hi = 0;
     c.state.exp_lo  = c.state.exp_hi  = 0;
-    int rr = u2_combat_cannon(&c, 10, 12, &a);
+    int rr = u2_combat_cannon(&c, NULL, 10, 12, &a);
     CHECK(rr == 2, "a cannon blow above the creature's hp kills it (got %d)", rr);
     CHECK(c.state.mon_type[4] == 0 && c.state.mon_kind[4] == 0,
           "the kill clears type and kind");
@@ -335,6 +343,48 @@ int main(void)
          * catch), slot 0 would become attackable. Assert it never returns slot 0. */
         CHECK(u2_monsters_at_attackable(&z, 31, 47) != 0,
               "the attack scan must never return slot 0 — gutting the skip fails here");
+    }
+
+    /* asm/2CA4 -> asm/50B3 -> asm/2CB5. asm/2CA4 points the cursor at the dead creature's
+     * cell and calls asm/50B3, which is map_tile_ptr and only COMPUTES the address; the
+     * write is in asm/2CB5, `mov 0x1b7(%di),%al` then `mov %al,(%bx,%si)` — the terrain byte
+     * saved at spawn goes back into the cell the corpse stood on. So the original clears a
+     * kill off the map and leaves no ghost. The engine cleared hp, type and kind and left the
+     * sprite stamped, and a player on jarvis walked past a monster he had already killed.
+     *
+     * The world here is built by hand rather than loaded: this harness links no world.c, and
+     * the only thing the kill touches is the grid and its dirty flag. */
+    {
+        u2_ctx k;
+        u2_world w;
+        memset(&k, 0, sizeof k);
+        memset(&w, 0, sizeof w);
+        w.map_loaded = 1;
+        for (int i = 0; i < U2_SECTOR_TILES; i++)
+            w.map[i] = w.map_base[i] = 0x08;
+
+        const int slot = 5, kx = 20, ky = 21;
+        const uint8_t ground = 0x0C, sprite = 0x37;
+        const int kc = ky * U2_SECTOR_EDGE + kx;
+        k.state.mon_x[slot]    = kx;
+        k.state.mon_y[slot]    = ky;
+        k.state.mon_hp[slot]   = 30;
+        k.state.mon_type[slot] = sprite;
+        k.state.mon_kind[slot] = ground;      /* DS:1B7: the byte to put back */
+        w.map_base[kc] = ground;
+        w.map[kc]      = sprite;              /* the live creature's own stamp */
+
+        u2_attack a;
+        CHECK(u2_combat_cast_kill(&k, &w, slot, &a) == 2, "KILL reports killed");
+        CHECK(k.state.mon_type[slot] == 0, "death clears the type");
+        CHECK(k.state.mon_kind[slot] == 0,
+              "death clears the terrain byte too (file 0x30D2..0x30DC) — which is why the "
+              "restore has to read it first");
+        CHECK(w.map[kc] == ground,
+              "CONTROL FAILED: the corpse's cell kept its sprite. asm/2CB5 writes DS:1B7 "
+              "back through the cell pointer; without it the engine leaves a ghost");
+        CHECK(u2_monsters_ghost_cells(&k, &w) == 0,
+              "and the grid after a kill has no stamp without a creature standing on it");
     }
 
     printf("attack_check: %d checks, %d failures\n", checks, fails);

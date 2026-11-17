@@ -2218,7 +2218,7 @@ void u2_overworld_attack_dir(u2_ctx *ctx, u2_overworld *ow, const char *word, in
 
     u2_attack a;
     memset(&a, 0, sizeof a);
-    const int r = (slot >= 0) ? u2_combat_attack(ctx, slot, &a) : 0;
+    const int r = (slot >= 0) ? u2_combat_attack(ctx, &ow->world, slot, &a) : 0;
 
     /* An empty cell is a miss, not a refusal: the original's target scan walks all
      * 32 slots and falls through to the MISS printer when nothing matches
@@ -2329,6 +2329,13 @@ static void overworld_present_now(u2_ctx *ctx)
  * L_000911/L_0054ca durations are not cleanly measured, and a guessed one is worse). */
 static void victory_fade(u2_ctx *ctx, u2_overworld *ow)
 {
+    /* Snapshot BEFORE the fade. The kill that wins the game now dirties the grid, because
+     * asm/2CB5 writes DS:1B7 back through the cell pointer and u2_world_tile_put is what
+     * sets the flag — so map_dirty is legitimately 1 by the time the ending runs, and
+     * measuring it raw after the fade blamed the fade for the kill. The claim G75a actually
+     * proved is narrower and still stands: the fade itself is screen-only, 0 of 90 content
+     * files changed. So what is recorded is whether the fade newly dirtied the map. */
+    const int dirty_before_fade = ow->world.map_dirty;
     int blackened = 0;
     for (int outer = 0; outer < U2_SECTOR_EDGE; outer++) {
         for (int inner = 0; inner < U2_SECTOR_EDGE; inner++) {
@@ -2352,7 +2359,7 @@ static void victory_fade(u2_ctx *ctx, u2_overworld *ow)
     }
     ctx->victory_fade_black = blackened;
     /* Recorded so the gate can assert the fade did NOT dirty the map. See ctx.h. */
-    ctx->victory_map_dirty = ow->world.map_dirty;
+    ctx->victory_map_dirty = (!dirty_before_fade && ow->world.map_dirty) ? 1 : 0;
 }
 
 /* asm/72A0 75E1..: the rocket walks DS:00/DS:01 by +1 & 0x3f each step with a present.
@@ -2749,7 +2756,7 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             const int cy = (ow->y + dy) & (U2_SECTOR_EDGE - 1);
             u2_attack at;
             const int cslot = u2_monsters_at(ctx, cx, cy);   /* before firing: the swap moves her */
-            const int fired = u2_combat_cannon(ctx, cx, cy, &at);
+            const int fired = u2_combat_cannon(ctx, &ow->world, cx, cy, &at);
             if (fired == 0)
                 seam_str_out(ctx, U2_S_MISS);
             seam_char_print(ctx, '\r');

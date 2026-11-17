@@ -16,6 +16,7 @@
 
 #include "game/combat.h"
 #include "game/monsters.h"   /* U2_MON_SLOTS: the attack takes a creature slot */
+#include "core/world.h"      /* u2_world_tile_put: the kill restores the corpse's cell */
 #include "game/victory.h"    /* U2_MON_TYPE_MINAX, u2_victory: the CP8 endgame gate */
 #include "core/rng.h"
 #include "core/state.h"
@@ -235,8 +236,8 @@ int u2_combat_force_field(u2_ctx *ctx)
  * the three-space range, attacking from the deck, and now the reward — and each time the
  * listing was read correctly and the *reach* of a branch was read wrong or the behaviour was
  * assumed to be absent because the game is silent about it. */
-static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *out,
-                                int force_kill)
+static int apply_damage_to_slot(u2_ctx *ctx, u2_world *w, int slot, unsigned dmg,
+                                u2_attack *out, int force_kill)
 {
     u2_attack r;
     memset(&r, 0, sizeof r);
@@ -267,6 +268,22 @@ static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *
                          ? (dmg >= hp) : (dmg > hp));
     const uint8_t dead_type = ctx->state.mon_type[slot];
     if (lethal) {
+        /* asm/2CA4 -> asm/50B3 -> asm/2CB5, and the middle link is the one that was missed:
+         * asm/2CA4 sets the cursor to the dead creature's x/y and calls asm/50B3, which is
+         * map_tile_ptr — it only COMPUTES the cell address and leaves it in DS:6. The write
+         * is the next file down: `mov 0x1b7(%di),%al` then `mov %al,(%bx,%si)`, i.e. the
+         * terrain byte saved at spawn (the same DS:1B7 slot asm/2233 restores on departure)
+         * goes back into the cell the corpse was standing on.
+         *
+         * So the original clears the corpse's cell on the kill. It leaves no ghost. The
+         * engine cleared hp, type and kind and left the sprite stamped, which is how a
+         * character on jarvis ended up walking past a monster he had already killed. The
+         * read has to come before the clears below, because mon_kind is the byte being
+         * restored and death zeroes it. */
+        if (w != NULL)
+            u2_world_tile_put(w, ctx->state.mon_x[slot], ctx->state.mon_y[slot],
+                              ctx->state.mon_kind[slot]);
+
         /* Death clears hp, type and kind — and NOT x/y (file 0x30D2..0x30DC). */
         ctx->state.mon_hp[slot]   = 0;
         ctx->state.mon_type[slot] = 0;
@@ -316,7 +333,7 @@ static int apply_damage_to_slot(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *
     return 1;
 }
 
-int u2_combat_attack(u2_ctx *ctx, int slot, u2_attack *out)
+int u2_combat_attack(u2_ctx *ctx, u2_world *w, int slot, u2_attack *out)
 {
     u2_attack r;
     memset(&r, 0, sizeof r);
@@ -346,19 +363,19 @@ int u2_combat_attack(u2_ctx *ctx, int slot, u2_attack *out)
     unsigned dmg = (((unsigned)ctx->state.readied_weapon * 8u)
                     + (unsigned)ctx->state.stat_str) >> 2;
     r.damage = (uint8_t)dmg;
-    return apply_damage_to_slot(ctx, slot, dmg, out, 0);
+    return apply_damage_to_slot(ctx, w, slot, dmg, out, 0);
 }
 
 /* asm/3139 slot 7: MAGIC MISSILE. The caller computes the amount; this applies it.
  * The amount is NOT this function's business, and that is deliberate — see cmd_C for why the
  * formula belongs to the spell and not to the arithmetic. */
-int u2_combat_cast_damage(u2_ctx *ctx, int slot, unsigned dmg, u2_attack *out)
+int u2_combat_cast_damage(u2_ctx *ctx, u2_world *w, int slot, unsigned dmg, u2_attack *out)
 {
     if (slot < 0 || slot >= U2_MON_SLOTS) {
         if (out) memset(out, 0, sizeof *out);
         return 0;
     }
-    return apply_damage_to_slot(ctx, slot, dmg, out, 0);
+    return apply_damage_to_slot(ctx, w, slot, dmg, out, 0);
 }
 
 /* asm/3139 L_0034b2, the MAGIC MISSILE amount, transcribed instruction by instruction:
@@ -406,13 +423,13 @@ unsigned u2_cast_missile_amount(uint8_t exp_hi)
  * damage step, so the creature dies whatever its HP and the reward is the same block melee and
  * the cannon reach. Returns 2 (killed) always; a caller that found no target must not call this
  * at all, which is what the target scan's zero flag is for. */
-int u2_combat_cast_kill(u2_ctx *ctx, int slot, u2_attack *out)
+int u2_combat_cast_kill(u2_ctx *ctx, u2_world *w, int slot, u2_attack *out)
 {
     if (slot < 0 || slot >= U2_MON_SLOTS) {
         if (out) memset(out, 0, sizeof *out);
         return 0;
     }
-    return apply_damage_to_slot(ctx, slot, 0u, out, 1);
+    return apply_damage_to_slot(ctx, w, slot, 0u, out, 1);
 }
 
 /* asm/35ED..asm/3611: the FRIGATE'S CANNON.
@@ -461,7 +478,7 @@ int u2_combat_cast_kill(u2_ctx *ctx, int slot, u2_attack *out)
  * asm/5DA9's header says its frequency arithmetic "is inferred and has not been confirmed
  * against a tone heard in a capture". A guessed tone is worse than none, and the text this
  * prints is already a message. */
-int u2_combat_cannon(u2_ctx *ctx, int cx, int cy, u2_attack *out)
+int u2_combat_cannon(u2_ctx *ctx, u2_world *w, int cx, int cy, u2_attack *out)
 {
     u2_attack r;
     memset(&r, 0, sizeof r);
@@ -490,5 +507,5 @@ int u2_combat_cannon(u2_ctx *ctx, int cx, int cy, u2_attack *out)
      * whatever rand_byte produced, so this is a floor of 32 and not a range of 32..63. */
     const unsigned dmg = (unsigned)(u2_rand_byte(ctx) | 0x20u);
     r.damage = (uint8_t)dmg;
-    return apply_damage_to_slot(ctx, slot, dmg, out, 0);
+    return apply_damage_to_slot(ctx, w, slot, dmg, out, 0);
 }
