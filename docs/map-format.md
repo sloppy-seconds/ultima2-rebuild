@@ -667,3 +667,53 @@ that reached it and wrote nothing. That is a gate that cannot fail. The determin
 the `--play-map --script` shape `tests/site_state.py` and `tests/cp6_commerce_seed.py` already
 use, where a seeded record places the player on the cell under test and there is no stream to
 fall behind.
+
+## 11. The ghost factory: a map overlay written without its creature overlay (2026-11-18)
+
+A played save had ten bare creature stamps across three sectors, and the coordinates gave it
+away rather than the count. Cell `(32,26)` held `0x30` in `mapx00`, `mapx10` **and** `mapx20`;
+`(45,40)` held `0xF0` in two of them and `(40,56)` held `0x2C` in two, with different ground
+underneath. Creatures do not walk to identical cells in three sectors.
+
+The producer was not a creature at all. It was the save:
+
+```
+saves/PLAYER/  mapx00  mapx10  mapx20  monx20  monx30  PLAYER
+```
+
+`mapx00` and `mapx10` exist; `monx00` and `monx10` do not. The two sector writes were gated
+independently, and a sector could persist its stamps without persisting the creature table
+that explains them. On the next load the overlay is read ahead of content, so those stamps
+become terrain, while the creatures come back from the release `monx` — which for sectors 10,
+20 and 30 is a byte-identical copy of the player record and holds none. Every baked cell is
+then a sprite with nothing under it.
+
+Three things follow, and all three are now enforced:
+
+* **The writes are paired, in one direction.** `save_body` syncs the creature table before
+  storing a dirty map. Not the other way round: writing the grid when only the table changed
+  would bake whatever stamps happen to be standing at that instant, which is the
+  write-rarity problem from § 10b rather than a fix for it.
+* **A death syncs the table.** `apply_damage_to_slot` is the only place a creature dies, and
+  it used to leave `mon_dirty` unset. The corpse's cell was restored and dirtied the grid, so
+  the save wrote the map and not the creatures — the dead creature came back on reload while
+  its restored cell stayed restored.
+* **The store says so out loud.** `u2_world_store` prints a NOTE when it writes a map overlay
+  with no creature overlay beside it, naming the path that asked for the write.
+
+The original does not have this failure available to it: its transit autosave writes record +
+`mapx` + `monx` together, measured in `captures/spice86/g64-timedoor-autosave`. The engine's
+"store only what is dirty" contract was the thing that made the two halves separable.
+
+**Measurement notes from the same investigation, both of which were wrong before they were
+right.** The first count said four ghosts in sector 00 using only the save's creature list,
+and `monx00` ships with 31 creatures, so a save that never rewrote it still has 31 live
+creatures in it; the creature source has to fall back to the release file. And a
+pixel-level claim that the serpents were standing in water, read off a screenshot, was wrong
+twice over: the colour words in § 3 describe the original CGA art and the session was drawing
+the `alt` EGA theme, and the save said sector 30 while the bytes being read were `mapx20`.
+
+The gate is `engine/tests/gate_transit_save.py`: every map overlay in the slot must have a
+creature overlay beside it. No scripted scenario in the suite can produce an orphan — every
+path that dirties a map also syncs the table — so the gate plants the shape and requires the
+scan to name it, which is the only honest way to show the check can go red.

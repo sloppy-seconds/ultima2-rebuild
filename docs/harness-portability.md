@@ -2265,3 +2265,17 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   where the reimplementation wrote it on nearly every save, so "the reimplementation leaves more
   residue" can be a difference in *when it writes* rather than in what it computes.
   → Tier 1, measurement discipline for persistence.
+
+- **2026-11-18 — an overlay directory whose related files are gated independently will eventually
+  contain one half of a pair, and the half that survives alone becomes the truth.** A save wrote a
+  sector's terrain overlay without its creature overlay, because "store only what is dirty" was
+  applied to each file separately. On reload the orphaned overlay was read as ground truth and the
+  missing half was filled from release data, which turned every stamp it had baked into a sprite
+  with nothing under it. The tell was not the count of bad cells but their *coordinates*: the same
+  cell and the same byte appearing in three different sector files, with different ground
+  underneath each, is not behaviour, it is one buffer reaching several filenames. Two generic
+  rules: when a write-back layer can persist a derived file without the source file it was derived
+  from, pair them at the write and assert sibling completeness over the whole directory rather
+  than over the one file a scenario happens to touch; and when a check can only be driven red by a
+  shape no scripted scenario produces, plant the shape and require the check to name it.
+  → Tier 1, persistence invariants.
