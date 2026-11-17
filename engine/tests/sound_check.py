@@ -17,10 +17,14 @@ it goes green with the step wiring deleted. What has to be asserted is the divis
 the gap and the ORDER, and a refused step has to be shown to actually have been refused, or
 the refusal half is testing nothing at all.
 
-Controls, both of which were run and did go red:
+Controls, all of which were run and did go red:
   - delete the u2_sound_step call in u2_overworld_step_food -> the accepted-step case fails
     with zero tones, not with a skip;
-  - move u2_sound_refusal above the thumps -> the refused-step case fails on order.
+  - move u2_sound_refusal above the thumps -> the refused-step case fails on order;
+  - remove the mute guard from seam_tone -> both mute halves fail with six tones instead
+    of four and one swallowed emission instead of three;
+  - remove the fidelity check from u2_feedback -> only the classic mute half fails, for
+    inventing a notice the original's five-byte handler does not print.
 
 Usage: sound_check.py <engine-binary> <work-dir>
 Exit 0 = both cases matched. Exit 1 = a divergence. Exit 2 = the scenario did not happen as
@@ -35,6 +39,8 @@ import sys
 # The engine's own key bytes (core/keys.h): U2_KEY_EAST, U2_KEY_WEST.
 EAST = "0xf3"
 WEST = "0xf2"
+# Ctrl-S: the original's sound key (asm/4F76 compares it, asm/4F7B toggles DS:54D).
+MUTE = "0x13"
 
 WATER_COLUMN = 10     # mapx column filled with open water, which refuses a step on foot
 START_X = 11          # one cell east of it: WEST is refused, EAST is grass
@@ -45,15 +51,24 @@ SILENCE = re.compile(r"seam=speaker_silence asm=5CE4 ms=(\d+)")
 TEXT = re.compile(r"seam=str_out asm=4FDF text=(.*)")
 
 
-def run(engine, work, case):
-    keys = os.path.join(work, f"{case}.keys")
-    with open(keys, "w") as f:
-        f.write((EAST if case == "east" else WEST) + "\n")
+TONE = re.compile(r"seam=speaker_freq asm=5CD2 divisor=(\d+) ms=(\d+)")
+SILENCE = re.compile(r"seam=speaker_silence asm=5CE4 ms=(\d+)")
+MUTED = re.compile(r"seam=speaker_mute asm=(5CB2|5CE4)")
+TEXT = re.compile(r"seam=str_out asm=4FDF text=(.*)")
+
+
+def run(engine, work, case, keys=None, mode=None):
+    keys = keys or (EAST if case == "east" else WEST) + "\n"
+    with open(os.path.join(work, f"{case}.keys"), "w") as f:
+        f.write(keys)
+    env = dict(os.environ)
+    if mode:
+        env["U2_MODE"] = mode
     r = subprocess.run([engine, "--headless", "--play-map", "--cleanroom",
                         "--data-dir", os.path.join(work, "content"),
                         "--save-dir", os.path.join(work, "save"),
-                        "--script", keys, "--trace"],
-                       capture_output=True, text=True, timeout=120)
+                        "--script", os.path.join(work, f"{case}.keys"), "--trace"],
+                       capture_output=True, text=True, timeout=120, env=env)
     return (r.stdout or "") + (r.stderr or "")
 
 
@@ -126,7 +141,44 @@ def main() -> int:
         for f in fails:
             print(f"sound-check: FAIL {f}")
         return 1
-    print("sound-check: ok -- thud-thud on a step, thud-thud-buzz on a refusal, in that order")
+
+    # --- Ctrl-S mutes, and unmutes ---------------------------------------------
+    # asm/4F76 is the key poll comparing AL against 0x13 and asm/4F7B is the handler:
+    # `xorb $0xff,0x54d` and back into the poll with AH=0. So this is the game's own
+    # sound key, and three properties come with the bytes rather than with taste: the
+    # byte is consumed and never reaches a command, the flag toggles (both directions,
+    # which is why one press cannot prove the gate), and the handler prints nothing.
+    #
+    # Run in both modes because they are supposed to differ in exactly one of those:
+    # classic stays silent, because asm/4F7B is five bytes and none of them is output;
+    # enhanced announces through the one seam that invents text. A gate in one mode
+    # only would let the other mode drift.
+    seq = "\n".join([EAST, MUTE, EAST, MUTE, EAST]) + "\n"
+    for mode, want_notice in (("classic", False), ("enhanced", True)):
+        out = run(engine, work, f"mute-{mode}", keys=seq, mode=mode)
+        tones = TONE.findall(out)
+        hush = MUTED.findall(out)
+        # Two thuds, then one muted step (three swallowed emissions: tone, gap, tone),
+        # then two thuds again. Anything else and the toggle is a one-way switch or the
+        # flag is not read at all.
+        if tones != [("16384", "14")] * 4:
+            fails.append(f"mute [{mode}]: expected two thuds, a silent step, two thuds; got {tones}")
+        if len(hush) != 3:
+            fails.append(f"mute [{mode}]: expected three swallowed emissions during the muted step, got {len(hush)}")
+        if "ILLEGAL" in out:
+            fails.append(f"mute [{mode}]: Ctrl-S reached the command loop; the original swallows it in the poll")
+        notices = ("[sound off]" in out, "[sound on]" in out)
+        if want_notice and notices != (True, True):
+            fails.append(f"mute [{mode}]: enhanced must announce the toggle, saw {notices}")
+        if not want_notice and any(notices):
+            fails.append(f"mute [{mode}]: classic invented a notice; asm/4F7B prints nothing")
+
+    if fails:
+        for f in fails:
+            print(f"sound-check: FAIL {f}")
+        return 1
+    print("sound-check: ok -- thud-thud on a step, thud-thud-buzz on a refusal, in that order;"
+          " Ctrl-S mutes and unmutes")
     return 0
 
 

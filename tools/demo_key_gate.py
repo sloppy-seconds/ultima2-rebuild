@@ -11,11 +11,15 @@ What it checks, one line per control byte:
 
   0x12  Ctrl-R, the demo toggle.   MUST NOT be compared anywhere.
   0x11  Ctrl-Q, --dev quit.        MUST NOT be compared anywhere.
-  0x13  Ctrl-S, the screenshot.    MUST be compared at asm/4F76, which is the site
-                                    seam.c cites for it. A screenshot key that
-                                    collided with play would be invisible in a
-                                    scripted capture, because scripts send the
-                                    shifted byte.
+  0x18  Ctrl-X, the screenshot.    MUST NOT be compared anywhere.
+  0x13  Ctrl-S, the game's own sound toggle. MUST be compared at asm/4F76, whose
+                                    handler asm/4F7B XORs DS:54D. This one is the
+                                    inverse claim: the byte is the ORIGINAL's, so
+                                    the engine must spend it on sound and not on an
+                                    invention — which is why the screenshot moved off
+                                    it to 0x18. A screenshot key that collided with
+                                    play would be invisible in a scripted capture,
+                                    because scripts send the shifted byte.
 
 Only instruction operands count. Comments are skipped, and a DS displacement is not
 an immediate: `cmpb $0xff,0x12` in asm/5AB1 compares the view-mode byte at DS:12 and
@@ -47,9 +51,10 @@ IMM_CMP = re.compile(r"^\s*cmp[bwl]?\s+\$0x([0-9a-fA-F]{1,4})\s*,\s*%(a?[a-z]{2}
 FREE = {
     0x11: "Ctrl-Q (--dev quit)",
     0x12: "Ctrl-R (demo record/playback toggle)",
+    0x18: "Ctrl-X (screenshot)",
 }
 CLAIMED = {
-    0x13: ("Ctrl-S (screenshot)", "4F76_sub_4f76.asm"),
+    0x13: ("Ctrl-S (sound toggle, the original's own key)", "4F76_sub_4f76.asm"),
 }
 
 

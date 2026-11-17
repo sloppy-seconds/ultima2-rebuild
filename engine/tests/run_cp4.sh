@@ -238,6 +238,7 @@ fi
 # rect — as tested behaviour, not folklore.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/status_check" \
    tests/status_check.c src/game/status.c src/core/seam.c src/core/vram.c \
+   src/game/sound.c src/game/feedback.c \
    src/core/state.c src/core/demo.c src/core/font.c src/core/frame.c src/core/view.c \
    src/core/world.c src/core/roots.c src/core/slot.c \
    src/core/rng.c src/core/timer.c src/core/replay.c src/core/sha256.c \
