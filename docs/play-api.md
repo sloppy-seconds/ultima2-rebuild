@@ -162,7 +162,8 @@ buys for demos, arrived at from the other direction.
 `input_script.c` and `input_demo.c` are the templates, and `input_demo.c`'s header states the
 rule this one inherits: *"there is no parallel demo code path"*. A key delivered through the
 API is the same alphabet, through the same seam, past the same `key_uppercase_fold` and the
-same Ctrl-S swallow, as a key typed by a person.
+same Ctrl-S swallow, as a key typed by a person. (Ctrl-S is the game's own sound toggle
+since 2026-11-17; the screenshot that used to hold that byte is now Ctrl-X.)
 
 This is what makes an API session comparable to a demo and a demo replayable from an API
 session. It is also why the API needs no changes to game logic at all.
@@ -372,7 +373,7 @@ site that blocked, not guessed.
 | need | already there |
 | --- | --- |
 | key delivery into game logic | `u2_input` vtable; `input_script.c`, `input_demo.c` as templates |
-| the key alphabet | `--script` tokens, `key_uppercase_fold`, the Ctrl-S swallow, all in `core/seam.c` |
+| the key alphabet | `--script` tokens, `key_uppercase_fold`, the Ctrl-S and Ctrl-X swallows, all in `core/seam.c` |
 | named state as JSON | `u2_dump_state_json()` in `debug/dump_state.{h,c}` |
 | behavioural digest | `u2_demo_digest()` in `core/demo.c` |
 | the text grid | `u2_dump_screen()`, and the VRAM it reads |

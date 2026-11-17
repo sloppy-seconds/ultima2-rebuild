@@ -2361,3 +2361,63 @@ One thing this change leaves genuinely un-gated, said rather than left implied: 
 layout's dungeon view has no assertion of its own. CP7 measures the original geometry.
 
 `make test`: CP0..CP7, CP6, demo PASS. `tools/check_all.sh --fast` green.
+
+## 2026-11-17 — Ctrl-S mutes, because the original already bound it
+
+Owner asked for Ctrl-S to toggle sound in enhanced mode. The bytes said the request was
+smaller and larger than it looked: smaller because the original already binds Ctrl-S, and
+larger because the engine had taken that byte for something else.
+
+### What the bytes say
+
+`asm/4F76` is the key poll comparing AL against `0x13`. `asm/4F7B` is the whole handler:
+`xorb $0xff,0x54d`, then back into the poll with `AH=0`. Five bytes, no output, and the
+only write to that flag anywhere in the binary — so the segment's zero-initialisation is
+the game's "sound on" default, nothing saves it, and the byte never reaches a command.
+
+The polarity is the trap in the naming: `DS:54D` is a **sound-off** flag. Every guard is
+`cmpb $0x0,0x54d` followed by `jne` past the work — `asm/5CB2` at the port write, `asm/5C95`
+and `asm/5D09` above it — so non-zero is muted. `asm/5DA9`'s header had called it "a
+sound-enabled flag" while quoting the same `je`, which reads backwards against the body;
+the bodies agree with each other and the header was the odd one out.
+
+### Engine
+
+* `ctx.sound_off` (`core/ctx.h`), `uint8_t`, outside the DS mirror in `state.h` because it
+  is not in the saved span and no capture has seen it saved.
+* Checked at `seam_tone` and `seam_silence` rather than at each emitter, which is where
+  `asm/5CB2` checks it — the primitive every tone passes. A tone wired later inherits the
+  mute instead of forgetting it. The guard is traced (`speaker_mute`) and the tone is not,
+  because a run that swallowed its tones has to look different in the trace from one that
+  played them, or a gate over the mute cannot tell them apart.
+* `u2_sound_toggle()` in `game/sound.c` does the XOR and the notice. `seam.c` swallows the
+  byte at the same point as Ctrl-R, which is where the original swallows it — above the
+  command loop, so it works everywhere the poll does.
+* Classic prints nothing, cited to `asm/4F7B`. Enhanced says `[sound off]` / `[sound on]`
+  through `feedback.h`, which is the one seam that invents text and already resolves to
+  nothing in original mode — so this is one call, not a branch.
+* `seam.c` now includes `game/sound.h`, the one core→game include in that file, with its
+  reason at the include: routing the notice through the sound module keeps `feedback.h`'s
+  single-audit-point rule intact. The alternative was a second hand-written enhanced-only
+  print path in the seam, which is the divergence that seam exists to prevent.
+
+### The screenshot moved: Ctrl-S → Ctrl-X
+
+An engine invention had taken a byte the game spends. Fidelity wins the byte, and the
+replacement was chosen by a gate rather than by taste: `tools/demo_key_gate.py` refuses any
+engine claim on a byte `asm/` compares against, and it went red on both nicer candidates.
+Ctrl-G (`0x07`) is a range-check operand in nine sites including `cmd_W` and the cleric
+shrine; Ctrl-P (`0x10`) is compared four times. Ctrl-X (`0x18`) has zero comparison sites.
+The gate gained `0x18` in FREE and a rewritten `0x13` entry that now states the inverse
+claim: that byte must be compared, because it is the original's.
+
+### Gate
+
+`tests/sound_check.py` grew a mute case run in **both** modes: two thuds, a silent step,
+two thuds again, three swallowed emissions, no `ILLEGAL` (proof the byte was consumed and
+not delivered), and the notice present in enhanced and absent in classic. Four controls,
+all run and all red — the two new ones are removing the guard from `seam_tone` (both modes
+fail: six tones, one swallowed emission) and removing the fidelity check from `u2_feedback`
+(only classic fails, for inventing a line the original does not print).
+
+`make test`: CP0..CP7, CP6, demo PASS.

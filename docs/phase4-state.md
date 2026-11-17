@@ -1091,7 +1091,7 @@ and its gate `asm/0AAA` — the dispatch table, the four specials with their res
 
 | id | item | mode | what it needs | honest constraint |
 | --- | --- | --- | --- | --- |
-| **E1** | the wound tone and flash, faithful to the original | **original mode, not enhanced** | wire `seam_tone` at the wound site with the two divisors above, and a video-XOR equivalent for the flash. The routines are now named: `asm/5EAC`, `asm/5EF2`, `asm/5DA9_tone_player`, `asm/5255_wound_video_flash`, `asm/4C1E_video_xor_patch` | the tone is gated on the sound flag at `DS:54D`, so the engine must respect that too. The flash needs a video-XOR path the engine does not have — it composites text into a frame rather than XOR-ing CGA. **Owner ruled a sound substitutes for a message, so the tone alone satisfies the rule**; the flash is the nicer half and can follow |
+| **E1** | the wound tone and flash, faithful to the original | **original mode, not enhanced** | wire `seam_tone` at the wound site with the two divisors above, and a video-XOR equivalent for the flash. The routines are now named: `asm/5EAC`, `asm/5EF2`, `asm/5DA9_tone_player`, `asm/5255_wound_video_flash`, `asm/4C1E_video_xor_patch` | the tone is gated on the sound flag at `DS:54D` — **modelled 2026-11-17** as `ctx.sound_off`, checked at `seam_tone`, with the original's own Ctrl-S (`asm/4F76`/`asm/4F7B`) as the toggle, so any tone wired here inherits the mute for free. The flash needs a video-XOR path the engine does not have — it composites text into a frame rather than XOR-ing CGA. **Owner ruled a sound substitutes for a message, so the tone alone satisfies the rule**; the flash is the nicer half and can follow |
 | **E2** | damage number pop (`-11`) over the HP field | enhanced | per-cell colour exists — `u2_vram_poke(row, col, ch, attr)` — so the pixels are not the problem | **colour is settled, timing is not.** Owner ruled 2026-10-26 that enhanced mode may go full colour, so the CGA 4-colour limit does not bind here and red is available. The remaining blocker is structural: the engine is **turn-driven** — frames advance on player input — so a transient pop needs an animation clock that does not exist yet. That clock is the real work item, not the colour |
 | **E3** | a status-log line for a wound (`YOU ARE HIT FOR 11`) | enhanced | a `u2_feedback()` seam called at each effect site, emitting nothing in original mode | **the seam is built (2026-11-02): `game/feedback.c`, one function, original mode resolves to nothing, gated by CP5 E1's enhanced arm — first caller is the swamp (`[swamp -5 HP]`). The wound line itself is still parked: the damage amount is a BCD value from the same subtract that is already computed, so the number is available. The wording is invented — it must be visibly engine-authored, not dressed up as game text, which is why the bracketed lower-case convention is written into feedback.h |
 | **E4** | hit animation on the monster sprite | enhanced | a per-cell or per-tile flash on the creature's cell | same turn-driven problem as E2 |
@@ -1263,7 +1263,7 @@ HP fell 9999 → 9952 while a monster stood adjacent, and the log showed nothing
 
 | effect on / by the player | engine today | grade | what closes it |
 | --- | --- | --- | --- |
-| monster melee wound | **prints nothing** | **answered: the original gives a tone and a screen flash, no text** | the wound loop is runtime `0x0BB2..0x0BCF`, driven by `DS:20` (contacts) and `DS:21` (hits), both set upstream at `0x0B4D`/`0x0B79`. Per iteration it calls `0x5EAC` (a tone, divisor `0x300`, about 1.5 kHz) and, once hits remain, `0x5255` twice with `0x5EF2` (a tone, divisor `0x800`, about 580 Hz) between them. `asm/5255` → `asm/4C1E` **XORs a pattern table into CGA video** — the segment table it loads holds `0xB8C8`, `0xBAC8`, `0xB8CD`, `0xBACD`…, all inside `0xB800`. Calling an XOR twice restores the screen, which is exactly why it is called twice. So the feedback is **sound plus a flash**, and the absence of text is real. **Wired 2026-11-02 (E1, CP5 E2)**: `game/flash.c` XORs the generated ring onto the victim's cell, sounds the `asm/5EF2` tone (divisor from the bytes, duration from the capture), XORs back; hooks at the wound application in `creature_turn` and the landed swing in `u2_overworld_attack_dir`. The `asm/5EAC` tone is NOT wired — divisor proven, duration neither decoded nor measured, and a guessed tone is worse than none; the `DS:54D` sound flag is not modelled (backend choice is the user's knob). **Upgraded 2026-11-02 from "never observed": the loop executed and the flash was caught on video-memory frames — `captures/spice86/wound-flash-20261102` (white disc + inverted player at screen centre, ~150-180 ms, mask matches the table at runtime 0x5288 record for record). Owner's both-directions claim **resolved the same day**: the ring marks the hit unit's cell — frame 00257 of the same capture shows the identical ring five scanlines above the player when the player's attack lands on the orc. E1's wiring must therefore hook both the wound path and the player's landed-attack path, each drawing at the victim's cell |
+| monster melee wound | **prints nothing** | **answered: the original gives a tone and a screen flash, no text** | the wound loop is runtime `0x0BB2..0x0BCF`, driven by `DS:20` (contacts) and `DS:21` (hits), both set upstream at `0x0B4D`/`0x0B79`. Per iteration it calls `0x5EAC` (a tone, divisor `0x300`, about 1.5 kHz) and, once hits remain, `0x5255` twice with `0x5EF2` (a tone, divisor `0x800`, about 580 Hz) between them. `asm/5255` → `asm/4C1E` **XORs a pattern table into CGA video** — the segment table it loads holds `0xB8C8`, `0xBAC8`, `0xB8CD`, `0xBACD`…, all inside `0xB800`. Calling an XOR twice restores the screen, which is exactly why it is called twice. So the feedback is **sound plus a flash**, and the absence of text is real. **Wired 2026-11-02 (E1, CP5 E2)**: `game/flash.c` XORs the generated ring onto the victim's cell, sounds the `asm/5EF2` tone (divisor from the bytes, duration from the capture), XORs back; hooks at the wound application in `creature_turn` and the landed swing in `u2_overworld_attack_dir`. The `asm/5EAC` tone is NOT wired — divisor proven, duration neither decoded nor measured, and a guessed tone is worse than none; the `asm/5EAC` tone is NOT wired — divisor proven, duration neither decoded nor measured, and a guessed tone is worse than none; the `DS:54D` sound flag was not modelled at the time and has since been (2026-11-17, `ctx.sound_off` + Ctrl-S). **Upgraded 2026-11-02 from "never observed": the loop executed and the flash was caught on video-memory frames — `captures/spice86/wound-flash-20261102` (white disc + inverted player at screen centre, ~150-180 ms, mask matches the table at runtime 0x5288 record for record). Owner's both-directions claim **resolved the same day**: the ring marks the hit unit's cell — frame 00257 of the same capture shows the identical ring five scanlines above the player when the player's attack lands on the orc. E1's wiring must therefore hook both the wound path and the player's landed-attack path, each drawing at the victim's cell |
 | force-field damage |**not wired at all** — `u2_combat_force_field` is decoded (`asm/24B5`, −1000 HP, ring protects) but only the test calls it | **VIOLATION, different kind** | needs the tile trigger wired into the step path, then its message comes with it. Do not report this as a missing message; it is a missing effect |
 | player death | prints | ok | `asm/0C82` announcement, already in `u2_death` |
 | paralysis on a refused step | prints `--PARALYZED!` | ok | CP5 C3 asserts it |
@@ -1298,6 +1298,31 @@ What they lack is a **duration**, which is what the two wired sounds got from a 
 `asm/5DA9`'s own header says its frequency arithmetic is inferred and unconfirmed
 against a heard tone, which is why `combat.c` deliberately emits nothing on a cannon
 shot rather than inventing one.
+
+**The mute, and the key that sets it.** Every row above sounds through a guard on
+`DS:54D`, and the bytes agree on its polarity even though the name reads backwards:
+`cmpb $0x0,0x54d` then `jne` past the port write, at `asm/5CB2` (the primitive that
+raises the gate), at `asm/5C95`, at `asm/5D09` and at `asm/5DA9`. Non-zero is muted.
+One instruction in the whole binary writes it — `xorb $0xff,0x54d` in `asm/4F7B`,
+reached when the key poll sees `0x13` at `asm/4F76` — so **Ctrl-S is the game's own
+sound key**, the segment is zero-initialised so the game starts audible, and nothing
+is saved or restored. The handler is five bytes and prints nothing, which is why the
+engine's classic mode prints nothing either.
+
+Modelled 2026-11-17 as `ctx.sound_off`, checked at the engine's single tone seam
+(`seam_tone` / `seam_silence`) rather than at each emitter, so a tone wired later
+inherits the mute instead of forgetting it. Ctrl-S is swallowed in `seam.c` at the
+same point as Ctrl-R, which is where the original swallows it — above the command
+loop, so it works in a menu, a shop and a dungeon. Enhanced announces `[sound off]`
+/ `[sound on]` through `feedback.h`; classic is silent, cited to `asm/4F7B`. Gated by
+`make test-cp5` (`tests/sound_check.py`), both modes, with two controls that were run
+and went red.
+
+One consequence nobody asked for and everyone should know: **the engine's screenshot key
+moved off Ctrl-S to Ctrl-X (0x18)**. An engine invention had taken a byte the original
+spends. `tools/demo_key_gate.py` is what caught the first two replacement candidates —
+Ctrl-G is a range-check operand in nine sites and Ctrl-P is compared four times — so
+Ctrl-X was chosen by the gate rather than by taste.
 
 **Two live-session bugs this audit turned up, both reproduced headless:**
 
@@ -3595,13 +3620,14 @@ correct, every text assertion in the suite was correct, and the window showed no
 the process sat at 550% CPU with the main thread parked in `sdl_upload` re-uploading one
 unchanged frame. The fix is ordering, not presence: paint, present, then pace the poll with a
 wait. What proves it now is `engine/tests/space_view_gate.py` leg 7, which drives the SDL
-renderer headlessly and compares the frame the engine actually uploaded (Ctrl-S, swallowed at
+renderer headlessly and compares the frame the engine actually uploaded (Ctrl-X, swallowed at
 the key seam) between the orbit screen and the hyperwarp prompt; with the ordering reverted
 the two captures are byte-identical at 1295 ink pixels. It needed `--play-map` and two `WAIT`
 tokens before it could see anything: without the first the menu ate every key and both
 screenshots were of the splash -- which is how the first draft of that leg passed while
 measuring nothing -- and without the second the screenshot is taken inside the poll that
-consumed Ctrl-S, before that poll has painted.
+consumed Ctrl-X, before that poll has painted. (Ctrl-X, not Ctrl-S: the screenshot moved off
+0x13 on 2026-11-17 because the original spends that byte on its own sound toggle.)
 
 ### B. Present-then-spin — screen is correct, CPU is not (9)
 

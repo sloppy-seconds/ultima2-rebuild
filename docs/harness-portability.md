@@ -1807,6 +1807,21 @@ Newest first. One line per learning; the detail stays in the owning document.
   or committed evidence with no mode field does not mean "whatever this build defaults to", it
   means the mode that was the default when the file was written, and reading it any other way
   makes the same file replay a different game the day the default moves.
+- **An affordance key picked by the harness is a claim about a byte, and the target may
+  already spend it.** Emulators and drivers reach for control bytes because they are below
+  the letter alphabet and cannot collide with a typed shortcut — but a real-mode program
+  reads the keyboard at the BIOS level, where control bytes are ordinary return values, and
+  it may bind one of its own. So the claim must be a gate over the disassembly rather than a
+  sentence in a comment: enumerate every immediate comparison against a register, and assert
+  both directions — the bytes the harness claims must have no comparison site, and any byte
+  the target demonstrably binds must have one and must be left alone. Expect the first
+  candidate to be rejected and pick the byte the gate allows, not the one with the nicest
+  mnemonic; a range-check operand (`cmp $0x7,%al` as "is this menu digit small?") will look
+  like a keystroke claim to a naive scanner, which is why the rule counts only comparisons
+  against a register and skips comments. The sharper half of the lesson is that the
+  collision is invisible to scripted input: injected keys usually arrive as the shifted
+  byte, so a harness key that steps on a game key passes every automated test and only
+  shows up to a human at a keyboard.
 
 ---
 

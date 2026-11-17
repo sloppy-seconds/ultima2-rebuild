@@ -213,6 +213,13 @@ a set with `--ega-theme`, and press **Ctrl-T** in play to cycle themes live. `--
 so it refuses to start (rather than silently drawing CGA) when the art is missing. Full detail
 in `docs/ega-graphics.md`.
 
+**In play.** **Ctrl-S** mutes and unmutes. That is the game's own key, not one the engine
+invented: `asm/4F76` recognises it in the key poll and `asm/4F7B` flips the sound flag, so it
+works in a menu, a shop and a dungeon, and classic mode says nothing when you press it because
+the original prints nothing. Enhanced tells you `[sound off]` / `[sound on]`. **Ctrl-X** saves
+the frame on screen as a bitmap — it used to be Ctrl-S, and it moved because the byte belonged
+to the game.
+
 **Missing or cloned planet maps.** In a stock CD/GOG copy the planet maps (Mercury, Venus,
 Mars, Jupiter) are effectively missing: they shared filenames with Earth's era maps and were
 overwritten when the three floppies were collapsed into one folder, so flying to a planet

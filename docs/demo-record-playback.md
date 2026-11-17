@@ -281,6 +281,7 @@ to forget, in a project whose recorded failure mode is exactly that.
 game logic's stimulus (`asm/4F4D` is the original's one seam, and one seam is the documented reason both
 engine entries must answer in the same alphabet). Journal what passes there, after `key_uppercase_fold`,
 after the Ctrl-S swallow. That sequence is downstream of every key that was never consumed and upstream
+(Note: the swallow at the time was the screenshot's; the byte is now the game's own sound toggle — see D10's correction.)
 of every handler, so it needs no per-handler hooks and cannot record a key the game ignored.
 
 Consequence worth stating plainly: this is *stimulus*-exact, not *action*-exact. The demo reproduces the
@@ -418,9 +419,18 @@ committed game data, no external dependency, and it goes red when either half br
 
 ### D10 — `Ctrl-R` is a seam-level key, swallowed before game logic, like `Ctrl-S`
 
-`Ctrl-S` is already handled this way: `U2_KEY_SCREENSHOT 0x13` in `seam.c:170`, intercepted by
-`take_screenshot_key()` and returned to the caller as "no key". `Ctrl-R` follows the identical pattern with
-`0x12`.
+`Ctrl-S` is already handled this way: intercepted in the key seam and returned to the caller
+as "no key". `Ctrl-R` follows the identical pattern with `0x12`.
+
+> **Corrected 2026-11-17, and the correction matters for how D10 is read.** When this was
+> written, the byte 0x13 in `seam.c` was `U2_KEY_SCREENSHOT` — an engine invention sitting on
+> a byte the original spends: `asm/4F76` compares `0x13` in the key poll and `asm/4F7B` toggles
+> `DS:54D`, the sound flag. So the precedent D10 leaned on was itself a collision, discovered
+> later and fixed by moving the screenshot to Ctrl-X (`0x18`, the first candidate
+> `tools/demo_key_gate.py` did not reject). What survives is the *shape* D10 argued for — a
+> seam-level key swallowed above game logic, at the instant a key becomes game logic's stimulus
+> — and it now has a better example than it knew: the original's own Ctrl-S is swallowed in the
+> poll for exactly that reason, and the engine's copy of it is faithful rather than convenient.
 
 Availability is measured, not assumed: the only `cmp` against a control byte in the corpus is
 `asm/4F76`'s `cmp $0x13,%al`, and **no `cmp $0x12` exists anywhere in `asm/`**. That is the same
