@@ -42,7 +42,7 @@
 # calls: L_0051df (str_out), L_0025e6 (cursor init + slot scan seed), L_0055f4 (emit),
 #        L_0052b3 (map_tile_ptr) x2
 # provenance: live:armour-buy, food-buy; static
-#           entry executed in 38 of 285 harvests; derived from ExecutedInstructions. This line
+#           entry executed in 38 of 289 harvests; derived from ExecutedInstructions. This line
 #           previously carried the live citations but no executed count, and tools/cmd_handlers.py
 #           parses only the `entry executed in N of M` form -- so TRANSACT was reported as never
 #           exercised while 24 harvests already contained it. The crosswalk's `--` was a format
