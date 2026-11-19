@@ -58,6 +58,14 @@ typedef struct {
      * guessed, because a typo in a mode is the kind of mistake that otherwise
      * plays for twenty minutes before anyone notices the wrong layout. */
     char mode[16];
+    /* [game] sound — "on" or "off", the PC-speaker flag the original keeps at
+     * DS:54D and toggles with Ctrl-S (asm/4F7B). Empty means the file says nothing
+     * and sound is on, which is the original's startup state. Like `mode`, a third
+     * word is refused at startup rather than guessed: a half-typed `of` would
+     * otherwise leave a player wondering why the speaker is still chirping.
+     *
+     * This is the first config key the game itself writes back. See u2_config_set. */
+    char sound[8];
     /* [install] — the sources `--install` was given, recorded so the same command
      * works again with no flags from beside the game directory. The game never
      * reads these; the installer does, through core/install.h.
@@ -96,5 +104,37 @@ void u2_config_apply(u2_ctx *ctx, const u2_config *cfg);
  * directory the engine was launched from — the same default-drive model the
  * original's FCB drive byte 0 implies. `--config` overrides it. */
 #define U2_CONFIG_DEFAULT_FILE "config.ini"
+
+/* Set one key in an ini file, leaving everything else exactly as it was, and
+ * return 0 on success with `err` naming the reason otherwise.
+ *
+ * This exists because the player changes settings in game — Ctrl-T for a theme,
+ * Ctrl-S for sound — and a preference that evaporates on exit is a preference the
+ * player re-enters every session. Writing the whole file back from the parsed
+ * struct was rejected: the installer's config.ini is commented for a reason, and a
+ * rewrite that drops the comments and the section order would make the file worse
+ * to read in exchange for being easier to write.
+ *
+ * So this is surgical. Within `[section]`, a line whose key matches is replaced in
+ * place — including a commented one, because the installer ships `#theme = ...` as
+ * a worked example and a player who chose a theme has chosen to activate it. If the
+ * key is not there, it is appended at the end of that section; if the section is not
+ * there, the section is appended. Nothing else moves.
+ *
+ * The write is to `<path>.u2tmp` then a rename, so a crash or a full disk leaves the
+ * old file intact rather than a half-written one the loader would refuse.
+ *
+ * A missing file is created: the setting has to live somewhere, and the alternative
+ * is to accept the change and lose it. */
+int u2_config_set(const char *path, const char *section, const char *key,
+                  const char *value, char *err, size_t errsz);
+
+/* Persist one in-game setting to the file this ctx was read from, so the two call
+ * sites — Ctrl-S and Ctrl-T — do not each invent a policy about where a preference
+ * goes. Returns 0 on success. On failure `err` says why and the caller decides what
+ * the player is told; a change that took effect but could not be saved is still a
+ * change, so neither caller may pretend the key did nothing. */
+int u2_config_persist(u2_ctx *ctx, const char *section, const char *key,
+                      const char *value, char *err, size_t errsz);
 
 #endif

@@ -457,6 +457,12 @@ typedef struct u2_ctx {
      * saved span (DS:36..0x135) and no capture has ever seen it saved or restored. */
     uint8_t sound_off;
 
+    /* Where config.ini was read from, so an in-game change can be written back to
+     * the file the player actually has. Set once at startup next to the load call;
+     * empty means no config was read and nothing is persisted. See core/config.h's
+     * u2_config_set for what a write does to the rest of the file. */
+    char config_path[512];
+
     int cleanroom;           /* --cleanroom: use the engine's own independently
                               * created assets instead of the game's — tiles now,
                               * sound and other media as they land. One axis, so a

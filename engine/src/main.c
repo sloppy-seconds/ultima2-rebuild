@@ -842,6 +842,11 @@ int main(int argc, char **argv)
             fprintf(stderr, "u2: %s\n", cerr);
             return 2;
         }
+        /* Remembered whether or not the file existed: an in-game change is written
+         * back to this path, and creating the file is better than accepting a
+         * preference and losing it. */
+        snprintf(ctx.config_path, sizeof ctx.config_path, "%s",
+                 config_path ? config_path : U2_CONFIG_DEFAULT_FILE);
         u2_config_apply(&ctx, &cfg);
         /* The mode, from the three places that are not the command line, in the same
          * precedence the paths follow: a flag outranks the environment, the

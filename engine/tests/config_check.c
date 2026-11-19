@@ -38,6 +38,22 @@ static void write_text(const char *path, const char *text)
     fclose(f);
 }
 
+/* The whole file, or NULL. Every write-half check reads the file back rather than
+ * trusting that a write did what it said, because the failure this half of the
+ * module can produce is a file that looks fine and is not. */
+static char *read_text(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long n = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char *b = calloc((size_t)n + 1, 1);
+    if (b && n > 0 && fread(b, 1, (size_t)n, f) != (size_t)n) { free(b); b = NULL; }
+    fclose(f);
+    return b;
+}
+
 /* Load `text` as config.ini in `dir`, returning the result code. */
 static u2_config_result load_from(const char *dir, const char *name, const char *text,
                                   u2_config *cfg, char *err, size_t errsz)
@@ -264,6 +280,117 @@ int main(int argc, char **argv)
         char k[64];
         while (u2_ini_next_key(ini, "a", &cur, k, sizeof k)) n++;
         CHECK(n == 2, "the key walk sees both keys of one section and no others");
+    }
+
+    /* ---- the write half: core/config_write.c ----------------------------------
+     *
+     * The property is that a player's file survives being edited by the game. The
+     * installer's config.ini is commented on purpose, so a writer that regenerated
+     * the file would delete that documentation the first time anyone pressed Ctrl-S.
+     * Every check below is a way the file could be made worse by a write that was
+     * supposed to change one line. */
+    {
+        const char *p = "cfgw.ini";
+        char err[256];
+
+        /* 1. a commented example becomes the live line, and there is only one. */
+        write_text(p,
+            "[themes]\n"
+            "dir = themes\n"
+            "# theme = 10   # uncomment to pin a theme\n"
+            "\n"
+            "[game]\n"
+            "# mode = enhanced\n");
+        CHECK(u2_config_set(p, "themes", "theme", "alt", err, sizeof err) == 0,
+              "setting a commented key succeeds");
+        char *t = read_text(p);
+        CHECK(t && strstr(t, "theme = alt\n") && !strstr(t, "# theme = alt"),
+              "the commented example is replaced by the live line, not left behind");
+        CHECK(t && strstr(t, "# uncomment to pin a theme") == NULL,
+              "the replaced line's trailing comment goes with it: one line, one value");
+        CHECK(t && strstr(t, "dir = themes") && strstr(t, "# mode = enhanced"),
+              "everything the write did not touch is still there");
+        CHECK(t && strstr(t, "theme = alt")
+              && strstr(strstr(t, "theme = alt") + 11, "theme =") == NULL,
+              "exactly one theme key: a duplicate makes the loader refuse the file");
+        free(t);
+
+        /* 2. round trip: what was written is what the reader reads back. No `dir`
+         *    line here: config.c refuses a [themes] dir that is not a directory, and
+         *    this fixture is a bare file in a scratch cwd. */
+        write_text("cfgw2.ini", "[themes]\n# theme = 10\n");
+        {
+            u2_config c;
+            char e2[256];
+            CHECK(u2_config_set("cfgw2.ini", "themes", "theme", "alt", err, sizeof err) == 0
+                  && u2_config_load("cfgw2.ini", &c, e2, sizeof e2) == U2_CONFIG_OK
+                  && !strcmp(c.theme, "alt"),
+                  "the written file loads and carries the new theme");
+        }
+
+        /* 3. a key absent from a section that exists lands inside that section. */
+        write_text(p, "[themes]\ndir = themes\n\n[game]\n# mode = enhanced\n");
+        CHECK(u2_config_set(p, "game", "sound", "off", err, sizeof err) == 0,
+              "setting a key the section does not have succeeds");
+        t = read_text(p);
+        CHECK(t && strstr(t, "sound = off") && strstr(t, "sound = off") > strstr(t, "[game]"),
+              "the new key lands after its own heading, not at the bottom of the file");
+        CHECK(t && strstr(t, "# mode = enhanced") && strstr(t, "dir = themes"),
+              "an insert does not disturb the neighbouring section");
+        free(t);
+
+        /* 4. a section that does not exist is created. */
+        write_text(p, "[paths]\ndata = .\n");
+        CHECK(u2_config_set(p, "game", "sound", "on", err, sizeof err) == 0
+              && ((t = read_text(p)) != NULL)
+              && strstr(t, "[game]") && strstr(t, "sound = on") && (free(t), 1),
+              "a missing section is appended with its key");
+
+        /* 5. a file that does not exist is created rather than the change lost. */
+        remove(p);
+        CHECK(u2_config_set(p, "game", "sound", "off", err, sizeof err) == 0
+              && ((t = read_text(p)) != NULL)
+              && strstr(t, "[game]") && strstr(t, "sound = off") && (free(t), 1),
+              "no config.ini is not a reason to accept a preference and then lose it");
+
+        /* 6. no debris: a rename that left a temp file would litter the game
+         *    directory once per toggle. */
+        {
+            FILE *g = fopen("cfgw.ini.u2tmp", "rb");
+            CHECK(!g, "the write leaves no .u2tmp behind");
+            if (g) fclose(g);
+        }
+
+        /* 7. sound is read, applied, and a third word is refused. */
+        write_text(p, "[game]\nsound = off\n");
+        {
+            u2_config c;
+            char e2[256];
+            u2_ctx cx;
+            memset(&cx, 0, sizeof cx);
+            CHECK(u2_config_load(p, &c, e2, sizeof e2) == U2_CONFIG_OK
+                  && !strcmp(c.sound, "off"),
+                  "[game] sound = off parses");
+            u2_config_apply(&cx, &c);
+            CHECK(cx.sound_off == 0xff, "sound = off mutes at startup, in the DS:54D shape");
+        }
+        write_text(p, "[game]\nsound = maybe\n");
+        {
+            u2_config c;
+            char e2[256];
+            CHECK(u2_config_load(p, &c, e2, sizeof e2) == U2_CONFIG_REFUSED,
+                  "[game] sound = maybe is refused at startup, not guessed");
+        }
+        write_text(p, "[game]\nsound = OFF\n");
+        {
+            u2_config c;
+            char e2[256];
+            CHECK(u2_config_load(p, &c, e2, sizeof e2) == U2_CONFIG_OK
+                  && !strcmp(c.sound, "off"),
+                  "case is not part of the meaning, same as mode");
+        }
+        remove(p);
+        remove("cfgw2.ini");
     }
 
     printf(fails ? "config check: FAIL (%d of %d)\n" : "config check: all %d checks passed\n",

@@ -23,6 +23,7 @@
 #include "game/flash.h"       /* u2_flash_cell: the wound flash, both directions (E1) */
 #include "game/sound.h"       /* u2_sound_step, u2_sound_refusal: asm/5EC7 and asm/5C95 */
 #include "core/rng.h"         /* u2_rand_byte: asm/0BDB's damage randomiser */
+#include "core/config.h"      /* u2_config_persist: Ctrl-T writes the theme back */
 #include "game/status.h"
 #include "core/font.h"
 #include "core/layout.h"
@@ -2657,13 +2658,21 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
                      * and nothing about the window, the texture or the staging
                      * buffer the renderer allocated at startup. */
                     snprintf(ow->ega_theme, sizeof ow->ega_theme, "%s", next);
-                    snprintf(ow->ega_theme, sizeof ow->ega_theme, "%s", next);
                     /* The ink DOES follow the theme: cycling into a theme that
                      * ships a palette changes which index is readable text, and
                      * cycling out must restore the CGA pair. */
                     u2_frame_set_text_fg(&ow->frame, ctx->text_fg);
-                    char msg[48];
+                    char msg[96];   /* room for the "(not saved)" tail on a full-length name */
                     snprintf(msg, sizeof msg, "EGA THEME: %s", next);
+                    /* Written back so the theme you left the game in is the theme
+                     * you come back to — the same argument as sound, and the reason
+                     * `[themes] theme` is a config key at all. */
+                    char cerr[256];
+                    if (u2_config_persist(ctx, "themes", "theme", next,
+                                          cerr, sizeof cerr) != 0) {
+                        fprintf(stderr, "u2: theme not saved: %s\n", cerr);
+                        snprintf(msg, sizeof msg, "EGA THEME: %s (not saved)", next);
+                    }
                     seam_str_out_at(ctx, 0, U2_MSG_TOP, msg);
                     fprintf(stderr, "u2: ega theme -> %s\n", next);
                 }

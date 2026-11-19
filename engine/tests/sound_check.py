@@ -64,9 +64,16 @@ def run(engine, work, case, keys=None, mode=None):
     env = dict(os.environ)
     if mode:
         env["U2_MODE"] = mode
+    # --config into the work dir, not the default config.ini in the cwd. This gate
+    # presses Ctrl-S, and Ctrl-S now writes its setting back so the player does not
+    # have to set it again next session; without this the gate would leave a
+    # config.ini in whatever directory CI happened to invoke it from.
+    with open(os.path.join(work, "config.ini"), "w") as f:
+        f.write("[game]\nsound = on\n")
     r = subprocess.run([engine, "--headless", "--play-map", "--cleanroom",
                         "--data-dir", os.path.join(work, "content"),
                         "--save-dir", os.path.join(work, "save"),
+                        "--config", os.path.join(work, "config.ini"),
                         "--script", os.path.join(work, f"{case}.keys"), "--trace"],
                        capture_output=True, text=True, timeout=120, env=env)
     return (r.stdout or "") + (r.stderr or "")

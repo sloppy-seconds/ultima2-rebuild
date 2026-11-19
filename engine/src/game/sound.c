@@ -19,8 +19,10 @@
  * that is a little short is a slightly brisk game; it is not a wrong sound. */
 #include "game/sound.h"
 
-#include "game/sound.h"
+#include <stdio.h>
+
 #include "game/feedback.h"
+#include "core/config.h"
 #include "core/seam.h"
 
 /* asm/5D09's sequence 0, record at CS:5D5D: {count 0x05, divisor 0x4000}.
@@ -71,7 +73,22 @@ int u2_sound_toggle(u2_ctx *ctx)
     /* The original prints nothing here; asm/4F7B is five bytes and none of them is
      * output. Classic mode therefore stays silent, and this is the citation AGENTS.md
      * § 3 asks for at a silent mutation site. Enhanced announces through the one seam
-     * that invents text, which resolves to nothing in original mode anyway. */
-    u2_feedback(ctx, ctx->sound_off ? "[sound off]" : "[sound on]");
+     * that invents text, which resolves to nothing in original mode anyway.
+     *
+     * The setting is written back to config.ini so a player who turns the speaker off
+     * is not turning it off again next session. A failed write is said: the toggle
+     * still took effect, and "it worked until you restart" is the kind of thing a
+     * player should not have to discover by themselves. The reason goes to stderr and
+     * the screen gets the short form, because the message line is 80 columns and a
+     * strerror is not a sentence the player needs in front of them. */
+    char cerr[256];
+    const int saved = u2_config_persist(ctx, "game", "sound",
+                                        ctx->sound_off ? "off" : "on",
+                                        cerr, sizeof cerr) == 0;
+    if (!saved)
+        fprintf(stderr, "u2: sound setting not saved: %s\n", cerr);
+    u2_feedback(ctx, ctx->sound_off
+                        ? (saved ? "[sound off]" : "[sound off] (not saved)")
+                        : (saved ? "[sound on]"  : "[sound on] (not saved)"));
     return ctx->sound_off != 0;
 }

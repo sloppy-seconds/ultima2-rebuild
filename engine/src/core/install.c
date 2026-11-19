@@ -771,6 +771,9 @@ static int write_config(const char *to, int have_themes, const u2_install_reques
           "#                   # not avoid removed. classic is the original\n"
           "#                   # presentation in one word, the same thing --classic\n"
           "#                   # does on the command line.\n"
+          "# sound = on        # the PC speaker. Ctrl-S in game toggles this and\n"
+          "#                   # writes the line here itself, uncommented, so the\n"
+          "#                   # next start comes up the way you left it.\n"
           "\n", f);
 
     /* What --install was given, so running it again from here needs no flags.

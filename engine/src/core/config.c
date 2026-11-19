@@ -25,8 +25,9 @@ static const char *const k_paths_keys[] = { "data", "saves" };
 static const char *const k_theme_keys[] = { "dir", "theme" };
 /* The presentation mode, which is neither a path nor an art choice, so it gets its
  * own section rather than being filed under one that would make a reader guess. */
-static const char *const k_game_keys[] = { "mode" };
+static const char *const k_game_keys[] = { "mode", "sound" };
 static const char *const k_modes[] = { "classic", "enhanced" };
+static const char *const k_sounds[] = { "on", "off" };
 /* What --install recorded about itself. `themes2..4` rather than one
  * comma-separated list because the ini grammar has one value per key and the
  * parser refuses rather than splits; four is U2_THEMES_MAX_SOURCES, asserted below
@@ -212,6 +213,7 @@ u2_config_result u2_config_load(const char *path, u2_config *out,
             { "themes",  "dir",     out->themes,sizeof out->themes},
             { "themes",  "theme",   out->theme, sizeof out->theme },
             { "game",    "mode",    out->mode,  sizeof out->mode  },
+            { "game",    "sound",   out->sound, sizeof out->sound },
             { "install", "to",      out->inst_to,      sizeof out->inst_to },
             { "install", "original",out->inst_original,sizeof out->inst_original },
             { "install", "updated", out->inst_updated, sizeof out->inst_updated },
@@ -262,6 +264,25 @@ u2_config_result u2_config_load(const char *path, u2_config *out,
                 r = U2_CONFIG_REFUSED;
             } else {
                 for (char *c = out->mode; *c; c++)
+                    if (*c >= 'A' && *c <= 'Z')
+                        *c = (char)(*c + ('a' - 'A'));
+            }
+        }
+
+        /* [game] sound is one of two words, for the same reason mode is: the
+         * failure it prevents is a player who believes they turned the speaker off
+         * and has not. Stored lower-case for the one reader in u2_config_apply. */
+        if (r == U2_CONFIG_OK && *out->sound) {
+            int known_sound = 0;
+            for (size_t i = 0; i < sizeof k_sounds / sizeof k_sounds[0]; i++)
+                if (!strcasecmp(out->sound, k_sounds[i]))
+                    known_sound = 1;
+            if (!known_sound) {
+                snprintf(err, errsz, "%s: [game] sound = %s is neither 'on' nor 'off'",
+                         path, out->sound);
+                r = U2_CONFIG_REFUSED;
+            } else {
+                for (char *c = out->sound; *c; c++)
                     if (*c >= 'A' && *c <= 'Z')
                         *c = (char)(*c + ('a' - 'A'));
             }
@@ -319,4 +340,10 @@ void u2_config_apply(u2_ctx *ctx, const u2_config *cfg)
         ctx->ega_theme_dir = cfg->themes;
     if ((!ctx->ega_theme || !*ctx->ega_theme) && *cfg->theme)
         ctx->ega_theme = cfg->theme;
+    /* Sound is the one setting the game writes back, so the flag has to be set here
+     * as well as read: a player who turned it off and came back must not hear it
+     * again. A command-line override does not exist, so there is no precedence to
+     * preserve — the file either says `off` or it does not. */
+    if (!strcmp(cfg->sound, "off"))
+        ctx->sound_off = 0xff;
 }

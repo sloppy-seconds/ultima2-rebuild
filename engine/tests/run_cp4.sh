@@ -240,7 +240,7 @@ cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/status_check" \
    tests/status_check.c src/game/status.c src/core/seam.c src/core/vram.c \
    src/game/sound.c src/game/feedback.c \
    src/core/state.c src/core/demo.c src/core/font.c src/core/frame.c src/core/view.c \
-   src/core/world.c src/core/roots.c src/core/slot.c \
+   src/core/world.c src/core/roots.c src/core/slot.c src/core/config.c src/core/config_write.c src/core/ini.c \
    src/core/rng.c src/core/timer.c src/core/replay.c src/core/sha256.c \
    src/debug/trace.c src/debug/dump_state.c 2>"$WORK/cc-status.err"
 if [ $? -ne 0 ]; then
@@ -259,7 +259,7 @@ fi
 # P lands where the player stood. Plus the outdoors guard and the CP11
 # save-anywhere policy hook.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/save_q_check" \
-   tests/save_q_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/game/space_view.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/dungeon3d.c src/game/dungeon_assets.c src/game/flash.c src/game/sound.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c \
+   tests/save_q_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/game/space_view.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/dungeon3d.c src/game/dungeon_assets.c src/game/flash.c src/game/sound.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c src/core/config.c src/core/config_write.c \
    src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c src/core/demo.c \
    src/core/vram.c src/core/state.c src/core/font.c src/core/frame.c \
    src/core/view.c src/core/rng.c src/core/timer.c src/core/replay.c \
@@ -279,7 +279,7 @@ fi
 # file 0x0B0D spends 10 food per PASS and file 0x0B2E sends a borrow to the
 # death handler at runtime 0x0E62 (asm/0C62), which zeroes DS:51..59.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/food_check" \
-   tests/food_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/game/space_view.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/dungeon3d.c src/game/dungeon_assets.c src/game/flash.c src/game/sound.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c \
+   tests/food_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/game/space_view.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/dungeon3d.c src/game/dungeon_assets.c src/game/flash.c src/game/sound.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c src/core/config.c src/core/config_write.c \
    src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c src/core/demo.c \
    src/core/vram.c src/core/state.c src/core/font.c src/core/frame.c \
    src/core/view.c src/core/rng.c src/core/timer.c src/core/replay.c \
@@ -660,7 +660,7 @@ fi
 # silent defaults, and precedence is flag > ini > nothing. The fixtures are written
 # under $WORK, so this runs in CI with no media. docs/install-design.md § 4.
 cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/config_check" \
-   tests/config_check.c src/core/config.c src/core/ini.c >"$WORK/cc-cfg.err" 2>&1 \
+   tests/config_check.c src/core/config.c src/core/config_write.c src/core/ini.c >"$WORK/cc-cfg.err" 2>&1 \
     && "$WORK/config_check" "$WORK" >"$WORK/cfg.out" 2>&1 \
     && ok "config.ini: precedence, path resolution, 8 refusals ($(grep -c '^  ok' "$WORK/cfg.out") checks)" \
     || { bad "config.ini check failed:"; tail -20 "$WORK/cfg.out" 2>/dev/null | sed 's/^/        /'; tail -4 "$WORK/cc-cfg.err" | sed 's/^/        /'; }
