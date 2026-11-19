@@ -115,8 +115,9 @@
 #define U2_ENH_TEXT_COLS U2_ENH_CMD_COLS
 
 /* The bottom bar. Measured as constant full-width chrome in the reference (it does
- * not track HP: identical in frames at H:258 and H:4922), and ruled to stay
- * meaningless for now with "planet or area" as its candidate use.
+ * not track HP: identical in frames at H:258 and H:4922). It was ruled to stay empty
+ * until there was a use, and the use it now carries is the one named here as the
+ * candidate: where the player is, planet and era on Earth, planet off Earth.
  * Positioned from the bottom of the frame rather than a literal, so it survives a
  * change of frame height without silently overlapping the map. */
 #define U2_ENH_BAR_H       16

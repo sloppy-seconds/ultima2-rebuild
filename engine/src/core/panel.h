@@ -26,7 +26,7 @@ typedef struct {
     uint8_t border;     /* box outline */
     uint8_t text;       /* ordinary text */
     uint8_t accent;     /* what the world said to the player */
-    uint8_t bar;        /* the bottom bar, currently meaningless chrome */
+    uint8_t bar;        /* the bottom bar, which now carries the planet and era */
 } u2_panel_colours;
 
 /* Pick the panel's colours from the palette actually in force. `text_fg` is the

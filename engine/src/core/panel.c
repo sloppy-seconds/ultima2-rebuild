@@ -9,6 +9,7 @@
 #include "core/font.h"
 #include "core/state.h"
 #include "core/pool_names.h" /* the weapon and armour name pools, same lookup as status.c */
+#include "gen_content.h"        /* era and world names, from the extractor, not retyped */
 
 #ifdef U2_T_WEAPONS_N
    /* The pools come from the player's own executable, so a build without it has
@@ -302,6 +303,68 @@ static void draw_cmd(u2_frame *f, const u2_panel_colours *c,
 
 /* ---------------------------------------------------------------- draw */
 
+/* The bottom bar's first real content: where the player is, in the game's own words.
+ * The era names are the ANOS: lines the original prints when a time door lands (asm/3546)
+ * and the world names are the table at exe 0x072b9; both arrive through the generated
+ * content header, so the bar carries no hand-maintained copy of game text.
+ *
+ * One label is ours. That world table ends `...PLUTO.` then `X.` and nothing more, so to
+ * the bytes the ninth world is called X. "Planet X" is what everyone calls it, and this
+ * is the presentation mode rather than the fidelity run, so the bar says PLANET X. */
+static const char *const k_era[5] = {
+    U2_S_ANOS_LEGENDS, U2_S_ANOS_9M_BC, U2_S_ANOS_1423_BC,
+    U2_S_ANOS_1990_AD, U2_S_ANOS_2112_AD,
+};
+static const char *const k_world[10] = {
+    U2_S_WORLD_EARTH, U2_S_WORLD_MERCURY, U2_S_WORLD_VENUS, U2_S_WORLD_MARS,
+    U2_S_WORLD_JUPITER, U2_S_WORLD_SATURN, U2_S_WORLD_URANUS, U2_S_WORLD_NEPTUNE,
+    U2_S_WORLD_PLUTO, "PLANET X",
+};
+
+/* "ANOS: 1990 A.D." -> "1990 A.D.", "URANUS." -> "URANUS". The affixes are the
+ * original's, because that is how the strings are stored; the bar wants the noun. */
+static void bar_word(char *out, size_t n, const char *s)
+{
+    if (strncmp(s, "ANOS: ", 6) == 0)
+        s += 6;
+    snprintf(out, n, "%s", s);
+    size_t l = strlen(out);
+    while (l > 0 && (out[l - 1] == '.' || out[l - 1] == '!'))
+        out[--l] = '\0';
+}
+
+/* Earth is "EARTH - <era>", because on Earth the sector's tens digit IS the era. Off
+ * Earth the same digit is the world, and DS:6D is what says which of the two it is —
+ * docs/planet-maps-galaxy-patch.md § 3a is the reason this cannot be read off the
+ * sector number alone. DS:6D = 0x0A is deep space, which the original narrates as
+ * "YOU ARE ORBITING <planet>" rather than naming, so that label is ours too. */
+static void bar_place(char *out, size_t n, const u2_ctx *ctx)
+{
+    const uint8_t w = ctx->state.world;
+    if (w == 0) {
+        char world_name[16], era_name[24];
+        bar_word(world_name, sizeof world_name, k_world[0]);
+        const uint8_t era = ctx->state.sector_first;
+        bar_word(era_name, sizeof era_name, era < 5 ? k_era[era] : "???");
+        snprintf(out, n, "%s - %s", world_name, era_name);
+    } else if (w <= 9) {
+        char name[16];
+        bar_word(name, sizeof name, k_world[w]);
+        snprintf(out, n, "%s", name);
+    } else {
+        snprintf(out, n, "DEEP SPACE");
+    }
+}
+
+static void draw_bar(u2_frame *f, const u2_ctx *ctx, const u2_panel_colours *c)
+{
+    char place[64];
+    bar_place(place, sizeof place, ctx);
+    box(f, U2_ENH_BAR_X, U2_ENH_BAR_Y, U2_ENH_BAR_W, U2_ENH_BAR_H,
+        c->bar, c->border);
+    text(f, U2_ENH_BAR_X + U2_ENH_BOX_PAD, U2_ENH_BAR_Y, place, c->text, c->bar);
+}
+
 void u2_panel_draw(u2_frame *f, const u2_ctx *ctx, const u2_tiles_ega *tiles,
                    const u2_panel_colours *c, int avatar_art,
                    const char *const *log, int n_log)
@@ -313,8 +376,8 @@ void u2_panel_draw(u2_frame *f, const u2_ctx *ctx, const u2_tiles_ega *tiles,
     draw_stats(f, ctx, c);
     draw_cmd(f, c, log, n_log);
 
-    /* Constant chrome in the reference: identical at H:258 and H:4922, so it is
-     * not a health bar. Ruled to stay meaningless until there is a use for it. */
-    box(f, U2_ENH_BAR_X, U2_ENH_BAR_Y, U2_ENH_BAR_W, U2_ENH_BAR_H,
-        c->bar, c->border);
+    /* Was constant chrome, measured as identical at H:258 and H:4922 and therefore not a
+     * health bar, and ruled to stay empty until there was a use for it. The use is the
+     * one the layout header named as the candidate: planet or area. */
+    draw_bar(f, ctx, c);
 }
