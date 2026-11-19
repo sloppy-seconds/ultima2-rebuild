@@ -852,7 +852,9 @@ fi
 #
 # Entering map byte 0x04 (mode 0x02, swamp) costs 5 HP silently (asm/248B -> asm/2495), and
 # entering map byte 0x5C (mode 0x2E, force field) costs 1000 unless [DS:D6] holds a ring
-# (asm/24B1 -> asm/24B5). The whole chain is gated on [DS:4A] == 0, the sector's ones digit.
+# (asm/24B1 -> asm/24B5). There is NO sector gate on the chain: an earlier note here said
+# it was gated on [DS:4A] == 0, and that is refuted by captures/spice86/g29-field, whose
+# own memory dump reads DS:4A = 3 — sector 03, where every shipped force field is.
 #
 # The shape this gate exists to catch is the naive one: a charge for STANDING on the swamp,
 # or for LEAVING it, passes only the safe->swamp case, and the safe->swamp case is the one
@@ -862,7 +864,7 @@ fi
 # before this was trusted: a 6-HP charge turns `enter` red, and firing the ladder on the
 # tile you stand on instead of the tile you enter turns five of eight red.
 if U2_BIN=./u2 python3 tests/swamp_damage.py > "$WORK/e1.log" 2>&1; then
-    ok "CP5 E1: tile effects — swamp -5 on entry only (3 owner controls), underflow is death, field -1000 and its ring gate, refused mounted step onto a swamp still pays the 5 (G55) (11 cases)"
+    ok "CP5 E1: tile effects — swamp -5 on entry only (3 owner controls), underflow is death, field -1000 and its ring gate in sector 00 and in sector 03, refused mounted step onto a swamp still pays the 5 (G55) (13 cases)"
 else
     sed 's/^/        /' "$WORK/e1.log" | tail -10
     bad "CP5 E1: the tile-effect ladder disagrees with asm/248B/2495/24B1/24B5"

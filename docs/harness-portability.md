@@ -2298,3 +2298,18 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   than over the one file a scenario happens to touch; and when a check can only be driven red by a
   shape no scripted scenario produces, plant the shape and require the check to name it.
   → Tier 1, persistence invariants.
+- A gate that seeds only the region where its own wrong precondition happens to hold will pass
+  every case it has while the rule is dead in the field. A tile-cost rule here grew a sector test
+  transcribed from a branch at the routine's entry; ten cases passed, and the effect never fired
+  in the only map regions that contain the tile. Two things made it visible, and neither was the
+  gate. First, the live capture that originally proved the effect was re-read rather than
+  re-believed: its memory dump named the region it was taken in, and that region failed the test
+  the gate had quietly adopted. Second, a data census — counting the tile across every shipped map
+  file — showed it existed nowhere the gate allowed. The generic rules: when a capture is cited as
+  the proof of a behaviour, re-read the capture's own state for the conditions it was observed
+  under, because a prose summary of a capture loses exactly the context a later reader needs; and
+  when a rule is transcribed from a branch, write the case in the region the evidence actually
+  names, not the convenient one, then run the refuted rule as a control and require the new case
+  — and only the new case — to go red. A control that turns everything red proves the case is
+  sensitive to nothing in particular.
+  → Tier 1, evidence provenance and gate design.

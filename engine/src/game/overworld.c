@@ -2457,15 +2457,27 @@ static void victory_flight(u2_ctx *ctx, u2_overworld *ow, int steps)
 }
 
 /* asm/248B_swamp_damage_gate -> asm/2495_swamp_damage (swamp, -5) then asm/24B1/24B5
- * (force field, -1000 unless a ring protects): the tile-effect ladder. In the bytes it
- * sits at the ENTRY of asm/2423, ahead of the passability verdict, so it fires on the
+ * (force field, -1000 unless a ring protects): the tile-effect ladder. It fires on the
  * destination cell whether the step is accepted OR refused - a horse turned away from a
  * swamp by asm/2626 still pays the 5 (G55, captures/spice86/g55-swamp-refused-step:
- * refused swamp -5, refused mountain 0). Gated on the outdoor map (DS:4A == 0). */
+ * refused swamp -5, refused mountain 0).
+ *
+ * There is NO sector gate on this ladder. An earlier reading of asm/2423's entry
+ * (`mov 0x4a,%al; cmp $0x0,%al; je L_00268b`) was transcribed as "only runs on an
+ * outdoor map", and the engine carried `if (sector_lo != 0) return;` for a while.
+ * That is refuted by the only live observation of the effect it gated:
+ * captures/spice86/g29-field/spice86dumpMemoryDump.bin reads DS:49 = 0, DS:4A = 3,
+ * DS:51 = 0x39 — sector 03, HP 3999, the last row of the recorded 9999-down-to-3999
+ * crossing sequence. The field fired in sector 03, whose ones digit is 3.
+ *
+ * The data agrees that the gate could not have been doing what it claimed: every
+ * force-field tile in the shipped set is in sector 03 (72 of them) or sector 71 (4),
+ * and neither passes a ones-digit-equals-zero test. Swamps are the same story — 53 of
+ * them sit in sector 03 alongside the fields, and more in sectors 11, 21, 32, 61 and 93.
+ * So the `je` at the entry is an early route to the ladder, not a permission slip, and
+ * the rung tests are the only gate the bytes actually support. */
 static void u2_tile_effect_ladder(u2_ctx *ctx, u2_overworld *ow, int tx, int ty)
 {
-    if (ow->sector_lo != 0)
-        return;
     const uint8_t dest = u2_world_tile_at(&ow->world, tx, ty);
     if (dest == 0x04u)
         u2_swamp_damage(ctx);

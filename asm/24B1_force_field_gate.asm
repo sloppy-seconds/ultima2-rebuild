@@ -15,6 +15,18 @@
 #           1000 figure is the asm/24B5 string "FIELD CAUSES 1000 DAMAGE!" agreeing with
 #           `sbb al,0x10` on the HIGH BCD byte. Not yet observed live: no capture has
 #           walked onto a force field, so the effect's runtime behaviour is inferred.
+# corrected 2026-11-20 -- evidence: captures/spice86/g29-field/spice86dumpMemoryDump.bin
+#           reads DS:49 = 0x00, DS:4A = 0x03, DS:51 = 0x39, i.e. sector 03 at 3999 HP, the
+#           last row of the recorded 9999-down-to-3999 crossing sequence. So the rung HAS
+#           been observed live, in sector 03, and the "not yet observed" line above is kept
+#           as written because it is part of the record.
+#           The rung carries no sector gate. asm/2423's entry does read `mov 0x4a,%al;
+#           cmp $0x0,%al; je L_00268b`, and that was transcribed as a permission test for
+#           the whole ladder; the engine implemented `if (sector_lo != 0) return;` and the
+#           CP5 comment said so. Both are refuted by the capture above and by the data: all
+#           72 force-field tiles in the shipped set are in sector 03 and the 4 in sector 71,
+#           neither of which passes a ones-digit-equals-zero test, and sector 03 also holds
+#           53 swamp tiles. The `je` is an early route to the ladder, not a gate on it.
 # func 24B1..24B4  len 0004 B  evidence: seed+reko
 # confidence: medium (bytes proven by check_func.py)
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)

@@ -60,6 +60,33 @@ def state_case(name, keys, tiles=None, items=None, hp_pair=None, extra=()):
     return text, G.state_from_text(text)
 
 
+def seed_sector(name, hi, lo, tiles=None, items=None):
+    """Seed a character standing in sector hi*10+lo, on a copy of the sector-00 grid.
+
+    The sector digits are record bytes DS:49 and DS:4A, and the ones digit is also the
+    site kind. The grid is copied rather than taken from the real mapx03 so the cell
+    under test is the only thing in the sector the case has to trust.
+    """
+    work = seed_case(name, tiles=None, items=items)
+    content = os.path.join(work, "content")
+    grid = bytearray(open(os.path.join(content, "mapx00"), "rb").read())
+    for (x, y), v in (tiles or {}).items():
+        grid[y * 64 + x] = v
+    with open(os.path.join(content, "mapx%02d" % (hi * 10 + lo)), "wb") as f:
+        f.write(bytes(grid))
+    pp = G.record(work)
+    p = bytearray(open(pp, "rb").read())
+    p[0x49 - 0x36] = hi
+    p[0x4A - 0x36] = lo
+    open(pp, "wb").write(bytes(p))
+    return work
+
+
+def sector_case(name, hi, lo, keys, tiles=None, items=None):
+    text = G.run_stdout(seed_sector(name, hi, lo, tiles, items), keys, name)
+    return text, G.state_from_text(text)
+
+
 def main():
     fails = 0
 
@@ -131,6 +158,26 @@ def main():
     text, s = state_case("ring", ["RIGHT"], tiles={G.EAST: 0x5C}, items={0: 1})
     check("ring", s and hp(s) == 9997 and "RING" in G.flatten(text),
           "hp %d, screen %s (want 9997 and the RING line)" %
+          (hp(s) if s else -1, "ok" if "RING" in G.flatten(text) else "missing"))
+
+    # field-in-site-03: the ladder has no sector gate, and this is the case that proves
+    # it. Every force-field tile in the shipped data is in sector 03 (72 of them) or
+    # sector 71 (4) — ones digits 3 and 1 — and the only live observation of this
+    # effect, captures/spice86/g29-field, reads DS:49 = 0 and DS:4A = 3 in its own
+    # memory dump. The ten cases above all seed mapx00, so a `sector_lo != 0` early
+    # return passed every one of them while switching the effect off in the only sectors
+    # that have it. The owner hit exactly this on 2026-11-20: ring held, walked onto a
+    # field in Shadow Guard, and the screen said nothing.
+    text, s = sector_case("field-site-03", 0, 3, ["RIGHT"], {G.EAST: 0x5C})
+    check("field-site-03", s and hp(s) == 8997 and "1000" in G.flatten(text),
+          "sector 03: hp %d, screen %s (want 8997 and the FIELD line)" %
+          (hp(s) if s else -1, "ok" if "1000" in G.flatten(text) else "missing"))
+
+    # ring-in-site-03: the arm the owner actually met. Protection is a message, not a
+    # silence — the original prints RING PROTECTS FROM FIELD! and takes nothing.
+    text, s = sector_case("ring-site-03", 0, 3, ["RIGHT"], {G.EAST: 0x5C}, items={0: 1})
+    check("ring-site-03", s and hp(s) == 9997 and "RING" in G.flatten(text),
+          "sector 03 with ring: hp %d, screen %s (want 9997 and the RING line)" %
           (hp(s) if s else -1, "ok" if "RING" in G.flatten(text) else "missing"))
 
     # refused-swamp (G55): the ladder sits at asm/2423 entry, ahead of the verdict, so a
