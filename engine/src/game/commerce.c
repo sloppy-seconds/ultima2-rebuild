@@ -971,8 +971,15 @@ static u2_transact_result sell_spell(u2_ctx *ctx, int wizard)
     if (!u2_spend_price(ctx, price))
         return U2_TRANSACT_REFUSED;
 
-    if (slot >= 0 && slot < (int)(sizeof st->spell_counts / sizeof st->spell_counts[0]))
-        st->spell_counts[slot] = u2_bcd_add_five(st->spell_counts[slot]);
+    if (slot >= 0 && slot < (int)(sizeof st->spell_counts / sizeof st->spell_counts[0])) {
+        const uint8_t was = st->spell_counts[slot];
+        const uint8_t now = u2_bcd_add_five(was);
+        /* Learning a spell book adds five to a slot that may already be near the ceiling.
+         * The original lets it roll: 99 + 5 prints as 04. Enhanced caps at 99 like every
+         * other counter (U2_SATURATE, core/ctx.h). Detected by the sum coming out below
+         * what went in, because that is what a packed-decimal wrap looks like. */
+        st->spell_counts[slot] = (U2_SATURATE(ctx) && now < was) ? was : now;
+    }
     return U2_TRANSACT_OPEN;
 }
 
