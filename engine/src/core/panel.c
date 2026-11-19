@@ -205,10 +205,19 @@ static void draw_vitals(u2_frame *f, const u2_ctx *ctx, const u2_tiles_ega *tile
          * visible one. The built-in theme is an identity map, so this only fires for
          * a v2 theme with a partial map. */
         const int tile_ok = tile >= 0 ? tile : u2_tiles_ega_tile(tiles, 60);
+        /* The box it must fit inside is measured in PHYSICAL pixels, and a 16x16
+         * atlas in a scale-2 frame blits 32x32: the blitter multiplies by the
+         * present ratio and the placement used to use the atlas's native size. So
+         * the figure was placed 16 px further right than it lands and its opaque
+         * margin painted over the box's own right border — owner screenshot
+         * 2026-11-20, where the border is missing for 32 rows exactly. */
+        const int pres = u2_tiles_ega_present(tiles, f->scale);
+        const int aw = u2_tiles_ega_tile_w(tiles) * pres;
+        const int ah = u2_tiles_ega_tile_h(tiles) * pres;
         if (tile_ok >= 0)
             u2_frame_blit_tile_ega(f, tiles, tile_ok,
-                                   x + w - U2_ENH_BOX_PAD - u2_tiles_ega_tile_w(tiles),
-                                   y + (h - u2_tiles_ega_tile_h(tiles)) / 2);
+                                   x + w - U2_ENH_BOX_PAD - aw,
+                                   y + (h - ah) / 2);
     }
 }
 

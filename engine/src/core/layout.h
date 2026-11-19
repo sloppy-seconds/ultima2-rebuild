@@ -121,7 +121,11 @@
  * Positioned from the bottom of the frame rather than a literal, so it survives a
  * change of frame height without silently overlapping the map. */
 #define U2_ENH_BAR_H       16
-#define U2_ENH_BAR_Y       (U2_ENH_MAP_Y + U2_ENH_MAP_ROWS * 32 + 8)
+/* Must land on the text grid: the panel's text() places by y / U2_ENH_TEXT_H, so a
+ * y that is not a whole cell silently loses the remainder and the label draws above
+ * its own bar. The old +8 put the place line 9 px above the red it sits on — owner
+ * screenshot 2026-11-20. 16 is one cell, so the bar and its text now agree exactly. */
+#define U2_ENH_BAR_Y       (U2_ENH_MAP_Y + U2_ENH_MAP_ROWS * 32 + U2_ENH_TEXT_H)
 #define U2_ENH_BAR_X       8
 #define U2_ENH_BAR_W       (U2_ENH_W - 2 * U2_ENH_BAR_X)
 
