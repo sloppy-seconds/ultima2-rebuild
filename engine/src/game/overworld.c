@@ -2900,30 +2900,46 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
         const int nx = raw_x & U2_SECTOR_MASK;
         const int ny = raw_y & U2_SECTOR_MASK;
 
-        /* CP5 W4: a creature standing there blocks the step.
+        /* CP5 W4, mechanism settled 2026-11-19: there is no creature test here at
+         * all. The step gate is the tile ladder over the stamped byte, and a creature
+         * blocks a cell only because its stamp is not a walkable tile.
          *
-         * Observed, not inferred: in captures/spice86/cp5-fight/ stepping into an
-         * occupied cell printed the same `--INVALID MOVE!` as a mountain and the
-         * player stayed put. The engine did not do this until measured against: with
-         * a patched monx31 placing a creature at (1,0), EAST was ACCEPTED while
-         * ATTACK--EAST hit that same creature in the same build. Stamping the type
-         * byte into the grid does not block anything on its own, because
-         * u2_tile_passable defaults every unmeasured tile id to passable — the
-         * "one grid, one truth" hope for W2 and W4 sharing a mechanism was wrong.
+         * The discriminator that this comment used to ask for was run. In a live
+         * sector, poking one byte of the stamped grid at DS:1800 and pressing one
+         * arrow, with the cell's own terrain as the control:
          *
-         * The mechanism is still open, and this is deliberately the weaker claim.
-         * asm/2423 has two distinct reject returns (0x2538 and 0x25FF), so the
-         * original may block an occupied cell through the tile table — the stamped
-         * type byte simply not being a walkable tile — or through a separate
-         * occupancy test. The discriminator is cheap and is worth running: put a
-         * creature on terrain already measured passable in a live run and see which
-         * return fires. Until then the behaviour matches what was seen and the code
-         * path is ours, which is the honest state of this branch.
+         *   grid 0x08 grass        -> step ACCEPTED   (the control: same cell)
+         *   grid 0x30 Orc stamp    -> step REFUSED
+         *   grid 0xfc Thief stamp  -> refused by the same threshold
          *
-         * A creature-blocked step costs food like any other refusal: the charge is
-         * inside asm/2423 upstream of the verdict (see the blocked branch below), so
-         * whatever rejects, the 19 is already gone. G2, closed 2026-10-25. */
-        const int blocked_by_creature = u2_monsters_at(ctx, nx, ny) >= 0;
+         * so the byte the creature wrote is what rejects, and it rejects through the
+         * ordinary `cmp $0x16,%al; jae reject` at asm/25F4 — Orc 0x30>>1 = 0x18,
+         * Thief 0xfc>>1 = 0x7e, both at or above the threshold. A creature in the
+         * table with nothing stamped under it does not stop anybody: an earlier run
+         * put an Orc in the table at a cell whose grid still said grass and the
+         * original walked straight onto it.
+         *
+         * That replaces `blocked_by_creature`, which tested the creature table and
+         * was ours, not the original's. It agreed with the original by coincidence,
+         * because almost no creature's type byte is a walkable tile — and it broke
+         * on the one that is. 0x48 is both the Frigate's type byte and the placed
+         * ship tile, and foot_ladder() accepts 0x24 (= 0x48>>1) precisely so that a
+         * moored ship at Port Boniface can be walked aboard and then taken with B.
+         * Under the table test a moored ship is map furniture and boards fine, while
+         * a Frigate in the open sea is a creature and cannot be entered at all, so
+         * the same byte in the same cell gave opposite answers depending on whether
+         * it arrived as terrain or as a monster. The original has one rule; passive
+         * versus active is an AI property and never a movement one.
+         *
+         * Honest gap: the same rig, with a Frigate's byte poked into a cell, reported
+         * that step as refused, which contradicts both the ladder and the owner's
+         * recollection of boarding. The rig is the suspect — the byte was verified
+         * after the first refusal and not after that one, so a reverted stamp would
+         * have looked like a verdict. Recorded rather than hidden.
+         *
+         * A refused step costs food either way: the charge is inside asm/2423
+         * upstream of the verdict (see the blocked branch below), so the 19 is
+         * already gone whatever rejects. G2, closed 2026-10-25. */
 
         /* CP5 C3: legs paralysis is a movement rejection, not a combat overlay.
          *
@@ -2966,8 +2982,7 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             continue;
         }
 
-        if (blocked_by_creature || !u2_mode_passable(&ow->world, nx, ny,
-                                                     ctx->state.player_stamp)) {
+        if (!u2_mode_passable(&ow->world, nx, ny, ctx->state.player_stamp)) {
             /* Blocked. The direction word and the complaint share a line:
              * "CMD: WEST--INVALID MOVE!" then a fresh prompt below.
              *

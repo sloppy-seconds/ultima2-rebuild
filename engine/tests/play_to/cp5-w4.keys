@@ -1,4 +1,4 @@
-# CP5 W4 — a creature blocks the step, and a killed one does not.
+# CP5 W4 — a creature's stamp blocks the step, and a killed one does not.
 #
 # Run against a data dir whose monx31 places slot0 at (1,0) with hp 25, and a
 # save whose entry position is (0,0). The patch is two bytes in monx31:
@@ -12,6 +12,13 @@
 # The third line is the point: the step is accepted only because the creature in
 # it is dead. With the creature alive, EAST prints `EAST--INVALID MOVE!` and the
 # player stays put; NORTH, where nothing stands, prints a bare `NORTH`.
+#
+# The reason is the stamped byte, not the creature. 0x68>>1 = 0x34, past the
+# ladder's 0x16 threshold, so the cell is impassable while it is stamped and
+# walkable the moment the corpse restores the ground. A creature in the table with
+# a walkable stamp under it does not stop anybody — that case is gated by
+# tests/passability_ladder.py's creature-stamp section, which is the half this
+# sequence cannot show because 0x68 happens to refuse either way.
 #
 # NOT A GATE. This sequence was run by hand on 2026-10-23 and is recorded so the
 # next agent re-runs it rather than re-deriving it. Nothing in `make test`

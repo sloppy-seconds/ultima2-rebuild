@@ -88,6 +88,76 @@ def run_case(work, tile):
         return json.load(f)["state"]["raw"]["pos"].strip()
 
 
+def run_creature_case(work, stamp):
+    """The same verdict, but the byte arrives as a creature's stamp, not as the map.
+
+    The walk gate used to consult the creature table directly. That agreed with the
+    original by coincidence — almost no creature's type byte is a walkable tile — and
+    broke on the one that is: 0x48 is both the Frigate's type byte and the moored-ship
+    tile, so a ship you can walk aboard at Port Boniface became a wall the moment it
+    was a creature in the open sea. This is the discriminator the old comment asked for.
+    """
+    if os.path.isdir(work):
+        shutil.rmtree(work)
+    subprocess.run([sys.executable, SEED, work], check=True,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # Ground under test is grass, so the only thing that can refuse the step is the stamp.
+    mp = os.path.join(work, "content", "mapx00")
+    d = bytearray(open(mp, "rb").read())
+    d[0 * 64 + 3] = 0x08
+    open(mp, "wb").write(bytes(d))
+
+    # Slot 0 sits on the cell, dormant (role 0) so it cannot walk away before the key.
+    fp = os.path.join(work, "content", "monx00")
+    m = bytearray(open(fp, "rb").read())
+    m[0], m[32], m[64], m[96], m[128], m[160] = 3, 0, 40, stamp, 0x70, 0
+    open(fp, "wb").write(bytes(m))
+
+    keys = os.path.join(work, "k")
+    open(keys, "w").write("0xf3\n")
+    dbg = os.path.join(work, "dbg")
+    subprocess.run([ENGINE, "--headless", "--play-map", "--cleanroom",
+                    "--data-dir", os.path.join(work, "content"),
+                    "--save-dir", os.path.join(work, "save"),
+                    "--script", keys, "--debug", "cli", "--debug-path", dbg,
+                    "--debug-limit", "0"],
+                   check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    dumps = sorted(subprocess.run(["find", dbg, "-name", "turn-*.json"],
+                                  capture_output=True, text=True).stdout.split())
+    if not dumps:
+        return None
+    with open(dumps[-1]) as f:
+        return json.load(f)["state"]["raw"]["pos"].strip()
+
+
+# (creature type byte, expected accept?, what it is)
+CREATURE_CASES = [
+    (0x48, True,  "Frigate — 0x48>>1 = 0x24, the ship tile the ladder names"),
+    (0x30, False, "Orc — 0x30>>1 = 0x18, at the threshold"),
+    (0xFC, False, "Thief — 0xFC>>1 = 0x7E, well past it"),
+]
+
+
+def creature_main():
+    fails = 0
+    for stamp, want, why in CREATURE_CASES:
+        pos = run_creature_case("/var/tmp/u2-cp5-stamp-%02x" % stamp, stamp)
+        moved = (pos == "03 00")
+        if moved != want:
+            fails += 1
+        print("  %s  creature stamp %#04x -> %-8s %s (%s)" %
+              ("PASS" if moved == want else "FAIL", stamp, pos or "no dump",
+               "moved" if moved else "refused", why))
+    if fails:
+        print("  FAIL  %d of %d creature-stamp cases wrong — the gate is reading the "
+              "table again, not the stamped byte" % (fails, len(CREATURE_CASES)))
+        return 1
+    print("  PASS  creature stamps: %d/%d verdicts come from the byte, not the table" %
+          (len(CREATURE_CASES), len(CREATURE_CASES)))
+    return 0
+
+
 def main():
     fails = 0
     for tile, want, why in CASES:
@@ -104,7 +174,7 @@ def main():
         return 1
     print("  PASS  passability ladder: %d/%d tiles match asm/2423's verdicts" %
           (len(CASES), len(CASES)))
-    return mode_main()
+    return mode_main() or creature_main()
 
 
 # ---- the travel-mode arms (W2) ---------------------------------------------------
