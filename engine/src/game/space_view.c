@@ -56,12 +56,25 @@ static uint32_t star_hash(uint32_t s)
 }
 
 /* Plot in view coordinates, i.e. add the asm/4B76 origin pair. Everything the space
- * screen draws goes through here so the measured inset cannot be bypassed by accident. */
-static void view_plot(u2_frame *f, int vx, int vy)
+ * screen draws goes through here so the measured inset cannot be bypassed by accident.
+ *
+ * The view is a 256x128 rectangle measured off the original's own 320x200 screen, where
+ * it is 80% of the width and 64% of the height. On the 1024x512 enhanced canvas those
+ * same pixels are 25% and 25%, which is what the owner meant by "squished" (frames
+ * 2026-11-20). So the plot carries a transform: `scale` of 1 with the measured origin
+ * reproduces the original exactly, and the enhanced caller passes 2 with an origin that
+ * centres the doubled field in the map area. Every star, every warp streak and the ship
+ * cross go through it, so there is one place where the geometry is decided. */
+static void view_plot(u2_frame *f, const u2_space_scene *s, int vx, int vy)
 {
     if (vx < 0 || vx >= U2_SPACE_VIEW_COLS || vy < 0 || vy >= U2_SPACE_VIEW_ROWS)
         return;
-    u2_frame_pixel(f, U2_SPACE_VIEW_X + vx, U2_SPACE_VIEW_Y + vy, U2_CGA_WHITE);
+    const int sc = s->scale > 0 ? s->scale : 1;
+    const int px = s->ox + vx * sc;
+    const int py = s->oy + vy * sc;
+    for (int dy = 0; dy < sc; dy++)
+        for (int dx = 0; dx < sc; dx++)
+            u2_frame_pixel(f, px + dx, py + dy, U2_CGA_WHITE);
 }
 
 void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out)
@@ -94,6 +107,11 @@ void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out)
                          * that function's note for what is bytes and what is invented. */
     out->ship_x = st->space_ship_x;
     out->ship_y = st->space_ship_y;
+    /* The original's own geometry. A caller that wants the field bigger or moved
+     * overrides these three before drawing; nothing else in the file reads them. */
+    out->scale = 1;
+    out->ox = U2_SPACE_VIEW_X;
+    out->oy = U2_SPACE_VIEW_Y;
     out->star_seed = ((uint32_t)st->world << 16) ^
                      ((uint32_t)out->xeno << 8) ^ (uint32_t)out->yako;
 }
@@ -251,7 +269,7 @@ void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s)
          * strung out along rays, because a star plots one pixel per pass at wherever its
          * own distance put it, not one pixel per pass along a shared ray. */
         for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++)
-            view_plot(f, s->warp_x[i], s->warp_y[i]);
+            view_plot(f, s, s->warp_x[i], s->warp_y[i]);
     } else if (s->warping) {
         /* Radiating field: dots along rays out of the view centre. The centre and the
          * rectangle are measured (space_view.h); the ray count, the per-ray spacing and
@@ -273,7 +291,7 @@ void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s)
                 /* integer ray march: dx,dy from a coarse angle, radius d */
                 const int dx = d * (int)(((angle_num % 512u) * 2 - 512)) / 512;
                 const int dy = d * (int)(((angle_num % 256u) * 2 - 256)) / 256;
-                view_plot(f, U2_SPACE_CENTRE_X + dx, U2_SPACE_CENTRE_Y + dy);
+                view_plot(f, s, U2_SPACE_CENTRE_X + dx, U2_SPACE_CENTRE_Y + dy);
             }
         }
     } else {
@@ -282,15 +300,22 @@ void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s)
             h = star_hash(h);
             const int x = (int)(h % U2_SPACE_VIEW_COLS);
             const int y = (int)((h >> 16) % U2_SPACE_VIEW_ROWS);
-            view_plot(f, x, y);
+            view_plot(f, s, x, y);
         }
     }
 
     /* The ship: the plus asm/6CC4 erases, drawn back. Vertical stroke x fixed, y
      * from -3 to +2; horizontal stroke y fixed, x from -3 to +3. These are SCREEN
-     * coordinates (DS:47B/47C read 0x80/0x40 on the screen, not in the view). */
+     * coordinates (DS:47B/47C read 0x80/0x40 on the screen, not in the view), so the
+     * transform below converts screen to view once and then scales: at scale 1 with
+     * the measured origin this reproduces the old absolute plot byte for byte. */
+    const int sc = s->scale > 0 ? s->scale : 1;
+    const int svx = s->ship_x - U2_SPACE_VIEW_X;
+    const int svy = s->ship_y - U2_SPACE_VIEW_Y;
     for (int d = U2_SPACE_SHIP_V_FROM; d <= U2_SPACE_SHIP_V_TO; d++)
-        u2_frame_pixel(f, s->ship_x, s->ship_y + d, U2_CGA_WHITE);
+        for (int k = 0; k < sc; k++)
+            u2_frame_pixel(f, s->ox + svx * sc + k, s->oy + (svy + d) * sc, U2_CGA_WHITE);
     for (int d = U2_SPACE_SHIP_H_FROM; d <= U2_SPACE_SHIP_H_TO; d++)
-        u2_frame_pixel(f, s->ship_x + d, s->ship_y, U2_CGA_WHITE);
+        for (int k = 0; k < sc; k++)
+            u2_frame_pixel(f, s->ox + (svx + d) * sc, s->oy + svy * sc + k, U2_CGA_WHITE);
 }

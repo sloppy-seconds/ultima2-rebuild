@@ -193,6 +193,12 @@ int u2_overworld_autosave_record(u2_ctx *ctx, u2_overworld *ow);
  * prompt and message history, one composited framebuffer. */
 void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow);
 
+/* Compose the text layer over whatever was just drawn: the enhanced side panel, or
+ * the original's bottom text rows in classic mode. space_readout additionally
+ * surfaces the rocket readout, which the panel has no state field for. Used by the
+ * space loop, which composites its own frame. */
+void u2_compose_text_layer(u2_ctx *ctx, u2_overworld *ow, int space_readout);
+
 /*
  * Render one frame of the probe sector and write it to `path` as PPM. This is
  * the zero-dependency way to see the real extracted tiles, and it is also what

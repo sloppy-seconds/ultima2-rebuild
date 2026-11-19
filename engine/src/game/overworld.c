@@ -1983,7 +1983,19 @@ int u2_overworld_init_state(u2_ctx *ctx, u2_overworld *ow)
  * the dungeon so both show the same panel. The dungeon once drew the bottom rows
  * in enhanced mode, which put the command echo at the bottom-left over the
  * corridor floor instead of in the panel's command box on the right. */
-static void compose_text_layer(u2_ctx *ctx, u2_overworld *ow)
+static void compose_text_layer(u2_ctx *ctx, u2_overworld *ow, int space_readout);
+
+/* Public entry for the space loop, which owns its own frame composition and cannot
+ * reach the static above. It passes space_readout so the rocket readout — which lives
+ * in the vram's right block and has no state field the panel could draw — reaches the
+ * player as text instead of being cut with the status columns. In classic mode this
+ * is exactly the bottom text rows the space loop used to draw by hand. */
+void u2_compose_text_layer(u2_ctx *ctx, u2_overworld *ow, int space_readout)
+{
+    compose_text_layer(ctx, ow, space_readout);
+}
+
+static void compose_text_layer(u2_ctx *ctx, u2_overworld *ow, int space_readout)
 {
     if (!ctx->enhanced_layout) {
         u2_font_draw_vram_rows(&ow->frame, &ctx->vram, U2_MSG_TOP, U2_ROWS - 1);
@@ -1996,8 +2008,11 @@ static void compose_text_layer(u2_ctx *ctx, u2_overworld *ow)
      * row would show the player their gold twice in two formats at once. Cut at
      * the status column and box 3 carries only what was said. */
     enum { U2_ENH_MSG_COLS = 30 };
-    static char rowbuf[U2_ROWS - U2_MSG_TOP][U2_COLS + 1];
-    const char *lines[U2_ROWS - U2_MSG_TOP];
+    /* Four extra rows: in space the right-hand block carries the rocket readout
+     * (FUEL/XENO/YAKO/ZABO) and nothing else, and the panel has no state field to
+     * draw it from, so it is appended as text below the command lines. */
+    static char rowbuf[U2_ROWS - U2_MSG_TOP + 4][U2_COLS + 1];
+    const char *lines[U2_ROWS - U2_MSG_TOP + 4];
     int n = 0;
     for (int r = U2_MSG_TOP; r < U2_ROWS; r++, n++) {
         if (u2_vram_row_text(&ctx->vram, r, rowbuf[n], U2_COLS + 1) <= 0)
@@ -2005,6 +2020,18 @@ static void compose_text_layer(u2_ctx *ctx, u2_overworld *ow)
         if ((int)strlen(rowbuf[n]) > U2_ENH_MSG_COLS)
             rowbuf[n][U2_ENH_MSG_COLS] = '\0';
         lines[n] = rowbuf[n];
+    }
+    if (space_readout) {
+        for (int r = U2_MSG_TOP; r < U2_ROWS && n < (int)(sizeof lines / sizeof lines[0]); r++) {
+            char tmp[U2_COLS + 1];
+            if (u2_vram_row_text(&ctx->vram, r, tmp, sizeof tmp) <= 0) tmp[0] = '\0';
+            const char *p = ((int)strlen(tmp) > U2_ENH_MSG_COLS) ? tmp + U2_ENH_MSG_COLS : "";
+            while (*p == ' ') p++;
+            if (!*p) continue;
+            snprintf(rowbuf[n], sizeof rowbuf[n], "%s", p);
+            lines[n] = rowbuf[n];
+            n++;
+        }
     }
     u2_panel_colours pc;
     uint8_t pal[16][3];
@@ -2042,7 +2069,7 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
     if (u2_site_is_dungeon(ctx)) {
         u2_frame_clear(&ow->frame, U2_CGA_BLACK);
         u2_dungeon_render(ctx, ow, ctx->state.moved_flag != 0);
-        compose_text_layer(ctx, ow);
+        compose_text_layer(ctx, ow, 0);
         if (u2_dg_dual_mode())
             u2_dungeon_render_classic_view(ctx, ow, U2_ENH_MAP_COLS * 32, 0,
                                            U2_ENH_CMD_Y);
@@ -2125,7 +2152,7 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
      * histories is two definitions of what the player was told, and the rule that
      * every effect must produce a message is only checkable against one of them. */
     if (ctx->enhanced_layout) {
-        compose_text_layer(ctx, ow);
+        compose_text_layer(ctx, ow, 0);
     } else {
         u2_font_draw_vram_rows(&ow->frame, &ctx->vram, U2_MSG_TOP, U2_ROWS - 1);
     }

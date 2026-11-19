@@ -65,6 +65,14 @@ typedef struct u2_ctx u2_ctx;
  * writes the three coordinates into DS:4CA/4CB/4CC from the world table, and the fuel
  * it labels is DS:E5 (TRI-LITHIUM). */
 typedef struct u2_space_scene {
+    /* Where and how big to draw. The field's own geometry is a measured 256x128
+     * rectangle inset 16 px on the original's 320x200 screen; these say where that
+     * rectangle lands on THIS frame and how many physical pixels one of its pixels
+     * is worth. scale=1, ox=16, oy=16 is the original, and u2_space_scene_from always
+     * sets exactly that; the enhanced caller overrides before drawing. */
+    int scale;
+    int ox;
+    int oy;
     uint8_t fuel;
     uint8_t xeno;
     uint8_t yako;

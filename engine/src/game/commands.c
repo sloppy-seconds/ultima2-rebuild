@@ -18,6 +18,7 @@
 #include "core/rng.h"
 #include "core/world.h"   /* u2_combat_* now take the world: a kill restores the corpse's cell */
 #include "core/frame.h"
+#include "core/layout.h"   /* U2_ENH_MAP_ROWS, to place the doubled star field */
 #include "core/font.h"
 #include "game/status.h"
 #include "game/overworld.h"
@@ -1447,6 +1448,16 @@ static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
     sc.warping = warping;
     sc.warp_frame = warp_frame;
     sc.keep_frame = keep_frame;
+    /* The field's 256x128 rectangle was measured on the original's 320x200 screen,
+     * where it is most of the picture. On the 1024x512 enhanced canvas the same
+     * pixels are a stamp in the corner — owner, 2026-11-20: "space is squished".
+     * Doubled it fills the map area's height and runs 64 px under the panel, which is
+     * opaque chrome drawn after it, so the overlap is hidden rather than clipped. */
+    if (ctx->enhanced_layout) {
+        sc.scale = 2;
+        sc.ox = 0;
+        sc.oy = (U2_ENH_MAP_ROWS * 32 - U2_SPACE_VIEW_ROWS * sc.scale) / 2;
+    }
     /* The sweep drives `keep_frame` above: asm/6B3D gates the erase of each star's own old
      * pixel on DS:4C7 being non-zero, and that byte sweeps 128->1, holds at 0 for 128
      * frames, holds at 1, climbs 2->126 step 2, holds at 128. The 128-frame zero window is
@@ -1472,7 +1483,7 @@ static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
      * This is the same composite the overworld does at the end of its own draw
      * (overworld.c, u2_font_draw_vram_rows after draw_view). Omitting it is what made
      * the screen look inert even though the loop was alive and reading keys. */
-    u2_font_draw_vram_rows(&ow->frame, &ctx->vram, U2_MSG_TOP, U2_ROWS - 1);
+    u2_compose_text_layer(ctx, ow, 1);
 }
 
 static void space_paint(u2_ctx *ctx, u2_overworld *ow)
