@@ -1160,3 +1160,30 @@ now named `view_mode`.
 
 A CP4 test had been asserting the opposite behaviour by name and passing; it is replaced
 and the replacement says why.
+
+## G92 — what a direction key does to the star field in the orbit view `[ ]`
+
+**Who can do it: agent, and it is cheap.** The original is already drivable in space
+headless; this needs keys and two screenshots, not the owner.
+
+**The question.** In the orbit view — in space, not hyperwarping — what does a direction
+key do to the field? The crosshair is now known to be fixed: `DS:47B`/`DS:47C` read
+`0x80`/`0x40`, the centre of the 256x128 field, in all 120 frames of
+`captures/spice86/g90-warp-table`, and the warp step is a measured radial expansion
+around that centre. What is *not* known is whether steering changes the centre, scrolls
+the table by a constant, or does nothing to the field at all and only moves the ship's
+position in the system.
+
+**Why it is still open.** The one capture that holds the star tables never pressed a
+direction key. Everything else about this was settled statically or from existing data;
+this is the remaining inference, and the engine deliberately does not implement it — the
+cross is fixed and the warp expands, both measured, and the orbit field is still a static
+scatter.
+
+**What a session would do.** Load into orbit, read `DS:4CD..4EC` and `DS:50D..52C` and
+`DS:47B/47C`, screenshot, press one direction, read the same fields, screenshot. The diff
+answers it in one step: if the tables shift by a constant it is a scroll, if they are
+rewritten by the radial rule it is the same mechanism as the warp, if only a system
+coordinate moved then the field genuinely does not change. A frame is required for each
+side, not just the memory: the question is what the player sees move.
+
