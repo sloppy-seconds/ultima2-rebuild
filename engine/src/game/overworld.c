@@ -2013,8 +2013,15 @@ static void compose_text_layer(u2_ctx *ctx, u2_overworld *ow)
     else
         u2_frame_palette_ega(pal);
     u2_panel_pick_colours(&pc, pal, ctx->text_fg ? ctx->text_fg : U2_CGA_WHITE);
+    /* The avatar mirrors the map, owner ruling 2026-11-19: it shows the boat when you
+     * are aboard the boat and the horse when you are mounted, because it is the same
+     * expression the map uses and so the two cannot disagree about who or what you are.
+     * It used to be U2_OVERWORLD_PLAYER_ART, the constant 60, which was the Fighter and
+     * therefore wrong for Cleric, Wizard and Thief as well as for every vehicle. The
+     * original has no status-screen sprite at all, so nothing is being reproduced here;
+     * the only standard is internal consistency. */
     u2_panel_draw(&ow->frame, ctx, ow->use_ega ? &ow->tiles_ega : NULL, &pc,
-                  ow->use_ega ? U2_OVERWORLD_PLAYER_ART : -1, lines, n);
+                  ow->use_ega ? (int)(ctx->state.player_stamp >> 1) : -1, lines, n);
 }
 
 void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
@@ -2096,8 +2103,8 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
      * comments -- HORSE 0x22/tile 0x44, SHIP 0x24/0x48, PLANE 0x26/0x4C,
      * ROCKET 0x28/0x50, each of which halves to exactly stamp>>1 -- and the foot
      * case reproduces the old constant, so this is a widening and not a change.
-     * The status PANEL icon is deliberately left on the constant: it is a different
-     * routine, and nothing here has evidence for what it draws while mounted. */
+     * The status PANEL icon now follows the same expression; see the note at the
+     * u2_panel_draw call above. */
     const int player_art = ctx->state.player_stamp >> 1;
     if (ow->use_ega)
         u2_frame_draw_view_ega(&ow->frame, &ow->view, &ow->tiles_ega,

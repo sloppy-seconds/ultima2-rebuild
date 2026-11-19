@@ -192,11 +192,21 @@ static void draw_vitals(u2_frame *f, const u2_ctx *ctx, const u2_tiles_ega *tile
     text(f, cx, r0 + 6 * U2_ENH_TEXT_H, wline, c->text, c->box_bg);
 
     if (avatar_art >= 0 && tiles) {
-        /* Through the theme's map, not raw: art 60 is the avatar and pool index 60
-         * in a v2 theme is a capital O. That was a real bug, fixed 2026-11-05. */
+        /* Through the theme's map, not raw: the avatar art is the live player stamp
+         * shifted once, so it is 60..63 by class and the vehicle tile while mounted,
+         * and pool index 60 in a v2 theme is a capital O. That mismatch was a real bug,
+         * fixed 2026-11-05; the rule is that the value must come through the map, not
+         * that it is ever 60. */
         const int tile = u2_tiles_ega_tile(tiles, avatar_art);
-        if (tile >= 0)
-            u2_frame_blit_tile_ega(f, tiles, tile,
+        /* A theme whose map has no row for the current art falls back to the Fighter
+         * figure rather than drawing nothing. The avatar disappearing because you
+         * changed class, or boarded, would be a silent blank of exactly the kind this
+         * project keeps calling a defect; a slightly wrong figure is at least a
+         * visible one. The built-in theme is an identity map, so this only fires for
+         * a v2 theme with a partial map. */
+        const int tile_ok = tile >= 0 ? tile : u2_tiles_ega_tile(tiles, 60);
+        if (tile_ok >= 0)
+            u2_frame_blit_tile_ega(f, tiles, tile_ok,
                                    x + w - U2_ENH_BOX_PAD - u2_tiles_ega_tile_w(tiles),
                                    y + (h - u2_tiles_ega_tile_h(tiles)) / 2);
     }

@@ -29,10 +29,15 @@
 #define U2_OVERWORLD_PROBE_X 33
 #define U2_OVERWORLD_PROBE_Y 23
 
-/* Art record the original draws for the player, derived from the live DS
+/* Art record the original draws for a Fighter on foot, derived from the live DS
  * capture: the staging byte at the player's cell is 0x78, and 0x78 >> 1 == 60,
  * a humanoid figure. The player is stamped in after the terrain fill, which is
- * why that cell holds a value no map byte can produce. */
+ * why that cell holds a value no map byte can produce.
+ *
+ * Kept as the named Fighter case, not as the player's art: the stamp is
+ * 0x78 + 2*pclass, so this is one of four class values plus the vehicle modes,
+ * and nothing in the engine should treat it as "the player" any more. Use
+ * ctx->state.player_stamp >> 1 at the draw site. */
 #define U2_OVERWORLD_PLAYER_ART 60
 
 typedef struct u2_overworld {

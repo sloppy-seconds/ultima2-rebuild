@@ -200,6 +200,14 @@ v2 theme.
    entirely unmapped in our crosswalk precisely because it varies by race and class,
    an axis the DOS atlas does not have. If the box-1 figure comes from that bank,
    we cannot draw it faithfully from what we have mapped.
+
+   > Ruled 2026-11-19, and the FM Towns bank turned out to be the wrong question. The
+   > DOS atlas already varies by class: the on-foot stamp is `0x78 + 2*pclass`, so the
+   > map figure is art 60..63 for Fighter/Cleric/Wizard/Thief, and the vehicle tile
+   > while mounted. The owner ruled that the avatar mirrors the map, so it shows the
+   > boat and the horse too. Nothing is being reproduced faithfully here — the original
+   > has no status-screen sprite at all — so the standard is internal consistency, and
+   > the panel now passes the same expression the map does rather than the constant 60.
 5. **Is the banner part of the game?** It carries `Ultima Trilogy` and `FUJITSU`,
    which is packaging and hardware branding rather than game output, and we would
    be inventing our own text for it either way.
