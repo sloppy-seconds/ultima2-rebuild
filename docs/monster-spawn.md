@@ -705,8 +705,15 @@ again, and again the bytes were the ones that got the veto.
 **Contact does not produce an attack at all.** When a creature's candidate cell is the
 player's cell, the routine skips the commit and goes to the next slot. The creature
 refuses to walk onto the player; it does not strike for standing there. That is the same
-rule W4 found from the other side — a creature blocks the tile — and it means the engine's
-occupancy test and the original's contact test are two views of one rule.
+rule W4 appeared to find from the other side — a creature blocks the tile — and it means the
+engine's occupancy test and the original's contact test were two views of one rule.
+
+> Corrected 2026-11-19: they were not, and the engine's occupancy test has been deleted. The
+> walk gate is the tile ladder over the stamped byte and has no creature test; a creature
+> blocks a cell only because its stamp is not a walkable tile. The contact test above is
+> therefore its own rule, not a mirror of the walk rule, and it is the one half of the pair
+> that survives. See the note above `u2_mode_passable` in `engine/src/game/overworld.c` for
+> the measurement and `tests/passability_ladder.py` for the gate.
 
 ### Where the creature's attack really lives
 

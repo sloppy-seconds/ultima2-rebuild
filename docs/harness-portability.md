@@ -189,6 +189,25 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-19 — A proxy rule that agrees with the original by coincidence will break on exactly
+  the case that matters, and it will look correct in every test anyone thinks to write.** The
+  movement gate rejected a step when the subject was present in the entity table. The original
+  has no such test: it classifies the stamped byte of the destination cell, and an entity blocks
+  a cell only because the byte it writes is not a walkable value. The two rules agree on almost
+  every entity, because almost no entity's type byte is a walkable tile — so the proxy passed
+  every observation anyone made, and it disagreed with the original on the single byte that is
+  both an entity's type and a walkable tile, which was the one behaviour the owner actually
+  noticed as wrong. Three things follow. When a rule is inferred rather than read, ask what
+  would make it differ from the rule it stands in for and go measure *that* case, because that
+  is the only case with information in it. A rule stated as "the entity is there" and a rule
+  stated as "the byte says so" are not two spellings of one fact and must not be treated as
+  interchangeable. And when a live probe contradicts a decoded rule plus the owner's recollection,
+  suspect the probe before the pair: here a memory poke was verified after the first refusal and
+  not after the contradicting one, so a reverted stamp would have been read as a verdict. The
+  gate that now pins this asserts the *divergent* case — an entity whose stamp is walkable must
+  be walkable — and it went red the moment the proxy was reinstated, which the old suite could
+  not do at all.
+  → Tier 1, evidence discipline and gate design.
 * **2026-11-17 — Before building a harness to find out whether a code path produces something,
   check whether it shares a function with a path you already trust.** A persistence artefact was
   attributed to a transition path, a scripted harness was built to drive it, and the question
