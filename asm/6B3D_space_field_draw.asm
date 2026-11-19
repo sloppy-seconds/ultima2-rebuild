@@ -65,6 +65,21 @@
 #           property of the mode byte and of the absence of a clear, and an engine that clears
 #           its frame every iteration cannot produce it at any mode. See
 #           `engine/src/game/space_view.c` `u2_space_scene_draw`, which does exactly that.
+#           CORRECTED 2026-11-20 -- there is no delta table at cs:0x6cac. The instruction
+#           was located by its real encoding (`2e 1a 85 ac 6c`, file 0x6d6e), so the
+#           displacement is genuinely 0x6cac, but those bytes are the space loop's own key
+#           dispatch (`cmp $0x48,%al`, `cmp $0x4c,%al`, the string LEFT nearby), not data.
+#           The step was measured from the capture instead: pairing 300 consecutive frames
+#           of DS:4CD.. in captures/spice86/g90-warp-table/table.txt gives 11941 changed
+#           star samples, and bucketing by ((old - centre) & 0xff) >> 4 the dominant
+#           displacement is -1..-8 then +8..+1 -- every star moves AWAY from the centre by
+#           a step that grows with distance, 1 px near the middle and 8 px at the edge. A
+#           radial expansion, reproduced on 86.7% of the real per-frame moves. That
+#           refutes the direction this file's step was transcribed as (toward the ship, step
+#           largest next to it), and engine/tests/warp_step_check.c now pins the measured
+#           rule. Also measured from the same capture: DS:47B and DS:47C are 0x80 and 0x40
+#           in all 120 frames it holds, so the crosshair is fixed at the field centre and
+#           the field moves under it.
 # renamed again 2026-11-15 (same day): the header used to list "what the mode >= 2 branch
 #           draws" as undecoded. It draws nothing; the question was the wrong shape, and the
 #           right question — what does the branch DO — was answerable statically in one read.

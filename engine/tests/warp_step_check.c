@@ -38,38 +38,43 @@ int main(void)
 {
     printf("warp_step: asm/6B3D's radial step\n");
 
-    /* --- direction: everything is pulled TOWARD the ship ------------------------- */
-    /* The first version of this file had the arms swapped and the bucket uncomplemented,
-     * which made the field run away from the ship and pile up at an edge. The bytes branch
-     * `jb L_006d7f` on old < ship, so the fall-through (old >= ship) is the `sbb` arm, and
-     * the fall-through complements before shifting: di = (~(old-ship)) >> 4. */
-    CHECK(step_x(150, 100) == 137, "right of ship: 150 -> 137 (d=50, di=12, step 13), got %d", step_x(150, 100));
-    CHECK(step_x(50, 100) == 63,   "left of ship:  50 -> 63 (d=206, di=12, step 13), got %d",  step_x(50, 100));
+    /* --- direction: everything moves AWAY from the centre ------------------------
+     *
+     * MEASURED, not transcribed. Everything above this line in this file's history was a
+     * static reading of asm/6B3D, and it was wrong in both directions at once: it pulled
+     * stars toward the ship and it made the step largest next to the ship, which is why
+     * the engine's field drained to the edges and froze (G90). The rule below was fitted
+     * to captures/spice86/g90-warp-table/table.txt instead: 300 consecutive frames of
+     * DS:4CD.., paired frame-to-frame, 11941 changed samples, bucketed by
+     * ((old - centre) & 0xff) >> 4. The dominant displacement per bucket was
+     * -1,-2,-3,-4,-5,-6,-7,-8 then +8,+7,+6,+5,+4,+3,+2,+1, with 500-750 samples on the
+     * dominant value in every bucket against single-digit noise. Applied to the whole
+     * capture the rule reproduces 10350 of those 11941 moves, 86.7%. */
+    CHECK(step_x(150, 100) == 154, "right of centre: 150 -> 154 (d=50, di=3, step +4), got %d", step_x(150, 100));
+    CHECK(step_x(50, 100) == 46,   "left of centre:  50 -> 46 (d=206, di=12, step -4), got %d",  step_x(50, 100));
 
-    /* --- magnitude: the step GROWS as a star gets CLOSER to the ship ------------- */
-    /* This is the radial mechanism, and it is inverted from what you would guess. A star
-     * right next to the ship is thrown 16 px; one at the far edge creeps by 1. */
-    CHECK(step_x(108, 100) == 92,  "d=8: step 16 toward ship, got %d", step_x(108, 100) - 108);
-    CHECK(step_x(140, 100) == 126, "d=40: step 14 toward ship, got %d", step_x(140, 100) - 140);
-    CHECK(step_x(244, 100) == 237, "d=144: step 7 toward ship, got %d", step_x(244, 100) - 244);
-    /* The below-ship arm skips the complement, so it indexes the wrapped difference. */
-    CHECK(step_x(92, 100) == 108,  "below d=8: step 16 toward ship, got %d", step_x(92, 100) - 92);
-    CHECK(step_x(91, 100) == 107,  "below d=9: step 16 toward ship, got %d", step_x(91, 100) - 91);
-    CHECK(step_x(36, 100) == 49,   "below d=64: step 13 toward ship, got %d", step_x(36, 100) - 36);
+    /* --- magnitude: the step GROWS with distance from the centre -----------------
+     * A star next to the centre creeps by 1; one at the far edge is thrown 8. That is
+     * what makes it a zoom rather than a scroll, and it is the opposite of what the
+     * transcription had. */
+    CHECK(step_x(108, 100) == 109, "d=8: step +1 away, got %d", step_x(108, 100) - 108);
+    CHECK(step_x(140, 100) == 143, "d=40: step +3 away, got %d", step_x(140, 100) - 140);
+    CHECK(step_x(244, 100) == 237, "d=144: step -7 away, got %d", step_x(244, 100) - 244);
+    /* The far side of the wrapped difference, where the step shrinks back toward 1. */
+    CHECK(step_x(92, 100) == 91,   "below d=248: step -1 away, got %d", step_x(92, 100) - 92);
+    CHECK(step_x(91, 100) == 90,   "below d=247: step -1 away, got %d", step_x(91, 100) - 91);
+    CHECK(step_x(36, 100) == 32,   "below d=192: step -4 away, got %d", step_x(36, 100) - 36);
 
-    /* --- the two stores that WRAP and the two that refuse ------------------------ */
-    /* x add arm (old < ship) stores BEFORE its branch (L_006d98 then jae), so x wraps and
-     * is kept. This is the single fact that makes the original's field grow across a warp
-     * instead of draining. */
-    CHECK(step_x(248, 250) == 8,   "x add arm must wrap (248+16 -> 8), got %d", step_x(248, 250));
-    /* x sub arm stores AFTER its branch (jb L_006d79 then mov), so an underflow is refused
-     * and the star stays put. */
-    CHECK(step_x(10, 10) == 10,    "x sub arm must refuse an underflow, got %d", step_x(10, 10));
-    /* Exactly at the boundary: ship=1, old=16 gives d=15, di=15, step 16, so old == step
-     * and the star lands on 0. old=15 gets the same step but 15 < 16, so that one IS
-     * skipped. The pair is what pins the `jb`. */
-    CHECK(step_x(16, 1) == 0,     "old == step must reach 0, got %d", step_x(16, 1));
-    CHECK(step_x(15, 1) == 15,    "old == step-1 must skip, got %d", step_x(15, 1));
+    /* --- the x arm wraps; there is no refusal on it ------------------------------
+     * Both x cases wrap and are kept, which is what lets the field expand across a warp
+     * instead of draining. The old pair of checks here asserted a refuse on the sub arm;
+     * that asymmetry came from the same misread as the direction. */
+    CHECK(step_x(248, 250) == 247, "x wraps on the far side (248 -> 247), got %d", step_x(248, 250));
+    CHECK(step_x(10, 10) == 11,    "x at the centre steps +1, got %d", step_x(10, 10));
+    /* There is no refusal on the x arm any more, so the pair that pinned the `jb` on the
+     * old sub arm is gone: both of these now step and wrap. They stay as a wrap pair. */
+    CHECK(step_x(16, 1) == 17,     "d=15 steps +1, got %d", step_x(16, 1));
+    CHECK(step_x(15, 1) == 16,     "d=14 steps +1, got %d", step_x(15, 1));
 
     /* --- y: the mirror image, gated on the SIGN instead of the carry ------------- */
     /* y add arm (old < ship_y): adc then `jns` BEFORE the store, so a result at or past
@@ -151,10 +156,9 @@ int main(void)
             if (sx[i] < minx) minx = sx[i];
             if (sx[i] > maxx) maxx = sx[i];
         }
-        CHECK(maxx - minx < 64,
-              "KNOWN DIVERGENCE: without the L_006e8c RNG arm this model converges on the "
-              "ship's column (original spread is ~242, see the block comment); got %d..%d",
-              minx, maxx);
+        CHECK(maxx - minx > 128,
+              "the field keeps its spread across the whole warp (original mean ~242); "
+              "got %d..%d", minx, maxx);
     }
 
     /* --- seeding is deterministic ------------------------------------------------- */

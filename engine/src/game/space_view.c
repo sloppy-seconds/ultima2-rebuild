@@ -222,16 +222,35 @@ int u2_space_warp_advance(uint8_t *sx, uint8_t *sy, int n, int ship_x, int ship_
     int moved = 0;
     for (int i = 0; i < n; i++) {
         int old = sx[i], d, di, step, nv;
-        if (old >= ship_x) {
-            d = (old - ship_x) & 0xff;
-            di = ((~d) & 0xff) >> 4;
-            step = di + 1;
-            if (old >= step) sx[i] = (uint8_t)((old - step) & 0xff);
-        } else {
-            d = (old - ship_x) & 0xff;
-            di = d >> 4;
+        /* x: MEASURED, not transcribed. The arms below used to be a static reading of
+         * asm/6B3D and they pulled every star TOWARD the ship's column, which is the
+         * opposite of a warp. The rule here was fitted instead of read, from the
+         * capture that already existed: captures/spice86/g90-warp-table/table.txt
+         * carries 300 consecutive frames of DS:4CD.., and pairing each frame with the
+         * next gives 11941 changed star samples. Bucketing by
+         * `((old - centre) & 0xff) >> 4` and taking the dominant displacement in each
+         * bucket gives, with no ambiguity (500-750 samples on the dominant value per
+         * bucket against single-digit noise on the rest):
+         *
+         *   bucket   0  1  2  3  4  5  6  7   8  9 10 11 12 13 14 15
+         *   old-new -1 -2 -3 -4 -5 -6 -7 -8  +8 +7 +6 +5 +4 +3 +2 +1
+         *
+         * i.e. new = old + (bucket+1) on the near side and old - (16-bucket) on the far
+         * side: every star moves AWAY from the centre by an amount proportional to its
+         * distance from it, 1 px next to the middle and 8 px at the edge. That is a
+         * radial expansion, and it is the zoom the owner described.
+         *
+         * The centre is the ship's screen position, and the same capture reads DS:47B
+         * and DS:47C as 0x80 and 0x40 in every one of 120 frames: the crosshair does
+         * not move, the field moves under it. See the cross below. */
+        d = (old - ship_x) & 0xff;
+        di = d >> 4;
+        if (di < 8) {
             step = di + 1;
             sx[i] = (uint8_t)((old + step) & 0xff);
+        } else {
+            step = 16 - di;
+            sx[i] = (uint8_t)((old - step) & 0xff);
         }
 
         old = sy[i];
@@ -310,8 +329,19 @@ void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s)
      * transform below converts screen to view once and then scales: at scale 1 with
      * the measured origin this reproduces the old absolute plot byte for byte. */
     const int sc = s->scale > 0 ? s->scale : 1;
-    const int svx = s->ship_x - U2_SPACE_VIEW_X;
-    const int svy = s->ship_y - U2_SPACE_VIEW_Y;
+    /* The cross is at the CENTRE of the field and does not move. Measured, not
+     * inferred: g90-warp-table/ship.txt reads DS:47B and DS:47C as 0x80 and 0x40 — the
+     * middle of the 256x128 field — in all 120 frames it captured, while the star
+     * tables in the same capture are rewriting themselves every frame. So the original
+     * pins the crosshair and scrolls the field under it, and the engine had it the
+     * other way round: a static hash field with a travelling cross.
+     *
+     * s->ship_x and s->ship_y are still what the step is measured against, because the
+     * centre IS the ship's screen position; they are simply no longer where the cross
+     * is drawn. What a direction key does to the field in the orbit view is still
+     * open and is NOT implemented here. */
+    const int svx = U2_SPACE_CENTRE_X;
+    const int svy = U2_SPACE_CENTRE_Y;
     for (int d = U2_SPACE_SHIP_V_FROM; d <= U2_SPACE_SHIP_V_TO; d++)
         for (int k = 0; k < sc; k++)
             u2_frame_pixel(f, s->ox + svx * sc + k, s->oy + (svy + d) * sc, U2_CGA_WHITE);
