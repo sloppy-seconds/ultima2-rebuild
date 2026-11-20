@@ -40,18 +40,49 @@ OUT = ENGINE / "src" / "core" / "licenses_data.h"
 GUARD = "U2_CORE_LICENSES_DATA_H"
 
 
-def c_string(text: str) -> str:
-    """Render text as a chain of adjacent C string literals, one per source line.
+# ISO C only requires a compiler to accept 4095 bytes in one string literal
+# (5.2.4.1), and adjacent literals are concatenated into a single literal during
+# translation, so emitting a licence as one chain of them produced an 11357-byte
+# literal and -pedantic was right to say so. The text is therefore emitted as an
+# array of chunks, each chunk its own literal under the limit, and licenses.c
+# prints them in order. The bytes printed are exactly what one literal printed.
+CHUNK_LIMIT = 4000
 
-    Adjacent literals are concatenated by the compiler, which keeps the generated
-    header readable and keeps any single line short enough to diff.
-    """
-    lines = text.split("\n")
-    parts = []
-    for line in lines:
-        esc = line.replace("\\", "\\\\").replace('"', '\\"')
-        parts.append('\n    "%s\\n"' % esc)
-    return "".join(parts).lstrip("\n")
+
+def c_literal(line: str) -> str:
+    esc = line.replace("\\", "\\\\").replace('"', '\\"')
+    return '"%s\\n"' % esc
+
+
+def c_chunks(text: str) -> "list[str]":
+    """Render the text as runs of literals, each run under CHUNK_LIMIT bytes."""
+    chunks: "list[str]" = []
+    cur: "list[str]" = []
+    size = 0
+    for line in text.split("\n"):
+        n = len(line) + 1
+        if n > CHUNK_LIMIT:
+            # A source line longer than the limit gets split on the limit itself.
+            if cur:
+                chunks.append(" ".join(cur))
+                cur, size = [], 0
+            for i in range(0, len(line), CHUNK_LIMIT):
+                chunks.append(c_literal(line[i:i + CHUNK_LIMIT]))
+            continue
+        if size + n > CHUNK_LIMIT and cur:
+            chunks.append(" ".join(cur))
+            cur, size = [], 0
+        cur.append(c_literal(line))
+        size += n
+    if cur:
+        chunks.append(" ".join(cur))
+    return chunks
+
+
+def c_ident(path) -> str:
+    """A C identifier for one entry, derived from its source filename."""
+    stem = path.stem.lower()
+    return "u2_lic_" + "".join(c if c.isalnum() else "_" for c in stem)
 
 
 def build() -> str:
@@ -83,14 +114,32 @@ def build() -> str:
     out.append("typedef struct u2_license_entry {\n"
                "    const char *title;   /* one-line heading, printed as-is   */\n"
                "    const char *origin;  /* where the text came from          */\n"
-               "    const char *text;    /* the licence or notice, verbatim   */\n"
+               "    /* The licence or notice, verbatim, in chunks: one string literal\n"
+               "       may only be relied on to 4095 bytes, so the text is an array and\n"
+               "       licenses.c prints the chunks in order. Reads as one document. */\n"
+               "    const char *const *text;\n"
                "} u2_license_entry;\n\n")
     out.append(f"#define U2_LICENSE_COUNT {len(loaded)}u\n\n")
-    out.append("static const u2_license_entry u2_license_table[U2_LICENSE_COUNT] = {\n")
+    arrays: "list[str]" = []
+    rows: "list[str]" = []
+    seen: "set[str]" = set()
     for title, path, text in loaded:
         origin = str(path.relative_to(REPO))
-        out.append("    { %s, %s, %s },\n"
-                   % (jsonish(title), jsonish(origin), c_string(text)))
+        ident = c_ident(path)
+        if ident in seen:
+            raise SystemExit(f"gen_licenses: {path} and an earlier entry both map to "
+                             f"{ident}; the identifier must be unique")
+        seen.add(ident)
+        chunks = c_chunks(text)
+        if not chunks:
+            raise SystemExit(f"gen_licenses: no chunks emitted for {path}")
+        arrays.append("static const char *const %s[] = {\n%s\n    NULL,\n};\n\n"
+                      % (ident, "\n".join("    " + c + "," for c in chunks)))
+        rows.append("    { %s, %s, %s },\n"
+                    % (jsonish(title), jsonish(origin), ident))
+    out.extend(arrays)
+    out.append("static const u2_license_entry u2_license_table[U2_LICENSE_COUNT] = {\n")
+    out.extend(rows)
     out.append("};\n\n")
     out.append(f"#endif /* {GUARD} */\n")
     return "".join(out)

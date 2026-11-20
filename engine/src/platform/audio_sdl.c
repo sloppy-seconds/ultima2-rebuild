@@ -144,3 +144,10 @@ const u2_audio u2_audio_sdl = {
 };
 
 #endif /* U2_HAVE_SDL */
+
+/* Everything above is inside the SDL guard, so a build without SDL leaves this
+ * file with no declarations at all, and ISO C forbids an empty translation unit
+ * (5.1.1.1). A typedef is the smallest conforming thing to put here: it emits no
+ * symbol and no code, so the object file stays as empty as it was.
+ */
+typedef struct u2_audio_sdl_no_sdl_tu_s u2_audio_sdl_no_sdl_tu_t;

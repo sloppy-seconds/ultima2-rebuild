@@ -395,11 +395,11 @@ static void sdl_upload(u2_ctx *ctx, const struct u2_frame *f)
             uint8_t pal[16][3];
             if (ctx->theme_palette_set) memcpy(pal, ctx->theme_palette, sizeof pal);
             else u2_frame_palette_ega(pal);
-            wrc = u2_frame_write_ppm16(fr, ctx->dump_screen, pal);
+            wrc = u2_frame_write_ppm16(fr, ctx->dump_screen, &pal[0][0]);
         } else {
             uint8_t pal[4][3];
             u2_frame_palette(pal);
-            wrc = u2_frame_write_ppm(fr, ctx->dump_screen, pal);
+            wrc = u2_frame_write_ppm(fr, ctx->dump_screen, &pal[0][0]);
         }
         if (wrc == 0)
             ctx->dump_screen_done = 1;
@@ -427,11 +427,11 @@ static void sdl_upload(u2_ctx *ctx, const struct u2_frame *f)
             uint8_t pal[16][3];
             if (ctx->theme_palette_set) memcpy(pal, ctx->theme_palette, sizeof pal);
             else u2_frame_palette_ega(pal);
-            wrc = u2_frame_write_ppm16(fr, path, pal);
+            wrc = u2_frame_write_ppm16(fr, path, &pal[0][0]);
         } else {
             uint8_t pal[4][3];
             u2_frame_palette(pal);
-            wrc = u2_frame_write_ppm(fr, path, pal);
+            wrc = u2_frame_write_ppm(fr, path, &pal[0][0]);
         }
         if (wrc == 0)
             ctx->dump_frames++;
@@ -477,11 +477,11 @@ static int sdl_screenshot(u2_ctx *ctx)
         uint8_t pal[16][3];
         if (ctx->theme_palette_set) memcpy(pal, ctx->theme_palette, sizeof pal);
         else u2_frame_palette_ega(pal);
-        rc = u2_frame_write_bmp16(v->last, path, pal);
+        rc = u2_frame_write_bmp16(v->last, path, &pal[0][0]);
     } else {
         uint8_t pal[4][3];
         u2_frame_palette(pal);
-        rc = u2_frame_write_bmp(v->last, path, pal);
+        rc = u2_frame_write_bmp(v->last, path, &pal[0][0]);
     }
     if (rc != 0) {
         fprintf(stderr, "u2: could not write %s\n", path);
@@ -578,3 +578,10 @@ const u2_renderer u2_renderer_sdl = {
 };
 
 #endif /* U2_HAVE_SDL */
+
+/* Everything above is inside the SDL guard, so a build without SDL leaves this
+ * file with no declarations at all, and ISO C forbids an empty translation unit
+ * (5.1.1.1). A typedef is the smallest conforming thing to put here: it emits no
+ * symbol and no code, so the object file stays as empty as it was.
+ */
+typedef struct u2_renderer_sdl_no_sdl_tu_s u2_renderer_sdl_no_sdl_tu_t;

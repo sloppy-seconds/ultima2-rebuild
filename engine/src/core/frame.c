@@ -470,7 +470,7 @@ static void put32le(FILE *f, unsigned long v)
 }
 
 int u2_frame_write_ppm(const u2_frame *f, const char *path,
-                       const uint8_t pal[4][3])
+                       const uint8_t *pal)
 {
     if (!f || !f->px || !path || !pal) return -1;
     FILE *fp = fopen(path, "wb");
@@ -479,7 +479,7 @@ int u2_frame_write_ppm(const u2_frame *f, const char *path,
     fprintf(fp, "P6\n%d %d\n255\n", f->w, f->h);
     for (int y = 0; y < f->h; y++) {
         for (int x = 0; x < f->w; x++) {
-            const uint8_t *rgb = pal[f->px[y][x] & 3];
+            const uint8_t *rgb = pal + 3 * (f->px[y][x] & 3);
             fputc(rgb[0], fp); fputc(rgb[1], fp); fputc(rgb[2], fp);
         }
     }
@@ -489,7 +489,7 @@ int u2_frame_write_ppm(const u2_frame *f, const char *path,
 }
 
 int u2_frame_write_ppm16(const u2_frame *f, const char *path,
-                         const uint8_t pal[16][3])
+                         const uint8_t *pal)
 {
     if (!f || !f->px || !path || !pal) return -1;
     FILE *fp = fopen(path, "wb");
@@ -498,7 +498,7 @@ int u2_frame_write_ppm16(const u2_frame *f, const char *path,
     fprintf(fp, "P6\n%d %d\n255\n", f->w, f->h);
     for (int y = 0; y < f->h; y++) {
         for (int x = 0; x < f->w; x++) {
-            const uint8_t *rgb = pal[f->px[y][x] & 15];
+            const uint8_t *rgb = pal + 3 * (f->px[y][x] & 15);
             fputc(rgb[0], fp); fputc(rgb[1], fp); fputc(rgb[2], fp);
         }
     }
@@ -508,7 +508,7 @@ int u2_frame_write_ppm16(const u2_frame *f, const char *path,
 }
 
 int u2_frame_write_bmp(const u2_frame *f, const char *path,
-                       const uint8_t pal[4][3])
+                       const uint8_t *pal)
 {
     if (!f || !f->px || !path || !pal) return -1;
 
@@ -535,7 +535,7 @@ int u2_frame_write_bmp(const u2_frame *f, const char *path,
 
     for (int y = f->h - 1; y >= 0; y--) {            /* BMP is bottom-up */
         for (int x = 0; x < f->w; x++) {
-            const uint8_t *rgb = pal[f->px[y][x] & 3];
+            const uint8_t *rgb = pal + 3 * (f->px[y][x] & 3);
             fputc(rgb[2], fp); fputc(rgb[1], fp); fputc(rgb[0], fp);  /* BGR */
         }
     }
@@ -545,7 +545,7 @@ int u2_frame_write_bmp(const u2_frame *f, const char *path,
 }
 
 int u2_frame_write_bmp16(const u2_frame *f, const char *path,
-                         const uint8_t pal[16][3])
+                         const uint8_t *pal)
 {
     if (!f || !f->px || !path || !pal) return -1;
 
@@ -572,7 +572,7 @@ int u2_frame_write_bmp16(const u2_frame *f, const char *path,
 
     for (int y = f->h - 1; y >= 0; y--) {            /* BMP is bottom-up */
         for (int x = 0; x < f->w; x++) {
-            const uint8_t *rgb = pal[f->px[y][x] & 15];
+            const uint8_t *rgb = pal + 3 * (f->px[y][x] & 15);
             fputc(rgb[2], fp); fputc(rgb[1], fp); fputc(rgb[0], fp);  /* BGR */
         }
     }

@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "core/attr.h"
 #include "core/rng.h"
 #include "core/seam.h"
 #include "core/state.h"
@@ -150,7 +151,7 @@ static int bcd_sbb(unsigned a, unsigned sub, int borrow_in, unsigned *out)
  * where the owner ruled that counters cap rather than roll over (core/ctx.h, U2_SATURATE).
  * It stays because u2_bcd_inc_sat is the shared form of exactly this instruction, and
  * inlining it there would hide which original opcode the behaviour comes from. */
-[[maybe_unused]] static uint8_t bcd_inc1(uint8_t v)
+U2_MAYBE_UNUSED static uint8_t bcd_inc1(uint8_t v)
 {
     int cf = 0;
     return daa_add(v, 1u, 0, &cf);

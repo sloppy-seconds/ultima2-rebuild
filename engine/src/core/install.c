@@ -728,10 +728,13 @@ void u2_install_fill_from_config(u2_install_request *rq, const u2_config *cfg, F
  * a later Ctrl-T or a changed install. The theme line is left as a commented
  * example so a player who wants to pin one has the syntax to hand. */
 /* The installer writes `dir = themes`; the engine's auto-detection looks for
- * `themes` when nothing named a directory. Two literals in two files is a drift
- * waiting to happen, so they are tied here rather than left to agreement. */
-_Static_assert(0 == strcmp(U2_INSTALL_THEMES, U2_EGA_THEMES_DIR_NAME),
-               "the installed themes directory name must match the engine's default");
+ * `themes` when nothing named a directory. Those used to be two literals tied
+ * together by a static assert, which was not a tie: strcmp is not a constant
+ * expression, and neither is subscripting a string literal, so C11 offers no way
+ * to compare two strings at compile time and the assert was only ever a warning.
+ * Both names are now aliases of U2_CONFIG_THEMES_DIR in core/config.h, so there
+ * is one literal and nothing left to drift.
+ */
 
 static int write_config(const char *to, int have_themes, const u2_install_request *rq)
 {

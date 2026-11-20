@@ -42,6 +42,12 @@
 #include "game/overworld.h"
 static void usage(const char *argv0)
 {
+    /* Split into six calls on purpose. Concatenated, this text is a single string
+     * literal of about 15.6 KB, and ISO C only requires a compiler to accept 4095
+     * bytes in one literal (5.2.4.1), so as written it was not conforming C11.
+     * Six calls print exactly the same bytes. Only the first carries a format
+     * spec (%s for argv0); the rest go through fputs, so a stray % added to the
+     * later text cannot be read as a conversion with no argument. */
     fprintf(stderr,
         "u2 — portable C engine (Phase 4); spec = asm/ tree\n"
         "usage: %s [--headless] [--script FILE] [--dump-state] [--selftest] [--trace[=FILE]]\n"
@@ -79,7 +85,10 @@ static void usage(const char *argv0)
         "                  layout. This is the DEFAULT (owner, 2026-11-17); the flag is\n"
         "                  kept so a script written before it still says what it means.\n"
         "                  --classic is the opt-out, and config.ini [game] mode is the\n"
-        "                  place to choose it without a flag.\n"
+        "                  place to choose it without a flag.\n",
+        argv0);
+
+    fputs(
         "  --classic       original mode: the original's CGA art AND the original screen\n"
         "                  layout, in one flag (--cga is an alias). Opting out of the\n"
         "                  presentation means opting out of all of it; art alone is\n"
@@ -116,7 +125,10 @@ static void usage(const char *argv0)
         "                    proves the window pixel path with no display\n"
         "  --dump-screen-every N F\n"
         "                    (SDL build) save every Nth presented frame to F, which\n"
-        "                    holds a %%d for the frame index (or the index is put\n"
+        "                    holds a %d for the frame index (or the index is put\n"
+        , stderr);
+
+    fputs(
         "                    before the extension). Does not end the run: this is how\n"
         "                    you look at an animation, e.g. the 509-frame warp.\n"
         "  --trace-rolls F   write one line per rand_byte() call: '<roll> <function>'. The roll"
@@ -151,6 +163,9 @@ static void usage(const char *argv0)
         "                    AND written: the original rewrites its own sectors.\n"
         "  --ega             force the fan pack's 16-colour EGA art (EGATILES tiles and\n"
         "                    PIC*-E pictures). An art axis only: it changes no rules\n"
+        , stderr);
+
+    fputs(
         "                    and is available in both fidelity modes. Strict: if the\n"
         "                    theme named is not there the run refuses to start rather\n"
         "                    than quietly drawing CGA. Not needed to GET EGA - with no\n"
@@ -187,6 +202,9 @@ static void usage(const char *argv0)
         "                    merged into, overwritten or deleted.\n"
         "  --install         with no --to: reinstall the tree whose config.ini records\n"
         "                    this install. An install writes the sources it used into\n"
+        , stderr);
+
+    fputs(
         "                    [install] there, so a binary kept beside the game needs no\n"
         "                    arguments. A recorded source that has moved is reported and\n"
         "                    asked for again, never skipped.\n"
@@ -226,6 +244,9 @@ static void usage(const char *argv0)
         "          with a command half-typed, and quitting while it is running ends\n"
         "          the file cleanly.\n"
         "  --trace[=FILE]  log every seam call with its asm address\n"
+        , stderr);
+
+    fputs(
         "\ndemo record and playback (docs/demo-record-playback.md):\n"
         "  --playback FILE   replay a recording. It restores the checkpoint the file\n"
         "                    carries, re-injects the recorded keys through the same\n"
@@ -262,8 +283,8 @@ static void usage(const char *argv0)
         "  --playback-pace     pace a HEADLESS playback at real time. Off by default\n"
         "                    because the gate has to finish; SDL and terminal playback\n"
         "                    pace without being asked, and pacing cannot reach state.\n"
-        "  --mode M          reserved for CP11; only 'original' exists today\n",
-        argv0);
+        "  --mode M          reserved for CP11; only 'original' exists today\n"
+        , stderr);
 }
 
 static int wire_backends(u2_ctx *ctx)

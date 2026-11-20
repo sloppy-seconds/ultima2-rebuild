@@ -34,7 +34,11 @@ void u2_licenses_print(FILE *out)
         rule(out);
         fprintf(out, "%s\n", e->title);
         fprintf(out, "  source in the repository: %s\n\n", e->origin);
-        fputs(e->text, out);
+        /* Chunks, not one fputs: see the note on the field in licenses_data.h.
+         * Printed in order, so the output is the whole document as one run.
+         */
+        for (const char *const *chunk = e->text; *chunk; chunk++)
+            fputs(*chunk, out);
         fputc('\n', out);
     }
     rule(out);

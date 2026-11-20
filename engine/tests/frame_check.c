@@ -144,7 +144,7 @@ int main(void)
     snprintf(bmp, sizeof bmp, "%s/f.bmp", dir);
 
     u2_frame_clear(&f, 1);
-    CHECK(u2_frame_write_ppm(&f, ppm, pal) == 0, "ppm written");
+    CHECK(u2_frame_write_ppm(&f, ppm, &pal[0][0]) == 0, "ppm written");
     /* P6 header "P6\n320 200\n255\n" is 15 bytes, then 320*200*3. */
     CHECK(filesize(ppm) == 15 + (long)U2_SCREEN_W * U2_SCREEN_H * 3,
           "ppm is the exact uncompressed size, no compression needed");
@@ -153,7 +153,7 @@ int main(void)
     if (pf) fclose(pf);
     CHECK(hdr_ok, "ppm carries a P6 magic");
 
-    CHECK(u2_frame_write_bmp(&f, bmp, pal) == 0, "bmp written");
+    CHECK(u2_frame_write_bmp(&f, bmp, &pal[0][0]) == 0, "bmp written");
     CHECK(filesize(bmp) == 54 + (long)U2_SCREEN_W * U2_SCREEN_H * 3,
           "bmp is 54-byte header plus uncompressed BGR rows");
     unsigned char b[58];

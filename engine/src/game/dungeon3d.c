@@ -286,7 +286,7 @@ static void dg3_build_rgb_lut(void)
  * [0,edge]. Transparent texels carry zero weight, so edges blend against the
  * opaque neighbours instead of a black halo. Returns 0 if the footprint is fully
  * transparent (caller skips), else writes the snapped index to *out. */
-static int dg3_sample_bilinear(const uint8_t *tex, int edge, const uint8_t pal[240][3],
+static int dg3_sample_bilinear(const uint8_t *tex, int edge, const uint8_t *pal,
                                float u, float v, uint8_t *out)
 {
     if (u < 0) u = 0;
@@ -308,10 +308,10 @@ static int dg3_sample_bilinear(const uint8_t *tex, int edge, const uint8_t pal[2
     const float A = a00 * w00 + a10 * w10 + a01 * w01 + a11 * w11;
     if (A <= 0.004f) return 0;
     float R = 0, G = 0, B = 0;
-    if (a00) { const uint8_t *p = pal[c00 - 16]; R += w00*p[0]; G += w00*p[1]; B += w00*p[2]; }
-    if (a10) { const uint8_t *p = pal[c10 - 16]; R += w10*p[0]; G += w10*p[1]; B += w10*p[2]; }
-    if (a01) { const uint8_t *p = pal[c01 - 16]; R += w01*p[0]; G += w01*p[1]; B += w01*p[2]; }
-    if (a11) { const uint8_t *p = pal[c11 - 16]; R += w11*p[0]; G += w11*p[1]; B += w11*p[2]; }
+    if (a00) { const uint8_t *p = pal + 3 * (c00 - 16); R += w00*p[0]; G += w00*p[1]; B += w00*p[2]; }
+    if (a10) { const uint8_t *p = pal + 3 * (c10 - 16); R += w10*p[0]; G += w10*p[1]; B += w10*p[2]; }
+    if (a01) { const uint8_t *p = pal + 3 * (c01 - 16); R += w01*p[0]; G += w01*p[1]; B += w01*p[2]; }
+    if (a11) { const uint8_t *p = pal + 3 * (c11 - 16); R += w11*p[0]; G += w11*p[1]; B += w11*p[2]; }
     *out = g_rgb_lut[(int)(R / A) >> 3][(int)(G / A) >> 3][(int)(B / A) >> 3];
     return 1;
 }
@@ -410,7 +410,7 @@ static void dg3_sprites(u2_frame *f, const u2_overworld *ow, int fl,
                     if (y < 0 || y >= DG3_H) continue;
                     const float v = ((float)(y - y0) + 0.5f) * sv - 0.5f;
                     uint8_t idx;
-                    if (dg3_sample_bilinear(tex, edge, pal, u, v, &idx))
+                    if (dg3_sample_bilinear(tex, edge, &pal[0][0], u, v, &idx))
                         u2_frame_put(f, x, y, idx);
                 }
             }

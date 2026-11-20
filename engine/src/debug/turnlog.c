@@ -71,7 +71,7 @@ void u2_turnlog(const u2_ctx *ctx, const u2_frame *frame, unsigned turn)
     snprintf(path, sizeof path, "%s/turn-%05u.ppm", ctx->debug_path, turn);
     uint8_t pal[4][3];
     u2_frame_palette(pal);
-    if (u2_frame_write_ppm(frame, path, pal) != 0) {
+    if (u2_frame_write_ppm(frame, path, &pal[0][0]) != 0) {
         warn(ctx->debug_path, errno);
         return;
     }

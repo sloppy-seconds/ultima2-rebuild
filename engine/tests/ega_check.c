@@ -77,7 +77,7 @@ int main(void)
     /* --- the 16-entry PPM writer maps indices 4..15 ---------------------- */
     u2_frame_clear(&f, 0);
     for (int x = 0; x < 16; x++) f.px[0][x] = (uint8_t)x;
-    if (u2_frame_write_ppm16(&f, "/var/tmp/ega_check.ppm", pal) == 0) {
+    if (u2_frame_write_ppm16(&f, "/var/tmp/ega_check.ppm", &pal[0][0]) == 0) {
         FILE *fp = fopen("/var/tmp/ega_check.ppm", "rb");
         /* Skip the P6 header line-by-line is fiddly; just confirm it wrote. */
         CHECK(fp != NULL, "write_ppm16 produced a file");

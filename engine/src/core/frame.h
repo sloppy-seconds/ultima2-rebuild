@@ -263,20 +263,30 @@ void u2_frame_draw_view_ega(u2_frame *f, const u2_view *v, const u2_tiles_ega *t
 
 /* Write the frame as a binary PPM (P6) mapped through `pal`. Uncompressed, so
  * it needs no zlib and no dependency — which is what makes "look at the real
- * tiles today" possible without SDL2. Returns 0 on success. */
+ * tiles today" possible without SDL2. Returns 0 on success.
+ *
+ * `pal` is a flat run of 3-byte entries, and callers pass `&pal[0][0]` rather
+ * than the array itself. That is not a style choice: a
+ * parameter declared `const uint8_t pal[16][3]` decays to a pointer to an array
+ * of *const* elements, and converting a plain `uint8_t (*)[3]` into that is not a
+ * valid qualification conversion before C23, so every caller holding a local
+ * `uint8_t pal[16][3]` — which is all of them, because they fill it from
+ * u2_frame_palette — was non-conforming. A flat pointer converts cleanly and
+ * keeps the const.
+ */
 int u2_frame_write_ppm(const u2_frame *f, const char *path,
-                       const uint8_t pal[4][3]);
+                       const uint8_t *pal);
 
 /* Same, as an uncompressed 24-bit BMP, for viewers that prefer it. */
 int u2_frame_write_bmp(const u2_frame *f, const char *path,
-                       const uint8_t pal[4][3]);
+                       const uint8_t *pal);
 
 /* The 16-colour variants of the two writers, for a frame composed in the EGA
  * art mode. They index `pal` with the full 0..15 range; the 4-entry writers above
  * mask to 0..3 and are the CGA path, left byte-for-byte untouched. */
 int u2_frame_write_ppm16(const u2_frame *f, const char *path,
-                         const uint8_t pal[16][3]);
+                         const uint8_t *pal);
 int u2_frame_write_bmp16(const u2_frame *f, const char *path,
-                         const uint8_t pal[16][3]);
+                         const uint8_t *pal);
 
 #endif /* U2_FRAME_H */

@@ -41,6 +41,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "core/ctx.h"
+#include "core/config.h"        /* U2_CONFIG_THEMES_DIR */
 #include "core/tiles.h"          /* U2_TILE_COUNT, U2_TILE_W, U2_TILE_H */
 
 #define U2_TILE_EGA_BPP    4
@@ -174,9 +175,12 @@ static inline int u2_tile_ega_pixel(const u2_tiles_ega *t, int tile, int x, int 
 #define U2_EGA_THEME_PREFERRED "10"
 
 /* The directory an installed tree keeps its themes in, when nothing named one.
- * Same literal as U2_INSTALL_THEMES in core/install.h; install.c static-asserts
- * the two so a rename cannot silently split the layout from the lookup. */
-#define U2_EGA_THEMES_DIR_NAME "themes"
+ * An alias, not a copy: core/config.h owns the literal and core/install.h
+ * aliases it too, so the layout the installer writes and the lookup here cannot
+ * drift apart. A static assert could not have tied two separate literals —
+ * string subscripting is not an integer constant expression in C11.
+ */
+#define U2_EGA_THEMES_DIR_NAME U2_CONFIG_THEMES_DIR
 
 typedef enum u2_tiles_ega_result {
     U2_TILES_EGA_OK = 0,

@@ -26,11 +26,11 @@ static int luminance(const uint8_t e[3]) { return e[0] + e[1] + e[2]; }
  * theme replaces the palette wholesale: the FM Towns table puts black at index 3,
  * which already made status text invisible once when an index was assumed rather
  * than looked up. Scanning the live table cannot go wrong that way. */
-static int pick(const uint8_t pal[16][3], int (*score)(const uint8_t *), int want_max)
+static int pick(const uint8_t *pal, int (*score)(const uint8_t *), int want_max)
 {
-    int best = 0, best_score = score(pal[0]);
+    int best = 0, best_score = score(pal);
     for (int i = 1; i < 16; i++) {
-        const int s = score(pal[i]);
+        const int s = score(pal + 3 * i);
         if ((want_max && s > best_score) || (!want_max && s < best_score)) {
             best_score = s;
             best = i;
@@ -44,7 +44,7 @@ static int s_red(const uint8_t *e)    { return e[0] - (e[1] + e[2]) / 2; }
 static int s_dark(const uint8_t *e)   { return luminance(e); }
 static int s_light(const uint8_t *e)  { return luminance(e); }
 
-void u2_panel_pick_colours(u2_panel_colours *c, const uint8_t pal[16][3],
+void u2_panel_pick_colours(u2_panel_colours *c, const uint8_t *pal,
                            uint8_t text_fg)
 {
     if (!c || !pal) return;

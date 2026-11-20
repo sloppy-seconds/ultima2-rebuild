@@ -105,6 +105,16 @@ void u2_config_apply(u2_ctx *ctx, const u2_config *cfg);
  * original's FCB drive byte 0 implies. `--config` overrides it. */
 #define U2_CONFIG_DEFAULT_FILE "config.ini"
 
+/* The directory an installed tree keeps its themes in. This is the one place the
+ * literal is written: the installer writes it into `dir =` and the engine's
+ * auto-detection looks for it when nothing named a directory, and those two
+ * agreeing is not negotiable. core/install.h and core/tiles_ega.h both alias
+ * this rather than repeating it, because a static assert tying two independent
+ * literals cannot be written in C11 — string subscripting is not an integer
+ * constant expression, so the only conforming tie is to have one literal.
+ */
+#define U2_CONFIG_THEMES_DIR "themes"
+
 /* Set one key in an ini file, leaving everything else exactly as it was, and
  * return 0 on success with `err` naming the reason otherwise.
  *

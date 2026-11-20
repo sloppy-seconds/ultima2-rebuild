@@ -2040,7 +2040,7 @@ static void compose_text_layer(u2_ctx *ctx, u2_overworld *ow, int space_readout)
         memcpy(pal, ctx->theme_palette, sizeof pal);
     else
         u2_frame_palette_ega(pal);
-    u2_panel_pick_colours(&pc, pal, ctx->text_fg ? ctx->text_fg : U2_CGA_WHITE);
+    u2_panel_pick_colours(&pc, &pal[0][0], ctx->text_fg ? ctx->text_fg : U2_CGA_WHITE);
     /* The avatar mirrors the map, owner ruling 2026-11-19: it shows the boat when you
      * are aboard the boat and the horse when you are mounted, because it is the same
      * expression the map uses and so the two cannot disagree about who or what you are.
@@ -3168,11 +3168,11 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             uint8_t pal[16][3];
             if (ctx->theme_palette_set) memcpy(pal, ctx->theme_palette, sizeof pal);
             else u2_frame_palette_ega(pal);
-            wrc = u2_frame_write_ppm16(&ow->frame, ctx->frame_dump_path, pal);
+            wrc = u2_frame_write_ppm16(&ow->frame, ctx->frame_dump_path, &pal[0][0]);
         } else {
             uint8_t pal[4][3];
             u2_frame_palette(pal);
-            wrc = u2_frame_write_ppm(&ow->frame, ctx->frame_dump_path, pal);
+            wrc = u2_frame_write_ppm(&ow->frame, ctx->frame_dump_path, &pal[0][0]);
         }
         if (wrc != 0)
             fprintf(stderr, "u2: --dump-frame could not write %s\n",
@@ -3212,11 +3212,11 @@ int u2_overworld_dump(u2_ctx *ctx, const char *path)
         uint8_t pal[16][3];
         if (ctx->theme_palette_set) memcpy(pal, ctx->theme_palette, sizeof pal);
         else u2_frame_palette_ega(pal);
-        wrc = u2_frame_write_ppm16(&ow.frame, path, pal);
+        wrc = u2_frame_write_ppm16(&ow.frame, path, &pal[0][0]);
     } else {
         uint8_t pal[4][3];
         u2_frame_palette(pal);
-        wrc = u2_frame_write_ppm(&ow.frame, path, pal);
+        wrc = u2_frame_write_ppm(&ow.frame, path, &pal[0][0]);
     }
     u2_frame_free(&ow.frame);
     if (wrc != 0) {

@@ -31,8 +31,12 @@ typedef struct {
 
 /* Pick the panel's colours from the palette actually in force. `text_fg` is the
  * index the loader already chose for readable text, so the panel cannot drift from
- * the text layer the way it did when index 3 was assumed to be black. */
-void u2_panel_pick_colours(u2_panel_colours *c, const uint8_t pal[16][3],
+ * the text layer the way it did when index 3 was assumed to be black.
+ * `pal` is a flat run of 16 three-byte entries — see the note on the same shape in
+ * core/frame.h: a `const uint8_t pal[16][3]` parameter is not a legal conversion
+ * for a caller's local array before C23.
+ */
+void u2_panel_pick_colours(u2_panel_colours *c, const uint8_t *pal,
                            uint8_t text_fg);
 
 /* Draw the whole panel: backdrop, three boxes, and the bottom bar.

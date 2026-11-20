@@ -51,7 +51,7 @@ typedef enum {
 #define U2_INSTALL_DATA_ORIG  "data/original"
 #define U2_INSTALL_DATA_UPD   "data/updated"
 #define U2_INSTALL_SAVES      "saves"
-#define U2_INSTALL_THEMES     "themes"
+#define U2_INSTALL_THEMES     U2_CONFIG_THEMES_DIR
 #define U2_INSTALL_CONFIG     "config.ini"
 
 typedef struct {

@@ -620,7 +620,12 @@ static int mrow_cmp(const void *a, const void *b)
     return strcasecmp(((const mrow *)a)->dst, ((const mrow *)b)->dst);
 }
 
-static int manifest_save(const char *themes_dir, const char comments[16][200], int nc,
+/* `comments` is a flat run of 200-byte rows, not a 2-D array parameter: a
+ * `const char comments[16][200]` parameter is a pointer to an array of const
+ * chars, and a caller's plain `char comments[16][200]` does not convert to that
+ * conformingly before C23. Same reason as the palette parameters in core/frame.h.
+ */
+static int manifest_save(const char *themes_dir, const char *comments, int nc,
                          mrow *rows, int n)
 {
     char path[1200], tmp[1240];
@@ -631,7 +636,7 @@ static int manifest_save(const char *themes_dir, const char comments[16][200], i
         return -1;
     if (nc > 0) {
         for (int i = 0; i < nc; i++)
-            fprintf(f, "%s\n", comments[i]);
+            fprintf(f, "%s\n", comments + 200 * i);
     } else {
         fprintf(f, "# built by u2 --install — do not hand-edit, regenerate\n");
     }
@@ -699,7 +704,7 @@ int u2_themes_record(const char *themes_dir, const char *subdir,
     }
     closedir(d);
 
-    if (manifest_save(themes_dir, comments, nc, rows, n) != 0) {
+    if (manifest_save(themes_dir, &comments[0][0], nc, rows, n) != 0) {
         snprintf(err, errsz, "cannot rewrite %s", U2_THEMES_MANIFEST);
         return 1;
     }

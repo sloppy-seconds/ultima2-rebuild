@@ -430,7 +430,7 @@ int main(int argc, char **argv)
         u2_world_dungeon_put(&ow.world, 0, 6, 6, U2_DG_DOWN);    /* ladder   */
         u2_dungeon_render(&ctx, &ow, 1);
         uint8_t pal[16][3]; u2_frame_palette_ega(pal);
-        u2_frame_write_bmp16(&ow.frame, argv[2], pal);
+        u2_frame_write_bmp16(&ow.frame, argv[2], &pal[0][0]);
         printf("wrote %s\n", argv[2]);
         u2_frame_free(&ow.frame);
         return 0;
