@@ -2348,3 +2348,15 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   ends. Reloading persisted state only undoes the part that was ever persisted, and a harness that
   asserts "the next run looks clean" will pass while the fields outside the record stay wrong.
   → Tier 1, state ownership and restore discipline.
+- **2026-11-20 — a test that proves nothing was written has not proved nothing happened.** An
+  ending sequence was believed to touch no files because every content file was hashed before
+  and after it and none changed. That correctly refuted a *save*, and the write-up then recorded
+  the stronger conclusion that the file I/O in that path was unexecuted. It was a **read** of a
+  map the sequence then drew, and a hash comparison is blind to reads at any sampling rate. The
+  bytes were unambiguous all along and had simply never been decoded, because the capture's
+  verdict made decoding them feel settled. The generic rules: when a measurement is used to
+  refute an interpretation, write down what it can see and what it cannot, and treat "we saw no
+  evidence of X" and "X did not happen" as different claims; and when a disassembler left a
+  region as raw bytes, that region is unexplored territory no matter what a later test concluded,
+  because the test was written by someone working from the same gap.
+  → Tier 1, evidence provenance and what a negative measurement can carry.
