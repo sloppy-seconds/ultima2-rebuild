@@ -28,8 +28,10 @@
  *   - L_0061a6 beside the "MAPX30" filename is NOT a sector save: 0 content files changed
  *     across the whole ending. The repaint is in-memory grid only and is never persisted,
  *     so the engine writes nothing to disk here (and correctly so).
- *   - The flight loop is non-terminating in the original (flies until quit). The engine
- *     bounds it (U2_VICTORY_FLIGHT_STEPS) and ends the run, the 1d owner decision.
+ *   - The flight loop is non-terminating in the original (flies until quit). The engine now
+ *     matches that when a person is playing, and bounds it to U2_VICTORY_FLIGHT_STEPS only
+ *     headlessly so a scripted gate can finish. Either way the run then ends: the original
+ *     offers nothing after this point, so there is no menu to return to.
  * G75 items (a)/(b)/(c) are closed by that capture; see asm/72A0's header.
  */
 #include "game/victory.h"
@@ -51,9 +53,33 @@ void u2_victory(u2_ctx *ctx)
     seam_str_out(ctx, U2_S_WIN_UNIVERSE);
     seam_str_out(ctx, U2_S_WIN_FOUND_IN);
 
+    /* Snapshot before the writes, not after: these four fields are the animation's costume,
+     * and the only reason the engine can hand them back is that it caught them on the way in.
+     * Guarded on the flag rather than unconditional, because a second call would otherwise
+     * overwrite the saved values with the ending's own.
+     */
+    if (!ctx->victory_saved) {
+        ctx->victory_saved       = 1;
+        ctx->victory_saved_view  = ctx->state.view_mode;
+        ctx->victory_saved_stamp = ctx->state.player_stamp;
+        ctx->victory_saved_x     = ctx->state.sector_x;
+        ctx->victory_saved_y     = ctx->state.sector_y;
+    }
+
     /* The three writes the original makes after the text, in its order. */
     ctx->state.view_mode    = 0xFF;   /* DS:12 */
     ctx->state.player_stamp = 0x28;   /* DS:13, the rocket stamp */
     ctx->state.sector_x     = 0;      /* DS:00 */
     ctx->state.sector_y     = 0;      /* DS:01 */
+}
+
+void u2_victory_restore(u2_ctx *ctx)
+{
+    /* Put back what the ending borrowed. All four live outside the saved record, so this is
+     * the only way they come home; u2_save_load covers the record span and nothing here.
+     */
+    ctx->state.view_mode    = ctx->victory_saved_view;
+    ctx->state.player_stamp = ctx->victory_saved_stamp;
+    ctx->state.sector_x     = ctx->victory_saved_x;
+    ctx->state.sector_y     = ctx->victory_saved_y;
 }

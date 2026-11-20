@@ -25,6 +25,7 @@
 #include "core/rng.h"         /* u2_rand_byte: asm/0BDB's damage randomiser */
 #include "core/config.h"      /* u2_config_persist: Ctrl-T writes the theme back */
 #include "game/status.h"
+#include "game/victory.h"   /* u2_victory_restore: the ending's writes live outside the record */
 #include "core/font.h"
 #include "core/layout.h"
 #include "core/panel.h"
@@ -2395,9 +2396,29 @@ static void overworld_present_now(u2_ctx *ctx)
  * tail, measured live in captures/spice86/victory-live/. */
 
 /* The original's rocket-flight loop is non-terminating (measured flying 30s+ until
- * quit). The engine bounds the flight to this many steps so the run ends on victory
- * (the 1d owner decision) rather than hanging. One full wrap of the 64-cell grid. */
+ * quit), so the engine needs an exit the original never had. Interactive play flies
+ * until the player closes the window or presses a key; a headless run is bounded to this
+ * many steps so a scripted gate terminates. One full wrap of the 64-cell grid.
+ */
 #define U2_VICTORY_FLIGHT_STEPS 64
+
+/* The flight step cadence is MEASURED, not chosen. captures/spice86/victory-live/
+ * ds.jsonl holds 822 consecutive position changes spanning 87.8 s at a median 0.100 s
+ * apart — the rocket advancing once per DS poll for a minute and a half. So 100 ms per
+ * step is what the player actually saw. It is an upper bound at the capture's poll
+ * resolution: the true step may be faster, never slower, and a faster step would only
+ * make the flight snappier than this.
+ *
+ * The fade's row cadence is NOT measured and is not pretending to be. asm/72A0 loads %bx
+ * with $0x0e before the fade's delay call and $0x06 before the flight's (the flight's is
+ * the `bb 06 00` the Phase 2 map left as `db ... split: branch target inside data`), so
+ * the original's row is about 2.3x its step — but L_000911 is not decoded, so that
+ * register value cannot be turned into milliseconds from here. The fade therefore reuses
+ * the flight's 100 ms, which reads as roughly six seconds of fade. The real cadence is a
+ * capture question, not a guess dressed up as a byte.
+ */
+#define U2_VICTORY_FLIGHT_STEP_MS 100
+#define U2_VICTORY_FADE_ROW_MS    100
 
 /* asm/72A0 74DA..7511: 64 outer x 64 inner. Each inner picks a RANDOM cell (L_005417
  * & 0x3f) and writes the black tile 0x74 through the grid pointer; one present per
@@ -2434,26 +2455,49 @@ static void victory_fade(u2_ctx *ctx, u2_overworld *ow)
         }
         u2_overworld_draw(ctx, ow);
         if (seam_present_frame(ctx)) break;   /* window closed mid-fade */
+        /* The present does not block — SDL_RenderPresent returns immediately — so on its
+         * own 64 rows of 64 writes finish in a few milliseconds, and the "slow fade" the
+         * owner described was a blink. The sleep is the pacing; in a scripted run the
+         * script clock only advances virtual time, so gates pay nothing for it.
+         */
+        if (ctx->clock && ctx->clock->sleep_ms)
+            ctx->clock->sleep_ms(ctx, U2_VICTORY_FADE_ROW_MS);
     }
     ctx->victory_fade_black = blackened;
     /* Recorded so the gate can assert the fade did NOT dirty the map. See ctx.h. */
     ctx->victory_map_dirty = (!dirty_before_fade && ow->world.map_dirty) ? 1 : 0;
 }
 
-/* asm/72A0 75E1..: the rocket walks DS:00/DS:01 by +1 & 0x3f each step with a present.
- * The original's loop is non-terminating (measured flying 30s+ until quit); the engine
- * bounds it to `steps` so the run ends, per the 1d owner decision to end on victory.
- * This is a deliberate, documented deviation, not a claim that the original stops. */
+/* asm/72A0 75E1..: the rocket walks DS:00/DS:01 by +1 & 0x3f each step with a delay and
+ * `jmp -0x2a` back. The loop is non-terminating in the original — measured flying 30 s+
+ * until the player quit — so `steps < 0` reproduces that, and the exits below are the ones
+ * a player needs rather than a bound invented to make the engine stop. A positive `steps`
+ * is the headless bound, so a scripted gate still terminates.
+ *
+ * Ending the flight does NOT open a menu: the caller sets ctx->victory_quit, because the
+ * original offers nothing after this point.
+ */
 static void victory_flight(u2_ctx *ctx, u2_overworld *ow, int steps)
 {
-    for (int s = 0; s < steps; s++) {
+    for (int s = 0; steps < 0 || s < steps; s++) {
         ow->x = (ow->x + 1) & (U2_SECTOR_EDGE - 1);
         ow->y = (ow->y + 1) & (U2_SECTOR_EDGE - 1);
         ctx->state.sector_x = ow->x;
         ctx->state.sector_y = ow->y;
         u2_overworld_draw(ctx, ow);
         if (seam_present_frame(ctx)) break;   /* window closed mid-flight */
+        if (ctx->clock && ctx->clock->sleep_ms)
+            ctx->clock->sleep_ms(ctx, U2_VICTORY_FLIGHT_STEP_MS);
         ctx->victory_flight_steps++;
+        if (steps < 0) {
+            /* Forever, so something has to be able to end it. A key is the player saying
+             * enough; a spent script or a closed window is the harness saying the run is
+             * over. Both leave the process, neither opens a menu.
+             */
+            u2_key k;
+            if (seam_key_poll(ctx, &k) != 0) break;
+            if (ctx->exit_code || ctx->input_exhausted) break;
+        }
     }
 }
 
@@ -2563,7 +2607,25 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
              * flies from (0,0) as the original does, not from the kill cell. */
             ow->x = ctx->state.sector_x;
             ow->y = ctx->state.sector_y;
-            victory_flight(ctx, ow, U2_VICTORY_FLIGHT_STEPS);
+            /* Interactive: fly forever, as the original does. Headless: bounded, or every
+             * victory gate would hang.
+             */
+            victory_flight(ctx, ow,
+                           ctx->mode == U2_MODE_HEADLESS ? U2_VICTORY_FLIGHT_STEPS : -1);
+            /* The ending wrote four fields into the live state — view_mode, the rocket
+             * stamp and the position — and the original never returns from that path, so
+             * nothing was ever meant to read them again. Two restores, because they are not
+             * one kind of thing. u2_victory_restore puts back DS:12/13/00/01, which live
+             * OUTSIDE the 256-byte record and so cannot come back from disk. u2_save_load
+             * puts back the record span, which is the character Paul asked to come back: the
+             * autosave that fires entering Minax's castle is the last write, so reloading
+             * stands the player at the castle door with the stats and gold they walked in
+             * with. Both are needed; either alone leaves half the ending behind.
+             */
+            if (u2_save_record_present(ctx)) (void)u2_save_load(ctx);
+            u2_victory_restore(ctx);
+            ctx->victory = 0;
+            ctx->victory_quit = 1;
             break;
         }
 

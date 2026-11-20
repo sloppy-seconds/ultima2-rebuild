@@ -171,6 +171,18 @@ void u2_game_run(u2_ctx *ctx)
                  * it did the first half, so a death here went to the menu. The loop is
                  * now the inner one, and the menu is only where you land when there is
                  * genuinely nothing to come back to. */
+                /* Victory ends the process instead of offering the menu again. The
+                 * original never returns from the victory path, so "press P to play"
+                 * after winning is a state the game does not have — and before this, it
+                 * was worse than a wart: ctx->victory was never cleared, so 'P' re-ran the
+                 * whole ending before the first keypress. The ending already reloaded the
+                 * record, so nothing victory wrote into ctx->state outlives this break.
+                 */
+                if (ctx->victory_quit) {
+                    ctx->restart_requested = 0;
+                    break;
+                }
+
                 if (!ctx->death_pending || ctx->quit_on_death)
                     break;
                 if (u2_save_load(ctx) == U2_SAVE_OK) {

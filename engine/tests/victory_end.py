@@ -183,6 +183,38 @@ def main():
           "the fade left the map clean (victory_map_dirty=%s, must be 0: the original never "
           "schedules a write-back from the ending)" % dirty)
 
+    # The ending must not leave its own state behind. u2_victory writes view_mode, the
+    # rocket stamp and sector 0,0 into the LIVE record, and the original never returns from
+    # that path, so nothing was ever meant to read them again. Two things used to go wrong:
+    # ctx->victory was set and never cleared anywhere in the tree, and overworld_enter spawns
+    # from ctx->state rather than the disk, so pressing 'P' at the menu respawned the player
+    # at sector 0,0 as a rocket and re-ran the entire ending before the first keypress. The
+    # ending now reloads the record and clears the flag, and the run says it quit.
+    #
+    # Control: delete the u2_save_load in the victory branch and the stamp check goes red
+    # (0x28, the rocket) while everything above stays green -- the ending still prints, the
+    # fade still paints, and the run still ends. A leaked state is invisible to a gate that
+    # only looks at the run that leaked it.
+    quit_ = diag_int(text, "victory_quit")
+    check(quit_ == 1,
+          "the ending says the run is over (victory_quit=%s, must be 1: the original offers "
+          "nothing after this point, so no menu and no 'P' to press)" % quit_)
+    stamp = diag_int(text, "stamp")
+    check(stamp is not None and stamp != 0x28,
+          "the rocket stamp did not survive the ending (stamp=%s; 0x28 means the record was "
+          "never reloaded, so the next run spawns as a rocket at 0,0)" % stamp)
+    msec = re.findall(r'"sector":"(\d+)"', text)
+    sec = msec[-1] if msec else None
+    check(sec is not None and sec != "00",
+          "the sector digits survived the ending (sector=%s)" % sec)
+    # The position is the other half of the restore, and in headless it is the sharper of
+    # the two: the flight walks DS:00/DS:01 from 0 for 64 steps, and 64 steps of +1 masked
+    # to 6 bits lands back on 0 -- so a run that skipped the restore ends at (0,0) and looks
+    # exactly like a run that restored, EXCEPT that the restore puts the entry cell back.
+    check(p == (2, 0),
+          "the player came back to the entry cell (pos=%s; (0,0) means the flight's walk of "
+          "DS:00/DS:01 outlived the ending)" % (p,))
+
     if fails:
         print("  FAIL  %d victory-end checks are wrong" % len(fails))
         return 1

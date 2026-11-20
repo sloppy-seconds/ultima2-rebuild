@@ -35,4 +35,11 @@
  * looping animation, so a caller should treat the run as over. */
 void u2_victory(u2_ctx *ctx);
 
+/* Put back the four runtime fields the ending borrowed (DS:12, DS:13, DS:00, DS:01). They
+ * live outside the 256-byte saved record, so reloading the save does not reach them, and
+ * leaving them set is how a finished ending kept drawing the player as a rocket at 0,0.
+ * Call it when the ending is over; the original never gets here, which is the point.
+ */
+void u2_victory_restore(u2_ctx *ctx);
+
 #endif

@@ -237,6 +237,26 @@ typedef struct u2_ctx {
      * engine bounds it, and this counts the steps it actually drew before the run ended. */
     int victory_fade_black;
     int victory_flight_steps;
+    /* The ending writes four runtime fields — DS:12 view_mode, DS:13 player_stamp, DS:00/01
+     * position — and all four live OUTSIDE the saved record span (the record is DS:36..,
+     * 256 bytes), so u2_save_load cannot put them back. victory.c snapshots them the moment
+     * the ending starts and u2_victory_restore() puts them back when it ends. The original
+     * never returns from the ending, so nothing downstream was ever meant to see them; here
+     * they outlived it and the next world entry spawned the player as a rocket at 0,0.
+     */
+    int victory_saved;
+    uint8_t victory_saved_view;
+    uint8_t victory_saved_stamp;
+    uint8_t victory_saved_x;
+    uint8_t victory_saved_y;
+    /* Set when the ending finished, so whoever owns the run ends it instead of offering
+     * 'P' again. The original never returns from the victory path, so "back to the menu"
+     * is not a state the original has and the engine must not invent one. It is paired
+     * with the record reload at the end of the ending: ctx->victory used to be set and
+     * never cleared anywhere in the tree, and overworld_enter spawns from ctx->state, so
+     * 'P' after a win respawned the player at sector 0,0 with the rocket stamp and ran
+     * the whole ending again before the first keypress. */
+    int victory_quit;
     /* Whether the ENDING dirtied the map. MUST be 0: the original's fade is screen-only
      * (G75a, 0 of 90 content files changed), so a dirty flag raised by the ending is the
      * engine promising a write-back the original never makes. Note this is measured against

@@ -1426,6 +1426,13 @@ int main(int argc, char **argv)
             if (rc != 0)
                 break;
             u2_overworld_loop(&ctx, &ow);
+            /* Victory ends the run here too, not just in u2_game_run. This is the entry
+             * the noVNC play session uses, so leaving it out is the difference between
+             * "the game ends when you win" and "the game hands you a menu with the ending
+             * still loaded" on the machine the owner actually plays on.
+             */
+            if (ctx.victory_quit)
+                break;
             if (!ctx.death_pending || ctx.quit_on_death)
                 break;
             if (u2_save_load(&ctx) != U2_SAVE_OK)
