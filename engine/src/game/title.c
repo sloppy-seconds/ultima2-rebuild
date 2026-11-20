@@ -182,7 +182,11 @@ static int show_pic(u2_ctx *ctx, const char *name, int hold_ms)
     static u2_frame pic_frame;      /* one picture on screen at a time, heap-backed
                                      * at the active theme's frame scale */
 
-    if (u2_frame_ensure(&pic_frame, ctx->frame_scale) != 0) return 0;
+    if (u2_frame_ensure(&pic_frame, ctx->frame_scale) != 0) {
+        fprintf(stderr, "u2: NOTE splash %s not shown: no frame memory at scale %d\n",
+                name, (int)ctx->frame_scale);
+        return 0;
+    }
     u2_frame_set_text_fg(&pic_frame, ctx->text_fg);
 
     /* EGA first when the art axis asks for it: the fan pack's PIC*-E is a full
@@ -192,10 +196,26 @@ static int show_pic(u2_ctx *ctx, const char *name, int hold_ms)
     if (ctx->art_mode == U2_ART_EGA && u2_pic_can_show_ega(ctx, name))
         shown = (u2_pic_blit_ega(ctx, name, &pic_frame) == 0);
     if (!shown) {
-        if (!u2_pic_can_show(ctx, name))
+        /* Every way out of here used to be silent, which made "the art is missing", "the
+         * backend takes no frames" and "the unpack failed" indistinguishable from outside --
+         * and it is exactly how a reasonable person concludes the engine never draws the
+         * original pictures. The fallback to the text screen is unchanged; what changed is
+         * that each reason now says which one it was.
+         */
+        if (!u2_pic_backend_has_frames(ctx)) {
+            fprintf(stderr, "u2: NOTE splash %s not shown: this renderer takes no frames"
+                            " (cell/terminal backend)\n", name);
             return 0;
-        if (u2_pic_blit(ctx, name, &pic_frame) != 0)
+        }
+        if (!u2_pic_can_show(ctx, name)) {
+            fprintf(stderr, "u2: NOTE splash %s not shown: no readable copy of the right"
+                            " size in the content roots (check --data-dir)\n", name);
             return 0;
+        }
+        if (u2_pic_blit(ctx, name, &pic_frame) != 0) {
+            fprintf(stderr, "u2: NOTE splash %s was found but the unpack failed\n", name);
+            return 0;
+        }
     }
     u2_font_draw_vram_rows(&pic_frame, &ctx->vram, 0, U2_ROWS - 1);
 
