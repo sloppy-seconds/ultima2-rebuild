@@ -22,6 +22,12 @@
 #           3. The fade was seen in the chamber the player was standing in, which is NOT
 #              sector 30, so the embedded `MAPX30  ` filename being the fill target is now
 #              the weakest claim in this header rather than one of the stronger ones.
+#              **CORRECTED 2026-11-20, and the reasoning was the mistake.** The filename is
+#              not the fill target at all: it is the target of a READ that happens AFTER the
+#              fade (see 7535..754C below). A fade over the chamber and a load of sector 30
+#              afterwards are not in conflict, and the owner's frames from this very capture
+#              show a half-faded map of open ocean, which is a world map and not a chamber.
+#              The observation was right; the inference drawn from it was wrong.
 #           RESOLVED 2026-11-12 by a live capture (`captures/spice86/victory-live/`: 110
 #           frames + a change-triggered DS log + content-file md5s, driven by
 #           tools/spice86_play_capture.py while a seeded character killed a type-0x40
@@ -31,10 +37,18 @@
 #             across 0x00..0x3f with no monotonic pattern (66 sampled pairs, e.g. 22/19,
 #             39/19, 0a/1c, 14/09, 01/1b ...). So the 64x64 fill paints RANDOM cells black
 #             each iteration -- that is what makes it a slow fade, not a systematic sweep.
-#           * `L_0061a6` beside the `MAPX30  ` filename is NOT a sector save. Across the whole
-#             fade + flight the run-dir content files were md5'd every 2s and NONE changed
-#             (0 write events over 90 content files). The black repaint is in-memory grid
-#             only and is never persisted; the engine's victory.c correctly writes nothing.
+#           * `L_0061a6` beside the `MAPX30  ` filename is NOT a sector SAVE, and that is
+#             all this bullet ever proved. Across the whole fade + flight the run-dir content
+#             files were md5'd every 2s and NONE changed (0 write events over 90 content
+#             files), so the black repaint is in-memory grid only and is never persisted.
+#             **CORRECTED 2026-11-20: it is a sector LOAD.** The caller's bytes are
+#             `mov $0x27,%ah` -- INT 21h AH=27h, FCB random BLOCK READ -- with `CX=0x1000`
+#             (4096 records, one 64x64 grid) and `DS:DX` pointing at an FCB, followed inline
+#             by the name `MAPX30  `. Sector 30 is Earth, 1990 A.D. So the ending fades the
+#             chamber black, reads the 1990 wilderness, and flies the rocket over that. The
+#             md5 test could not have detected this at any sampling rate, because a read does
+#             not change an md5; the bullet's own grade line said the file-I/O reading was
+#             unexecuted, and what it should have said was that the test was blind to reads.
 #           Bonus (G75c): the trailing flight loop is non-terminating -- `DS:00`/`DS:01` kept
 #             advancing (17,19 -> 62,57 -> ... -> 33,07) for the full 30s+ observed, so the
 #             rocket flies until the run is quit; it does not return to the command loop.
@@ -56,13 +70,18 @@
 #         a few instructions later says which one: "MAPX30  " -- sector 30, the 1990 A.D.
 #         wilderness. "ALL HER WORKS SHALL DIE!" is not flavour text, it is a description of
 #         the map write. Grade: the loop bounds and the fill byte are measured from the bytes;
-#         "which sector" is measured from the embedded filename; the reading of L_005417 and
-#         L_0061a6 as cell-addressing and file I/O is INFERRED and unexecuted.
+#         "which sector" is measured from the embedded filename; the reading of L_005417 as
+#         cell-addressing was refuted the same day (it is the RNG, above), and the reading of
+#         L_0061a6 as file I/O is now measured from the caller's AH=27h, not inferred.
 #   7517  call str_out              ; "\rYOU FEEL A STRANGE FORCE!"
 #   7535  call L_0061a6
-#   7538  mov $0x27,%ah ; mov $0x1000,%cx ; mov [0x0472],%dx ; call L_0054ca   ; delay
-#   7544  db "MAPX30  "             ; an FCB-style padded filename
-#   754C  call L_0061a6
+#   7538  mov $0x27,%ah             ; INT 21h AH=27h = FCB RANDOM BLOCK READ (not a delay;
+#                                   ;   an earlier reading of this line as a delay is wrong)
+#         mov $0x1000,%cx           ; 4096 records = one 64x64 sector grid
+#         mov [0x0472],%dx          ; DS:DX = the FCB, per INT 21h AH=27h's calling contract
+#         call L_0054ca             ; opens the name that follows inline
+#   7544  db "MAPX30  "             ; an FCB-style padded filename: sector 30, Earth 1990 A.D.
+#   754C  call L_0061a6             ; performs the DOS call with AH as set above: the READ
 #   754F  call str_out              ; "\r\rYOU HAVE SAVED THE UNIVERSE,\rAND COMPLETED ULTIMA ][!"
 #                                   ; " SEEK\rNOW TO CONQUER WICKED EXODUS,\r"
 #   75AE  call str_out              ; "FOUND IN ULTIMA ]I[-D ]II[-P!"

@@ -2530,6 +2530,49 @@ static void u2_tile_effect_ladder(u2_ctx *ctx, u2_overworld *ow, int tx, int ty)
         u2_force_field(ctx);
 }
 
+/* asm/72A0 7535..754c, decoded from bytes the Phase 2 map left as `db` fragments:
+ *
+ *   7538  b4 27        mov  $0x27,%ah     INT 21h AH=27h = FCB RANDOM BLOCK READ
+ *   753a  b9 00 10     mov  $0x1000,%cx   4096 records = the 64x64 grid, one sector
+ *   753d  8b 16 72 04  mov  0x472,%dx     DS:DX = the FCB, per the AH=27h contract
+ *   7541  call L_0054ca                    ; opens the name that follows inline
+ *   7544  "MAPX30  "                       FCB-padded filename
+ *   754c  call L_0061a6                    ; performs the DOS call with AH as set above
+ *
+ * AH=27h is a READ, so the ending does not fly over the chamber it fades out of: it reads
+ * sector 30 and flies over that, and `tools/census.py` says sector 30 is Earth, 1990 A.D.
+ * The capture that proved the ending writes nothing to disk (0 of 90 content files
+ * changed) could not have seen this, because a read does not change an md5 -- which is
+ * how G75a came to say the file I/O here was unexecuted when what it measured was only
+ * that it was not a write.
+ *
+ * The load must not dirty the grid: G75a still holds, and nothing here is ever persisted.
+ */
+static int victory_load_world(u2_ctx *ctx, u2_overworld *ow)
+{
+    const u2_sector_id id = { 3, 0 };
+    if (u2_world_load(ctx, &ow->world, 1, id) != U2_WORLD_OK) return -1;
+    ctx->victory_world_loaded = 1;
+    ow->sector_hi = 3;
+    ow->sector_lo = 0;
+    monsters_clear(ctx);
+    return 0;
+}
+
+/* asm/72A0 75CF..75DE: DS:12 = 0xFF (view_mode), DS:13 = 0x28 (the rocket stamp),
+ * DS:00/01 = 0. The position of these writes is the point: they come after the fade and
+ * after the sector read, so the player does not turn into a rocket at the moment of the
+ * kill. The engine used to do them inside u2_victory, on the kill path, which is what made
+ * the avatar become a rocket standing in a chamber.
+ */
+static void victory_rocket_mode(u2_ctx *ctx)
+{
+    ctx->state.view_mode    = 0xFF;
+    ctx->state.player_stamp = 0x28;
+    ctx->state.sector_x     = 0;
+    ctx->state.sector_y     = 0;
+}
+
 int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
 {
     /* The handoff is complete from here on: any key the play API parked while the title flow
@@ -2601,12 +2644,21 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
          * unwinds like it does on death. Checked after the draw/present above so the
          * ending text is on screen before the fade begins. */
         if (ctx->victory) {
-            victory_fade(ctx, ow);
-            /* asm/72A0 75D9 resets DS:00/DS:01 to 0 before the flight; u2_victory set
-             * ctx->state.sector_x/y but not the loop's ow->x/y mirror. Sync so the rocket
-             * flies from (0,0) as the original does, not from the kill cell. */
+            /* asm/72A0's order, which is not the order the engine had it. The kill path
+             * printed all four strings and set the rocket mode synchronously, so the text
+             * landed at once and the avatar changed before the fade even started. The
+             * original interleaves the prints with the fade and the sector read.
+             */
+            victory_fade(ctx, ow);                        /* 74DA */
+            seam_str_out(ctx, U2_S_STRANGE_FORCE);        /* 7517 */
+            if (victory_load_world(ctx, ow) == 0) u2_overworld_draw(ctx, ow);
+            seam_present_frame(ctx);
+            seam_str_out(ctx, U2_S_WIN_UNIVERSE);         /* 754F */
+            seam_str_out(ctx, U2_S_WIN_FOUND_IN);         /* 75AE */
+            victory_rocket_mode(ctx);                     /* 75CF..75DE */
             ow->x = ctx->state.sector_x;
             ow->y = ctx->state.sector_y;
+            seam_present_frame(ctx);
             /* Interactive: fly forever, as the original does. Headless: bounded, or every
              * victory gate would hang.
              */

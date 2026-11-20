@@ -237,6 +237,12 @@ typedef struct u2_ctx {
      * engine bounds it, and this counts the steps it actually drew before the run ended. */
     int victory_fade_black;
     int victory_flight_steps;
+    /* Whether the ending's sector read (asm/72A0's MAPX30 block) actually landed. It is a
+     * diag rather than an assert-in-place because the flight looks identical either way, and
+     * a load that silently fails would leave the engine flying over the chamber it was told
+     * to fade out of -- which is the defect this whole sequence was reworked to fix.
+     */
+    int victory_world_loaded;
     /* The ending writes four runtime fields — DS:12 view_mode, DS:13 player_stamp, DS:00/01
      * position — and all four live OUTSIDE the saved record span (the record is DS:36..,
      * 256 bytes), so u2_save_load cannot put them back. victory.c snapshots them the moment

@@ -32,6 +32,20 @@
  *     matches that when a person is playing, and bounds it to U2_VICTORY_FLIGHT_STEPS only
  *     headlessly so a scripted gate can finish. Either way the run then ends: the original
  *     offers nothing after this point, so there is no menu to return to.
+ *   - `L_0061a6` beside the `MAPX30  ` filename IS file I/O, and it is a READ. The caller's
+ *     own bytes say so (AH=0x27, INT 21h FCB random block read; CX=0x1000 = 4096 records =
+ *     one 64x64 grid; filename "MAPX30  "), and sector 30 is Earth, 1990 A.D. So the ending
+ *     fades the chamber to black, reads the 1990 wilderness, and flies the rocket over that.
+ *     The earlier "not a sector save" finding stands and was never the same claim: the
+ *     capture md5'd every content file before and after and saw 0 changes, and a read cannot
+ *     change an md5, so that test could not have seen the load even though it was running.
+ *
+ * Where each half lives: this function is the flag, the first line of text and the snapshot.
+ * The fade, the other three strings, the sector read and the rocket-mode writes are in
+ * game/overworld.c, because the loop owns the grid and the renderer and this runs on the
+ * kill path. Splitting them that way is not a convenience: the original interleaves the
+ * prints with the fade and the read, and printing them all here made the ending arrive as
+ * one block of text with the avatar already redrawn as a rocket.
  * G75 items (a)/(b)/(c) are closed by that capture; see asm/72A0's header.
  */
 #include "game/victory.h"
@@ -47,14 +61,14 @@ void u2_victory(u2_ctx *ctx)
     ctx->victory = 1;
 
     seam_str_out(ctx, U2_S_MINAX_DEAD);
-    /* asm/72A0's 64x64 fade runs in the overworld loop (victory_fade), not here: this
-     * function is on the kill path and has no grid or renderer. See the header note. */
-    seam_str_out(ctx, U2_S_STRANGE_FORCE);
-    seam_str_out(ctx, U2_S_WIN_UNIVERSE);
-    seam_str_out(ctx, U2_S_WIN_FOUND_IN);
+    /* Only the first line lives here. asm/72A0 prints the other three after the fade and
+     * after the sector read, so they belong to the loop that owns the grid and the renderer:
+     * see the victory arm in game/overworld.c.
+     */
 
-    /* Snapshot before the writes, not after: these four fields are the animation's costume,
-     * and the only reason the engine can hand them back is that it caught them on the way in.
+    /* Snapshot the four runtime fields the ending borrows. The borrowing happens in the
+     * overworld loop (victory_rocket_mode), but the snapshot belongs here because this is the
+     * last point at which the character is still the one that walked into the castle.
      * Guarded on the flag rather than unconditional, because a second call would otherwise
      * overwrite the saved values with the ending's own.
      */
@@ -65,12 +79,6 @@ void u2_victory(u2_ctx *ctx)
         ctx->victory_saved_x     = ctx->state.sector_x;
         ctx->victory_saved_y     = ctx->state.sector_y;
     }
-
-    /* The three writes the original makes after the text, in its order. */
-    ctx->state.view_mode    = 0xFF;   /* DS:12 */
-    ctx->state.player_stamp = 0x28;   /* DS:13, the rocket stamp */
-    ctx->state.sector_x     = 0;      /* DS:00 */
-    ctx->state.sector_y     = 0;      /* DS:01 */
 }
 
 void u2_victory_restore(u2_ctx *ctx)

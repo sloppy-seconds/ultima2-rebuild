@@ -76,6 +76,14 @@ def build_site_seed(work):
     with open(os.path.join(content, "monx03"), "wb") as f:
         f.write(bytes(mon))
 
+    # mapx30: the sector the ending READS. asm/72A0 7538..754c is AH=0x27 (INT 21h FCB
+    # random block read), CX=0x1000 = 4096 records, filename "MAPX30  " -- Earth, 1990 A.D.
+    # It is seeded on purpose: without this file the read fails, the engine flies over the
+    # chamber it was supposed to have faded out of, and every other check here still passes.
+    # That is exactly what an ungated path looks like from inside a gate.
+    with open(os.path.join(content, "mapx30"), "wb") as f:
+        f.write(bytes([0x08]) * 4096)
+
     # PLAYER record: file[i] == DS[0x36+i]. Sector digits 0,3 (castle). Entry (2,0).
     # Certain-hit agility, readied weapon, big HP so Minax's strikes don't kill the player.
     p = bytearray(384)
@@ -214,6 +222,11 @@ def main():
     check(p == (2, 0),
           "the player came back to the entry cell (pos=%s; (0,0) means the flight's walk of "
           "DS:00/DS:01 outlived the ending)" % (p,))
+
+    loaded = diag_int(text, "victory_world_loaded")
+    check(loaded == 1,
+          "the ending read sector 30 (Earth, 1990 A.D.) before it flew (victory_world_loaded"
+          "=%s; 0 means the MAPX30 read did not run and the rocket is over the chamber)" % loaded)
 
     if fails:
         print("  FAIL  %d victory-end checks are wrong" % len(fails))

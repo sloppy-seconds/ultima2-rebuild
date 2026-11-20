@@ -199,7 +199,7 @@ int u2_state_json(const u2_ctx *ctx, char *out, int outsz)
         "\"screen\":{\"cols\":%d,\"rows\":%d,\"cells_written\":%llu,"
         "\"cursor\":{\"row\":%d,\"col\":%d,\"visible\":%d}},"
         "\"state\":{%s%s\"ghosts\":%d,\"baked_unowned\":%d,\"flashes\":%u,\"unstamped\":%d,\"unstamped_at_load\":%d,"
-        "\"victory_fade_black\":%d,\"victory_flight_steps\":%d,\"victory_map_dirty\":%d,\"victory_quit\":%d,"
+        "\"victory_fade_black\":%d,\"victory_flight_steps\":%d,\"victory_map_dirty\":%d,\"victory_quit\":%d,\"victory_world_loaded\":%d,"
         /* pos is DS:00/01, the original's own player-position mirror. The field below was NAMED
          * player_x/player_y but reported DS:23/24, which is the staged candidate cell the step gate
          * reads — it sat at 0 in every turn log, so a recording could not say where the player was
@@ -229,6 +229,7 @@ int u2_state_json(const u2_ctx *ctx, char *out, int outsz)
         ctx->victory_flight_steps,
         ctx->victory_map_dirty,
         ctx->victory_quit,
+        ctx->victory_world_loaded,
         s->sector_x, s->sector_y,
         s->sector_first, s->sector_second,
         s->player_stamp,
