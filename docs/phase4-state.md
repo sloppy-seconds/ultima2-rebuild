@@ -3327,6 +3327,52 @@ town. Gate is 18 checks.
 player's own `--data-dir`, exactly like the tile art. Nothing is committed, nothing is substituted, and
 with the file absent the text screens are byte-for-byte what they were before this existed.
 
+### The demonstration pictures were wrong in three ways at once (owner-found, 2026-11-20)
+
+Owner: "in EGA mode the dragon renders but the demo pictures are messed up, and in CGA mode both
+are." Three independent defects were stacked, and the second hid the first.
+
+**1. The text layer stamped the previous screen over the art.** Once the composite stopped wiping the
+picture (section above), it began drawing *all* of `vram` over it. Whatever the last screen left
+there landed on the art: the intro's `OF THE #1 BEST SELLING / FANTASY ROLE-PLAYING GAME / BY LORD
+BRITISH` across the dragon, and the menu's title block across the demonstration's couplets. The
+original stamps nothing on the dragon, whose lettering is part of the art
+(`captures/spice86/g58-demonstration/title-dragon.png`), and stamps only the couplet on the
+pictures, in rows 23 and 24. `show_pic` now takes the first row that may be composited, and the two
+callers pass `U2_ROWS` and `23`. A captured frame showed the intro text on the dragon before this
+and nothing after it.
+
+**2. The EGA picture search never looked in the content sublayers.** `pic_ega.c`'s `candidate_dirs`
+read `ctx->data_dir`, which is the content root and nothing else, so an installed tree was searched
+as `themes/` and `.` only. The pack's pictures live in `data/original/` and `data/updated/`, which
+are root *sublayers* from `core/roots.h`, and `roots.h` says pic.c asks there. It did not. The pack
+ships seven EGA pictures, three of them also copied into `themes/` (dragon, dungeon, space), so
+those resolved and the rest silently fell back to CGA. That asymmetry is the entire reason the
+dragon looked fine and the town did not, and it had nothing to do with the dragon. Measured: the
+town frame agreed with `PICTWN-E` at 70.8%, and at 99.0% when run with `--data-dir data/original`.
+Now 100.0% with the normal config. `U2_ROOT_MAX` bounds the array this needs and `roots.c`
+static_asserts the table fits, so a grown table fails the build instead of dropping a root quietly.
+
+**3. CGA art drawn through the EGA palette is nonsense.** The fallback handed CGA indices 0..3 to a
+backend resolving against the 16-colour EGA table, where CGA's cyan and magenta are not indices 1
+and 2. White came out cyan, magenta came out green, and the picture looked like noise. The engine
+already had the mechanism (`u2_frame::cga_on_ega`: black 0, cyan 3, magenta 5, white 15) and the
+picture path simply never used it. The CGA blit now routes through `u2_frame_cga_idx`, and a
+fallback that actually happens prints a `u2: NOTE` instead of being silent, because "the EGA copy
+was not found" is otherwise invisible from outside. The town frame matched *CGA pictwn through the
+EGA palette* at 98.6% before the fix, which is what identified it.
+
+`pic_check` is 21 checks. The three new ones assert the remap, that no raw CGA index survives it,
+and a control that `pictwn` really uses the indices being remapped so the first two can fail.
+Control run with the remap removed: both red, control green. `run_cp4.sh`'s link line needed
+`pic_ega.c`, since `u2_pic_show` now owns the EGA decision.
+
+**Method note.** Every claim above is a pixel census against the file on disk, not a look at a
+screenshot. "The EGA art is dark and sparse" was wrong twice over: the first EGA previews were
+rendered as raw index-as-greyscale with no palette at all, and the first frame comparisons used the
+wrong frame from a deduplicated list. Both produced confident, wrong readings, and both were killed
+by comparing against the actual source file rather than against an impression.
+
 ## Resizing the window now scales the picture (owner-found, 2026-11-03)
 
 The owner asked whether SDL supports scaling, because dragging the window left the graphics

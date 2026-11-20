@@ -2375,3 +2375,30 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   which is the third time this project has had a "the code ran and the pixels disagreed" report; the
   generic lesson is that a present call is not evidence of a visible result.
   → Tier 1, gate design: what a check must be able to fail on, and composites need both-direction controls.
+
+- 2026-11-20 — **a resource lookup that reads one path field instead of the project's content-root
+  list sees a subset of the tree, and the symptom is format-dependent, so it reads as a bug in the
+  format that failed.** The splash loader searched the theme directory and the bare content root, and
+  never the patch/release sublayers that the root list defines. The upgrade package's high-colour
+  pictures live in a sublayer, so the three that happened to be duplicated in the theme directory
+  resolved and the rest fell back to the low-colour originals. The report was "the title picture is
+  fine and the demo pictures are broken", which invites a theory about the pictures; the actual
+  discriminator was which directory each file had been copied into. Two rules. A harness should have
+  exactly one search-path facility, and every loader that resolves a data file goes through it — a
+  loader that hand-rolls "themes dir then data dir" is a second copy of the path policy and will
+  drift. And when a fallback changes the *format* of what it loads, it must also change the
+  interpretation of the bytes (palette, stride, bit order) or be refused: a silent format fallback
+  produces output that is confidently wrong rather than missing, which is the worst kind to debug.
+  → Tier 1, content resolution: one search-path facility, and a format fallback must remap or refuse.
+
+- 2026-11-20 — **when a visual claim is checked by eye against a render the harness itself produced,
+  a bug in the preview tool reads as a bug in the game.** Three wrong readings happened in one
+  investigation: palette-index bytes were saved as greyscale and the resulting near-black images were
+  read as "the art is sparse and dark"; frames were compared from a deduplicated list and the wrong
+  frame was matched to the wrong source file; and a non-integer downscale for a side-by-side made
+  correct art look combed. Each was plausible and each cost time. The fix was to stop comparing
+  impressions and assert pixel agreement against the source file through the same decode the engine
+  uses, which turns "looks wrong" into a number and a named file. A harness that renders previews for
+  a human should apply the real palette and scale by an integer factor, or it manufactures defects.
+  → Tier 1, verification discipline: measure against the source, and make preview tooling faithful
+  or do not trust it.
