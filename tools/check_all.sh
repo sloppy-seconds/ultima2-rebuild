@@ -92,6 +92,13 @@ run "content_header gate" engine/content/gen_content.h -- python3 engine/tools/e
 # build rule, so the only thing keeping it honest is this: if a notice file changes
 # and the header is not regenerated, the shipped binary prints a stale licence.
 run "licenses_data fresh" engine/src/core/licenses_data.h -- python3 engine/tools/gen_licenses.py --verify
+# The fourth committed generated header, and the only one whose generator is
+# host-dependent: it uses rembg and pngquant when present and in-file fallbacks
+# when not, so emitted art differs by machine. That is why this is a structural
+# check of the generator's SPRITES/EDGE/PAL_N tables against the emitted header
+# rather than a byte comparison, which would fail on a clean checkout and get
+# ignored. engine/tools/check_dungeon_sprites.py carries the full reasoning.
+run "dungeon_sprites_gen consistent" engine/src/game/dungeon_sprites_gen.h -- python3 engine/tools/check_dungeon_sprites.py
 run "cmd_handlers" asm disasm/jump-table.txt -- python3 tools/cmd_handlers.py --check
 # The derived half. captures/spice86/ is gitignored, so this is optional by declaration and
 # SKIPs in CI rather than pretending to have checked. It is the gate that makes `exec` generated

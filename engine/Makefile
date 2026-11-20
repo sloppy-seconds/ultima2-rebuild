@@ -58,7 +58,7 @@ DEPS     := $(OBJS:.o=.d)
 SDLOBJS  := $(patsubst %.c,$(BUILD)-sdl/%.o,$(SRCS))
 SDL_DEPS := $(SDLOBJS:.o=.d)
 
-.PHONY: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo clean content content-check licenses licenses-check fmtowns-map fmtowns-map-check sdl sdl-probe-check sdl-run sdl-win sdl-static play help fresh
+.PHONY: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo clean content content-check licenses licenses-check compile-commands compile-commands-check fmtowns-map fmtowns-map-check dungeon-sprites dungeon-sprites-check sdl sdl-probe-check sdl-run sdl-win sdl-static play help fresh
 
 all: $(BIN)
 
@@ -99,6 +99,26 @@ fmtowns-map-check:
 	@test -f $(FMTOWNS_MAP) || { echo "$(FMTOWNS_MAP) is missing and is committed content"; exit 1; }
 	python3 tools/fmtowns_map2h.py --verify -o $(FMTOWNS_MAP)
 
+# Dungeon sprite art, same discipline as the three above — the header is
+# committed generated output — but the check is NOT a byte comparison, and the
+# reason is in tools/check_dungeon_sprites.py: the generator uses rembg and
+# pngquant when present and falls back to in-file implementations when absent,
+# so emitted art differs by host and a byte-compare would fail on a clean
+# checkout even when the committed header is exactly right. The check is
+# therefore structural: the generator's SPRITES/EDGE/PAL_N tables against the
+# header's emitted symbols and defines. Byte-exact comparison belongs in
+# deploy/art-pipeline/, where the tools exist.
+DUNGEON_SPRITES_H := src/game/dungeon_sprites_gen.h
+DUNGEON_CONCEPTS  := ../concepts/dungeon2
+
+dungeon-sprites:
+	@mkdir -p $(BUILD)/preview
+	DG_PREVIEW_DIR=$(BUILD)/preview python3 tools/gen_dungeon_sprites.py $(DUNGEON_CONCEPTS) $(DUNGEON_SPRITES_H)
+
+dungeon-sprites-check:
+	@test -f $(DUNGEON_SPRITES_H) || { echo "$(DUNGEON_SPRITES_H) is missing and is committed content"; exit 1; }
+	@python3 tools/check_dungeon_sprites.py
+
 # The licence record, same discipline as the content header: the generated file is
 # committed, there is deliberately no build rule that regenerates it during a
 # normal build, and `licenses-check` proves the committed copy still matches its
@@ -110,6 +130,65 @@ licenses:
 licenses-check:
 	@test -f src/core/licenses_data.h || { echo "src/core/licenses_data.h is missing and is committed output"; exit 1; }
 	@python3 tools/gen_licenses.py --verify
+
+# ---- clangd compilation database ---------------------------------------------
+#
+# Why this exists: clangd has no project model for a plain Makefile. Without a
+# compilation database it guesses flags, cannot resolve -Isrc or -Icontent, and
+# reports every project header as missing — measured on engine/src/game/commerce.c:
+# 22 unresolved includes, after which textDocument/references answers "no
+# references" for symbols that have dozens. A plausible wrong answer is worse than
+# an error, so the database is generated from the Makefile's own variables rather
+# than hand-written, and rather than left to `bear` or `compiledb`, which have to
+# be remembered and re-run after every added file.
+#
+# Why generated in Make and not by a script: the build stamp embeds
+# -DU2_VERSION='"..."'. Getting that through a shell loses the inner double quotes
+# unless the flags travel by environment or by make's own writer, and a `sed`
+# escape would be exactly the kind of transform that fails silently — a missed
+# pattern returns the input unchanged and exits 0. $(file >) writes the text
+# byte-for-byte with no shell in the way, and $(subst) performs the single JSON
+# escape the stamp needs. No new tool file, no new dependency.
+#
+# Why it lives in build/ and is never committed: it carries absolute paths and this
+# host's compiler. That is the opposite ruling to content/gen_content.h, and for
+# the opposite reason — that one must survive a machine missing the inputs, this
+# one must not, because a stale database is a lie about the build. `make clean`
+# removes it with the rest of build/, and it regenerates in well under a second,
+# so staleness is never worth reasoning about. compile-commands-check is the gate
+# that keeps it honest.
+
+CC_DB        ?= $(BUILD)/compile_commands.json
+CC_DB_FLAGS  := $(CPPFLAGS) $(CFLAGS) $(STAMP_TERMINAL)
+# JSON cannot contain a bare double quote and the stamp is full of them.
+CC_DB_ESC    := $(subst ",\",$(CC_DB_FLAGS))
+# Derived from CPPFLAGS rather than hardcoded: dropping an -I must fail loudly here
+# rather than quietly produce a database that resolves half the headers.
+CC_DB_IDIRS  := $(patsubst -I%,%,$(filter -I%,$(CPPFLAGS)))
+comma := ,
+cc_db_row = { "directory": "$(CURDIR)", "file": "$(CURDIR)/$(1)", "command": "$(CC) $(CC_DB_ESC) -c $(1) -o $(BUILD)/$(1:.c=.o)" }$(if $(filter $(1),$(lastword $(SRCS))),,$(comma))
+CC_DB_TEXT   := [$(foreach s,$(SRCS),  $(call cc_db_row,$(s)))]
+CC_DB_EMIT    = $(file >$(CC_DB),$(CC_DB_TEXT))
+
+# The three checks below are the point as much as the output. Each one is a way
+# this file could produce a database that parses and is still wrong.
+compile-commands:
+	@mkdir -p $(BUILD)
+	@test -n "$(strip $(SRCS))" || { echo "compile_commands: empty source list — a database with no entries checks nothing and looks identical to a complete one"; exit 1; }
+	@for d in $(CC_DB_IDIRS); do test -d "$$d" || { echo "compile_commands: -I$$d from CPPFLAGS does not exist"; exit 1; }; done
+	@for s in $(SRCS); do test -f "$$s" || { echo "compile_commands: $$s is listed in SRCS but absent"; exit 1; }; done
+	@$(CC_DB_EMIT) :
+	@python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); assert d, "empty database"; print("compile_commands.json: %d entries -> %s" % (len(d), sys.argv[1]))' $(CC_DB)
+
+# Freshness gate, same shape as tools/census.py --check-fresh: regenerate to a
+# throwaway path and diff against the real one. A generated file with no freshness
+# check goes stale and keeps reporting healthy.
+compile-commands-check:
+	@test -f $(CC_DB) || { echo "compile-commands-check: $(CC_DB) is missing — run make compile-commands"; exit 1; }
+	@$(MAKE) --no-print-directory CC_DB=$(BUILD)/compile_commands.check.json compile-commands >/dev/null
+	@cmp -s $(CC_DB) $(BUILD)/compile_commands.check.json || { echo "compile-commands-check: $(CC_DB) is stale against the Makefile — run make compile-commands"; rm -f $(BUILD)/compile_commands.check.json; exit 1; }
+	@rm -f $(BUILD)/compile_commands.check.json
+	@echo "compile-commands-check: current"
 
 $(BIN): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
@@ -384,6 +463,6 @@ fresh:
 	echo "fresh: every binary is newer than its sources"
 
 help:
-	@echo "targets: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 sdl sdl-run play clean content content-check fresh help"
+	@echo "targets: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 sdl sdl-run play clean content content-check compile-commands compile-commands-check fresh help"
 
 -include $(DEPS) $(SDL_DEPS)
