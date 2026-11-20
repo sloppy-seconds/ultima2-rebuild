@@ -463,10 +463,10 @@ fi
 # row- and quadrant-level. Needs the player's own picdra, so it skips without the content.
 if [ -r "$MAPDIR/picdra" ] || [ -r "$MAPDIR/PICDRA" ]; then
     cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/pic_check" \
-       tests/pic_check.c src/core/pic.c src/core/roots.c src/core/frame.c src/core/font.c src/core/view.c src/debug/trace.c \
+       tests/pic_check.c src/core/pic.c src/core/pic_ega.c src/core/roots.c src/core/frame.c src/core/font.c src/core/view.c src/debug/trace.c \
         >"$WORK/cc-pic.err" 2>&1 \
         && "$WORK/pic_check" >"$WORK/pic.out" 2>&1 \
-        && ok "PIC unpack: 18 checks, interleave pinned by scanline and quadrant census, text-over-art overlay" \
+        && ok "PIC unpack: 21 checks, interleave pinned by scanline and quadrant census, text-over-art overlay, CGA-on-EGA index remap" \
         || { bad "PIC unpack failed:"; tail -12 "$WORK/pic.out" 2>/dev/null | sed 's/^/        /'; tail -4 "$WORK/cc-pic.err" | sed 's/^/        /'; }
 else
     printf '  SKIP  no player content: PIC unpack not exercised\n'

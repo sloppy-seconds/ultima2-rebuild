@@ -175,6 +175,48 @@ int main(void)
               " (%d ink vs %d before)", ink_ov, ink0);
     }
 
+    /* CGA art on an EGA palette. The pack does not carry an EGA copy of every
+     * picture in every install, and when one is missing the CGA original is shown
+     * instead -- but the backend is then resolving indices against the 16-colour
+     * EGA table, where CGA's cyan and magenta are NOT indices 1 and 2. Drawn raw,
+     * white comes out cyan and magenta comes out green, which is what the owner
+     * reported on 2026-11-20 as "the demo pictures are messed up in EGA mode".
+     * u2_frame::cga_on_ega is the existing mechanism (black 0, cyan 3, magenta 5,
+     * white 15); this pins that the picture path actually uses it, and that the
+     * classic path is untouched.
+     */
+    {
+        int base_c[16];
+        for (int i = 0; i < 16; i++) base_c[i] = 0;
+        f.cga_on_ega = 0;
+        u2_pic_blit(&ctx, "pictwn", &f);
+        for (int y = 0; y < U2_SCREEN_H; y++)
+            for (int x = 0; x < U2_SCREEN_W; x++) base_c[f.px[y][x]]++;
+
+        int rem_c[16];
+        for (int i = 0; i < 16; i++) rem_c[i] = 0;
+        f.cga_on_ega = 1;
+        u2_pic_blit(&ctx, "pictwn", &f);
+        for (int y = 0; y < U2_SCREEN_H; y++)
+            for (int x = 0; x < U2_SCREEN_W; x++) rem_c[f.px[y][x]]++;
+        f.cga_on_ega = 0;
+
+        CHECK(rem_c[0] == base_c[0] && rem_c[3] == base_c[1]
+              && rem_c[5] == base_c[2] && rem_c[15] == base_c[3],
+              "CGA art on an EGA palette lands on the EGA indices for the same colours"
+              " (0/3/5/15 held %d/%d/%d/%d, CGA census was %d/%d/%d/%d)",
+              rem_c[0], rem_c[3], rem_c[5], rem_c[15],
+              base_c[0], base_c[1], base_c[2], base_c[3]);
+        CHECK(rem_c[1] == 0 && rem_c[2] == 0,
+              "no raw CGA index survives the remap (index 1 held %d, index 2 held %d)"
+              " -- these are EGA blue and EGA red, and a picture drawn with them is the bug",
+              rem_c[1], rem_c[2]);
+        CHECK(base_c[1] + base_c[2] + base_c[3] > 0,
+              "the control: pictwn really does use the CGA indices being remapped"
+              " (%d/%d/%d), so the check above could have failed",
+              base_c[1], base_c[2], base_c[3]);
+    }
+
     /* PICCAS is named in the executable at file offset 0x6ba and has no file in the pack.
      * Asserting it stays absent keeps that fact honest: if a future pack adds it, this goes
      * red and someone re-reads the load sites instead of never noticing. */

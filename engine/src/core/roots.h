@@ -25,6 +25,13 @@ typedef struct {
     int patched;          /* 1 for a Galaxy patch layer, 0 for a release layer */
 } u2_root;
 
+/* Compile-time ceiling on the rows in u2_roots, so a caller that needs a fixed
+ * array of directories can size one. roots.c static_asserts the table fits, so
+ * growing the table without raising this fails the build rather than dropping a
+ * root silently -- which is the difference between "the picture was not found"
+ * and "the picture was never looked for". */
+#define U2_ROOT_MAX 4
+
 extern const u2_root u2_roots[];
 extern const size_t  u2_root_count;
 

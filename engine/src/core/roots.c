@@ -22,6 +22,11 @@ const u2_root u2_roots[] = {
 };
 const size_t u2_root_count = sizeof u2_roots / sizeof u2_roots[0];
 
+/* See U2_ROOT_MAX in roots.h: a caller sizes a fixed array from it, so a table
+ * that outgrew the ceiling must fail here and not drop a root at runtime. */
+_Static_assert(sizeof u2_roots / sizeof u2_roots[0] <= U2_ROOT_MAX,
+               "u2_roots grew past U2_ROOT_MAX; raise it in roots.h");
+
 const char *u2_content_root(const u2_ctx *ctx)
 {
     return (ctx && ctx->data_dir && *ctx->data_dir) ? ctx->data_dir : ".";

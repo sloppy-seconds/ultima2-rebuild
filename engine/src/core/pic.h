@@ -90,4 +90,17 @@ int u2_pic_blit(u2_ctx *ctx, const char *name, struct u2_frame *f);
  * decide between a picture and a text screen before it has a file to test. */
 int u2_pic_backend_has_frames(const u2_ctx *ctx);
 
+/* Which art a picture came from, and why it did not.
+ *
+ * u2_pic_show is the ONE place that decides between the EGA variant and the CGA
+ * original. It exists so the caller's fallback, the dev dump and a gate all look at
+ * what a run actually draws rather than each re-deriving the rule and drifting.
+ */
+#define U2_PIC_SHOWN_EGA   0
+#define U2_PIC_SHOWN_CGA   1
+#define U2_PIC_ERR_FRAMES (-1)   /* this renderer takes no frames (terminal build) */
+#define U2_PIC_ERR_NOFILE (-2)   /* neither spelling is readable at the right size */
+#define U2_PIC_ERR_BLIT   (-3)   /* found, and the unpack failed */
+int u2_pic_show(u2_ctx *ctx, const char *base, struct u2_frame *f);
+
 #endif /* U2_PIC_H */

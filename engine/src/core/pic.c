@@ -15,6 +15,7 @@
 #include "core/pic.h"
 
 #include "core/ctx.h"
+#include "core/pic_ega.h"
 #include "core/roots.h"
 #include "core/frame.h"
 #include "debug/trace.h"
@@ -70,6 +71,25 @@ static int pic_read(const u2_ctx *ctx, const char *name, uint8_t *out, size_t ca
     return got == PIC_PIXEL_BYTES ? 0 : 1;
 }
 
+int u2_pic_show(u2_ctx *ctx, const char *base, struct u2_frame *f)
+{
+    if (!u2_pic_backend_has_frames(ctx))
+        return U2_PIC_ERR_FRAMES;
+    /* EGA first when the art axis asks for it: the fan pack's PIC*-E is a full
+     * 16-colour image and the richer art wins. If it is absent the CGA pic is
+     * used unchanged, so --ega never blanks a splash that CGA could show.
+     */
+    if (ctx->art_mode == U2_ART_EGA && u2_pic_can_show_ega(ctx, base)) {
+        if (u2_pic_blit_ega(ctx, base, f) == 0)
+            return U2_PIC_SHOWN_EGA;
+    }
+    if (!u2_pic_can_show(ctx, base))
+        return U2_PIC_ERR_NOFILE;
+    if (u2_pic_blit(ctx, base, f) != 0)
+        return U2_PIC_ERR_BLIT;
+    return U2_PIC_SHOWN_CGA;
+}
+
 int u2_pic_backend_has_frames(const u2_ctx *ctx)
 {
     return (ctx && ctx->renderer && ctx->renderer->present_frame) ? 1 : 0;
@@ -117,7 +137,15 @@ int u2_pic_blit(u2_ctx *ctx, const char *name, struct u2_frame *f)
          * scale they are block-upscaled rather than left as an island in the
          * corner. Nearest-neighbour is the only honest choice for 4-colour art. */
         for (int x = 0; x < U2_SCREEN_W; x++)
-            u2_frame_put_logical(f, x, line, rowbuf[x]);
+            /* Through u2_frame_cga_idx, not straight in. This is 4-colour CGA art,
+             * and the frame it lands on may be presenting through the 16-colour EGA
+             * table (EGA mode with no EGA copy of this picture, or the enhanced
+             * layout). CGA's black/cyan/magenta/white already exist in the EGA table
+             * at 0/3/5/15, and the frame flag says when to make that jump; it is
+             * identity on the CGA path, so classic output is unchanged. Without it a
+             * CGA picture on an EGA palette renders white as cyan and magenta as
+             * green, which is the noise the owner reported on 2026-11-20. */
+            u2_frame_put_logical(f, x, line, u2_frame_cga_idx(f, rowbuf[x]));
     }
     u2_trace(ctx, "pic", "535A", "name=%s loaded=1 bytes=%d", name, PIC_PIXEL_BYTES);
     return 0;

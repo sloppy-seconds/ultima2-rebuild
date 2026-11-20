@@ -147,7 +147,8 @@ static int hold_for_esc(u2_ctx *ctx, unsigned ms)
         if (seam_key_poll(ctx, &k) && k.ch == 0x1B)
             return 1;
         return 0;
-    }    for (unsigned waited = 0; waited < ms; waited += 50) {
+    }
+    for (unsigned waited = 0; waited < ms; waited += 50) {
         /* A termination signal (T4) or a closed window lands on the poll as
          * exit_code / input_exhausted, not as a key. Without this test the
          * hold kept sleeping through its whole budget and the process sat
@@ -176,8 +177,22 @@ static int hold_for_esc(u2_ctx *ctx, unsigned ms)
  *
  * Returns the hold_for_esc result so a caller treats ESC exactly as it already does.
  * Returns 0 without drawing anything when the picture cannot be shown, which leaves the
- * caller's text screen as the whole of what the player sees. */
-static int show_pic(u2_ctx *ctx, const char *name, int hold_ms)
+ * caller's text screen as the whole of what the player sees.
+ *
+ * `first_row` is the first text row allowed over the art, and U2_ROWS means none. That
+ * is the original's behaviour, not a convenience knob: the dragon splash carries its
+ * lettering in the art and has nothing stamped on it (see
+ * captures/spice86/g58-demonstration/title-dragon.png), while the demonstration's
+ * couplets do sit over the picture, in rows 23 and 24. Compositing the WHOLE text
+ * layer, which is what this used to do, stamps whatever the previous screen left in
+ * vram across the art: the intro's "OF THE #1 BEST SELLING / FANTASY ROLE-PLAYING
+ * GAME / BY LORD BRITISH" landed on the dragon, and the menu's title block landed on
+ * the demonstration's pictures. The owner reported the demonstration pictures as
+ * "messed up" in EGA mode on 2026-11-20 and a captured frame confirmed it. Nobody saw
+ * it earlier because the old text layer painted a background rectangle per cell, so
+ * the stale text was painted over along with everything else and the picture did not
+ * appear at all (pic_check's controls hold both halves). */
+static int show_pic(u2_ctx *ctx, const char *name, int hold_ms, int first_row)
 {
     static u2_frame pic_frame;      /* one picture on screen at a time, heap-backed
                                      * at the active theme's frame scale */
@@ -189,40 +204,51 @@ static int show_pic(u2_ctx *ctx, const char *name, int hold_ms)
     }
     u2_frame_set_text_fg(&pic_frame, ctx->text_fg);
 
-    /* EGA first when the art axis asks for it: the fan pack's PIC*-E is a full
-     * 16-colour image and the richer art wins. If it is absent the CGA pic is
-     * used unchanged, so --ega never blanks a splash that CGA could show. */
-    int shown = 0;
-    if (ctx->art_mode == U2_ART_EGA && u2_pic_can_show_ega(ctx, name))
-        shown = (u2_pic_blit_ega(ctx, name, &pic_frame) == 0);
-    if (!shown) {
-        /* Every way out of here used to be silent, which made "the art is missing", "the
-         * backend takes no frames" and "the unpack failed" indistinguishable from outside --
-         * and it is exactly how a reasonable person concludes the engine never draws the
-         * original pictures. The fallback to the text screen is unchanged; what changed is
-         * that each reason now says which one it was.
-         */
-        if (!u2_pic_backend_has_frames(ctx)) {
-            fprintf(stderr, "u2: NOTE splash %s not shown: this renderer takes no frames"
-                            " (cell/terminal backend)\n", name);
-            return 0;
-        }
-        if (!u2_pic_can_show(ctx, name)) {
-            fprintf(stderr, "u2: NOTE splash %s not shown: no readable copy of the right"
-                            " size in the content roots (check --data-dir)\n", name);
-            return 0;
-        }
-        if (u2_pic_blit(ctx, name, &pic_frame) != 0) {
-            fprintf(stderr, "u2: NOTE splash %s was found but the unpack failed\n", name);
-            return 0;
-        }
-    }
-    /* Glyph dots only. The plain variant paints every cell's background, which is a
-     * text screen and, over a picture, a full-frame fill of text_bg that erases the
-     * art it was meant to caption. This line is why the demonstration's couplets sat on
-     * black instead of on the starfield: the blit worked, the composite deleted it.
+    /* Which palette the backend will resolve these indices against (the rule is
+     * renderer_sdl's: the EGA table whenever the art axis asks for it or the
+     * enhanced layout is on). The picture may still turn out to be the CGA original,
+     * because the pack does not have every picture in every install, and 4-colour
+     * art drawn through the 16-colour table is nonsense unless the frame is told to
+     * remap. Set before the blit, because the blit writes final indices.
      */
-    u2_font_draw_vram_rows_overlay(&pic_frame, &ctx->vram, 0, U2_ROWS - 1);
+    pic_frame.cga_on_ega = (uint8_t)(ctx->art_mode == U2_ART_EGA ||
+                                     ctx->enhanced_layout);
+
+    /* One decision, in one place (core/pic.h): EGA when the art axis asks for it and
+     * the fan pack has the picture, otherwise the CGA original, otherwise a reason.
+     * Every way this can fail used to be silent, which is how "the art is missing" and
+     * "this backend takes no frames" and "the unpack failed" all looked identical from
+     * outside -- and how a reasonable person concluded the engine never drew the
+     * original pictures at all. The fallback to the text screen is unchanged; each
+     * reason now says which one it was.
+     */
+    const int src = u2_pic_show(ctx, name, &pic_frame);
+    if (src < 0) {
+        fprintf(stderr, "u2: NOTE splash %s not shown: %s\n", name,
+                src == U2_PIC_ERR_FRAMES ? "this renderer takes no frames"
+                                          " (cell/terminal backend)"
+                : src == U2_PIC_ERR_NOFILE ? "no readable copy of the right size in the"
+                                            " content roots (check --data-dir)"
+                                          : "it was found but the unpack failed");
+        return 0;
+    }
+    if (src == U2_PIC_SHOWN_CGA && pic_frame.cga_on_ega) {
+        /* Loud, on purpose. The pack is missing this one picture, so the player is
+         * seeing the 1982 CGA art where the upgrade pack intended 16-colour art, and
+         * "the EGA version was not found" is otherwise invisible from outside. */
+        fprintf(stderr, "u2: NOTE splash %s: no EGA copy found, showing the CGA "
+                        "original through the EGA palette\n", name);
+    }
+    /* Glyph dots only, and only the rows that belong here. The plain variant paints
+     * every cell's background, which is a text screen and, over a picture, a
+     * full-frame fill of text_bg that erases the art it was meant to caption. That
+     * line is why the demonstration's couplets sat on black instead of on the
+     * starfield: the blit worked, the composite deleted it.
+     */
+    if (first_row < U2_ROWS) {
+        u2_font_draw_vram_rows_overlay(&pic_frame, &ctx->vram, first_row,
+                                       U2_ROWS - 1);
+    }
 
     struct u2_frame *saved = ctx->frame;
     ctx->frame = &pic_frame;
@@ -253,7 +279,7 @@ static int present_intro(u2_ctx *ctx)
      * menu, full screen, no text over it — the lettering in this one is part of the
      * art. With no picture file this is simply skipped and the intro is what it has
      * always been here: two text screens and the menu. */
-    if (show_pic(ctx, U2_PIC_TITLE, SPLASH_HOLD_MS))
+    if (show_pic(ctx, U2_PIC_TITLE, SPLASH_HOLD_MS, U2_ROWS))
         return 1;
     return 0;
 }
@@ -303,7 +329,7 @@ static int present_poem(u2_ctx *ctx)
             const int ci = i / 2;      /* one couplet per two narrative lines */
             if (show_pic(ctx, couplet_pic[ci < NARR(couplet_pic) ? ci
                                                                  : NARR(couplet_pic) - 1],
-                         POEM_HOLD_MS))
+                         POEM_HOLD_MS, 23))
                 return 1;
             continue;
         }

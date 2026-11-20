@@ -15,6 +15,7 @@
 #include "core/ctx.h"
 #include "core/artifact.h"   /* a release artifact does not know about references/ */
 #include "core/frame.h"
+#include "core/roots.h"
 #include "debug/trace.h"
 
 #define PIC_EGA_BYTES (U2_SCREEN_H * U2_SCREEN_W)   /* 200 * 320 * 1 = 64000 */
@@ -67,21 +68,39 @@ static int try_pic(const char *path, struct u2_frame *f)
     return 0;
 }
 
-/* The candidate directories, in the same resolution order tiles_ega uses:
- * explicit themes dir, then data dir, then (dev builds only) the dev-checkout
- * defaults. */
-static int candidate_dirs(u2_ctx *ctx, const char **cands)
+/* The directories an EGA picture may live in, in precedence order.
+ *
+ * The explicit themes dir first, because that is where a hand-placed picture
+ * goes and it is the narrowest scope. Then EVERY content root, which means the
+ * themes dir plus the content root plus its `data/updated`, `updated` and
+ * `data/original` sublayers, from core/roots.h.
+ *
+ * The sublayers are the whole point of this function and the reason it used to be
+ * wrong. It read `ctx->data_dir`, which is the content root and nothing else, so
+ * in an installed tree (`[paths] data = .`, pictures under `data/original/`) the
+ * pack's EGA pictures were invisible: the three that also happen to sit in
+ * `themes/` resolved and the rest fell back to CGA, which then drew through the
+ * EGA palette and looked like noise. Owner-reported 2026-11-20 as "the demo
+ * pictures are messed up in EGA mode"; the dragon was fine for no reason other
+ * than that the pack copied it into `themes/` too. roots.h already says pic.c
+ * asks here, and pic_ega.c was the one file that did not.
+ *
+ * The dev-checkout fallback stays last, and stays absent from a release artifact.
+ */
+#define PIC_MAX_DIRS (1 + U2_ROOT_MAX + 2)
+
+static int candidate_dirs(u2_ctx *ctx, char dirs[PIC_MAX_DIRS][448])
 {
     int nc = 0;
     if (ctx && ctx->ega_theme_dir && *ctx->ega_theme_dir)
-        cands[nc++] = ctx->ega_theme_dir;
-    if (ctx && ctx->data_dir && *ctx->data_dir)
-        cands[nc++] = ctx->data_dir;
+        snprintf(dirs[nc++], 448, "%.400s", ctx->ega_theme_dir);
+    for (size_t r = 0; r < u2_root_count && nc < PIC_MAX_DIRS; r++)
+        u2_root_path(dirs[nc++], 448, ctx, u2_roots[r].sub);
     /* A release artifact does not know where this repository keeps its copy of the
      * upgrade package; core/artifact.h gives the reason. */
-    if (!u2_is_release_artifact()) {
-        cands[nc++] = "../references/u2upgrade";
-        cands[nc++] = "references/u2upgrade";
+    if (!u2_is_release_artifact() && nc + 1 < PIC_MAX_DIRS) {
+        snprintf(dirs[nc++], 448, "../references/u2upgrade");
+        snprintf(dirs[nc++], 448, "references/u2upgrade");
     }
     return nc;
 }
@@ -95,8 +114,8 @@ static const char *first_pic(u2_ctx *ctx, const char *base,
                              pic_probe each, void *user,
                              char *pathbuf, size_t bufsz)
 {
-    const char *cands[4];
-    const int nc = candidate_dirs(ctx, cands);
+    char dirs[PIC_MAX_DIRS][448];
+    const int nc = candidate_dirs(ctx, dirs);
     static const char *const suffixes[2] = { "-E", ".EGA" };
 
     for (int d = 0; d < nc; d++) {
@@ -104,7 +123,7 @@ static const char *first_pic(u2_ctx *ctx, const char *base,
             for (int up = 0; up < 2; up++) {
                 char name[48];
                 make_name(name, sizeof name, base, suffixes[s], up);
-                if (snprintf(pathbuf, bufsz, "%s/%s", cands[d], name) >= (int)bufsz)
+                if (snprintf(pathbuf, bufsz, "%.447s/%s", dirs[d], name) >= (int)bufsz)
                     continue;
                 if (each(pathbuf, user) == 0)
                     return pathbuf;
