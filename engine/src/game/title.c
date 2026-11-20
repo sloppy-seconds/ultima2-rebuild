@@ -217,7 +217,12 @@ static int show_pic(u2_ctx *ctx, const char *name, int hold_ms)
             return 0;
         }
     }
-    u2_font_draw_vram_rows(&pic_frame, &ctx->vram, 0, U2_ROWS - 1);
+    /* Glyph dots only. The plain variant paints every cell's background, which is a
+     * text screen and, over a picture, a full-frame fill of text_bg that erases the
+     * art it was meant to caption. This line is why the demonstration's couplets sat on
+     * black instead of on the starfield: the blit worked, the composite deleted it.
+     */
+    u2_font_draw_vram_rows_overlay(&pic_frame, &ctx->vram, 0, U2_ROWS - 1);
 
     struct u2_frame *saved = ctx->frame;
     ctx->frame = &pic_frame;

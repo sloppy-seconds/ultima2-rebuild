@@ -56,4 +56,16 @@ int u2_font_draw_text(u2_frame *f, int row, int col, const char *s,
 void u2_font_draw_vram_rows(u2_frame *f, const u2_vram *v, int top_row,
                             int bottom_row);
 
+/* The same grid, drawn as glyph dots only, with NO background fill.
+ *
+ * u2_font_draw_vram_rows is a text screen: it paints every cell's background, which is
+ * what makes a text screen opaque. Over a picture that is fatal -- it fills the whole
+ * frame with text_bg and the picture is gone, which is how the demonstration's couplets
+ * came to sit on black instead of on the starfield. The original's printer writes glyph
+ * pixels and nothing else, so the art shows through the spaces. Use this variant
+ * wherever text is composited onto art (title.c's show_pic is the only such caller).
+ */
+void u2_font_draw_vram_rows_overlay(u2_frame *f, const u2_vram *v, int top_row,
+                                    int bottom_row);
+
 #endif /* U2_FONT_H */

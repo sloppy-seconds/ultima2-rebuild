@@ -64,6 +64,35 @@ int u2_font_draw_text(u2_frame *f, int row, int col, const char *s,
     return n;
 }
 
+void u2_font_draw_vram_rows_overlay(u2_frame *f, const u2_vram *v, int top_row,
+                                    int bottom_row)
+{
+    if (!f || !v || !f->px) return;
+    if (top_row < 0) top_row = 0;
+    if (bottom_row >= U2_ROWS) bottom_row = U2_ROWS - 1;
+
+    const int s = f->scale > 1 ? f->scale : 1;
+    const int rows = (f->h / s) / U2_FONT_CELL_H;
+    const int cols = (f->w / s) / U2_FONT_CELL_W;
+    const uint8_t fg = f->text_fg ? f->text_fg : U2_CGA_WHITE;
+
+    for (int r = top_row; r <= bottom_row && r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            const uint8_t ch = v->cell[r][c].ch;
+            if (ch < 32 || ch > 126) continue;      /* blanks and control bytes draw nothing */
+            const unsigned char *glyph = font8x8_basic[ch & 0x7F];
+            const int x0 = c * U2_FONT_CELL_W;
+            const int y0 = r * U2_FONT_CELL_H;
+            for (int y = 0; y < U2_FONT_CELL_H; y++) {
+                const unsigned char bits = glyph[y];
+                for (int x = 0; x < U2_FONT_CELL_W; x++)
+                    if (bits & (1u << x))
+                        u2_frame_put_logical(f, x0 + x, y0 + y, u2_frame_cga_idx(f, fg));
+            }
+        }
+    }
+}
+
 void u2_font_draw_vram_rows(u2_frame *f, const u2_vram *v, int top_row,
                             int bottom_row)
 {

@@ -25,6 +25,7 @@
 #include <string.h>
 
 #include "core/ctx.h"
+#include "core/font.h"
 #include "core/frame.h"
 #include "core/pic.h"
 
@@ -124,6 +125,54 @@ int main(void)
         const int total = c[0] + c[1] + c[2] + c[3];
         CHECK(rc == 0 && total == U2_SCREEN_W * U2_SCREEN_H,
               "%s unpacks to a full 320x200 (rc=%d, %d pixels)", others[i], rc, total);
+    }
+
+    /* The text layer over a picture must not paint a background.
+     *
+     * This is the gate for the defect that made the demonstration's couplets sit on black
+     * instead of on the starfield: u2_pic_blit wrote the art, then u2_font_draw_vram_rows
+     * filled every one of the 2000 cells with text_bg and deleted it. Both halves are
+     * asserted, because a check that only tests the new function cannot tell which of the
+     * two it was given.
+     */
+    {
+        u2_vram v;
+        memset(&v, 0, sizeof v);
+        for (int r = 0; r < U2_ROWS; r++)
+            for (int c = 0; c < U2_COLS; c++) {
+                v.cell[r][c].ch = ' ';
+                v.cell[r][c].attr = 0x07;
+            }
+        static const char cap[] = "BATTLE STRANGE CREATURES";
+        for (int i = 0; cap[i]; i++)
+            v.cell[23][i].ch = (uint8_t)cap[i];
+
+        u2_frame_clear(&f, U2_CGA_BLACK);
+        u2_frame_set_text_fg(&f, U2_CGA_WHITE);
+        u2_pic_blit(&ctx, "pictwn", &f);
+        int ink0 = 0;
+        for (int y = 0; y < U2_SCREEN_H; y++)
+            for (int x = 0; x < U2_SCREEN_W; x++)
+                if (f.px[y][x]) ink0++;
+
+        u2_font_draw_vram_rows(&f, &v, 0, U2_ROWS - 1);
+        int ink_plain = 0;
+        for (int y = 0; y < U2_SCREEN_H; y++)
+            for (int x = 0; x < U2_SCREEN_W; x++)
+                if (f.px[y][x]) ink_plain++;
+        CHECK(ink_plain < ink0 / 4,
+              "the plain text layer wipes the picture it was drawn over (%d ink left of %d)"
+              " -- this is the bug, pinned so a regression cannot call it a fix", ink_plain, ink0);
+
+        u2_pic_blit(&ctx, "pictwn", &f);
+        u2_font_draw_vram_rows_overlay(&f, &v, 0, U2_ROWS - 1);
+        int ink_ov = 0;
+        for (int y = 0; y < U2_SCREEN_H; y++)
+            for (int x = 0; x < U2_SCREEN_W; x++)
+                if (f.px[y][x]) ink_ov++;
+        CHECK(ink_ov >= ink0,
+              "the overlay text layer leaves the picture intact and adds the caption"
+              " (%d ink vs %d before)", ink_ov, ink0);
     }
 
     /* PICCAS is named in the executable at file offset 0x6ba and has no file in the pack.
