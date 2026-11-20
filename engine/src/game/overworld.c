@@ -2490,20 +2490,21 @@ static void victory_flight(u2_ctx *ctx, u2_overworld *ow, int steps)
             ctx->clock->sleep_ms(ctx, U2_VICTORY_FLIGHT_STEP_MS);
         ctx->victory_flight_steps++;
         if (steps < 0) {
-            /* Forever, so something has to be able to end it -- but NOT a keypress. The
-             * owner's first build ended the flight on any key and he could not get through
-             * the ending without doing it by accident, which is the same class of defect as
-             * a menu after a win: the original offers nothing here, so the only thing that
-             * may end it is the player leaving.
+            /* Forever, so something has to be able to end it -- but only deliberately.
+             * The owner's first build ended the flight on any key and he could not get
+             * through the ending without doing it by accident, which is the same class of
+             * defect as a menu after a win. Esc is the one key he allowed, and it means the
+             * same thing as closing the window: the player is leaving. The original's loop
+             * has no exit at all, so every way out here is an addition, and the rule for the
+             * additions is that they must be impossible to hit by mistake.
              *
              * The poll stays because it is the only thing that pumps the event queue --
              * seam_present_frame presents and returns, and SDL sees a window close only
              * when someone polls for it, so dropping the poll would make the window
-             * uncloseable and the flight a freeze. The key itself is discarded on purpose:
-             * a stray arrow key is not the player leaving, and a closed window is.
+             * uncloseable and the flight a freeze. Every other key is discarded.
              */
             u2_key k;
-            (void)seam_key_poll(ctx, &k);
+            if (seam_key_poll(ctx, &k) > 0 && k.ch == 0x1b) break;   /* Esc */
             if (ctx->exit_code || ctx->input_exhausted) break;
         }
     }
