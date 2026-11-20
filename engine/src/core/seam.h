@@ -67,7 +67,16 @@ void seam_silence(u2_ctx *ctx, uint32_t ms);
 void seam_present(u2_ctx *ctx);
 /* Present the pixel framebuffer. Returns non-zero when the display asked to
  * quit (window closed). A no-op returning 0 on cell-only backends, so callers
- * do not need to know which kind of renderer they were given. */
+ * do not need to know which kind of renderer they were given.
+ *
+ * It PAINTS AND RETURNS. It is not a frame rate and it is not a delay: no vsync is
+ * enabled anywhere in the SDL backend, so a loop whose only pacing is a present runs
+ * at memcpy speed. Three owner-reported bugs came from assuming otherwise -- the victory
+ * fade and flight, the wound flash, and the plane loop before it grew an explicit wait.
+ * An animation that lasts a measurable time must wait on the clock (seam_wait_ms or
+ * ctx->clock->sleep_ms) between presents, and must not borrow that wait from seam_tone,
+ * which queues samples and returns, and returns even earlier when audio is muted.
+ */
 int  seam_present_frame(u2_ctx *ctx);
 
 #endif /* U2_SEAM_H */

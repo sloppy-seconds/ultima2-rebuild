@@ -37,27 +37,39 @@ static void ring_xor(u2_frame *f, int col, int row)
     }
 }
 
+/* The ring's on-screen duration, in ms. MEASURED: the capture's poller saw the ring up
+ * for 148-180 ms at ~130 ms granularity (captures/spice86/wound-flash-20261102), so 150
+ * is inside the measurement rather than a round guess about it.
+ */
+#define U2_WOUND_FLASH_MS 150
+
 void u2_flash_cell(u2_ctx *ctx, int col, int row)
 {
     ctx->diag_flashes++;
 
-    /* The tone is the timer, as in the original: flash on, tone, flash off.
-     * Divisor 0x800 is asm/5EF2's own immediate; the duration is MEASURED, not
-     * guessed — the capture's poller saw the ring up for 148-180 ms at ~130 ms
-     * granularity (captures/spice86/wound-flash-20261102). The tone player's own
-     * repeat/period model (asm/5DA9 -> asm/5FA9, DX repeats of CX periods) is
-     * not decoded, so no attempt is made to derive the duration from it, and the
-     * wound loop's other tone (asm/5EAC, divisor 0x300) is NOT wired: its
-     * duration has no byte and no measurement, and a guessed tone is worse than
-     * none. NOT modelled either: the DS:54D sound flag that gates asm/5DA9 — the
-     * engine does not carry that byte; choosing the audio backend is the user's
-     * volume knob. */
+    /* The tone is the original's feedback and stays wired: divisor 0x800 is asm/5EF2's
+     * own immediate. It is NOT the timer any more, and the wound loop's other tone
+     * (asm/5EAC, divisor 0x300) is still not wired because its duration has no byte and
+     * no measurement, and a guessed tone is worse than none. NOT modelled either: the
+     * DS:54D sound flag that gates asm/5DA9 — the engine does not carry that byte;
+     * choosing the audio backend is the user's volume knob.
+     */
     if (ctx->frame) {
         ring_xor(ctx->frame, col, row);
         seam_present_frame(ctx);
     }
 
-    seam_tone(ctx, 0x800, 150);
+    seam_tone(ctx, 0x800, U2_WOUND_FLASH_MS);
+
+    /* The hold belongs to the clock, not the tone. In the original the speaker write is
+     * followed by a busy loop, so the tone really is the timer; here the SDL backend
+     * queues samples and returns, and a muted run returns before it reaches the backend
+     * at all -- so pacing on the tone made the ring appear and vanish inside one frame,
+     * and it did that silently for anyone playing with sound off. Same number, different
+     * owner. A scripted run pays nothing: the script clock only advances virtual time.
+     */
+    if (ctx->clock && ctx->clock->sleep_ms)
+        ctx->clock->sleep_ms(ctx, U2_WOUND_FLASH_MS);
 
     if (ctx->frame) {
         ring_xor(ctx->frame, col, row);   /* the undo: XOR is its own inverse */

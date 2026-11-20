@@ -1072,7 +1072,9 @@ static u2_cmd_result launch_plane(u2_ctx *ctx, u2_overworld *ow)
          * Owner report 2026-11-11: "planes have the same issues as rockets, once launched
          * they fly really quick, no delays" -- correct, and the same defect: the loop drew
          * a frame per cell and paid nothing for it, so its rate was however fast a memcpy
-         * is, paced only by seam_present_frame on the empty-poll branch (~16 ms, vsync).
+         * is: seam_present_frame paints and returns and this backend enables no vsync, so
+         * a present paces nothing (see seam.h, and note this comment used to claim the
+         * present was worth ~16 ms of vsync, which was never true).
          * Placed after the draw and before the next poll, which is where the original's
          * render sits: `3cd6 call L_005cb1 ; 3cd9 jmp 3c5f` back to the top of the loop.
          * U2_PLANE_STEP_MS is now the measured march rate (49 steps in 4.00 s at ~1350 Hz,
