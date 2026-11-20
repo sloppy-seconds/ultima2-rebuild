@@ -592,6 +592,49 @@ else
     printf '  SKIP  no ../themes/default to build a --classic fixture from\n'
 fi
 
+# --- config theme vs a flag (owner-found 2026-11-20) -----------------------
+# The precedence rule the config file exists to hold is flag > config.ini, and a
+# config that names a theme used to beat --classic outright: main() applied
+# `[themes] theme` unconditionally after argument parsing, so the flag set CGA and
+# the config set it back to EGA. Owner hit it on a real install whose config selects
+# the `alt` theme: `--classic --cga` still printed `art mode: ega (theme alt)`.
+# The control is the same fixture with no flag, which must be EGA, so this can only
+# go green if the theme still applies when nothing contradicts it.
+rm -rf "$WORK/cfgclash"; mkdir -p "$WORK/cfgclash/themes/default"
+cp ../themes/default/THEME.INI ../themes/default/TILES "$WORK/cfgclash/themes/default/" 2>/dev/null
+if [ -s "$WORK/cfgclash/themes/default/TILES" ]; then
+    U2_ABS="$PWD/u2"
+    printf '[themes]\ndir = themes\ntheme = default\n' > "$WORK/cfgclash/config.ini"
+    clash() { (cd "$WORK/cfgclash" && "$U2_ABS" --headless --config config.ini "$@" 2>&1 | grep '^u2: art mode' | head -1); }
+    case "$(clash)" in
+        *ega*) ok "clash control: a config theme with no flag is EGA: $(clash)" ;;
+        *)     bad "clash control: config theme with no flag should be EGA" ;;
+    esac
+    case "$(clash --classic)" in
+        *cga*) ok "--classic beats a config that names a theme: $(clash --classic)" ;;
+        *)     bad "--classic lost to [themes] theme: '$(clash --classic)' -- this is the owner-found defect" ;;
+    esac
+    case "$(clash --cga)" in
+        *cga*) ok "--cga beats a config that names a theme: $(clash --cga)" ;;
+        *)     bad "--cga lost to [themes] theme: '$(clash --cga)'" ;;
+    esac
+    # --ega chose the axis but named no theme, so the config's name is a detail, not
+    # a contradiction, and must survive: losing it would make the flag worse than silence.
+    case "$(clash --ega)" in
+        *"ega (theme default)"*) ok "--ega keeps the config's theme NAME while taking the axis: $(clash --ega)" ;;
+        *)  bad "--ega should keep the configured theme name: '$(clash --ega)'" ;;
+    esac
+    # And within one file, `[game] mode = classic` is the more specific intent than
+    # `[themes] theme`, so it wins too.
+    printf '[game]\nmode = classic\n[themes]\ndir = themes\ntheme = default\n' > "$WORK/cfgclash/config.ini"
+    case "$(clash)" in
+        *cga*) ok "[game] mode = classic beats [themes] theme in the same file: $(clash)" ;;
+        *)     bad "[game] mode = classic lost to [themes] theme: '$(clash)'" ;;
+    esac
+else
+    printf '  SKIP  no ../themes/default to build a config-clash fixture from\n'
+fi
+
 # --- [game] mode -----------------------------------------------------------
 # Enhanced is the default mode and `--classic` is the opt-out for the whole
 # presentation, not just the art (owner, 2026-11-17). The observable here is the art

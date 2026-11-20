@@ -906,12 +906,33 @@ int main(int argc, char **argv)
          * axis -- so `theme = fmtowns` in a config produced CGA, which is worse
          * than saying nothing at all. Found by deploying to a real installed tree
          * rather than by the fixture tests, which is the whole reason the deploy
-         * step exists. Naming a theme is asking for themed art, from either place. */
-        if (*cfg.theme) {
+         * step exists. Naming a theme is asking for themed art, from either place.
+         *
+         * But it must not beat a flag. The block used to apply unconditionally, and it
+         * runs after argument parsing, so a config that names a theme overwrote
+         * `--classic` and `--cga` outright: the flag set CGA, this set EGA, and this
+         * ran last -- the opposite of the precedence the usage text promises ("a flag
+         * always wins over it"), and it also set ega_required on a run that had asked
+         * for the original art. Owner-found 2026-11-20 on a tree whose config selects
+         * the `alt` theme: `--classic --cga` still printed `art mode: ega (theme alt)`.
+         *
+         * What loses is the *axis* decision, not the name: `--ega` with `theme = alt`
+         * still gets the named theme, because the flag chose the axis and the config
+         * supplied a detail. And `[game] mode = classic` in the same file is the more
+         * specific statement of intent than `[themes] theme`, so it wins too -- which
+         * falls out of testing art_mode_forced rather than only the flags.
+         */
+        const int theme_overridden = *cfg.theme && art_mode_forced
+                                     && ctx.art_mode != U2_ART_EGA;
+        if (*cfg.theme && !theme_overridden) {
             theme_named = 1;
             art_mode_forced = 1;
             ega_required = 1;
             ctx.art_mode = U2_ART_EGA;
+        } else if (theme_overridden) {
+            fprintf(stderr, "u2: NOTE [themes] theme = %s ignored: the art mode was"
+                            " already chosen by a flag or by [game] mode"
+                            " (--classic/--cga/--cleanroom)\n", cfg.theme);
         }
     }
 
