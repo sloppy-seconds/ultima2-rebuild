@@ -2327,3 +2327,24 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   — and only the new case — to go red. A control that turns everything red proves the case is
   sensitive to nothing in particular.
   → Tier 1, evidence provenance and gate design.
+- **2026-11-20 — piping a build through `head` can kill the build, and the failing test that
+  follows is a lie.** A gate was edited, then `make -j8 2>&1 | grep ... | head -5` was run to
+  check it compiled. `head` exits after five lines, the pipe closes, and `SIGPIPE` kills `make`
+  partway through: the compiler lines that did print looked like success because the warning flags
+  in each command line contained the substring being grepped. The binary on disk was the previous
+  one, so the next test run reported a defect that had already been fixed, and an hour went into
+  debugging source that was correct. The generic rules: never truncate a build's output with
+  `head` in the same pipeline, and never decide a build succeeded by reading its log — check the
+  build tool's own exit status, and make the check for errors a pattern that cannot match the
+  compiler's own command line (`error:` and `warning:`, not `error`). A harness that builds and
+  tests in one shell pipeline should assert the build's status before it runs anything.
+  → Tier 1, harness hygiene and build verification.
+- **2026-11-20 — "reload the save" is not a general undo.** An ending animation wrote four fields
+  into live state, and the obvious fix was to reload the save afterwards. It was wrong twice over:
+  the fields lived outside the record's byte span, so reloading could not reach them at all, and
+  the flag that gated the animation was never cleared anywhere, so the animation re-ran on the
+  next entry. The generic rule: when a sequence mutates state as a costume rather than as a
+  decision, snapshot what it touches at the moment it starts and restore it explicitly when it
+  ends. Reloading persisted state only undoes the part that was ever persisted, and a harness that
+  asserts "the next run looks clean" will pass while the fields outside the record stay wrong.
+  → Tier 1, state ownership and restore discipline.
