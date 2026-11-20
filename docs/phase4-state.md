@@ -3295,6 +3295,34 @@ correctly declines the picture; `--dump-screen` ends the run at the first presen
 is gated and the call site is not. Confirming the splash on screen needs a person with a window, or a
 `--dev` affordance to dump the Nth frame rather than the first.
 
+**Correction, 2026-11-20: the call site can be driven, and driving it found a bug.** `--dump-screen-every`
+does exist and does not end the run, but it makes the input backend signal exhaustion, which
+`hold_for_esc` reads as an abort, so a dumping run skips the second intro screen and the splash
+entirely and looks exactly like the defect it is meant to investigate. What works is the engine's own
+noVNC container: `./deploy/novnc/up.sh`, then `playwright_browser_navigate` to
+`http://127.0.0.1:6082/vnc.html?autoconnect=true` and `playwright_browser_press_key` with `d`. That is
+a real key into a real window, and `up.sh --shot` then captures what the player sees.
+
+### The text layer was deleting the art it was captioning (owner-found, 2026-11-20)
+
+Owner: "I see the dragon, but not the pictures in the poem." Correct, and the cause was not the art,
+the loader, or the content roots. `show_pic` blitted the picture into its frame and then composited
+the caption with `u2_font_draw_vram_rows`, which is a **text screen** routine: it paints every one of
+the 2000 cells' background, so it filled the whole frame with `text_bg` and the picture was gone
+before the present. The blit returned success, the frame was presented, and what reached the window
+was black with a couplet at the bottom. The dragon survived on an EGA theme only because that path
+composites differently; on CGA it was erased too, which the container proved (`ink=1577` on a frame
+whose picture alone carries 11,567 inked pixels).
+
+The original's printer writes glyph pixels and nothing else, which is the only way a couplet can sit
+*on* a starfield. So `u2_font_draw_vram_rows_overlay` now does exactly that, and `show_pic` uses it.
+
+`tests/pic_check.c` grew the two halves of the control, because a check that only exercises the new
+function cannot tell which of the two it was handed: the plain layer must still wipe the picture
+(607 ink left of 14,967, which is the bug pinned rather than hidden) and the overlay must leave it
+intact and add the caption (15,574). Verified on screen over VNC: the pub couplet now sits on the
+town. Gate is 18 checks.
+
 **Copyright posture unchanged and worth restating:** the pictures are read at runtime from the
 player's own `--data-dir`, exactly like the tile art. Nothing is committed, nothing is substituted, and
 with the file absent the text screens are byte-for-byte what they were before this existed.

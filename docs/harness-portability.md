@@ -2360,3 +2360,18 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   region as raw bytes, that region is unexplored territory no matter what a later test concluded,
   because the test was written by someone working from the same gap.
   → Tier 1, evidence provenance and what a negative measurement can carry.
+
+- 2026-11-20 — **a decoder gate that asserts the output is fully populated rather than that it is
+  non-trivial cannot fail on the failure that matters.** The picture unpack was gated on "every one of
+  the 64,000 pixels is written", which a decode that produced a black rectangle satisfies perfectly.
+  The bug was not in the decoder at all: the caller blitted the picture and then composited its caption
+  with a text-screen routine that paints every cell's background, so the art was deleted between the
+  blit and the present, and every automated check along the way reported success. Two transferable
+  rules. First, an art or decode gate should assert ink (a distribution over the palette, or a floor on
+  non-background pixels), not coverage; coverage only catches truncation. Second, when a pipeline has a
+  compositing step, gate the composite and assert both directions in the same test — the old routine
+  must still destroy the underlay and the new one must not — because a check that exercises only the
+  replacement cannot tell which function it was given. The owner found this by looking at the screen,
+  which is the third time this project has had a "the code ran and the pixels disagreed" report; the
+  generic lesson is that a present call is not evidence of a visible result.
+  → Tier 1, gate design: what a check must be able to fail on, and composites need both-direction controls.
