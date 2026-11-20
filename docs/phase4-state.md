@@ -3278,13 +3278,20 @@ town comparison, not a picture problem.
 | `PICDNG`, `PICTWN`, `PICOUT` | referenced by name in the executable | **where they appear is not established** |
 | `PICCAS` | referenced at file offset `0x6ba` | **has no file in the pack** — a load that can never find its data |
 
-**Gate.** `tests/pic_check.c`, 16 checks, wired into CP4. The interesting part is what a census
+**Gate.** `tests/pic_check.c`, 23 checks, wired into CP4. The interesting part is what a census
 *cannot* do: every candidate layout for these bytes is a permutation of the same 16,000 bytes, so the
-global colour census is **identical** for the correct interleave, for the two fields swapped, and for a
-naive non-interleaved read (all three give 52433/6061/4370/1136). A test written on the global census
-would pass on a decode that drew the picture combed. What separates them is placement: scanline 4
-carries eight magenta pixels and scanline 5 carries none under the correct layout, and swapping the
-fields moves those eight to scanline 5. The gate asserts that by name, plus four quadrant censuses.
+global colour census is **identical** for the correct layout, for the two fields swapped, and for a
+naive non-interleaved read. A test written on the global census would pass on a decode that drew the
+picture combed — and that is not hypothetical, because that is exactly what happened. This section
+used to name "scanline 4 carries eight magenta pixels and scanline 5 carries none" as the thing that
+separates the layouts, and asserted it as the correct interleave. It was the wrong layout, it passed
+every check aimed at it, and every picture shipped doubled and combed until 2026-11-21.
+
+What actually separates them is also positional but stronger: the art is 320x100 displayed doubled,
+so **every scanline pair is identical**, and the field reading fails that on 97 of 200 rows. The gate
+now asserts that, plus the control that keeps it honest (the file's second half is not a copy of its
+first, so the two layouts really are distinguishable), plus four quadrant censuses recomputed for the
+doubled layout. Control run with the old mapping restored: 7 checks red.
 It also asserts a missing file is a clean refusal that leaves the frame untouched, and that `piccas`
 is still absent — so if a future pack adds it, something notices.
 

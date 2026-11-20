@@ -2402,3 +2402,15 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   a human should apply the real palette and scale by an integer factor, or it manufactures defects.
   → Tier 1, verification discipline: measure against the source, and make preview tooling faithful
   or do not trust it.
+- 2026-11-21 — **a census is not a proof of layout, and a gate built on one cannot fail.** A picture
+  format was recorded as proven because decoding it one way reproduced a live capture at "100%
+  colour-class agreement over 4000 sampled pixels". Two candidate row mappings both produce exactly
+  the same colour histogram, so that check was satisfied by the wrong reading and by the right one
+  alike, and the wrong reading shipped: every picture rendered horizontally doubled and combed. The
+  property that separates the two is position, not count, and it needed a per-scanline comparison
+  against a capture rather than a tally. The general shape: **a derived check that summarises
+  structure into counts throws away exactly the axis that distinguishes the hypotheses it is meant
+  to separate.** It reads as a strong check because the number is large and the match is exact.
+  → Tier 1, verification discipline: when a check summarises geometry into a histogram, ask which
+  two layouts it cannot tell apart, and assert that pair positionally. Then write the control that
+  makes it red; if no input can make it fail, it is decoration.
