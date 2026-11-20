@@ -262,6 +262,23 @@ launch directory resolves against `.`, which is the original's default-drive mod
 directory that does not exist yet: it is output, and `save.c` creates it on first
 write the way the original would have.
 
+**Precedence is enforced, not just stated** — *owner-found 2026-11-20.* The rule above
+was written down in three places and broken in the code: `main()` applied
+`[themes] theme` after argument parsing and unconditionally, so on any install whose
+config names a theme, `--classic` and `--cga` set CGA and were then set back to EGA. The
+observable was `--classic --cga` printing `art mode: ega (theme alt)`.
+
+The rule as now implemented: a flag that settles the **art axis** wins over a config that
+names a theme, and so does `[game] mode = classic` in the same file, because naming a
+mode is the more specific statement of intent than naming a theme. What a flag does *not*
+steal is the theme **name**: `--ega` chose the axis and named nothing, so a configured
+`theme = alt` still supplies the detail. Making an explicit flag worse than silence is
+the trap in a feature whose whole job is supplying defaults, and the same mistake is
+recorded a few lines above in `main()`'s own comment about an earlier half-fix. An
+ignored theme prints a `u2: NOTE` rather than vanishing quietly. Gated in CP4 with the
+control in the same fixture (no flag must still be EGA), and proved red with the fix
+disabled before it was proved green.
+
 **`[install]` — what `--install` was given, recorded so a re-run needs no arguments.**
 *added 2026-11-05, owner request: "the install should put all the install paths in
 config.ini so if you keep it alongside your .exe it can reinstall without asking
