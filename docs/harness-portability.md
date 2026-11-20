@@ -189,6 +189,20 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-20 — A mutation selftest pins source text, so it rots silently the moment the code
+  is restructured, and the restructure is the commit that owes the update.** A selftest that
+  proves a checker can go red does it by rewriting one decoded fact in the source and requiring
+  the mutant to fail. The patterns it rewrites are literal text, so a rewrite of the function
+  under test — a correct rewrite, driven by better evidence — leaves the controls pointing at
+  code that no longer exists, and they will report a failure to mutate rather than a verdict.
+  Two of four did exactly that and sat red in the aggregate gate for weeks while the code they
+  described was rewritten twice. Two things follow. A control reporting "mutator failed" is the
+  selftest telling the truth and not a nuisance to silence: the fix is to re-point it at the fact
+  as it now stands, and then to confirm the mutant still fails on the assertion the control
+  names, not on a compile error or an unrelated early exit. And a harness that ships mutation
+  selftests should state in the selftest's own header that restructuring the target requires
+  updating the selftest in the same commit, because nothing else connects the two files.
+  → Tier 1, gate design.
 * **2026-11-19 — A proxy rule that agrees with the original by coincidence will break on exactly
   the case that matters, and it will look correct in every test anyone thinks to write.** The
   movement gate rejected a step when the subject was present in the entity table. The original

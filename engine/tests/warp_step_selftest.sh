@@ -10,6 +10,12 @@
 # Every mutation is verified to have landed before the mutant is trusted, because
 # str.replace() returns the string unchanged when the pattern misses and a no-op and a
 # success are otherwise indistinguishable.
+#
+# The patterns are source TEXT, so a rewrite of the step rule has to update this file in
+# the same commit. cd13d2a rewrote the x arm from the capture census and left controls 1
+# and 2 pointing at code that no longer existed; they reported BAD for weeks afterwards,
+# which is the selftest telling the truth and nobody listening. If a control goes BAD with
+# "mutator failed", the code moved — fix the pattern, do not delete the control.
 set -u
 cd "$(dirname "$0")/.." || exit 1
 
@@ -52,33 +58,37 @@ run_control() {
     fi
 }
 
-# Control 1: the two x arms are swapped. This is not hypothetical — it is the exact mistake
-# the first version of this function made, because `L_006d55 jb L_006d7f` branches on
-# old < ship, so the FALL-THROUGH is the >= case and the fall-through is the subtract arm.
-# Swapping them makes the field run away from the ship instead of toward it.
+# Control 1: the x arm's near/far split is inverted. cd13d2a rebuilt this arm from the
+# capture census: it is bucket-based now, `di = d >> 4`, and `di < 8` is the near side that
+# pushes a star away from the crosshair while the far side pulls it back. The pattern this
+# control used to match — an `old >= ship_x` comparison — is gone, because the arm no longer
+# compares against the ship at all. Inverting the split is the same failure the original
+# swapped-arms mistake was: the field runs the wrong way.
 cat > "$WORK/m1.py" <<'PY'
 import sys, pathlib
 src, dst = sys.argv[1], sys.argv[2]
 s = pathlib.Path(src).read_text()
-out = s.replace("        if (old >= ship_x) {", "        if (old < ship_x) {")
+out = s.replace("        if (di < 8) {", "        if (di >= 8) {")
 if out == s: sys.exit(1)
 pathlib.Path(dst).write_text(out)
 PY
-run_control "x arms swapped" "$WORK/m1.py"
+run_control "x near/far split inverted" "$WORK/m1.py"
 
-# Control 2: the bucket complement dropped. `L_006d57 xor $0xff,%al` before the four rcr is
-# what makes the step GROW as a star approaches the ship; without it the step shrinks and
-# the field is a drift, not a radial pull.
+# Control 2: the y arm's bucket complement dropped. `L_006d57 xor $0xff,%al` before the four
+# rcr is what makes the step GROW as a star approaches the ship; without it the step shrinks
+# and the field is a drift, not a radial pull. The complement lives on the y arm only — the x
+# arm gets the equivalent effect from the near/far split above — which is why this names the
+# complement line rather than the ship_x pair it used to look for.
 cat > "$WORK/m2.py" <<'PY'
 import sys, pathlib
 src, dst = sys.argv[1], sys.argv[2]
 s = pathlib.Path(src).read_text()
-out = s.replace("            d = (old - ship_x) & 0xff;\n            di = ((~d) & 0xff) >> 4;",
-                "            d = (old - ship_x) & 0xff;\n            di = d >> 4;")
+out = s.replace("            di = ((~d) & 0xff) >> 4;",
+                "            di = d >> 4;")
 if out == s: sys.exit(1)
 pathlib.Path(dst).write_text(out)
 PY
-run_control "x bucket no longer complemented" "$WORK/m2.py"
+run_control "y bucket no longer complemented" "$WORK/m2.py"
 
 # Control 3: the y add arm's sign gate is removed, so a result at or past 0x80 is stored.
 # asm/6B3D puts the store AFTER `jns` on this arm (L_006de9 adc, jns, L_006df3 mov), so the
@@ -107,6 +117,21 @@ if out == s: sys.exit(1)
 pathlib.Path(dst).write_text(out)
 PY
 run_control "x add-arm store re-gated on overflow" "$WORK/m4.py"
+
+# Control 5: the x arm's near-side magnitude is off by one. The direction controls prove the
+# field points the right way; this proves the check also pins HOW FAR a star moves, which is
+# the fact cd13d2a actually measured (buckets 0..7 give +1..+8, and the census behind that is
+# hundreds of samples per bucket). One pixel per frame is invisible in a single step and
+# obvious over a census, so it belongs under the gate.
+cat > "$WORK/m5.py" <<'PY'
+import sys, pathlib
+src, dst = sys.argv[1], sys.argv[2]
+s = pathlib.Path(src).read_text()
+out = s.replace("            step = di + 1;", "            step = di + 2;")
+if out == s: sys.exit(1)
+pathlib.Path(dst).write_text(out)
+PY
+run_control "x near-side step off by one" "$WORK/m5.py"
 
 echo "warp_step selftest: $controls controls, $fails bad"
 [ "$fails" -eq 0 ] || exit 1
