@@ -7,11 +7,19 @@
  * There is no image format here, and that is the finding. The files are literal images of
  * CGA mode-4 video memory, so the "decoder" is an unpack, not a parser.
  *
- * What is proven: decoding a pic file as 320x200 at 2bpp with even scanlines at offset 0 and
- * odd scanlines at 8000 reproduces a live captured frame of the original's title splash at
- * 100% colour-class agreement over 4000 sampled pixels (captures/spice86/splash-look, and
- * engine/tests/pic_check.c re-checks the census on any machine that has the game). The engine's
- * u2_frame stores one CGA index per pixel, so the unpack lands straight into it.
+ * What is proven: the pixel layout, established positionally on 2026-11-21 against a live
+ * capture of the original (captures/spice86/cga-splash-live/). Displayed row 2n equals file
+ * row n on 187 of 187 sampled rows across two pictures, so the art is 320x100 displayed
+ * doubled and only the first 8,000 bytes of a pic file are pixels. engine/tests/pic_check.c
+ * pins this by asserting scanline pairs are identical, which the earlier reading fails on 97
+ * of 200 rows.
+ *
+ * What used to be claimed here, and why it survived: "even scanlines at offset 0 and odd at
+ * 8000 reproduces a live captured frame at 100% colour-class agreement". A colour-class
+ * agreement is a census, and a census cannot separate these two layouts -- both yield exactly
+ * 11,567 inked pixels for picdra. The wrong reading therefore passed every check aimed at it
+ * and produced pictures that were horizontally doubled and combed. Do not re-prove this with
+ * a census.
  *
  * What is not proven is which instruction moves the bytes. asm/5351_sub_5351.asm does
  * `mov $0xb800,%ax ; mov %ax,%ds`, and 0xB800 is the mode-4 framebuffer, so the game certainly
@@ -23,9 +31,11 @@
  * engine does not need the answer: it reads the file itself.
  *
  * Layout of the pixel data, measured rather than assumed:
- *   - 320x200, 2 bits per pixel, 80 bytes per scanline
- *   - even scanlines occupy offset 0..7999 and odd scanlines 8000..15999, which is the
- *     CGA mode-4 interleave (B8000 even field, BA000 odd field)
+ *   - the screen is 320x200 at 2 bits per pixel, 80 bytes per displayed scanline pair
+ *   - displayed rows 2n and 2n+1 both come from file bytes (n)*80, i.e. the art is 320x100
+ *     and the original doubles it vertically; the bytes at 8000..15999 are not the odd field
+ *     and are not drawn. They are a horizontally shifted variant of the first half (picout by
+ *     22 px, pictwn by 36 px) and remain unexplained.
  *   - within a byte the leftmost pixel is in the top two bits
  *   - palette index 0 black, 1 cyan, 2 magenta, 3 white
  *   - five files are 16384 bytes (32 sectors, so 384 bytes of trailing padding) and

@@ -10,9 +10,9 @@
 #           arrives in many one-record reads with the buffer advanced by a caller that has not
 #           been identified. Both are consistent with the bytes and neither is established, so
 #           "pic_read" would overstate it. The empirical fact stands on its own regardless: the
-#           files are literal mode-4 framebuffer images, proven by decoding picdra against a
-#           live capture at 100% colour-class agreement (see asm/5351's header and
-#           engine/src/core/pic.h).
+#           files are literal mode-4 pixel data, established positionally against a live capture
+#           on 2026-11-21 (see asm/5351's header, which this line used to point at for a census
+#           claim that could not have distinguished the two candidate layouts).
 # func 535A..5370  len 0017 B  evidence: seed+reko
 # seams: dos_int21
 # provenance: read 2026-11-03 while implementing the engine's splash pictures

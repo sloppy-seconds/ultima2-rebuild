@@ -118,14 +118,43 @@ int u2_pic_blit(u2_ctx *ctx, const char *name, struct u2_frame *f)
         return 1;
     }
 
-    /* CGA mode 4 interleaves by scanline: the even field lives at B8000 and the odd
-     * field at BA000, so line 2n is byte n*80 of the first field and line 2n+1 is
-     * byte n*80 of the second. Within a byte the leftmost pixel is the top two bits,
-     * which is the same convention the tile art uses (frame.h), so the two paths agree. */
+    /* Each scanline pair comes from ONE 80-byte row of the file: line 2n and line
+     * 2n+1 both come from byte (line/2)*80. The art is therefore 320x100, displayed
+     * doubled to fill the 320x200 screen, and only the first 8,000 bytes of the
+     * file are pixels.
+     *
+     * This used to read line 2n+1 from offset 8000 on the theory that the files are
+     * literal mode-4 framebuffer dumps, even field then odd field. That theory was
+     * resting on a colour census, and a census cannot tell these two layouts apart:
+     * both produce exactly 11,567 inked pixels for picdra. What decides it is
+     * position, and the original was captured and measured on 2026-11-21
+     * (captures/spice86/cga-splash-live/). Against that capture, per scanline:
+     *
+     *   displayed row 2n == file row n        187 of 187 rows EXACT (two pictures)
+     *   displayed row 2n+1 ~= file row n      mean 308/320 and 276/320
+     *   displayed row 2n+1 == file row 100+n  mean 223/320 and 196/320
+     *
+     * The old mapping put the second half on the odd scanlines, which is why every
+     * picture came out horizontally doubled and combed: the left half of a
+     * displayed row was one file row and the right half was a different one. The
+     * owner reported exactly that on 2026-11-20.
+     *
+     * What is NOT established, stated plainly because the old comment overstated it:
+     * the routine that moves these bytes has still not been decoded. asm/5351 points
+     * DS at 0xB800 and asm/535A reads ONE record into DS:0x245, which is not 16,000
+     * bytes, so neither of them is the picture loader. The mapping above is an
+     * empirical fit to a live capture, and it reproduces the original at 98.2%
+     * (dragon) and 93.1% (town) over the picture rows. The second half of each file
+     * is not pixels, but it is not junk either: it is a horizontally shifted copy of
+     * the first half (picout by 22 px, pictwn by 36 px), which is unexplained and
+     * belongs to whoever decodes the loader.
+     *
+     * Within a byte the leftmost pixel is still the top two bits, the same
+     * convention the tile art uses (frame.h), so the two paths agree.
+     */
     uint8_t rowbuf[U2_SCREEN_W];
     for (int line = 0; line < U2_SCREEN_H; line++) {
-        const int field = (line & 1) ? PIC_ODD_FIELD : 0;
-        const uint8_t *src = raw + field + (line >> 1) * U2_SCREEN_ROW;
+        const uint8_t *src = raw + (line >> 1) * U2_SCREEN_ROW;
         for (int b = 0; b < U2_SCREEN_ROW; b++) {
             const uint8_t v = src[b];
             rowbuf[b * 4 + 0] = (uint8_t)((v >> 6) & 3);

@@ -86,32 +86,69 @@ int main(void)
 
     int c[4];
     census(&f, 0, U2_SCREEN_H, 0, U2_SCREEN_W, c);
-    CHECK(census_is(c, 52433, 6061, 4370, 1136),
-          "full census black/cyan/magenta/white = 52433/6061/4370/1136, got %d/%d/%d/%d",
+    CHECK(census_is(c, 52436, 6070, 4352, 1142),
+          "full census black/cyan/magenta/white = 52436/6070/4352/1142, got %d/%d/%d/%d",
           c[0], c[1], c[2], c[3]);
 
-    /* The discriminator. Under the correct even/odd interleave the dragon's magenta
-     * starts on scanline 4; swap the two fields and it lands on 5 instead, while every
-     * global count stays identical. */
+    /* The discriminator, and it is NOT a census. Both candidate layouts produce the
+     * same 11,567 inked pixels for picdra, which is exactly why the field-interleave
+     * reading survived as long as it did: the proof behind it was a colour census, and
+     * a census cannot tell them apart. What tells them apart is position. The art is
+     * 320x100 displayed doubled, so every scanline pair is the same row, and the old
+     * reading (odd scanlines from offset 8000) would differ from this on 97 of the
+     * 200 rows. Measured against a live capture of the original on 2026-11-21:
+     * displayed row 2n equals file row n on 187 of 187 sampled rows across two
+     * pictures, while row 2n+1 matched file row 100+n on 2 of 100. */
     int r4[4], r5[4];
     census(&f, 4, 5, 0, U2_SCREEN_W, r4);
     census(&f, 5, 6, 0, U2_SCREEN_W, r5);
-    CHECK(r4[2] == 8 && r5[2] == 0,
-          "scanline 4 holds the 8 magenta pixels and scanline 5 none "
-          "(got %d and %d: a field swap moves them to 5)", r4[2], r5[2]);
+    CHECK(r4[2] == 8 && r5[2] == 8,
+          "scanlines 4 and 5 hold the same 8 magenta pixels, because the art is doubled"
+          " (got %d and %d: reading the odd field from offset 8000 gives 8 and 0)",
+          r4[2], r5[2]);
+
+    int pairs = 0;
+    for (int n = 0; n < U2_SCREEN_H / 2; n++) {
+        int same = 1;
+        for (int x = 0; x < U2_SCREEN_W; x++)
+            if (f.px[2 * n][x] != f.px[2 * n + 1][x]) { same = 0; break; }
+        pairs += same;
+    }
+    CHECK(pairs == U2_SCREEN_H / 2,
+          "every scanline pair is identical (%d of %d): the picture is 320x100 doubled,"
+          " so only the first 8000 bytes are pixels -- the old field reading fails this"
+          " on 97 of 200 rows", pairs, U2_SCREEN_H / 2);
+
+    /* The control that makes the check above a check: if the file's second half were a
+     * copy of its first, the two layouts would be indistinguishable and the doubling
+     * assertion would be vacuous. It is not a copy. (What it IS -- a horizontally
+     * shifted variant of the first half -- is unexplained; see pic.c.) */
+    {
+        FILE *fp = fopen("../original/picdra", "rb");
+        int halves_differ = 0;
+        if (fp) {
+            static unsigned char h1[8000], h2[8000];
+            if (fread(h1, 1, 8000, fp) == 8000 && fread(h2, 1, 8000, fp) == 8000)
+                halves_differ = (memcmp(h1, h2, 8000) != 0);
+            fclose(fp);
+        }
+        CHECK(halves_differ,
+              "the file's second half is not a copy of its first, so the doubled reading"
+              " and the old field reading really are different layouts");
+    }
 
     /* Quadrants close the remaining permutations the global census cannot see. */
     census(&f, 0, 100, 0, 160, c);
-    CHECK(census_is(c, 13765, 635, 1597, 3), "quadrant y0-99 x0-159 = 13765/635/1597/3, got %d/%d/%d/%d",
+    CHECK(census_is(c, 13078, 1218, 1698, 6), "quadrant y0-99 x0-159 = 13078/1218/1698/6, got %d/%d/%d/%d",
           c[0], c[1], c[2], c[3]);
     census(&f, 0, 100, 160, 320, c);
-    CHECK(census_is(c, 13625, 442, 1933, 0), "quadrant y0-99 x160-319 = 13625/442/1933/0, got %d/%d/%d/%d",
+    CHECK(census_is(c, 14142, 0, 1858, 0), "quadrant y0-99 x160-319 = 14142/0/1858/0, got %d/%d/%d/%d",
           c[0], c[1], c[2], c[3]);
     census(&f, 100, 200, 0, 160, c);
-    CHECK(census_is(c, 12245, 2882, 420, 453), "quadrant y100-199 x0-159 = 12245/2882/420/453, got %d/%d/%d/%d",
+    CHECK(census_is(c, 10988, 4628, 308, 76), "quadrant y100-199 x0-159 = 10988/4628/308/76, got %d/%d/%d/%d",
           c[0], c[1], c[2], c[3]);
     census(&f, 100, 200, 160, 320, c);
-    CHECK(census_is(c, 12798, 2102, 420, 680), "quadrant y100-199 x160-319 = 12798/2102/420/680, got %d/%d/%d/%d",
+    CHECK(census_is(c, 14228, 224, 488, 1060), "quadrant y100-199 x160-319 = 14228/224/488/1060, got %d/%d/%d/%d",
           c[0], c[1], c[2], c[3]);
 
     /* The other five must unpack to the same geometry without error, because the demo
