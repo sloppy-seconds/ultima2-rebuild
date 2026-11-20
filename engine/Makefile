@@ -8,8 +8,15 @@
 
 CC       ?= cc
 STD      ?= -std=c11
+# -pedantic is on because the tree is clean under it, and it is the only thing
+# that keeps it clean. What it was catching was not cosmetics: eight call sites
+# passed a plain uint8_t (*)[3] where the parameter was const uint8_t (*)[3],
+# which is not a valid qualification conversion before C23, and one _Static_assert
+# on strcmp was a warning that had been mistaken for a check. The full reasoning
+# is on the palette parameters in core/frame.h and on U2_CONFIG_THEMES_DIR in
+# core/config.h.
 WARN     := -Wall -Wextra -Werror -Wshadow -Wstrict-prototypes -Wmissing-prototypes \
-            -Wpointer-arith -Wwrite-strings -Wno-unused-parameter
+            -Wpointer-arith -Wwrite-strings -Wno-unused-parameter -pedantic
 OPT      ?= -O2
 CPPFLAGS += -Isrc -Icontent
 CFLAGS   += $(STD) $(WARN) $(OPT)
