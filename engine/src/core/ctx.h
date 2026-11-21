@@ -13,11 +13,6 @@
 #include "core/vram.h"
 #include "core/state.h"
 
-/* A dungeon wall texture is one 32x32 tile of palette indices (k_pal under the FM
- * Towns theme). The theme bakes it; the loader copies it into ctx; the 3D renderer
- * samples it across the wall quads. See docs/enhanced-dungeon-3d.md § 7a step 2. */
-#define U2_DNG_WALL_PX 1024
-
 typedef enum u2_mode {
     U2_MODE_TERM = 0,   /* interactive terminal */
     U2_MODE_HEADLESS = 1/* null renderer, scripted or piped input */
@@ -146,14 +141,10 @@ typedef struct u2_ctx {
      * brightest entry of it, because the FM Towns palette has index 3 as black and
      * the CGA pair then draws status text in the background colour. */
     uint8_t text_fg;
-    /* The dungeon wall texture carried by the active theme (see U2_DNG_WALL_PX).
-     * dng_wall_set is true only when the theme shipped one; the 3D renderer then
-     * samples these indices across the wall quads, otherwise it draws the flat
-     * placeholder fill. The indices are the theme's own palette space (k_pal for
-     * FM Towns), which is why they render correctly with no remap: the uploader
-     * already maps frame indices through theme_palette. */
-    int dng_wall_set;
-    uint8_t dng_wall[U2_DNG_WALL_PX];
+    /* There is deliberately no dungeon-wall texture here. A theme may declare one
+     * (THEME.INI `dng_wall`) and the loader parses and validates it on the theme
+     * struct, but nothing draws it, so carrying a copy on every ctx was a wire to
+     * nowhere with a comment claiming otherwise. See u2_tiles_ega's has_dng_wall. */
     const u2_renderer *renderer;
     const u2_input    *input;
     const u2_audio    *audio;

@@ -58,6 +58,12 @@
 #define U2_TILE_EGA_MAX_TILES  128
 #define U2_TILE_EGA_MAX_FRAMES 8
 
+/* A dungeon wall texture is one 32x32 tile of palette indices (k_pal under the FM
+ * Towns theme). The theme bakes it and the loader validates it; see has_dng_wall
+ * below for why nothing draws it. It lives here rather than in ctx.h because the
+ * theme owns the bytes and ctx no longer carries a copy. */
+#define U2_DNG_WALL_PX 1024
+
 /* The frame scale the EGA art axis composites at, whatever theme is active.
  * This is a property of the ART MODE and not of the theme, and that is a ruling
  * rather than an inference: `--ega` always draws 640x400, a 16x16 v1 theme is
@@ -90,15 +96,26 @@ typedef struct u2_tiles_ega {
     int      has_palette;
     uint8_t  palette[16][3];        /* only meaningful when has_palette */
     /* An optional dungeon wall texture the theme bakes (THEME.INI `dng_wall`).
-     * One 32x32 tile of the theme's own palette indices, sampled across the 3D
-     * corridor's wall quads. Absent means the corridor draws its flat fill. */
+     * One 32x32 tile of the theme's own palette indices, and the loader parses and
+     * size-checks it -- but nothing samples it. The 3D corridor draws procedural
+     * wall art (dungeon3d.c, via u2_dga_tex), not theme art, and that is deliberate:
+     * engine/tests/dungeon_art_neutral.py forbids the dungeon from naming this
+     * module at all, and the in-game notice THEME ART DOES NOT COVER DUNGEONS was
+     * removed on 2026-11-06 only because the dungeon is theme-free. So the key is
+     * accepted because a theme tree that carries it is a legal tree and --check must
+     * still refuse one whose declared wall file is missing or the wrong size, not
+     * because the engine can show it. docs/enhanced-dungeon-3d.md § 7a step 2 is
+     * where the sampling was planned and never built. */
     int      has_dng_wall;
     uint8_t  dng_wall[U2_DNG_WALL_PX];
     int      has_map;
     uint16_t map[U2_TILE_COUNT][U2_TILE_EGA_MAX_FRAMES];
     uint8_t  map_n[U2_TILE_COUNT];
     int      scope_dungeon;         /* the theme claims dungeon art is mapped */
-    int      scope_tower;
+    /* No scope_tower field. `tower` is a legal word in the `scope` list and stays
+     * legal -- parse_scope still refuses anything else -- but tower art is out of
+     * scope for both formats (docs/theme-format.md), so the word is accepted and
+     * dropped rather than stored where nothing reads it. */
     /* A palette index this theme's art uses to mean "no pixel here", or -1 when the
      * art has no such convention. It is a property of the ART, not of the mode, and
      * the evidence differs per source: in the FM Towns banks 14 of 14 creature

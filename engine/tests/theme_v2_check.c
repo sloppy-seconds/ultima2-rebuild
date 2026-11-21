@@ -217,11 +217,15 @@ int main(void)
           U2_EGA_FRAME_SCALE, gctx.frame_scale);
     CHECK(t.has_palette && t.palette[1][1] == 255 && t.palette[1][0] == 0,
           "PALETTE.RGB is read and entry 1 is the green the fixture wrote");
-    CHECK(gctx.dng_wall_set == 1, "the theme's dng_wall reaches ctx (dng_wall_set=%d)", gctx.dng_wall_set);
+    /* Asserted on the theme, not on ctx. It used to assert the bytes reached ctx,
+     * which passed for months while nothing read them: a gate certifying a wire to
+     * nowhere. What --check genuinely depends on is that the declared wall file is
+     * found, sized and parsed, so that is what is asserted now. */
+    CHECK(t.has_dng_wall == 1, "the theme's dng_wall parsed (has_dng_wall=%d)", t.has_dng_wall);
     {
-        int ok = gctx.dng_wall_set == 1;
-        for (int i = 0; ok && i < 1024; i++) if (gctx.dng_wall[i] != (i % 8)) ok = 0;
-        CHECK(ok, "the wall tile bytes reach ctx verbatim (the i%%8 ramp)");
+        int ok = t.has_dng_wall == 1;
+        for (int i = 0; ok && i < 1024; i++) if (t.dng_wall[i] != (i % 8)) ok = 0;
+        CHECK(ok, "the wall tile bytes parsed verbatim (the i%%8 ramp)");
     }
     CHECK(t.has_map, "MAP.TSV is present so the atlas is not identity");
     CHECK(u2_tiles_ega_tile(&t, 5) == 1, "art 05 maps to pool tile 1");

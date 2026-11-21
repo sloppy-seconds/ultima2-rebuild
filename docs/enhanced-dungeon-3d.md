@@ -439,9 +439,18 @@ tile is the wall (tiles ~1-9 are flat brick) and which bank is the tower — § 
 2. **Bank loader.** (SHIPPED, `63f645f`) Bake the wall tile into the theme at build time
    (owner ruling: bake, not a runtime ISO read). `fmtowns.c` reads `DUNG1` directly and
    decodes tile 1 (a flat brick) into `DNGWALL.TILE` (1024 k_pal indices) and adds
-   `dng_wall = DNGWALL.TILE` to THEME.INI; `tiles_ega.c` parses the key and copies the
-   tile into `ctx->dng_wall`; `dungeon3d.c` samples it verbatim (no remap — the uploader
-   already maps frame indices through `theme_palette`). `fmtowns_theme.py` emits the
+   `dng_wall = DNGWALL.TILE` to THEME.INI; `tiles_ega.c` parses the key and validates the
+   tile. **Corrected 2026-11-21 — the last half of this chain was never built.** The step
+   claimed the tile was copied into `ctx->dng_wall` and sampled verbatim by `dungeon3d.c`.
+   Neither happened: the ctx fields were written by the theme loader and read by nothing, and
+   the walls are textured from `u2_dga_tex(U2_DGA_WALL_STONE, …)` — bank art, see
+   `dungeon_assets.h:43` — at `dungeon3d.c:211`. `u2_dungeon3d_set_wall_tex`, the seam step 3
+   below says it shipped, is not in the tree at all. The ctx fields and the dead
+   `scope_tower` are now deleted (issue #7); the parse stays, so `--check` still refuses a
+   theme whose declared wall file is missing or mis-sized, and `theme_v2_check` now asserts
+   the parse on the theme struct instead of on a wire to nowhere. If theme wall art is ever
+   wanted it is a product decision that also has to retire `engine/tests/dungeon_art_neutral.py`,
+   not a refactor. `fmtowns_theme.py` emits the
    identical bytes so the C<->Python byte-identity check stays green. Gate:
    `fmtowns_check` carries `DUNG1` in the synthetic ISO and asserts `DNGWALL.TILE` is
    DUNG1 tile 1 decoded. The floor/ceiling tiles and the tower-vs-dungeon bank choice

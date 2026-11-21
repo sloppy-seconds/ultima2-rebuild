@@ -138,7 +138,6 @@ static u2_tiles_ega_result try_load_v1(const char *path, const char *dir,
     t->has_palette = 0;
     memset(t->map_n, 0, sizeof t->map_n);
     t->scope_dungeon = 1;      /* the v1 atlas is the one the game itself uses */
-    t->scope_tower = 1;
     /* The DOS art has no transparent pen: index 0 is ordinary background there, so
      * a v1 theme draws every pixel. */
     t->transparent_index = -1;
@@ -411,7 +410,7 @@ static u2_tiles_ega_result try_load_v2(const char *dirpath, const char *theme,
     t->bpp = bpp;
     t->scale = scale;
     t->scope_dungeon = dungeon;
-    t->scope_tower = tower;
+    (void)tower;   /* legal in the scope list and deliberately not carried: tiles_ega.h */
     t->transparent_index = transparent;
     snprintf(t->source, sizeof t->source, "%s", path);
     snprintf(t->dir, sizeof t->dir, "%s", dir ? dir : "");
@@ -563,15 +562,11 @@ static void apply_to_ctx(u2_ctx *ctx, const u2_tiles_ega *t)
         ctx->theme_palette_set = 0;
         ctx->text_fg = 0;      /* unset: the frame keeps the CGA pair */
     }
-    /* The dungeon wall texture travels with the theme, and a v1 theme (or a v2 one
-     * that ships no dng_wall) clears it, so cycling back to a plain theme restores
-     * the flat corridor fill rather than keeping the last theme's brick. */
-    if (t->has_dng_wall) {
-        memcpy(ctx->dng_wall, t->dng_wall, sizeof ctx->dng_wall);
-        ctx->dng_wall_set = 1;
-    } else {
-        ctx->dng_wall_set = 0;
-    }
+    /* Nothing copies the theme's dng_wall, and that is the correction rather than an
+     * omission: the ctx field it was copied into was read by nothing, so cycling
+     * themes restored a value no renderer ever consulted. The parse stays -- see
+     * has_dng_wall in tiles_ega.h -- so --check still refuses a theme whose declared
+     * wall file is missing or the wrong size. */
 }
 
 /*

@@ -187,7 +187,9 @@ discriminator if it turns out to be data-driven rather than code).
 
 `engine/src/game/dungeon3d.c` — flat-shaded corridor, viewport-relative depth frames
 (`dg3_frame`, pinhole `s(d)=1/(d+1)`, `U2_DG_DRAW_DEPTH=7`), trapezoid fills, one sampled
-wall tile from `ctx->dng_wall`. The faithful renderer replaces the trapezoid fills with
+wall column textured from `u2_dga_tex(U2_DGA_WALL_STONE, …)`. (Corrected 2026-11-21: this
+said `ctx->dng_wall`. That field was written by the theme loader and read by nothing, and is
+now deleted — see `docs/enhanced-dungeon-3d.md` § 7a.) The faithful renderer replaces the trapezoid fills with
 per-(side,depth) tile blits driven by the codex; the `u2_dg_scan` topology (which faces are
 solid) is reused unchanged. The theme already bakes `DNGWALL.TILE` (`fmtowns.c`); the codex
 will grow that into a dungeon tile set (walls/doors/chests/ladders/monsters).
