@@ -16,6 +16,7 @@
 #include "debug/trace.h"
 #include "game/combat.h"      /* u2_combat_attack, u2_attack */
 #include "game/monsters.h"    /* u2_monsters_at: who is standing there */
+#include "game/residency.h"   /* u2_sector_load: the sequence that makes a sector resident */
 #include "game/commerce.h"    /* u2_commerce_transact: the TRANSACT ray and its shops */
 #include "game/gates.h"       /* u2_gate_transit, u2_gate_turn: the time doors */
 #include "game/dungeon.h"     /* CP7: the interior sector */
@@ -378,74 +379,13 @@ int site_reload(u2_ctx *ctx, u2_overworld *ow)
 {
     u2_sector_id id = { (uint8_t)ow->sector_hi, (uint8_t)ow->sector_lo };
 
-    const u2_world_result r = u2_world_load(ctx, &ow->world, 1, id);
-    if (r != U2_WORLD_OK) {
-        snprintf(ow->note, sizeof ow->note, "sector %d%d: %s",
-                 ow->sector_hi, ow->sector_lo, u2_world_result_text(r));
+    /* Clear before the load so a sector that authors no monsters cannot inherit the
+     * last sector's table. The open path does not do this, and must not: u2_sector_leave. */
+    u2_sector_leave(ctx);
+
+    u2_residency res;
+    if (u2_sector_load(ctx, ow, id, &res) != 0)
         return -1;
-    }
-
-    /* The recorded delta, applied here and nowhere later: it has to land before the
-     * spawn clear and the restamp, or those two run over bytes the recording never
-     * had and the pipelines diverge for a reason that has nothing to do with the
-     * player. The refusal text has already been printed by the time this returns -1. */
-    if (u2_demo_apply_world(ctx, &ow->world, id, 1) != 0) {
-        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo world does not match",
-                 ow->sector_hi, ow->sector_lo);
-        return -1;
-    }
-
-    monsters_clear(ctx);
-    const u2_world_result mr = u2_world_load(ctx, &ow->world, 0, id);
-    /* The creature file carries a delta too, and it has to land before the spawn: the
-     * spawn copies monx into the table, and clear_spawn_cells then restores terrain into
-     * the grid from mon_kind. Do that from the content creature file and the grid ends up
-     * with a creature the recorder never had -- which is exactly the 13-byte divergence
-     * measured at record 20 of the owner's demo, five of them the last element of each
-     * creature array. */
-    if (mr == U2_WORLD_OK && u2_demo_apply_world(ctx, &ow->world, id, 0) != 0) {
-        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo creatures do not match",
-                 ow->sector_hi, ow->sector_lo);
-        return -1;
-    }
-    const int creatures = (mr == U2_WORLD_OK) ? u2_monsters_spawn(ctx, &ow->world) : 0;
-    if (mr == U2_WORLD_OK)
-        u2_monsters_clear_spawn_cells(ctx, &ow->world);
-
-    /* asm/22D5 reads the sector's dialogue into the same scratch the creature table used.
-     * A sector with no tlkx file is normal, not a failure -- but the buffer must not keep the
-     * PREVIOUS sector's lines, or a role byte in a dialogue-less town would speak someone
-     * else's line. Clear first, load second. */
-    ow->world.tlkx_loaded = 0;
-    (void)u2_world_load_tlkx(ctx, &ow->world, id);
-
-    /* Restamp, or every creature in the sector is invisible until it moves. See the same call
-     * in site_reload() for the full reasoning; the two sites are the two ways a sector becomes
-     * resident, and both were missing it. */
-    if (mr == U2_WORLD_OK)
-        u2_monsters_restamp(ctx, &ow->world);
-    /* Latched AFTER the load path has finished, so it measures what a player would actually
-     * see on the first frame of the new sector: with the restamp in place it is 0, and with
-     * it removed it is the whole creature count, because nothing else stamps until a
-     * creature happens to move. */
-    ctx->diag_unstamped_at_load = u2_monsters_unstamped_cells(ctx, &ow->world);
-
-    /* The same digest-and-delta capture overworld_open does. Without it a recording only
-     * ever carried the sector it STARTED in: walk into a neighbour your save had dirtied
-     * and the demo had nothing to say about it, so a viewer rebuilt the original ground
-     * and the run diverged somewhere that looked exactly like an engine bug. This is the
-     * § 13.7 per-sector item; the cap was the smaller half of it. */
-    u2_demo_note_world(ctx, &ow->world);
-    if (u2_demo_overlay_failed(ctx)) {
-        /* The note has to name THIS sector. The latch is run-wide and sticky, so a
-         * reload that fails here long after an earlier refusal would otherwise leave
-         * whatever note the first failure wrote, and the message at the top level would
-         * blame a sector that was never involved. That is not hypothetical: it is what
-         * this path did, and it named sector 70 for a failure in sector 71. */
-        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo world does not match",
-                 ow->sector_hi, ow->sector_lo);
-        return -1;
-    }
 
     /* asm/343F tail, reached by every arm: `mov $0x4,%al; mov %al,0x12`.
      *
@@ -494,8 +434,8 @@ int site_reload(u2_ctx *ctx, u2_overworld *ow)
              "sector %d%d via %s, %d creature%s%s",
              ow->sector_hi, ow->sector_lo,
              ow->world.map_prefix ? ow->world.map_prefix : "?",
-             creatures, creatures == 1 ? "" : "s",
-             mr == U2_WORLD_OK ? "" : " (no monx file)");
+             res.creatures, res.creatures == 1 ? "" : "s",
+             res.no_monx ? " (no monx file)" : "");
     /* Same reason the open path prints its note unconditionally: on a transition
      * "sector 71 ... 32 creatures" is the difference between a silent no-op and a
      * diagnosable one. */
@@ -1663,21 +1603,9 @@ static int overworld_open(u2_ctx *ctx, u2_overworld *ow)
     }
 
     u2_sector_id id = { (uint8_t)ow->sector_hi, (uint8_t)ow->sector_lo };
-    wr = u2_world_load(ctx, &ow->world, 1, id);
-    if (wr != U2_WORLD_OK) {
-        snprintf(ow->note, sizeof ow->note, "sector %d%d: %s",
-                 ow->sector_hi, ow->sector_lo, u2_world_result_text(wr));
+    u2_residency res;
+    if (u2_sector_load(ctx, ow, id, &res) != 0)
         return -1;
-    }
-
-    /* The other of the two ways a sector becomes resident. Both need the delta, and a
-     * fix in only one of them is the mistake this project has now made twice with the
-     * restamp — see the comment at u2_monsters_restamp. */
-    if (u2_demo_apply_world(ctx, &ow->world, id, 1) != 0) {
-        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo world does not match",
-                 ow->sector_hi, ow->sector_lo);
-        return -1;
-    }
 
     /* The two bytes the original carries into the world and the engine never set
      * until site entry needed them: DS:13 is the sprite stamped into the map cell
@@ -1697,52 +1625,6 @@ static int overworld_open(u2_ctx *ctx, u2_overworld *ow)
     ctx->state.player_stamp   = u2_foot_stamp(ctx->state.pclass);
     ctx->state.view_mode      = ow->view_mode;
 
-    /* CP5 W1 wiring: the creature table. asm/22D5 reads 256 bytes of monxNN into
-     * DS:137 on the same sector load that reads the map, and u2_monsters_spawn
-     * copies those six arrays into the state block the attack and (later) the
-     * alarm read from.
-     *
-     * A missing monx is NOT fatal and says so in the note rather than emptying the
-     * world silently: 17 of the 33 sectors author no monsters at all
-     * (docs/monster-spawn.md § 6), and the original's own FCB open would simply
-     * find nothing there. */
-    const u2_world_result mr = u2_world_load(ctx, &ow->world, 0, id);
-    /* See the same pair at the other residency site: the recorded creature file has to be
-     * in place before the spawn copies it into the table. */
-    if (mr == U2_WORLD_OK && u2_demo_apply_world(ctx, &ow->world, id, 0) != 0) {
-        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo creatures do not match",
-                 ow->sector_hi, ow->sector_lo);
-        return -1;
-    }
-    const int creatures = (mr == U2_WORLD_OK) ? u2_monsters_spawn(ctx, &ow->world) : 0;
-    if (mr == U2_WORLD_OK)
-        u2_monsters_clear_spawn_cells(ctx, &ow->world);
-
-    /* Dialogue for this sector; see the clear-then-load pair at the other residency site. */
-    ow->world.tlkx_loaded = 0;
-    (void)u2_world_load_tlkx(ctx, &ow->world, id);
-
-    /* Restamp, or every creature in the sector is invisible until it moves.
-     *
-     * u2_monsters_spawn loads the creature table into state and clear_spawn_cells blanks the
-     * baked art the map file carries at those cells, but neither writes the sprites back into
-     * the grid. The only other caller of restamp is the creature turn, gated on rep.moved, so
-     * on entry the grid held paving where a monster stood: walkable, unhittable, and silent
-     * until that monster's first step, which is when it suddenly appeared. The owner walked
-     * into this as "when I first go into a town, the NPCs don't exist... after the first move
-     * they get rendered in that spot".
-     *
-     * This is also why the ghost counter never caught it: ghosts count stamps with no
-     * creature, and this is creatures with no stamp. u2_monsters_unstamped_cells() exists now.
-     */
-    if (mr == U2_WORLD_OK)
-        u2_monsters_restamp(ctx, &ow->world);
-    /* Latched AFTER the load path has finished, so it measures what a player would actually
-     * see on the first frame of the new sector: with the restamp in place it is 0, and with
-     * it removed it is the whole creature count, because nothing else stamps until a
-     * creature happens to move. */
-    ctx->diag_unstamped_at_load = u2_monsters_unstamped_cells(ctx, &ow->world);
-
     /* The status band and the command prompt, printed once on entering the
      * world (CP4b task 1). The four value lines go through the proven status
      * sites (asm/50F9..5175, packed BCD); the prompt is asm/087D's "CMD: "
@@ -1761,8 +1643,8 @@ static int overworld_open(u2_ctx *ctx, u2_overworld *ow)
                  : (ow->tiles.from_cache ? "tiles from cache" : "tiles extracted"),
              ow->tiles.unverified && strncmp(ow->tiles.source, "builtin:", 8) != 0
                  ? " (unverified)" : "",
-             creatures, creatures == 1 ? "" : "s",
-             mr == U2_WORLD_OK ? "" : " (no monx file)");
+             res.creatures, res.creatures == 1 ? "" : "s",
+             res.no_monx ? " (no monx file)" : "");
     return 0;
 }
 
@@ -1825,16 +1707,10 @@ static int overworld_resume(u2_ctx *ctx, u2_overworld *ow)
     ctx->screen_player_col = ow->view.player_col;
     ctx->screen_player_row = ow->view.player_row;
 
-    /* The demo's sector digests are checked here, at the one point where the loaded
-     * bytes are both available and still pristine — after the load, before anything
-     * has stamped into them. This is where § 4's line lands: refuse on the bytes that
-     * reach the world, note on the bytes that only reach the screen. */
-    u2_demo_note_world(ctx, &ow->world);
-    if (u2_demo_overlay_failed(ctx)) {
-        snprintf(ow->note, sizeof ow->note, "sector %d%d: demo world does not match",
-                 ow->sector_hi, ow->sector_lo);
-        return -1;
-    }
+    /* The demo digest and the refusal on a mismatched overlay happen inside
+     * u2_sector_load now, at the one point where the loaded bytes are both available
+     * and still pristine — before the checkpoint below lands. Both overworld inits
+     * come through overworld_open, so there is no path that reaches here without it. */
 
     if (!ctx->load_ds_path)
         return 0;
