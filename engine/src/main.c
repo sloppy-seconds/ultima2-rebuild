@@ -1454,20 +1454,13 @@ int main(int argc, char **argv)
              */
             if (ctx.victory_quit)
                 break;
-            if (!ctx.death_pending || ctx.quit_on_death)
-                break;
-            if (u2_save_load(&ctx) != U2_SAVE_OK)
-                break;
-            /* The clear belongs to whoever draws the new world over the corpse; the
-             * handoff deliberately leaves the death frame up. */
-            seam_clear_screen(&ctx);
-            /* Checked AFTER the reload, and that ordering is the bug this gate exists.
-             * A spent script used to break out before the save was re-read, so the
-             * scripted runs that every death test used could never observe the reload —
-             * which is precisely how "the game quits when you die" stayed invisible.
-             * Now the record is restored and the screen cleared first, and only then does
-             * a spent script end the run: on the live character, not the corpse. */
-            if (ctx.input_exhausted)
+            /* One handoff, one ordering, shared with u2_game_run: see
+             * u2_game_death_handoff in game.c for why the record is restored and the
+             * screen cleared before a spent script is allowed to end the run. The one
+             * way this entry differs is what happens when the record cannot be read at
+             * all — the driver falls back to the menu, and this entry has no menu, so
+             * U2_HANDOFF_NO_SAVE simply ends. */
+            if (u2_game_death_handoff(&ctx) != U2_HANDOFF_REENTER)
                 break;
         }
     } else {

@@ -129,6 +129,43 @@ int u2_game_init(u2_ctx *ctx)
     return 0;
 }
 
+/* The death handoff.
+ *
+ * Death reloads the last save and drops straight back into the world (owner
+ * ruling 2026-11-11). It has to be an explicit u2_save_load, not just another
+ * trip through overworld_enter, because init_state spawns from ctx->state — the
+ * copy in memory, which is the thing death just zeroed.
+ *
+ * The order of the last three steps is the whole point, and it is the part that
+ * used to be wrong: the record is restored and the screen cleared FIRST, and
+ * only then does a spent script end the run. A spent script used to break out
+ * before the save was re-read, so the scripted runs that every death test used
+ * could never observe the reload — which is precisely how "the game quits when
+ * you die" stayed invisible while every gate was green.
+ *
+ * Both world loops carried this ordering, comment and all, and the comment was
+ * the only thing keeping it correct. It lives here now. The gate that makes it
+ * red is engine/tests/death_reload.py, whose own docstring names the control:
+ * take the reload back out of one entry and the default case goes red on both of
+ * its checks. engine/tests/death_check.c owns the state-level half — the counter,
+ * the key wait, the reload landing.
+ *
+ * The clear belongs to whoever draws the new world over the corpse, so it happens
+ * here and not before: the handoff leaves the death frame up until there is a
+ * record to replace it with.
+ */
+u2_handoff_t u2_game_death_handoff(u2_ctx *ctx)
+{
+    if (!ctx->death_pending || ctx->quit_on_death)
+        return U2_HANDOFF_END;
+    if (u2_save_load(ctx) != U2_SAVE_OK)
+        return U2_HANDOFF_NO_SAVE;
+    seam_clear_screen(ctx);           /* see title.c: the world loop does not clear */
+    if (ctx->input_exhausted)
+        return U2_HANDOFF_END;        /* restored first, then ended: see above */
+    return U2_HANDOFF_REENTER;
+}
+
 void u2_game_run(u2_ctx *ctx)
 {
     if (ctx->selftest) {
@@ -160,11 +197,9 @@ void u2_game_run(u2_ctx *ctx)
                 u2_overworld ow;
                 (void)u2_overworld_run(ctx, &ow);
 
-                /* Death reloads the last save and drops straight back into the world
-                 * (owner ruling 2026-11-11). It has to be an explicit u2_save_load,
-                 * not just another trip through overworld_enter, because init_state
-                 * spawns from ctx->state — the copy in memory, which is the thing
-                 * death just zeroed.
+                /* Death reloads the last save and drops straight back into the
+                 * world; the ordering and why it is that way live with
+                 * u2_game_death_handoff, not here.
                  *
                  * This used to `continue` the OUTER loop, which runs u2_title_flow
                  * first: the comment claimed "reload the record and drop back in" and
@@ -183,16 +218,16 @@ void u2_game_run(u2_ctx *ctx)
                     break;
                 }
 
-                if (!ctx->death_pending || ctx->quit_on_death)
-                    break;
-                if (u2_save_load(ctx) == U2_SAVE_OK) {
-                    seam_clear_screen(ctx);   /* see title.c: the world loop does not clear */
-                    if (ctx->input_exhausted)
-                        break;                /* restored first, then ended: see main.c */
+                const u2_handoff_t ho = u2_game_death_handoff(ctx);
+                if (ho == U2_HANDOFF_REENTER)
                     continue;
+                if (ho == U2_HANDOFF_NO_SAVE) {
+                    /* Dead with no readable record: the only place to go is the menu,
+                     * and the intro has already been shown once this process.
+                     * ctx.h names title_skip_intro as this handoff's own flag. */
+                    ctx->title_skip_intro = 1;
+                    ctx->enter_world = 0;
                 }
-                ctx->title_skip_intro = 1;
-                ctx->enter_world = 0;
                 break;
             }
         }
