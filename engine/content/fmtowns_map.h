@@ -7,7 +7,7 @@
  *   python3 engine/tools/fmtowns_map2h.py --verify -o engine/content/fmtowns_map.h
  *   python3 engine/tools/fmtowns_map2h.py        -o engine/content/fmtowns_map.h
  *
- * Source: disasm/fmtowns-crosswalk.tsv md5=20c7ea212d32f5c872879c8e131852fa
+ * Source: disasm/fmtowns-crosswalk.tsv md5=de2fbdba5f82df6f31c7e30c56aff189
  * Rows are in crosswalk file order; tokens are exactly as written there. The
  * pool/order that numbers TILES is derived from these rows at run time, in
  * engine/src/core/fmtowns.c, so the data and the policy stay separate.
@@ -26,10 +26,10 @@
 
 /* art index -> comma-joined "BANK/tile" tokens, first entry is the one drawn. */
 static const char *const u2_fmtowns_map[U2_FMTOWNS_MAP_COUNT] = {
-    "MAP2_1/1",
     "MAP2_1/10",
+    "MAP2_1/1",
     "MAP2_1/2",
-    "MAP2_1/3",
+    "MAP2_1/4",
     "MAP2_1/5",
     "MAP2_1/13",
     "EXTRA/1,EXTRA/2",

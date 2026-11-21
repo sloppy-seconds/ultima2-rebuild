@@ -23,10 +23,10 @@
 # planet-1 atlas. See docs/fmtowns-graphics.md.
 #
 # art	fm_tiles	count	source	description
-00	MAP2_1/1	1	owner	magenta dashes in loose diagonal rows on black
-01	MAP2_1/10	1	owner	sparse cyan and white single pixels
+00	MAP2_1/10	1	owner	magenta dashes in loose diagonal rows on black
+01	MAP2_1/1	1	owner	sparse cyan and white single pixels
 02	MAP2_1/2	1	owner	sparser cyan-only pixels on black
-03	MAP2_1/3	1	owner	solid cyan plus-shaped blobs
+03	MAP2_1/4	1	owner	solid cyan plus-shaped blobs
 04	MAP2_1/5	1	owner	white diamond lattice, diagonal crosshatch
 05	MAP2_1/13	1	owner	five small white rings
 06	EXTRA/1,EXTRA/2	2	owner	four hollow white squares in 2x2 with a centre dot

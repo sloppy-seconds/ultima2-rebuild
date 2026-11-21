@@ -260,3 +260,33 @@ One thing the set is *not* good for: it is photographs of a screen, so the geome
 skewed and the colours are the camera's. Nothing in here settles a pixel-level question
 about a tile; for that, the disc is still the only authority.
 
+
+## 11. Refutation: three terrain rows were matched to the wrong tile
+
+The owner mapping had water on `MAP2_1/1`, swamp on `MAP2_1/10` and forest on
+`MAP2_1/3`. All three were wrong, and the cause was the method: the mapping was
+derived by comparing each FM Towns tile against a **description of the DOS tile**
+(`disasm/tile-art.tsv`, "magenta dashes in loose diagonal rows on black"). That
+works for shape and fails silently for palette, because the FM Towns release
+recoloured surfaces wholesale. The matcher still returned a confident best match
+for every row; three of them were the wrong tile, and each looked plausible
+because the shape did agree.
+
+Corrected 2026-11-21 by scoring candidates against a rendered frame of the FM
+Towns game itself, taken from the same starting sector as an engine capture:
+
+| art | was | now | why |
+| --- | --- | --- | --- |
+| `00` water | `MAP2_1/1` | `MAP2_1/10` | `/1` is 593 dark px of 1024 and reads as murk; `/10` is 360 blue and reads as open water. Water and swamp were simply swapped. |
+| `01` swamp | `MAP2_1/10` | `MAP2_1/1` | the other half of the same swap |
+| `03` forest | `MAP2_1/3` | `MAP2_1/4` | `/3` is 574 green and 96 yellow: one tree standing on grass. `/4` is 485 dark: canopy seen from above, which is what the FM Towns forest actually is. |
+
+Mountain (`04` -> `MAP2_1/5`) was checked the same way and **was already right**;
+three separate claims that it was wrong all came from comparing crops of two
+builds showing different map regions, and each was refuted by the matched pair.
+
+The remaining known gap is the palette, not the tiles. The FM Towns frame uses
+nine colours and the theme can express seven of them: `(0,34,238)` appears 37,916
+times as the water blue and `(255,255,85)` appears 9,636 times as a pale yellow
+highlight, and neither is in `PALETTE.RGB`. So the corrected water tile is the
+right shape in the wrong blue until a palette change lands.

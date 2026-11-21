@@ -189,6 +189,29 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-21 — A remaster's art set cannot be matched to the original platform's colour
+  descriptions, because the thing the remaster changed is the colour.** The crosswalk chose each
+  remaster tile by comparing it to a description written from the original's screen. That works
+  for shapes and fails silently for palettes: where the remaster recoloured a surface entirely,
+  the description no longer describes any tile in the new set, and the matcher still returns a
+  confident best match. Three terrain entries were wrong this way, and every one of them looked
+  plausible, because the *shape* of the tile did agree. Two things follow. A crosswalk between two
+  renderings of the same content should be built from a rendered frame of each, not from prose
+  about one of them, and the match should be scored on colour distribution rather than on a
+  description. And where a derived mapping is the only route from the original's identifiers to the
+  remaster's art, the mapping needs a row that names which evidence graded it, so a row graded by
+  description can be found and re-graded when a frame turns up.
+  → Tier 1, cross-platform mapping.
+* **2026-11-21 — Comparing two builds on screenshots of different levels produces confident,
+  wrong, and self-consistent findings.** Three separate conclusions about a terrain tile were
+  drawn from crops of two builds showing different map regions, and each was refuted the moment
+  the same starting state was captured from both. The crops were real, the measurements were real,
+  and the comparisons were invalid, which is why the error survived three rounds of checking: every
+  number agreed with the conclusion it was meant to test. A harness that compares renderings across
+  builds or versions should require the pair to name the shared state that makes them comparable,
+  and should refuse the comparison when the state differs, rather than reporting a difference that
+  is really a different place.
+  → Tier 1, verification discipline.
 * **2026-11-20 — A mutation selftest pins source text, so it rots silently the moment the code
   is restructured, and the restructure is the commit that owes the update.** A selftest that
   proves a checker can go red does it by rewriting one decoded fact in the source and requiring
