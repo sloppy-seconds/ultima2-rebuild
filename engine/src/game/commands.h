@@ -73,4 +73,39 @@ u2_cmd_result u2_cmd_dispatch(u2_ctx *ctx, u2_overworld *ow, uint8_t letter);
  * `out` (capacity >= 27). */
 int u2_cmd_implemented(char *out, int cap);
 
+/*
+ * A command that ended by waiting for a direction.
+ *
+ * Six letters print a prompt and consume the NEXT key as an aim rather than as a
+ * step: UNLOCK (U), TRANSACT (T), STEAL DIRECT (S), OFFER GOLD DIRECT (O), FIRE
+ * DIRECT (F) and ATTACK (A). The shape is the original's and not a convenience:
+ * the handler chain calls the asm/2362 aim gate and every exit from it is a tail
+ * jump to asm/0A33_cmd_done, so the direction word lands on the command line, the
+ * epilogue is the shared one, and a turn passes even when the aim was refused.
+ *
+ * The table lives here because which letter continues how is command knowledge.
+ * The loop that runs it lives in game/overworld.c because the epilogue ends in the
+ * creature sweep, which belongs to the overworld. The two meet at
+ * u2_cmd_continuation, and neither side has to know the other's list.
+ *
+ * Three live fields. A fourth was expected to be `is_turn` and is not needed:
+ * every one of these commands passes a turn, refusals included, which is a finding
+ * rather than an omission -- see the bytes and the corpus cited beside the table.
+ * FIRE is not in the table: its epilogue is interleaved with its own result
+ * handling, so forcing it in would need a field meaning "this entry ignores the
+ * epilogue", which would be the table admitting it is the wrong shape.
+ */
+typedef struct u2_cmd_cont {
+    char letter;
+    int print_word;      /* echo the direction word on the prompt line, no CR */
+    int redraw_status;   /* the handler can move a number the status band shows */
+    void (*on_direction)(u2_ctx *ctx, u2_overworld *ow, int dx, int dy,
+                         const char *word);
+} u2_cmd_cont;
+
+/* The continuation for a pending letter, or NULL when the letter does not
+ * continue. The caller clears its own pending flag; this only answers the
+ * question of how a letter continues, if it does. */
+const u2_cmd_cont *u2_cmd_continuation(char letter);
+
 #endif /* U2_COMMANDS_H */
