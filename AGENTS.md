@@ -713,3 +713,18 @@ Prefer a gate that fails loudly on its own misconfiguration over one that report
 success when it checked nothing. A skip is fine; a skip that can hide a failure is
 not.
 
+## 6. Agent Skills
+
+### Issue tracker
+
+New work items are filed as GitHub issues on `sloppy-seconds/ultima2-rebuild` via the `gh`
+CLI; the token is in `.env` and an agent shell must export it first. See
+`docs/agents/issue-tracker.md`. This does **not** replace the project's own queues:
+`docs/outstanding.md` and `docs/needs-gameplay.md` stay the authority on what is open,
+because their rows carry evidence and grades an issue body cannot hold. An issue that maps to
+a G-row links to it and never restates it.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` at the repo root, ADRs in `docs/adr/`. See `docs/agents/domain.md`.
+
