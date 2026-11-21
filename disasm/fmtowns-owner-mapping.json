@@ -119,19 +119,19 @@
   "MAP2_1/37"
  ],
  "3C": [
-  "ENEMY2/8",
-  "ENEMY2/9"
+  "PLAYER/0",
+  "PLAYER/1"
  ],
  "3D": [
-  "ENEMY2/6",
-  "ENEMY2/7"
+  "PLAYER/2",
+  "PLAYER/3"
  ],
  "3E": [
-  "ENEMY2/4",
-  "ENEMY2/5"
+  "PLAYER/10",
+  "PLAYER/11"
  ],
  "3F": [
-  "ENEMY2/2",
-  "ENEMY2/3"
+  "PLAYER/12",
+  "PLAYER/13"
  ]
 }

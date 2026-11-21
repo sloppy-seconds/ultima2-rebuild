@@ -83,7 +83,7 @@
 39	MAP2_1/63	1	strong	capital Z
 3A	MAP2_1/37	1	owner	near-black, 46 white px in a thin arrangement
 3B	MAP2_1/37	1	owner	near-black, 46 white px, arrangement differs from 0x3A
-3C	ENEMY2/8,ENEMY2/9	2	owner	Fighter — white humanoid, arms out
-3D	ENEMY2/6,ENEMY2/7	2	owner	Cleric — white humanoid holding a blade up and to the right
-3E	ENEMY2/4,ENEMY2/5	2	owner	Wizard — white humanoid beside a tall vertical bar
-3F	ENEMY2/2,ENEMY2/3	2	owner	Thief — white humanoid holding a curved bow
+3C	PLAYER/0,PLAYER/1	2	owner	Fighter — white humanoid, arms out
+3D	PLAYER/2,PLAYER/3	2	owner	Cleric — white humanoid holding a blade up and to the right
+3E	PLAYER/10,PLAYER/11	2	owner	Wizard — white humanoid beside a tall vertical bar
+3F	PLAYER/12,PLAYER/13	2	owner	Thief — white humanoid holding a curved bow
