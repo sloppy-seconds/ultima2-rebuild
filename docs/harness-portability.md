@@ -189,6 +189,36 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-21 — A test suite that inherits stdin passes in CI and hangs on a human terminal,
+  and the two states look identical right up until they do not.** An emulator or game binary
+  launched without a scripted input source falls back to the console, so under CI, where stdin
+  is a closed pipe, it reads EOF and continues; under a terminal it waits for input that never
+  comes, at zero CPU, with no timeout and no message. The suite was green for weeks and the only
+  person who ever saw the hang would have reasonably concluded the harness was broken. Two
+  rules follow. Close stdin at the suite boundary rather than at each call site, because the
+  next invocation added is the one that forgets. And treat "we only ever run this from CI" as a
+  warning about the test, not a justification: a check whose behaviour depends on which kind of
+  file descriptor a harness happens to hand it will be distrusted by the first person who runs
+  it by hand, and a distrusted check is not run.
+  → Tier 1, verification discipline.
+* **2026-11-21 — A freshness tripwire keyed on mtime, over a directory that reaches the build
+  only through a generated file, is a gate people clean around, and a gate people clean around
+  is not a gate.** The check compared each built binary against `find <sources> <corpus> -newer`,
+  where the corpus was over a thousand files of analysis text that the build consumed only
+  through one generated header. It therefore went red on every documentation edit, and on every
+  `checkout`, `stash` or rebase, which rewrite mtimes without changing a byte. Red often enough
+  to be routine, it was answered by deleting build output rather than by reading it, and a
+  tripwire that is routinely silenced has already stopped protecting anything. Two changes fixed
+  it. Key the check on a content hash of the inputs that actually feed each artifact, written by
+  the rule that links that artifact, and grade each artifact against its own stamp rather than
+  against one global stamp — a global stamp lets a partial rebuild declare an untouched artifact
+  fresh, which is the exact failure the check exists to catch. And where a build product cannot
+  be produced on the host at all, report it as "delete this" rather than "stale": a permanent
+  red for a reason nobody can act on teaches the same habit as a false red. Prove the new check
+  can still go red before trusting it: touch a source without editing it and require green,
+  append a line without rebuilding and require red, and perturb the generated file that stands
+  in for the corpus and require red.
+  → Tier 1, verification discipline.
 * **2026-11-21 — A remaster's art set cannot be matched to the original platform's colour
   descriptions, because the thing the remaster changed is the colour.** The crosswalk chose each
   remaster tile by comparing it to a description written from the original's screen. That works

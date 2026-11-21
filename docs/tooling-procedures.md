@@ -320,11 +320,58 @@ headers via `engine/tools/sdl_probe.sh`; this host has none, deliberately. If yo
 the container script above.
 
 **`make clean` is cheap, not a crisis.** The `engine build fresh` gate in `tools/check_all.sh`
-refuses to run over a dirty tree and says so (`fresh: run 'make clean' before rebuilding`). Running
-`make clean` deletes `engine/u2-sdl` and `engine/u2-sdl-static`, which are gitignored build output,
-and the container rebuilds the static one in about a minute. Do not treat a missing SDL binary as
-something to work around, and do not leave a stale one in place to keep a gate quiet — `outstanding.md`
-§ 6 carried exactly that stale binary as an environment constraint for weeks.
+refuses to run over a binary that predates its sources and says so (`fresh: run 'make clean'
+before rebuilding`). Running `make clean` deletes `engine/u2-sdl` and `engine/u2-sdl-static`,
+which are gitignored build output, and the container rebuilds the static one in about a minute.
+Do not treat a missing SDL binary as something to work around, and do not leave a stale one in
+place to keep a gate quiet — `outstanding.md` § 6 carried exactly that stale binary as an
+environment constraint for weeks.
+
+**What `fresh` grades, since 2026-11-21.** Each binary is compared against a content stamp at
+`engine/build/stamps/stamp.<bin>`, written by the link rule that produced it, so the question it
+answers is "does this binary match the sources on disk?" and nothing else. Three consequences:
+
+- An edit to `asm/` cannot make it red. The build reaches `asm/` only through
+  `content/gen_content.h`, which *is* in the stamp and is proved against the exe by CP1's
+  `content-check`, so a rename or a marked body correction is not a build event.
+- Neither can a git operation. `checkout`, `stash`, a rebase and a `git mv` rewrite mtimes
+  without changing a byte, and the stamp is a hash, not a timestamp. The old gate keyed on
+  `find src ../asm $(GEN) -newer`, so it went red on documentation-only days and on every
+  branch switch, which is how it got cleaned around.
+- A binary this host cannot rebuild is reported as `SKIP: ... delete it`, not `STALE`. A stale
+  `u2-sdl` on a host with no SDL3 sat permanently red for a reason nobody could act on.
+
+The controls, run before this shipped: touching a source without editing it stays green;
+appending a line to `src/core/save.c` without rebuilding goes red; so does appending one to
+`gen_content.h`, which is the proof that dropping `asm/` from the input set did not open a
+hole; and a binary with no stamp is STALE rather than skipped.
+
+## The gate suite, and what it costs
+
+`tools/check_all.sh` runs 53 gates. Measured 2026-11-21, full run, warm build: **121 s**,
+down from 197 s. Six gates are 92% of it: engine test suite 51 s, `guard_selftest` 19 s,
+`mutate_stepgate` 12 s, `mutate_speed` 12 s, `forced_keep_audit selftest` 9 s,
+`assemble_clean.sh` 3 s. Nothing else takes more than 3 s. If the suite feels slow again,
+re-measure before optimising: the top of that list used to be `shrine selftest` at **77 s**,
+which was two mutation controls each running `make -C . test`. It now compiles
+`commerce_check` against the mutant and takes **0.24 s**, the way `warp_step_selftest.sh`
+has always run ten controls.
+
+**A mutation control compiles the one check that names its assertion.** Running the whole
+suite per mutant looks safer and is not: it costs about 25 s a control, and it can go red on
+an unrelated suite, which the control then reports as "went red, but not on the expected
+assertion" — a failure that names the wrong thing.
+
+**Every suite runs with stdin closed** (`make test-cp*` pass `< /dev/null`). An engine
+invocation with no `--script` falls back to the console, so it waits forever on a terminal
+and reads EOF under CI. Found when `run_cp4`'s `--headless --config config.ini` case hung
+eight minutes at 0% CPU in a tty and passed instantly under a pipe, which is the shape of
+bug CI cannot see.
+
+**`fresh` grades content, not mtimes** — see the note above about `make clean`. Because
+`Makefile` is one of the hashed inputs, every object rule also lists it as a prerequisite, so
+a flags change rebuilds everything (4.5 s) instead of leaving the gate red with no remedy but
+`make clean`. A red that `make` cannot clear is a red people learn to ignore.
 
 ## Play in a browser, both binaries
 

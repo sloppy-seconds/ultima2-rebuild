@@ -17,7 +17,7 @@ STD      ?= -std=c11
 # core/config.h.
 WARN     := -Wall -Wextra -Werror -Wshadow -Wstrict-prototypes -Wmissing-prototypes \
             -Wpointer-arith -Wwrite-strings -Wno-unused-parameter -pedantic
-OPT      ?= -O2
+
 CPPFLAGS += -Isrc -Icontent
 CFLAGS   += $(STD) $(WARN) $(OPT)
 
@@ -49,9 +49,30 @@ STAMP_SDLSTATIC = $(call STAMP,sdl-static,sdl3,static,,release)
 STAMP_SDLWIN    = $(call STAMP,sdl-win,sdl3,static,,release)
 
 BIN      := u2
-BUILD    := build
+
 CONTENT  := content
 GEN      := $(CONTENT)/gen_content.h
+# --- freshness stamps (see the `fresh` target) --------------------------------
+# A stamp is the hash of everything that actually feeds a binary, written by the
+# link rule that produced that binary. `fresh` grades each binary against its own
+# stamp. The snippet lives here, not in the target, so a link rule and the gate
+# cannot disagree about what the inputs are.
+# `asm/` is deliberately absent: the build consumes it only through $(GEN), which
+# the extractor writes and CP1's content-check proves against the exe, so an asm
+# rename or a marked body correction cannot change a byte of any binary. mtime is
+# absent for the same reason: a checkout, a stash or a rebase rewrites hundreds of
+# mtimes without changing a byte.
+STAMPDIR := $(BUILD)/stamps
+# Makefile is one of the hashed inputs, so every object rule lists it as a
+# prerequisite too. Without that the gate can go red on a flags change and `make`
+# has no rule that fixes it, which leaves only `make clean` — a red the gate cannot
+# clear is a red people learn to ignore, the exact failure this rewrite was for.
+FRESH_HASH = { find src -type f \( -name '*.c' -o -name '*.h' \) -print0; \
+                 printf '%s\0' $(GEN) Makefile; } | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-64
+define WRITE_STAMP
+	@mkdir -p $(STAMPDIR)
+	@$(FRESH_HASH) > $(STAMPDIR)/stamp.$@.tmp && mv -f $(STAMPDIR)/stamp.$@.tmp $(STAMPDIR)/stamp.$@
+endef
 EXE      ?= ../original/ultimaii.exe
 SRCS     := src/main.c \
             $(wildcard src/core/*.c) \
@@ -199,8 +220,9 @@ compile-commands-check:
 
 $(BIN): $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^
+	$(WRITE_STAMP)
 
-$(BUILD)/%.o: %.c $(GEN)
+$(BUILD)/%.o: %.c $(GEN) Makefile
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(STAMP_TERMINAL) -MMD -MP -c $< -o $@
 
@@ -225,30 +247,36 @@ drive: $(BIN)
 	@test -f ../original/mapx20 || { echo "drive: needs ../original (the player's own game files); nothing to record against."; exit 1; }
 	SAVE_SOURCE="$${SAVE_SOURCE:-$(HOME)/Games/u2/saves}" bash tests/drive_and_validate.sh
 
+# Every suite runs with stdin closed. An engine invocation that has no --script otherwise
+# inherits whatever stdin the suite has, and under a human terminal that means it waits for
+# input forever: found 2026-11-21, when run_cp4's `--headless --config config.ini` case hung
+# eight minutes at 0% CPU in a tty and passed instantly under a pipe. CI pipes, so CI never
+# saw it, which is the whole point — a gate that only works when a machine runs it is a gate
+# that will be distrusted the first time a person runs it by hand.
 test-demo: $(BIN)
-	bash tests/run_demo.sh
+	bash tests/run_demo.sh < /dev/null
 
 test-api: $(BIN)
-	bash tests/run_api.sh
+	bash tests/run_api.sh < /dev/null
 
 # Drive the API from a shell the way a bot would. Needs nothing but the binary.
 api: $(BIN)
 	U2="$PWD/$(BIN)" python3 tools/u2api.py
 
 test-cp0: $(BIN)
-	bash tests/run_cp0.sh
+	bash tests/run_cp0.sh < /dev/null
 
 test-cp1: $(BIN)
-	bash tests/run_cp1.sh
+	bash tests/run_cp1.sh < /dev/null
 
 test-cp2: $(BIN)
-	bash tests/run_cp2.sh
+	bash tests/run_cp2.sh < /dev/null
 
 test-cp3: $(BIN)
-	bash tests/run_cp3.sh
+	bash tests/run_cp3.sh < /dev/null
 
 test-cp4: $(BIN)
-	bash tests/run_cp4.sh
+	bash tests/run_cp4.sh < /dev/null
 
 # CP5 combat: src/game/combat.c implements C1/C2/C6 and is linked into the engine
 # build (src/game/*.c), so the behavioural spec runs for real. The two fixture
@@ -256,7 +284,7 @@ test-cp4: $(BIN)
 # so the spec cannot go soft on a revert. See tests/run_cp5.sh and
 # docs/phase4-state.md § CP5.
 test-cp5:
-	bash tests/run_cp5.sh
+	bash tests/run_cp5.sh < /dev/null
 
 # CP6 commerce: src/game/commerce.c is the TRANSACT ray, the asm/1590 vendor selector and
 # the shops it reaches. The pure half (price walk, selector table, BCD charge) runs anywhere;
@@ -264,14 +292,14 @@ test-cp5:
 # strings cannot be extracted, which is the same rule CP1 runs under. See tests/run_cp6.sh and
 # docs/commerce.md.
 test-cp6:
-	bash tests/run_cp6.sh
+	bash tests/run_cp6.sh < /dev/null
 
 # CP7 dungeons: game/dungeon.c is the interior sector — the paged grid, the four movement
 # commands, the torch, the wireframe and the chest. The gate drives ./u2 against a synthetic
 # dungeon written by tests/cp7_dungeon_seed.py and SKIPs only when the content strings cannot
 # be extracted. See tests/run_cp7.sh and docs/phase4-state.md § CP7.
 test-cp7:
-	bash tests/run_cp7.sh
+	bash tests/run_cp7.sh < /dev/null
 
 # CP9 placeholder. SDL must be approved and installed by the owner first;
 # this target deliberately does not attempt any install.
@@ -329,6 +357,7 @@ sdl-probe-check:
 
 $(SDL_BIN): $(SDLOBJS)
 	$(CC) $(LDFLAGS) -o $@ $^ $(SDL_LIBS)
+	$(WRITE_STAMP)
 	@echo "u2: built $(SDL_BIN) — target=sdl sdl=$(SDL_IMPL) linkage=$(SDL_LINKAGE) artifact=$(SDL_ARTIFACT)"
 	@if [ "$(SDL_ARTIFACT)" = dev ]; then \
 	    echo "u2: NOTE this is a DEV build, not the shipped artifact. Players get"; \
@@ -336,7 +365,7 @@ $(SDL_BIN): $(SDLOBJS)
 	    echo "u2:      './$(SDL_BIN) --version' always repeats this."; \
 	fi
 
-$(SDLOBJ)/%.o: %.c $(GEN)
+$(SDLOBJ)/%.o: %.c $(GEN) Makefile
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -DU2_HAVE_SDL $(STAMP_SDL) $(SDL_CFLAGS) -MMD -MP -c $< -o $@
 
@@ -385,7 +414,7 @@ sdl-win: $(WIN_BIN)
 $(WIN_BIN): $(WINOBJS)
 	$(WIN_CC) -static -o $@ $^ $(SDLWIN_LIBS)
 
-$(WINOBJ)/%.o: %.c $(GEN)
+$(WINOBJ)/%.o: %.c $(GEN) Makefile
 	@command -v $(WIN_CC) >/dev/null || { echo "sdl-win: $(WIN_CC) not found; use deploy/winbuild/build.sh"; exit 1; }
 	@test -n "$(SDLWIN_CFLAGS)" || { echo "sdl-win: static mingw SDL3 not found (PKG_CONFIG_LIBDIR must reach libSDL3.a); use deploy/winbuild/build.sh"; exit 1; }
 	@mkdir -p $(dir $@)
@@ -416,8 +445,9 @@ sdl-static: $(STAT_BIN)
 
 $(STAT_BIN): $(STATOBJS)
 	$(SDLSTAT_CC) -static-libgcc -o $@ $^ $(SDLSTAT_LIBS)
+	$(WRITE_STAMP)
 
-$(STATOBJ)/%.o: %.c $(GEN)
+$(STATOBJ)/%.o: %.c $(GEN) Makefile
 	@test -n "$(SDLSTAT_CFLAGS)" || { echo "sdl-static: static SDL3 not found at $(SDLSTAT_PREFIX);" \
 	     "use deploy/linuxbuild/build.sh (container) or point SDLSTAT_PREFIX at a libSDL3.a prefix"; exit 1; }
 	@mkdir -p $(dir $@)
@@ -444,7 +474,7 @@ play: $(SDL_BIN)
 clean:
 	rm -rf $(BUILD) $(SDLOBJ) $(WINOBJ) $(STATOBJ) $(BIN) $(SDL_BIN) $(WIN_BIN) $(STAT_BIN)
 
-# Fail loudly if a built binary is older than any source or header it is made from.
+# Fail loudly if a built binary predates the sources it is made from.
 #
 # This exists because the SDL object tree was, until 2026-10-29, compiled with -MMD -MP but
 # its .d files were never included. A header edit therefore did not rebuild the SDL objects,
@@ -455,19 +485,40 @@ clean:
 #
 # The -include below is the cure. This target is the tripwire: cheap enough to run before any
 # deploy, and it names the offenders instead of silently relinking.
+#
+# It grades each binary against the stamp its own link rule wrote, never against mtimes. The
+# first draft ran `find src ../asm $(GEN) -newer $$bin`, which fired on two whole classes of
+# non-event: every edit to the 1212-file asm/ corpus, which reaches the build only through
+# $(GEN), and any git operation that rewrites mtimes without changing a byte. It went red often
+# enough that people cleaned the tree to get rid of it, which is how a tripwire dies.
+# Per-binary stamps are what keep the discrimination this gate was written for: one global
+# stamp would let a `make` that rebuilt only `u2` declare a stale `u2-sdl` fresh.
+#
+# A binary with no stamp is STALE, not skipped. That is what a binary built before this change,
+# or by a rule that does not stamp, is supposed to look like.
+FRESH_TARGETS = $(BIN):terminal $(SDL_BIN):sdl $(STAT_BIN):sdlstatic
+
 fresh:
 	@bad=0; \
-	for bin in $(BIN) $(SDL_BIN) $(STAT_BIN); do \
-		[ -e "$$bin" ] || continue; \
-		newer=$$(find src ../asm $(GEN) -newer "$$bin" -type f 2>/dev/null | head -5); \
-		if [ -n "$$newer" ]; then \
-			echo "STALE: $$bin is older than:"; printf '  %s\n' $$newer; bad=1; \
-		fi; \
+	for spec in $(FRESH_TARGETS); do \
+	  bin=$${spec%%:*}; kind=$${spec##*:}; \
+	  [ -e "$$bin" ] || continue; \
+	  if [ "$$kind" = sdl ] && [ -z "$(SDL_CFLAGS)" ]; then \
+	    echo "SKIP: $$bin cannot be built on this host (no SDL3 found). Delete it — do not keep a stale one to quiet this gate."; continue; \
+	  fi; \
+	  if [ "$$kind" = sdlstatic ] && [ -z "$(SDLSTAT_CFLAGS)" ]; then \
+	    echo "SKIP: $$bin cannot be built on this host (no static SDL3 at $(SDLSTAT_PREFIX)). Delete it — do not keep a stale one to quiet this gate."; continue; \
+	  fi; \
+	  want=$$( $(FRESH_HASH) ); have=$$(cat $(STAMPDIR)/stamp.$$bin 2>/dev/null); \
+	  if [ "$$want" != "$$have" ]; then \
+	    echo "STALE: $$bin predates the current sources"; \
+	    echo "  stamp: $${have:-<none>}"; echo "  now:   $$want"; bad=1; \
+	  fi; \
 	done; \
 	if [ "$$bad" -ne 0 ]; then \
 		echo "fresh: run 'make clean' before rebuilding."; exit 1; \
 	fi; \
-	echo "fresh: every binary is newer than its sources"
+	echo "fresh: every binary matches its input stamp"
 
 help:
 	@echo "targets: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 sdl sdl-run play clean content content-check compile-commands compile-commands-check fresh help"

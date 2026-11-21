@@ -544,7 +544,8 @@ if [ ! -s "$WORK/cfgtheme/themes/default/TILES" ]; then
 else
 printf '[themes]\ndir = themes\ntheme = default\n' > "$WORK/cfgtheme/config.ini"
 U2_ABS="$PWD/u2"   # the checks below cd into the fixture, so ./u2 would not resolve
-cfg_line=$( (cd "$WORK/cfgtheme" && "$U2_ABS" --headless --config config.ini 2>&1 | grep '^u2: art mode' | head -1) )
+# stdin closed: this run has no --script, so on a tty it would wait for input forever.
+cfg_line=$( (cd "$WORK/cfgtheme" && "$U2_ABS" --headless --config config.ini </dev/null 2>&1 | grep '^u2: art mode' | head -1) )
 case "$cfg_line" in
     *ega*) ok "config.ini naming a theme selects the EGA axis: $cfg_line" ;;
     *)     bad "config.ini named a theme but the run is not EGA: '${cfg_line:-no art-mode line}'" ;;
