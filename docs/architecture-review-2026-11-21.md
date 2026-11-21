@@ -461,8 +461,29 @@ smaller. Do them alongside, not after.
 | [#11](https://github.com/sloppy-seconds/ultima2-rebuild/issues/11) | 7 — `libu2.a` + harness | enhancement |
 | [#12](https://github.com/sloppy-seconds/ultima2-rebuild/issues/12) | 6 — the seed seam (blocked by #11) | enhancement |
 | [#13](https://github.com/sloppy-seconds/ultima2-rebuild/issues/13) | 8 — CLI extraction | enhancement |
-| [#14](https://github.com/sloppy-seconds/ultima2-rebuild/issues/14) | 1, 2, 3 — umbrella, interfaces undecided | enhancement |
+| [#14](https://github.com/sloppy-seconds/ultima2-rebuild/issues/14) | 1, 2, 3 — umbrella | enhancement |
+| [#15](https://github.com/sloppy-seconds/ultima2-rebuild/issues/15) | 1 — sector-residency module | child of #14 |
+| [#16](https://github.com/sloppy-seconds/ultima2-rebuild/issues/16) | 2 — the command tail | child of #14 |
+| [#17](https://github.com/sloppy-seconds/ultima2-rebuild/issues/17) | 3 — `game/flight.c` | child of #14 |
 | [#1](https://github.com/sloppy-seconds/ultima2-rebuild/issues/1)–[#6](https://github.com/sloppy-seconds/ultima2-rebuild/issues/6) | the smaller findings above | mixed |
 
-Candidates 1, 2 and 3 stay under the umbrella until their interfaces are settled. Children get
-filed there as each decision is made, not before.
+## Postscript — the interfaces got settled the same day
+
+The grilling round after this review closed the open decisions, so the umbrella is no longer
+holding undecided proposals. The rulings live on the issues and in
+[`GLOSSARY.md`](../GLOSSARY.md); the short version:
+
+* **The DS mirror owns position, sector and view mode.** The residency module publishes at one
+  quiescent point through named accessors; the per-frame mirror and `demo_restamp_pending`'s
+  re-sync are deleted, not documented.
+* **Residency prints its own note and still returns a verdict**, because the message rule
+  outranks purity and the existing checks already arm a frame.
+* **A command continuation carries four fields and no more** — word, direction callback,
+  redraw flag, turn flag. If the tail starts branching beyond those, the payload is wrong.
+* **`flight.c` owns its loop and registers `present_now`**, and `u2_space_scene_from` becomes
+  genuinely drawable instead of returning a half-built scene the caller corrects.
+* **The seed module generates offsets from `state.h` and refuses to simulate.** No
+  pathfinding, no legal-world synthesis, no save the original cannot load.
+
+Order of attack, each its own commit: #13 step 1 (the duplicated death handoff), then #7, then
+#15, then #11, then #12's Python half, then #16 and #17. #11 and #12 may run alongside #15.
