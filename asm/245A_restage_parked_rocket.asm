@@ -6,7 +6,7 @@
 #           than as a subroutine of the load path.
 # NAMED 2026-11-03 from a reader/writer sweep of the whole tree; it was a bulk-wave stub
 #           headed "behavior not yet reviewed". What it does is settled by its bytes.
-# CALLER RESOLVED 2026-11-04 (docs/handoff-2026-11-03.md § 3.6). There is no branch to
+# CALLER RESOLVED 2026-11-04 (docs/archive/handoff-2026-11-03.md § 3.6). There is no branch to
 #           L_00265a anywhere in the binary -- no e8/e9/ea/9a and no stored word 0x265a
 #           (the one apparent hit at file 0x620e is the segment-override bytes 3e 26 in
 #           code, not a pointer). It is reached by FALL-THROUGH from asm/2453, which is

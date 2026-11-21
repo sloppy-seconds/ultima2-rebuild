@@ -1,7 +1,7 @@
 # Handover — TRANSACT: what is evidenced, what is not, and what to build first
 
 **Scoped handoff for a fresh agent implementing `cmd_T` in the engine.** It is not the project entry
-point — read `AGENTS.md` first, then `docs/handoff-2026-10-29b.md` for general state. This file exists
+point — read `AGENTS.md` first, then `docs/archive/handoff-2026-10-29b.md` for general state. This file exists
 because the commerce question was assessed on 2026-10-29 and the answer is "build half of it", and the
 boundary between the two halves is the part that is easy to get wrong and expensive to rediscover.
 

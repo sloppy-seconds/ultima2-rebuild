@@ -4,7 +4,7 @@ Autonomous queue for a fresh agent running unattended. Every task is chosen beca
 needs **no owner interaction**: all inputs already exist inside this project, or are
 reachable by a headless emulator run that needs no display and no keyboard through X.
 
-**Start here:** read `AGENTS.md` (hard law), then `docs/handoff-2026-10-23.md` (the
+**Start here:** read `AGENTS.md` (hard law), then `docs/archive/handoff-2026-10-23.md` (the
 entry point, including the day's addendum), then this file.
 
 Standing context: `docs/phase4-state.md` (checkpoint table, CP5 tickets, gate log),
@@ -243,7 +243,7 @@ successful run; one that produced confident prose with no citations is not.
 | B3 | **DONE — G8 closed** | `captures/spice86/armour-buy/` — first shop interior ever reached. `DS:97` went `00→01` buying CLOTH (menu item 1), gold −12 = the quoted `0012`. **1-based**: the six types are `DS:97..9C`. Shop closes after one purchase, so a second type was not observed; `maxout` leaves the table empty while `DS:62` says POWER is worn. Selector question closed too: an NPC standing at the sign (`tools/shop_access.py`, 50 pairings) |
 | B4 | **DONE** | `tools/monx_layout_scan.py`. **Six** arrays, not five — `monx[160:191] → DS:0x1D7`. `type`/`HP` hold everywhere testable; **`kind` mismatches in 3 of 4 sectors**. `monxNN` non-empty exactly where `tlkxNN` exists plus sector 00. Tail: `[256]=0x1A` and `[257:384]==[129:256]` in every file checked |
 | C1 | **DONE** | `tools/strings_atlas.py`. 336 strings, every offset verified byte-exact against the exe; selftest asserts the cleric catalogue → `asm/1869_cleric_shrine` and the wizard catalogue → `asm/19D7_magic_shop_menu` and that they differ. The control failed for real twice during development, which is what makes it worth keeping |
-| C2 | **DONE** | `docs/handoff-2026-10-23.md`; 2026-10-22 archived; pointers updated in `AGENTS.md`, `phase4-state.md` and the four documents that cited it |
+| C2 | **DONE** | `docs/archive/handoff-2026-10-23.md`; 2026-10-22 archived; pointers updated in `AGENTS.md`, `phase4-state.md` and the four documents that cited it |
 | C3 | **DONE** | Seven entries added to `docs/harness-portability.md` § 6, checked clean of addresses, data layouts, record formats and symbol names from this binary |
 
 Gate status at end of run: `make -C engine test` **PASS (CP0–CP4, CP5 spec, tiles art)** · `assemble_clean.sh` **CLEAN REBUILD BYTE-MATCH: 37344 bytes identical**

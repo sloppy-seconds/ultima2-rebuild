@@ -14,7 +14,7 @@ project, autonomously, while the owner sleeps.
 **Read first, in this order:**
 
 1. `AGENTS.md` (project root) — isolation, licensing, script rules. Hard law.
-2. `docs/phase4-overnight-cp4b.md` — the task list (T1..T9), rules of
+2. `docs/archive/phase4-overnight-cp4b.md` — the task list (T1..T9), rules of
    engagement, and the recon already banked. This is your work order. T9
    (blog series + sailboat retro) runs only if T1–T8 are done or passed.
 3. `docs/phase4-state.md` — standing directives and gate history.
@@ -33,7 +33,7 @@ project, autonomously, while the owner sleeps.
    structural check passed and the render was wrong; the owner caught it
    from a screenshot).
 2. **Progress report as you go.** Append to
-   `docs/phase4-overnight-cp4b.md` under `## Morning report`, after each
+   `docs/archive/phase4-overnight-cp4b.md` under `## Morning report`, after each
    task, in this shape:
    - `DONE T<n>` — plain-English summary of what you implemented (what a
      player would see change), then the proof: asm/redecode citations that

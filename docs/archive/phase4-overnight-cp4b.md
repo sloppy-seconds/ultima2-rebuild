@@ -232,7 +232,7 @@ granted exception):
 - `docs/phase4-state.md` gate log (baseline moves, owner decisions)
 - `git log --format='%h %s'` — the commit messages are written as
   mini-narratives and are a ready spine for the series
-- `docs/phase4-overnight-cp4b.md` + its morning report (the autonomous-run
+- `docs/archive/phase4-overnight-cp4b.md` + its morning report (the autonomous-run
   experiment itself is one of the posts)
 
 Suggested series arc (agent may restructure if the material says so):

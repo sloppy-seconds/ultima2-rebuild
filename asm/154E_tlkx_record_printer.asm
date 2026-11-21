@@ -16,7 +16,7 @@
 #           (tools/tlkx_decode.py is the reference decode), and it starts with a NUL, so
 #           record 1 is the first non-empty one and AL selects it directly.
 #           The caller is asm/4209, which arrives with AL = [slot+0x1D7] - 0x80. That is the
-#           selection rule docs/handoff-commerce-transact.md § 4.5 recorded as "completely
+#           selection rule docs/archive/handoff-commerce-transact.md § 4.5 recorded as "completely
 #           unknown": the role byte IS the tlkx record index, high bit set as the Apple II
 #           convention. Observed 2026-10-29 with a breakpoint at this entry: a role-0x82
 #           Jester in sector 31 entered with AL=0x02 and DI=0x11 (slot 17), and tlkx31

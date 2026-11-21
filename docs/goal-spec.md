@@ -95,7 +95,7 @@ Three things the engine already knows that make this detector non-trivial:
   signal and a known trap at the same time. **A detector that greps for it in discovered
   blocks would be the mistake this project has already made once.** If it is used at all, it
   must come from the executed-instruction stream plus a frame.
-* **Death is memory-only, not a save** (`docs/handoff-2026-11-03.md`). A failed attempt is
+* **Death is memory-only, not a save** (`docs/archive/handoff-2026-11-03.md`). A failed attempt is
   not recoverable by reloading, so the detector must distinguish *dead* from *winning*
   immediately, in-session, or the bot will lose the run silently.
 
@@ -255,7 +255,7 @@ The 155 stop for the Int+Cha sum is the same arithmetic one level up: it leaves 
 Two things this does **not** settle. That the bit-7 NPC in sector 32 is the Hotel clerk is
 third-party-corroborated inference — the listing cannot name an NPC. And the save-and-reload
 tip is a strategy the game neither supports nor blocks: death is memory-only
-(`docs/handoff-2026-11-03.md`), and whether a mid-run manual save is worth the turns is a
+(`docs/archive/handoff-2026-11-03.md`), and whether a mid-run manual save is worth the turns is a
 policy question, not a byte one.
 
 Note the conflict P1 creates with P2: grinding pushes `Int+Cha` up toward 155, straight
@@ -314,7 +314,7 @@ against a damage number nobody has measured for frigates. Grade: **recalled** pa
 > invincible monsters within the keep which can not be defeated by any means.
 
 `cmd_N` (Negate) is implemented, and `STRANGE COIN` is the consumable that powers it
-(`items_held[13]` — DS:E3 turned out to be a STRANGE COIN, per `docs/handoff-2026-10-29.md` § 5.
+(`items_held[13]` — DS:E3 turned out to be a STRANGE COIN, per `docs/archive/handoff-2026-10-29.md` § 5.
 There is no `U2_ITEM_STRANGE_COIN` define yet, only the five vehicle-token defines). So the *mechanism* is measured; the
 existence of unkillable creatures inside Shadowguard is **recalled and load-bearing** — if
 Minax herself is one of them outside the quicksword, the whole readiness conjunction changes.

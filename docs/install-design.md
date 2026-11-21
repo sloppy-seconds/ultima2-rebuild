@@ -2,7 +2,7 @@
 
 Status: **design, and three slices of it are now built.** This document takes over
 as the entry point for everything about *assembling* a playable tree, and it
-inherits the parts of `docs/handoff-themes-builder.md` that were never built. That
+inherits the parts of `docs/archive/handoff-themes-builder.md` that were never built. That
 handover is now **locked off** — its slice C list is folded into § 10 below rather
 than left in a handover, because handovers are entry points and this is the one.
 

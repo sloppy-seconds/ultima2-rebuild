@@ -672,7 +672,7 @@ u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, i
          * chain (0x60 guard, 0x64 jester, 0x68 merchant, 0xF0 fighter, 0xF4 cleric, 0xF8 wizard,
          * 0xFC thief), each printing one fixed line. The selector was observed executing
          * on 2026-10-29 with AL=0x02 for a role-0x82 Jester (captures/spice86/g23-food-live),
-         * so the mechanism is no longer the open question docs/handoff-commerce-transact.md
+         * so the mechanism is no longer the open question docs/archive/handoff-commerce-transact.md
          * recorded. The engine half is now in place too: core/world.c loads tlkxNN and
          * u2_world_tlkx_record walks it exactly as asm/154E does.
          * the guess the handoff told this branch to avoid.

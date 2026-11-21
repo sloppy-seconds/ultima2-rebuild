@@ -577,7 +577,7 @@ it follows from the loop's two exits. The direction→delta writer: **unknown**,
 
 ### 5d. The ray, the fork and the selector — closed 2026-10-29
 
-The three open items § 5c and `docs/handoff-commerce-transact.md` § 4 left behind were all in
+The three open items § 5c and `docs/archive/handoff-commerce-transact.md` § 4 left behind were all in
 the same eight bytes plus the fragments after them, and all three are now read.
 
 **The direction→delta writer is `asm/2362`, the same aim gate cmd_A/S/U/O use.** `asm/405D`

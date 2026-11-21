@@ -1185,7 +1185,7 @@ static void u2_swamp_damage(u2_ctx *ctx)
  * 0x2E, force field) costs 1000 HP unless a ring protects (asm/24B5). Both are accepted
  * here, and both costs are implemented — not in this function, which returns a verdict and
  * keeps it that way, but in the effect ladder at the step site. Full table and evidence:
- * docs/handoff-tile-effects.md; the gate is CP5 E1 in tests/run_cp5.sh.
+ * docs/archive/handoff-tile-effects.md; the gate is CP5 E1 in tests/run_cp5.sh.
  */
 static int foot_ladder(unsigned mode)
 {
@@ -1392,7 +1392,7 @@ uint8_t u2_unlock_spend_key(uint8_t keys)
  *
  * So mode 0x04 is grass and mode 0x02 is swamp, and they are different tiles. Both the
  * swamp and the force-field costs are implemented in the step path; see
- * docs/handoff-tile-effects.md for the full table and the evidence.
+ * docs/archive/handoff-tile-effects.md for the full table and the evidence.
  *
  * The water arm admits the ship alone: you may only drop the ship where you are afloat, which
  * is the tile its own BOARD arm left behind. */
@@ -1949,7 +1949,7 @@ int u2_overworld_init_state(u2_ctx *ctx, u2_overworld *ow)
                              ctx->state.rocket_parked_y, U2_TILE_ROCKET);
     }
 
-    /* Scope, not decoration (docs/handoff-themes-builder.md § 4.1) — but the
+    /* Scope, not decoration (docs/archive/handoff-themes-builder.md § 4.1) — but the
      * in-game notice for it was removed 2026-11-06 on the owner's ruling that the
      * dungeon should simply play the same under every theme, and it was right:
      * the dungeon is a first-person wireframe drawn by dg_line in CGA colour 3
@@ -2616,7 +2616,7 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
          *
          * Space is folded in here rather than being a separate hook: the in-space
          * command loop is this loop with a different tile set, which is what
-         * docs/handoff-2026-11-03.md § 2 concluded when it found that the
+         * docs/archive/handoff-2026-11-03.md § 2 concluded when it found that the
          * discriminator byte does not exist. */
         if (!ow->pending_cmd) {
             u2_demo_mode dm = U2_DEMO_MODE_OVERWORLD;

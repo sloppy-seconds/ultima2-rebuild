@@ -352,7 +352,7 @@ not produce a coherent printer, so this is also the confirmation that the segmen
    seed functions~~ done 2026-10-28d: the junk was not junk, it was the vector table, and the
    scan now excludes it. ~~Name routines from the anchor table~~ done for the six the first
    pass could reach — see § 4 "What the anchors have actually settled". Next there: the
-   remaining questions are in `docs/handoff-apple2-crosswalk.md` T3, and the ones that did not
+   remaining questions are in `docs/archive/handoff-apple2-crosswalk.md` T3, and the ones that did not
    move are recorded as silent rather than left open.
 2. ~~Resolve `FL`, `II`, `WII`, `UL`~~ done 2026-10-28c, see § 3b: data, one shared record
    format, every destination inside the `PIC.*` picture window. What is left there is what § 3b

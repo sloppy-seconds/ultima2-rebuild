@@ -1,7 +1,7 @@
 # Handoff — 2026-10-21 (read this first after a compaction)
 
 > **ARCHIVED 2026-10-22.** Superseded that same evening by `handoff-2026-10-21-evening.md`,
-> and now by `docs/handoff-2026-10-22.md`. Kept as the record of what was known at
+> and now by `docs/archive/handoff-2026-10-22.md`. Kept as the record of what was known at
 > midday, including claims later corrected. Not an entry point: the live queues are
 > `docs/phase4-state.md` and `docs/needs-gameplay.md`. Anything asserted here that
 > was not re-measured is suspect by default — note the `>>1` vs `>>2` art-index
@@ -25,7 +25,7 @@ running; ports free.
 7. `docs/spice86-live-findings.md` — §7–§11 evidence: combat, loot, provenance,
    screen reader, and the **offset tables in §11, which include the item and
    equipment slots**.
-8. `docs/handoff-live-capture.md` (this file) — index and running state.
+8. `docs/archive/handoff-live-capture.md` (this file) — index and running state.
 
 ## Running state
 

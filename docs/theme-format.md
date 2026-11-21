@@ -1,7 +1,7 @@
 # Theme format — what `--ega-theme-dir` reads
 
 Status: **specification, 2026-11-04.** This is the contract; the handover that
-produced it is `docs/handoff-themes-builder.md` and the user-facing page is
+produced it is `docs/archive/handoff-themes-builder.md` and the user-facing page is
 `docs/ega-graphics.md`. Where this file and the code disagree, the code is what
 ships and this file is the bug.
 

@@ -41,7 +41,7 @@
 #           * docs/commerce.md says of these arrays: "per-entity arrays, not direction vectors".
 #             That is now **wrong** — asm/10AA and asm/10BF write sign_of_al(rand_byte) into them and
 #             into DS:19/DS:1A in the same instruction pair. Corrected there.
-#           * docs/handoff-2026-10-24.md called this a "per-slot persistent direction". An earlier
+#           * docs/archive/handoff-cp5-2026-10-24.md called this a "per-slot persistent direction". An earlier
 #             revision of this header today called that word *doubtful*, because a tracked creature
 #             changed direction. It was right and I was wrong: it IS persistent, re-rolled on only
 #             one turn in four. Retracted.

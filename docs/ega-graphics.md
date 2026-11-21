@@ -155,7 +155,7 @@ across both. v1 is the fan pack's `EGATILES`, described above. v2 is a directory
 with a manifest, and it exists because the FM Towns art cannot be expressed as a
 flat array: its tiles are 32x32, one DOS art index maps to a *set* of FM tiles,
 and the alignment between a DOS index and an FM tile is not the identity
-(`docs/fmtowns-graphics.md`, and `docs/handoff-themes-builder.md` § 1). The field
+(`docs/fmtowns-graphics.md`, and `docs/archive/handoff-themes-builder.md` § 1). The field
 by field contract is `docs/theme-format.md`; this section is the shape of it.
 
 ```bash
@@ -205,7 +205,7 @@ Three consequences worth knowing before you try it:
 What v2 does **not** do yet: animation. `MAP.TSV` keeps every frame the crosswalk
 names — `art 0C` really does carry `ENEMY2/17,ENEMY2/16` — and the engine draws
 the first of each list, so the frames are in the file and nothing was thrown away
-to get here. Slice C (`docs/handoff-themes-builder.md` § 5) is animation, the
+to get here. Slice C (`docs/archive/handoff-themes-builder.md` § 5) is animation, the
 `PLAYER` bank's race-and-class variants, and the dungeon banks.
 
 The refusals are as deliberate as the accepts: a `bpp` other than 4, a map row

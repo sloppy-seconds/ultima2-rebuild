@@ -9,7 +9,7 @@
 #           counter at [DS:D6] and subtracts `sbb al,0x10` from [DS:51] — 0x10 in the HIGH
 #           BCD byte, i.e. 1000, matching its own string "FIELD CAUSES 1000 DAMAGE!".
 #           A miss jumps past both effects and the step costs nothing.
-#           Renamed 2026-11-02 from sub_24b1. See docs/handoff-tile-effects.md.
+#           Renamed 2026-11-02 from sub_24b1. See docs/archive/handoff-tile-effects.md.
 # provenance: static read of the asm/2423 span 2026-11-02. The mode-to-tile identity comes
 #           from asm/5B71_mode_table_copy's own header (`0x5C >> 1 == 0x2e`), and the
 #           1000 figure is the asm/24B5 string "FIELD CAUSES 1000 DAMAGE!" agreeing with

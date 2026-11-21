@@ -13,7 +13,7 @@
 #   tools/apple2_ghidra.sh --bulk               # also write the .c/.tsv next to the committed index
 #
 # The checksums printed at the end are the diff: if u2_6502.bin and u2_6502_seeds.txt match
-# the values in docs/handoff-apple2-crosswalk.md T0, the C on disk is the C that index came from.
+# the values in docs/archive/handoff-apple2-crosswalk.md T0, the C on disk is the C that index came from.
 #
 # Exit is non-zero if any stage fails or if the seed count does not match the committed list.
 set -euo pipefail

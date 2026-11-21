@@ -2203,7 +2203,7 @@ ok    1 file(s): the dungeon draws no theme art, so it plays the same under ever
 ```
 
 Docs corrected: `theme-format.md` § 6 rewritten to carry the ruling, `ega-graphics.md`
-updated, and `handoff-themes-builder.md` item 3 — the origin of the notice — given an
+updated, and `docs/archive/handoff-themes-builder.md` item 3 — the origin of the notice — given an
 inline correction rather than being left to contradict the engine.
 
 `make test`: CP0..CP7 PASS.

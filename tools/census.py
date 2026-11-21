@@ -643,7 +643,7 @@ def asm_tile_names(asm_dir):
 
 
 # Tile characteristics that are proven but were sitting in a prose table in
-# docs/handoff-tile-effects.md instead of in the census -- the same failure as passability: a
+# docs/archive/handoff-tile-effects.md instead of in the census -- the same failure as passability: a
 # curated, byte-cited table the join walked past. Keyed on MAP BYTE (not art, not mode), because
 # that is what the effects ladder tests. Each entry cites the routine that proves it.
 TILE_EFFECTS = {

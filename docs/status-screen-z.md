@@ -1,6 +1,6 @@
 # The `Z` status screen — spec for wiring it in the engine
 
-Opened by `docs/handoff-2026-10-27-night.md` item 3, which called it "self-contained,
+Opened by `docs/archive/handoff-2026-10-27-night.md` item 3, which called it "self-contained,
 zero unknowns". It is self-contained but it is not zero unknowns, and the two things the
 handoff guessed are both wrong: the handler is not `asm/462F_status_keys.asm`, and the
 screen has a real handler chain that is already partly readable. This document is the

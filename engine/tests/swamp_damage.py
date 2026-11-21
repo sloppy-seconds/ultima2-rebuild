@@ -3,7 +3,7 @@
 swamp_damage.py — CP5 gate E1: the two HP-costing tiles of asm/2423's effect ladder.
 
 What is under test is the ENTRY asymmetry and the amount, not just the happy path. The
-owner's three-way control (2026-11-02, docs/handoff-tile-effects.md § 3) is the shape of
+owner's three-way control (2026-11-02, docs/archive/handoff-tile-effects.md § 3) is the shape of
 this gate on purpose: a naive implementation that charges for STANDING on the swamp, or
 for LEAVING it, passes only the middle case — and the middle case is exactly the one that
 would fool a reviewer. So all three run, plus the controls that make the gate able to fail:

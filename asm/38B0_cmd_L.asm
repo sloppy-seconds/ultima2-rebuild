@@ -66,7 +66,7 @@
 #   and [DS:4A] are both zero it records the launch cell at DS:6A/6B with DS:69=1 and calls
 #   the sector store gate. CORRECTED 2026-11-15, because a wrong claim here propagated: this said
 #   "calls the save body at asm/24FD — launching a rocket SAVES THE GAME", and
-#   docs/handoff-2026-11-03.md recorded "the reason a rocket launch silently saves" on the
+#   docs/archive/handoff-2026-11-03.md recorded "the reason a rocket launch silently saves" on the
 #   strength of it. There is no asm/24FD. The instruction is `call L_0024fd`, and L_<addr> labels
 #   are FILE offsets (runtime + 0x200 = file), so the target is file 0x24fd = runtime 0x22FD =
 #   asm/22FD_sector_store_gate. A launch stores the SECTOR, on Earth and only where the sector's

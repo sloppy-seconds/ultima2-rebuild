@@ -12,7 +12,7 @@
 #           Reached from asm/40C0, which branches on bit 7 of [DI+0x1D7]: set means "this NPC
 #           has a scripted line", clear means walk the creature-type chain (asm/40CB onward,
 #           the street_* handlers). The role byte is therefore a record index into the
-#           sector's tlkx file — the rule docs/handoff-commerce-transact.md § 4.5 called
+#           sector's tlkx file — the rule docs/archive/handoff-commerce-transact.md § 4.5 called
 #           "completely unknown" and § 5 said to leave unimplemented rather than guess at. It
 #           is no longer a guess: stopped at asm/154E on 2026-10-29 with AL=0x02 for the
 #           role-0x82 Jester at (48,26) in sector 31, whose tlkx31 record 2 is

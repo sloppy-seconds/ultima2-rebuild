@@ -49,7 +49,7 @@
 #define U2_TILE_EGA_BYTES  (U2_TILE_H * U2_TILE_EGA_STRIDE)   /* 128 */
 #define U2_TILE_EGA_FILE   8320                               /* 65 * 128 */
 
-/* Format v2 bounds (docs/handoff-themes-builder.md § 4.1). A THEME.INI names a
+/* Format v2 bounds (docs/archive/handoff-themes-builder.md § 4.1). A THEME.INI names a
  * tile size and a pool of tiles, and the atlas below is sized for the largest
  * one this project has evidence for; a theme that exceeds a bound is refused
  * with a reason rather than truncated. */

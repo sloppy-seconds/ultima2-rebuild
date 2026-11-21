@@ -1,10 +1,10 @@
 # Handover — `apple2-reference`: the unattended queue is closed, contract 2's holes are gone, and three of five tickets were not what they said
 
-**Superseded as the entry point by `docs/handoff-apple2-crosswalk.md`** — the next piece of work is
+**Superseded as the entry point by `docs/archive/handoff-apple2-crosswalk.md`** — the next piece of work is
 the Apple II ↔ DOS anchor crosswalk, and that file has its own prerequisites checked already. This
 one stays as the record of what was settled here.
 
-Session label continues `docs/handoff-2026-10-28b.md`, then `2026-10-28c` (U1–U5). Branch
+Session label continues `docs/archive/handoff-2026-10-28b.md`, then `2026-10-28c` (U1–U5). Branch
 **`apple2-reference`**, working tree clean. Not merged to `main` — that is an owner call, see
 "Needs a person".
 

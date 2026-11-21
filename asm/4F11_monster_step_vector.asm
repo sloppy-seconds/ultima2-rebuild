@@ -34,7 +34,7 @@
 #           implementation agrees, which is what makes the torus reading of the x4 original
 #           1983 design rather than a DOS-port invention. It does not rename this file and it
 #           does not raise the grade. Found 2026-10-28 via tools/apple2_anchor_map.py and the
-#           hand-decode in docs/handoff-apple2-crosswalk.md T0.
+#           hand-decode in docs/archive/handoff-apple2-crosswalk.md T0.
 # provenance: static, decoded 2026-10-28; the x4/torus reading and the retraction of the
 #           -1 were both settled live the same day (captures/spice86/g28-pursuit)
 # confidence: high (bytes, and the resulting vector measured at runtime per slot)

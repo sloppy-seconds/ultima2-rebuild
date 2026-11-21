@@ -134,7 +134,7 @@ SATURN. URANUS.   NEPTUNE. PLUTO.
 
 The game prints `YOU ARE ORBITING MERCURY.` by concatenation, so the table order **is** the
 world byte's order: `0`–`8` = EARTH … PLUTO, `9` = **X** (printed from a separate routine
-past `0x729B`, per `docs/handoff-2026-11-03.md`), `0x0A` = deep space. It sits in the same
+past `0x729B`, per `docs/archive/handoff-2026-11-03.md`), `0x0A` = deep space. It sits in the same
 code region as the world coordinate table at `0x7212` that the rocket work found, which is a
 consistency check in itself.
 

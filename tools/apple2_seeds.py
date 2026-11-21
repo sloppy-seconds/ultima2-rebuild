@@ -23,7 +23,7 @@ made the naive scan report 335 instead of 328.
 vectors, not code, and the scan is byte-granular: it puts a seed on every third byte of the
 table, so Ghidra decompiles the vectors and reports their *targets*' bodies under the
 vectors' addresses. That is how the first Ghidra run presented the monster step vector as
-`FUN_4000`. See `docs/handoff-apple2-crosswalk.md` T0. Pass `--include-vectors` to get the
+`FUN_4000`. See `docs/archive/handoff-apple2-crosswalk.md` T0. Pass `--include-vectors` to get the
 historical list back — that is the gate this tool's `--selftest` checks against.
 
 Usage:

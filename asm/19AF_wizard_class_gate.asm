@@ -7,7 +7,7 @@
 #           catalogue inside asm/19D7). Falling through reaches
 #           asm/19BA_not_a_wizard_msg. [DS:47] is the class byte, so this is the wizard half
 #           of the pair whose cleric half is asm/1841_cleric_class_gate; § 4.7 of
-#           docs/handoff-commerce-transact.md listed the tested field as still unnamed and it
+#           docs/archive/handoff-commerce-transact.md listed the tested field as still unnamed and it
 #           is DS:47.
 # note: one of the eight destinations of asm/1590_transact_shop_selector — the west/south
 #           cell of a non-town site. The `call L_00527a` here is the same screen-preparation

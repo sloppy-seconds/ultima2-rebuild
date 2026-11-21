@@ -1,6 +1,6 @@
 # Handover — 2026-10-27 evening: work an agent can do alone
 
-> **SUPERSEDED 2026-10-28 — read `docs/handoff-2026-10-28.md` instead.** This file is kept as
+> **SUPERSEDED 2026-10-28 — read `docs/archive/handoff-2026-10-28.md` instead.** This file is kept as
 > the record of what was asked and what was found, not as the entry point. Of the queue below:
 > items 1, 6, 7 and 8 are done (7 twice — the followup refuted the asymmetry this file left
 > open), item 5 (G30) is closed statically and item 4 is wired on the strength of it, item 3

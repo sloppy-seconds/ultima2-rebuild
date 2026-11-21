@@ -52,7 +52,7 @@ Statuses: todo | in-progress | done | blocked | awaiting-gate
   any `STR` line inside a code span in `disasm/redecoded/` must be re-checked
   before being cited. Next step is one breakpoint capture at runtime `0x2423`.
 
-- **Entry point is `docs/handoff-2026-10-28d.md`.** The 2026-10-23 handoff named below is
+- **Entry point is `docs/archive/handoff-2026-10-28d.md`.** The 2026-10-23 handoff named below is
   superseded; it is kept as the record of what was closed that day (G1, G8,
   G18, G20, the dungeon encoding, the price operand) and the triage of the open list of the
   time. The CP4b
@@ -61,7 +61,7 @@ Statuses: todo | in-progress | done | blocked | awaiting-gate
   `docs/spice86-live-findings.md`.
 
 - **CP4 is mid-flight and everything is committed. To take over, read
-  `docs/handoff-2026-10-23.md` for current state, then
+  `docs/archive/handoff-2026-10-23.md` for current state, then
   `docs/phase4-kickoff-cp4b.md` for the CP4 work order itself.** The headline it must not
   miss:
   the original has **two display paths** — tiles for the map and banners, and
@@ -149,7 +149,7 @@ Done and green: kickoff § 2 items 1-2 (name = `MAPX` + two digits
 2026-10-28e. It deliberately carries no counts: every number it could name is printed by a
 tool, and a hand-kept number here has gone stale before.
 
-**Fresh agent: read `AGENTS.md`, then `docs/handoff-2026-10-28e.md`.** That handoff is the
+**Fresh agent: read `AGENTS.md`, then `docs/archive/handoff-2026-10-28e.md`.** That handoff is the
 entry point; the kickoff docs below are historical work orders, not the queue.
 
 **CP5 — combat.** Implemented or resolved ticket by ticket (see § CP5 above and
@@ -2169,7 +2169,7 @@ and this closed the one link in the MAGIC MISSILE model that memory alone could 
 
 `cmd_T` is implemented in `engine/src/game/commerce.{c,h}`, with the command entry in
 `commands.c` and the direction arm in `overworld.c`, and `make test-cp6` gates it. The finding
-that made it buildable is that three of the four things `docs/handoff-commerce-transact.md` § 4
+that made it buildable is that three of the four things `docs/archive/handoff-commerce-transact.md` § 4
 listed as not-evidenced were not waiting on gameplay — they were waiting on the eight bytes of
 `asm/1590` and the fragments after them, and on two hand-copied numbers being re-measured.
 

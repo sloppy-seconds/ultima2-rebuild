@@ -8,7 +8,7 @@
  *       header for the evidence and docs/ega-graphics.md for the user story.
  *
  *   v2  a directory with a THEME.INI naming a TILES pool, an optional
- *       PALETTE.RGB and an optional MAP.TSV (docs/handoff-themes-builder.md
+ *       PALETTE.RGB and an optional MAP.TSV (docs/archive/handoff-themes-builder.md
  *       § 4.1). This is what an art set that does NOT align 1:1 with the DOS art
  *       indices needs — the FM Towns banks are the reason it exists.
  *

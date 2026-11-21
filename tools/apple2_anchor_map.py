@@ -7,7 +7,7 @@ routines that print it are the same routine — and the 6502 around it is the sp
 8086 was translated from. That makes the Apple side a tiebreaker for *static ambiguity*
 questions: which of two readings of a compare is right, whether a table is what we think.
 It cannot prove anything about execution; see § 6 of that doc and the caveats in
-docs/handoff-apple2-crosswalk.md.
+docs/archive/handoff-apple2-crosswalk.md.
 
 Until now the anchor set was prose: "35 strings", ~10 clusters, not recoverable from the repo.
 This tool makes it a measured, regenerable lookup.

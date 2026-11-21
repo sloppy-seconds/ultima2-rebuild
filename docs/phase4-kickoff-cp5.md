@@ -1,7 +1,7 @@
 # CP5 kickoff — the wiring that makes a fight reachable and visible
 
 Written 2026-10-23 after the combat-mode audit, the live fight captures and G24/G25.
-Reads: `AGENTS.md`, `docs/phase4-state.md` § CP5, `docs/handoff-cp5-2026-10-23.md`,
+Reads: `AGENTS.md`, `docs/phase4-state.md` § CP5, `docs/archive/handoff-cp5-2026-10-23.md`,
 `docs/spice86-live-findings.md` § 14, § 15, § 16, § 17.
 
 **Acceptance bar (owner's words):** *"lets get to a rendered fight in the game"*. Not a green

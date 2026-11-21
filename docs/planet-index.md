@@ -27,7 +27,7 @@ byte. **Column-major, not ten triples.**
 That distinction is the whole finding, and the trap is instructive. Read as consecutive triples
 the same bytes give `(6,5,3) (6,1,2) (9,4,0) …` — every value in range, nothing obviously broken,
 and no planet matching anything. A first pass here produced exactly that and found no match at
-all. The signature that disambiguates is the one `docs/handoff-2026-11-03.md` recorded from live
+all. The signature that disambiguates is the one `docs/archive/handoff-2026-11-03.md` recorded from live
 screens: the first entry of each column is Earth `(6,6,6)` and the last is Planet X `(9,9,9)`.
 Scanning the whole binary for that property returns **exactly one offset**, so the tool locates
 the table by its signature rather than by a hard-coded address that would drift silently.

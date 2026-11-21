@@ -1,6 +1,6 @@
 # Handoff — 2026-10-21 (evening)
 
-> **ARCHIVED 2026-10-22.** Superseded by `docs/handoff-2026-10-22.md`. The § 4 open-work
+> **ARCHIVED 2026-10-22.** Superseded by `docs/archive/handoff-2026-10-22.md`. The § 4 open-work
 > list has been triaged against current state and carried forward there: some items
 > closed, some still open, and item 5 (`0x4C`) resolved in a way that exposed a
 > defect in `docs/tile-art-spec.md` — see the new handoff. Not an entry point.

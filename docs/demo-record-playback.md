@@ -844,7 +844,7 @@ polish that makes it a subsystem rather than a feature.
    `ctx->clock` is identical on every run. Use host time (§ 4, Filenames). This is the kind of bug that
    produces a silently overwritten file rather than a failure.
 8. **`Ctrl-R` inside a freeform input loop.** `cmd_Y` runs its own complete input loop
-   (`docs/handoff-2026-10-29.md` § 2 records that it was misread as an unresolved fall-through). The seam
+   (`docs/archive/handoff-2026-10-29.md` § 2 records that it was misread as an unresolved fall-through). The seam
    tap is upstream of it, so the toggle works there, and the quiescent rule (D12) means the recording
    starts after that command finishes. Test it: W2's control should include a `Ctrl-R` pressed mid-command.
 9. **SDL is not headless.** Playback under SDL runs a real event loop and `seam_wait_ms(16)`. Nothing in

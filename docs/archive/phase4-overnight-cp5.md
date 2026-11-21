@@ -24,7 +24,7 @@ this queue is drawn from).
    frame, or a recorded snapshot. If evidence is insufficient, write what was found
    and exactly what is missing into the progress report, mark the task PASSED, and
    move on. A passed task with a clear reason is a success. A guessed mechanic is a
-   failure — see § 3 of `docs/handoff-2026-10-21-evening.md` for three instances from
+   failure — see § 3 of `docs/archive/handoff-2026-10-21-evening.md` for three instances from
    one day, all of which the owner caught and the agent did not.
 2. **No emulator launches.** Every task is offline. There is no one to drive the game,
    and an unattended headless session produces no turns and therefore no evidence.

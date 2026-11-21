@@ -76,7 +76,7 @@ EARTH_ERAS = {
 # world_names() below, which reads them out of the binary and refuses to guess.
 FALLBACK_WORLDS = ["EARTH", "MERCURY", "VENUS", "MARS", "JUPITER",
                    "SATURN", "URANUS", "NEPTUNE", "PLUTO"]
-# World 9 is printed as `X` from a separate routine (docs/handoff-2026-11-03.md: "9 prints X
+# World 9 is printed as `X` from a separate routine (docs/archive/handoff-2026-11-03.md: "9 prints X
 # from a routine past 0x729B"), and 0x0A is deep space. Neither is in the nine-name table.
 WORLD_X = "PLANET X"
 

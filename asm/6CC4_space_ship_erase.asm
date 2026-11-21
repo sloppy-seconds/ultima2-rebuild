@@ -11,7 +11,7 @@
 #           It is called from asm/6999_space_status on every arrow arm and from
 #           asm/6DFD_hyperwarp_flow's 'H' arm, each time immediately before DS:47B/47C are
 #           reloaded with the next position -- so the order is erase-old, set-new, redraw.
-# CORRECTS the framing in docs/handoff-2026-11-03.md § 3.5, which called this "the actual
+# CORRECTS the framing in docs/archive/handoff-2026-11-03.md § 3.5, which called this "the actual
 #           space-movement routine" because every space arm calls it. That was an inference
 #           from the call graph, and the bytes refute it: this routine writes NOTHING to DS
 #           except the pixel-erase scratch DS:479/DS:47A, and moves no coordinate. The

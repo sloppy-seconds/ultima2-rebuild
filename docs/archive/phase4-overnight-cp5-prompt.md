@@ -19,7 +19,7 @@ one to ask.
    discipline. Hard law. Note especially: this project reads and writes only inside
    its own root; `original/` and `references/` are never written; scratch goes to
    `/var/tmp`, never `/tmp`.
-2. `docs/phase4-overnight-cp5.md` — **this is your work order.** Tasks T1..T10 in
+2. `docs/archive/phase4-overnight-cp5.md` — **this is your work order.** Tasks T1..T10 in
    priority order, the rules of engagement, and what is explicitly out of scope.
 3. `docs/phase4-state.md` — checkpoint table, the CP5 ticket list C1..C7, the backlog,
    and the gate log.

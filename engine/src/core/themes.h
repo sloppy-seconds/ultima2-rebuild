@@ -6,7 +6,7 @@
  * (docs/theme-format.md) that only gets one owner.
  *
  * The rules it implements, each learned the expensive way and recorded in
- * docs/handoff-themes-builder.md:
+ * docs/archive/handoff-themes-builder.md:
  *
  *   * A theme is a directory whose CONTENTS include a tile atlas. Not one named
  *     `EGATHEME.*` — keying discovery on the vendor's directory name produced a

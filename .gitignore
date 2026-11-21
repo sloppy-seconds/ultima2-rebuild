@@ -139,7 +139,7 @@ bestiary/view.html
 # themes/ is built by tools/build_themes.py out of the player's own media
 # (references/u2upgrade, original/updated, references/fmtowns). It holds
 # extracted game art, so it is never committed - same posture as original/,
-# references/, tmp/tiles and bestiary/cache/. See docs/handoff-themes-builder.md.
+# references/, tmp/tiles and bestiary/cache/. See docs/archive/handoff-themes-builder.md.
 /themes/
 # deploy/novnc/u2-sdl is a COPY of the host build (make -C engine sdl), staged here so the
 # image can COPY it. Never commit it: it is build output, and the host binary is the

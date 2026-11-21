@@ -5,153 +5,47 @@ agents (and human collaborators) reverse engineering early 16-bit real-mode DOS
 binaries (e.g., *Ultima II*) into assembly, re-engineering into C, and verifying
 exact byte-for-byte fidelity.
 
-> **Executable work orders:** Phase 1 (evidence capture), Phase 2 (function boundaries,
+> **Where the project stands.** Phase 1 (evidence capture), Phase 2 (function boundaries,
 > code/data separation, per-function asm corpus) and Phase 3 (clean byte-exact ASM
 > reconstruction, MASM dialect via jwasm target) are **complete and signed off** — see
 > `disasm/phase1-summary.md`, `disasm/phase2-summary.md` and `disasm/phase3-summary.md`.
 > Phase 4 (portable C engine reimplementation from the asm/ tree) is `docs/phase4-plan.md`;
 > the live task queue is `docs/phase4-state.md` and the running log is
-> `docs/phase4-implementation.md`. A plan for an enhanced-mode screen layout taken
-> from the FM Towns version is `docs/enhanced-layout-plan.md` — plan only, nothing
-> built, and its § 4 lists four decisions (viewport shape, frame size, string
-> provenance, when it turns on) that need the owner before work starts.
-> **The vehicle state machine is done except `cmd_L`'s flight-loop
-> gating: read `docs/handoff-vehicle-state-machine.md` for the byte evidence, but note its status
-> block at the head corrects three rows of its own § 1 table, and two things it named as blockers
-> have since closed — `u2_world_store` no longer writes a dirty map to the `monx` filename, and
-> BOARD's tile write is gated (CP5 V1) via `u2_world_terrain_put`.** W1 (BOARD), W2 (per-mode
-> passability), W3 (per-mode food) and W4/W5 (`cmd_L`) are implemented and W1/W2/W3 are gated as
-> CP5 P1 and V1. The one genuinely open question there (the plane's airborne flag, W6) is marked as
-> needing a capture and not a guess, and is now `docs/needs-gameplay.md` G43.** **Scoped handoffs are
-> the entry point for their own topic, not history:** `docs/handoff-space-view.md` (**fixes 1 and 2 shipped, 3 shipped in part**
-— `space_loop` no longer hot-spins and the orbit / deep-space screen is drawn; the remaining gaps
-are listed in its status table, and the two honest ones are the radiating hyperwarp animation and
-the readout's fixed cell positions, neither of which has a decoded routine behind it. Its § 1 names the four capture frames that
-define the screen; **the orbit/landed discriminator is closed** by `captures/spice86/w6-orbit-dive/`
-— there is no in-space boolean, launch changes only the coordinate triple and the fuel, and the
-recommendation in § 3a is to keep the loop-scoped structure rather than test the staging tables.
-§ 3a also warns not to call this W6, which is the plane's airborne flag and still open), and
-`docs/handoff-commerce-transact.md` (**executed
-> 2026-10-29, the day it was written — read its § 0 status block first**; `cmd_T` is now implemented
-> in `engine/src/game/commerce.c` and gated by `make test-cp6`, and the headline is that three of its
-> four "not evidenced" items closed statically: the grocery quote was `0020` and not `0200`, the axe
-> was 20 and not 25, `asm/1590` is a quadrant-and-site-kind switch rather than the menu-versus-line
-> fork, and the tlkx record index is the creature role byte minus `0x80`. **The talking branch is
-> now implemented, both arms** (2026-10-29): `u2_world_load_tlkx` and `u2_world_tlkx_record` in
-> `engine/src/core/world.c` carry the scripted arm, and `asm/40CB`'s `street_*` typed chain is
-> wired with its seven literals extracted as `run` locators, because each is a split `db` around
-> an embedded `0x0d` the db-index locator cannot see. `CP6 talk` in `run_cp6.sh` guards both
-> against the real `tlkx22`/`monx22`), and
-> `docs/moongates.md` (time doors:
-> observed mechanic, the decoded cell table for all five eras, and the destination rule
-> `target = k if k < era else k + 1` read out of `asm/26B7`+`26C3`+`26C6` — three fragments the
-> Phase 2 map had cut apart, the same failure as `cmd_C`/`cmd_D`/`cmd_K` — plus three recorded
-> self-corrections worth reading for method as much as content), and `docs/install-design.md` (**the current entry point for
-> anything about assembling a playable game directory** — installer modes, the layout and precedence
-> decisions still open, the invariants, the gate, and what `docs/handoff-themes-builder.md` left
-> behind now that the theme work is locked off), and `docs/demo-record-playback.md`
-> (**executed 2026-11-07, the day the status block names — read its § 0 first**: the
-> engine's `Ctrl-R` record and `--playback` verify subsystem, gated by `make
-> test-demo`, with fifteen deviations from the owner-ruled plan and each one's
-> measurement written down rather than edited silently into the body), and
-> `docs/handoff-save-scoped-worlds.md` (**executed 2026-11-05, the day it was written —
-> read its § 0 status block first**) moves sector write-back out
-> of the content directory into a per-save overlay under `saves/<slot>/`, which is where `mapx`
-> mutation, the `player`/`PLAYER` case collision, and multiple save games all land. Spec is
-> `docs/save-scoped-worlds.md` and its D1-D6 are all ruled, so do not re-argue them. Two things
-> the plan got wrong are recorded in that status block: S2 and S3 cannot be separate commits,
-> because D1 makes the slot directory and the flat record the same path; and the engine adopts
-> a record a pre-slot tree left behind (`u2_slot_adopt_legacy`, spec § 4b, an owner-approved
-> amendment to D6) because the drop-in layout has no installer to run. The gate for the whole change is `engine/tests/content_immutable.py`, wired
-> into `run_cp4.sh`, and it runs its own red control every time. **To start a fresh
-> agent, read `docs/outstanding.md` first (**what is actually left, validated against the tree
-> 2026-11-15** — it exists because handoff queues go stale faster than the sessions that read
-> them, and nine items in the entry point below had already shipped the same day it was written).
-> Then read `docs/handoff-2026-11-12.md` (the Minax session:
-> the game was won in the original, which retired several "never executed" notes in `asm/`, and
-> the open work is CP8 (Minax is skipped entirely by one line in `ai.c`, her teleport is observed
-> but undecoded, invulnerable castle creatures have no mechanism in the engine, and the engine's
-> ending has neither the fade nor the flight), plus the signpost arm of `cmd_E` with its frame
-> already captured. It also carries the seven hazards that cost this session time — read § 4
-> before touching a container or injecting a key.) The queue it supersedes is
-> `docs/handoff-2026-11-03.md` (the rocket and
-> space session: G39, G59, G60 and G62 closed and G63/G64 added. `DS:13 = 0x28` finally
-> observed after 167 empty harvests; the parked-rocket triple `DS:69/6A/6B` decoded, which
-> is the reason a rocket launch silently saves; the world coordinate tables at file
-> `0x7212`; the off-course gate `(fuel & 3) == 3`; `YOU HAVE EXPLODED!` shown to be a halt
-> and not a death; death shown to be memory-only and not a save; site entry shown to
-> auto-save and to pin the outdoor state; and G62 closed by finding that **there is no
-> discriminator byte** — the in-space command loop is `asm/6999` and it has no `ret`. **§ 2
-> of that file is mandatory reading: seven claims proved wrong, five written by this
-> project inside one day, three corrected within hours of being made.** Its § 4 carries the
-> working recipes — harvest-before-teardown, headless for scripted driving, find fields by
-> DS diff, locate tables by pattern, controlled A/B, mutate your gate — and § 5 the
-> hazards, including the trace loss on `up.sh --down` and the runtime/file offset
-> direction). Then `docs/handoff-2026-10-29b.md` (superseded as the entry point but **not
-> obsoleted** — its § 4 recipes and § 5 hazard list still stand, including the Spice86
-> noVNC key-injection crash that the 11-03 session walked into anyway), then the overnight
-> run that
-> closed D13, G40 and D12 and part of G46: `DS:4E` is charisma proven twice, the horse really does
-> refuse shallows and the engine already matched, `DS:25` is the site floor and is renamed
-> `site_floor`, KILL and BLINK observed, `cmd_D` executed at last, plus the three hold-a-value-
-> against-the-tick recipes in its § 4 and the Spice86 noVNC key-injection crash in its § 5), then
-> `docs/handoff-2026-10-29.md` (the queue it supersedes,
-> with items 2, 4 and 5 now ticked in place — **§ 2 is the part that
-> matters: six recorded decodes proved wrong, four of them written by this project inside a week
-> (`cmd_T`'s one-cell ray, `cmd_Y`'s "unresolved" fall-through which was a complete freeform input
-> loop, the class names in our own editor, and an on-foot stamp hardcoded to the one value a Fighter
-> would agree with); § 1 is open owner decisions D11 and D14 (the cheat-code flag, and whether
-> `cmd_C` ships gates without effects — D12's `DS:25` and D13's charisma-vs-wisdom dispute both
-> closed 2026-10-29, the latter by `captures/spice86/d13-cha-vs-wis`); 1222 `asm/` files,
-> whole-binary md5 green, `check_all` green, 23 of 26 handlers implemented and **all 26 letters have
-> now been seen executing** — `cmd_I`, `cmd_D` and `cmd_K` closed 2026-10-29 without a capture at
-> all, because all three were readable the whole time and had been cut in half by the Phase 2 map
-> (each is a one-byte `e8` whose operand and text live in the next fragment); `cmd_R` and `cmd_N` closed 2026-10-29 by
-> `captures/spice86/cmd-nr-live`, which is also where `DS:E3` turned out to be `items_held[13]`, a
-> STRANGE COIN, and where the string emitter's greedy `\xNN` escape was found to have been corrupting
-> five shipped menus; § 3 is the ranked queue, § 4 is facts worth knowing cold (the
-> sector's ones digit IS the site kind; the stamped grid at `DS:1800` is not the raw `mapx` bytes),
-> § 5 is the copy-paste capture recipes including the live owner-play loop, § 6 is the hazards that
-> cost this session time), then
-> `docs/handoff-2026-10-28f.md` (the queue it supersedes: the command-loop evidence split was
-> corrected from 14/12 to 22 proven / 4 unproven, the command dispatcher landed at
-> `engine/src/game/commands.c` in the `asm/0A1F` shape, the marker gate
-> `tools/cmd_marker_gate.py` gained 15 controls and went into CI, and `asm/4C50` was shown to render
-> a string table as invented instructions and is NOT trustworthy as code), then
-> `docs/handoff-2026-10-28e.md` (the queue it supersedes: the forced-keep corrections went 36 → 0,
-> the rendering-gap list emptied, three documented dispositions were retracted, and both mutation
-> harnesses were gates that exited 0 while printing FAIL), then
-> `docs/handoff-2026-10-28d.md` (the queue it supersedes is closed except the two verdicts;
-> what survives there is the speed-system identification, the era-table G14 closure, and the
-> body-correction marker path's own rationale), then
-> `docs/handoff-apple2-crosswalk.md` (executed 2026-10-28d, status block at its head: the
-> static Apple II ↔ DOS anchor crosswalk is built and gated, all six questions Q0–Q5 carry a
-> written verdict — five corroborated, one Apple-silent — the anchor count in
-> `docs/apple2-reference.md` § 4 is measured rather than remembered, and what survives there is
-> the "needs a person" list), then
-> `docs/handoff-apple2-reference.md` (the queue it supersedes: all five items closed, contract 2's
-> two named holes gone, three captures run and one of them refuting a claim made the same day, and
-> the branch fast-forward merged into `main` — unpushed as of 2026-10-28), then
-> `docs/handoff-2026-10-28b.md` (the two owner-approved renames and
-> three owner-reported creature bugs are done, `mon_role` gates the town sweep only, and what is
-> left there is for a person), then
-> `docs/handoff-2026-10-28.md` for the recipes and the hazard list (its own queue is now
-> closed: the spawn selector is pinned at runtime, the confirming unlock is on record, the Z
-> screen and CP5 C3 are shipped — what survives in that file is the working recipes, including
-> how to push from an agent shell and how to force a live value, and the twelve hazards that
-> cost the last two sessions time). The work it supersedes is in
-> `docs/handoff-2026-10-27-night.md` (its item queue is now resolved: 1, 6, 7, 8 done, 4 wired,
-> 5 closed statically, 2 re-blocked on the selector, 3 spec'd not built; plus the nine hazards
-> from that session), then `docs/handoff-cp5-2026-10-27.md` (CP5 W1–W9 and towns are done,
-> what was proven, the single mistake that caused three false blockers), then
-> `docs/phase4-state.md` § CP5.
-> `docs/phase4-kickoff-cp5.md` still holds the CP5 wiring build order and the work-item
-> list, but its sequencing is now historical — every W item on it has shipped or been
-> replaced by a byte-level finding. Superseded handoffs
-> (`docs/handoff-cp5-2026-10-24.md`, `docs/handoff-cp5-2026-10-23.md`,
-> `docs/handoff-2026-10-23.md`) are historical record, not
-> entry points; the 10-24 one is still worth reading for its traps and its working
-> recipes. Older ones live under `docs/archive/`.
+> `docs/phase4-implementation.md`.
+>
+> **To start a fresh agent, read in this order.**
+>
+> 1. `docs/outstanding.md` — what is actually left, re-validated against the tree. It exists
+>    because handoff queues go stale faster than the sessions that read them, and it is
+>    regenerated from the code, the gates and the capture corpus rather than copied forward.
+> 2. `docs/handoff-2026-11-12.md` — the most recent session. Its § 4 is the list of hazards
+>    that cost that session time; read it before touching a container or injecting a key.
+> 3. `docs/needs-gameplay.md` for open capture questions, and
+>    `docs/handoff-outstanding-agent-tests.md` for the subset an agent can drive unattended.
+>
+> **Scoped handoffs are the entry point for their own topic, not history.** Only four are
+> live: `docs/handoff-2026-11-12.md`, `docs/handoff-outstanding-agent-tests.md`,
+> `docs/handoff-vehicle-state-machine.md` (travel modes; W6, the plane's airborne flag, is
+> the open question and needs a capture rather than a guess — G43), and
+> `docs/handoff-space-view.md` (the orbit / deep-space screen; its status table names what is
+> left). Each carries its own status block at the head, and that block outranks its body.
+>
+> **Topic docs are the entry point for their own area:** `docs/install-design.md`
+> (assembling a playable game directory), `docs/moongates.md` (time doors),
+> `docs/demo-record-playback.md` (`Ctrl-R` record and `--playback`, gated by
+> `make test-demo`), `docs/save-scoped-worlds.md` (the per-save overlay under
+> `saves/<slot>/`; its D1–D6 are all ruled, so do not re-argue them), and
+> `docs/enhanced-layout-plan.md` (an FM Towns screen layout — plan only, nothing built, and
+> its § 4 lists four decisions that need the owner before work starts).
+>
+> **Superseded handoffs are historical record, not entry points,** and live under
+> `docs/archive/`. Three are still worth reading for method rather than state:
+> `docs/archive/handoff-2026-11-03.md` (§ 2 is seven claims this project proved wrong, § 4
+> the working capture recipes, § 5 the hazards), `docs/archive/handoff-2026-10-29b.md`
+> (§ 4 recipes and § 5 hazards, including the Spice86 noVNC key-injection crash) and
+> `docs/archive/handoff-2026-10-28.md` (how to push from an agent shell and how to force a
+> live value, plus twelve hazards). `docs/phase4-kickoff-cp5.md` still holds the CP5 wiring
+> build order and work-item list, but its sequencing is historical.
 
 > **What this file is.** Rules and orientation only. It does not contain source
 > code, tool listings, or reference material — those live in the files named

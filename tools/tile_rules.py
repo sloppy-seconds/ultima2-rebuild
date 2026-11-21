@@ -163,7 +163,7 @@ PENDING_REDRAW |= set(LETTER_ARTS)
 # right borders, NO bottom row, interior columns alternating with period 2.
 # This re-identifies a cold case. The spec had guessed "wall / bulk structure"; the tsv
 # never did, it says "vertical bars, no letter". And byte 0xC0 is the tile that threw a
-# player y=20->57 in a probe (docs/handoff-2026-10-21-evening.md item 6), which a
+# player y=20->57 in a probe (docs/archive/handoff-2026-10-21-evening.md item 6), which a
 # teleporter explains and a wall does not. Grade: recalled (owner) corroborated by
 # observed (probe). Proving it needs one capture of stepping onto a 0xC0 tile.
 RULES[0x30] = {

@@ -643,7 +643,7 @@ is named on disk as `asm/2199_creature_step_gate.asm`.
 
 ## 13. The `0x1240` blocker was an address-space slip, and what the bytes actually say (2026-10-27)
 
-`docs/handoff-cp5-2026-10-24.md` § 2 named one thing to do first: "identify what
+`docs/archive/handoff-cp5-2026-10-24.md` § 2 named one thing to do first: "identify what
 `238b → 0x1240` is", noting that no `asm/` file begins in `0x1230..0x1250` and that the
 target must therefore sit inside another fragment's span. It does not. **The number was a
 label, not an address.**
@@ -941,7 +941,7 @@ extending the existing tool is the right move, not writing a second one.
 
 ## 15.2 The caller is not a call: the spawner is the tail of the per-command creature sweep (2026-10-28)
 
-Item 1 of `docs/handoff-2026-10-27-night.md`. `tools/bp_read.py` was extended rather than
+Item 1 of `docs/archive/handoff-2026-10-27-night.md`. `tools/bp_read.py` was extended rather than
 duplicated — it now takes `--state`, `--ret`, `--ret-type`, `--stack N` and `--callstack`,
 all spoken over RSP on the gdb port while the target is stopped. The prize turned out to be
 a **null result, and the null result is the answer**: there is no return address, because

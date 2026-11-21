@@ -23,12 +23,12 @@
 #           being hit" is the viewport redraw, not this routine.
 #           Borrow propagation confirmed by a poked single step: HP 0400 -> 0395.
 #           Renamed 2026-11-02 from sub_2495. Full table and the engine work still owed:
-#           docs/handoff-tile-effects.md.
+#           docs/archive/handoff-tile-effects.md.
 # provenance: static read of the asm/2423 span 2026-11-02, confirmed live the same day:
 #           HP read at DS:51/52 over nine consecutive steps on map byte 0x04 in sector 20
 #           (0370..0330, every delta -5), and again earlier as 0400->0385 over three steps.
 #           Owner control established the enter/exit/PASS asymmetry. Table and follow-up
-#           work: docs/handoff-tile-effects.md.
+#           work: docs/archive/handoff-tile-effects.md.
 # func 2495..24B0  len 001C B  evidence: seed+reko
 # calls: L_000e62
 # confidence: medium (bytes proven by check_func.py; the meaning is observed live)

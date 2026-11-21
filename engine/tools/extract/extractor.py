@@ -520,7 +520,7 @@ MANIFEST = [
     ("U2_S_LAUNCH_PLANE_REF_B",    "38B0_cmd_L.asm",            ("run", 0x3C2A, 23, "MISSING A BRASS BUTTON!")),
     ("U2_S_LAND_PLANE",            "38B0_cmd_L.asm",            ("run", 0x3D5D, 11, "LAND PLANE.")),
     ("U2_S_LAND_NOT_HERE",         "38B0_cmd_L.asm",            ("run", 0x3D75, 19, "LAND--NOT HERE!!!!!")),
-    # The in-space rocket layer (item #1 of docs/handoff-2026-11-03.md). asm/6999 is the
+    # The in-space rocket layer (item #1 of docs/archive/handoff-2026-11-03.md). asm/6999 is the
     # space command loop, asm/6DFD the hyperwarp arm, asm/7030 the orbit determination and
     # the dive. Every offset below was measured by searching original/ultimaii.exe for the
     # literal bytes (not derived from label arithmetic), and each is unique in the binary

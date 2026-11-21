@@ -8,7 +8,7 @@
 #           by an indirect store, and that is where the tile dependence of
 #           passability must enter. Unresolved; docs/passability-findings.md F3.
 # APPLE2: no equivalent, and that is the answer the ticket was waiting for (2026-10-28,
-#           docs/handoff-apple2-crosswalk.md Q4). Three targeted scans of the resident 6502
+#           docs/archive/handoff-apple2-crosswalk.md Q4). Three targeted scans of the resident 6502
 #           image: no run of 3+ `LDA abs ; STA zp` copy pairs anywhere (this block's shape);
 #           no `LSR A ; TAX ; LDA abs,X` anywhere (a tile>>1-indexed table read, which is the
 #           shape the mode would have to arrive in); and the bytes corresponding to DS:17/DS:18
