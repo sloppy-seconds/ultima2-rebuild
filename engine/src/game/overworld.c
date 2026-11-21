@@ -1931,14 +1931,10 @@ static void compose_text_layer(u2_ctx *ctx, u2_overworld *ow, int space_readout)
 
 void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
 {
-    /* Keep the original's own position mirror current. DS:00/01 is the player position in the
-     * captured segment — it read back as the seeded entry point in every live capture — and the
-     * engine kept the live coordinate only in ow->x/ow->y, so every turn log reported a position of
-     * 0,0 and a recording could not answer "where was the player standing". Mirroring here rather
-     * than at each movement site means the log and the frame are taken from the same instant.
-     */
-    ctx->state.sector_x = (uint8_t)ow->x;
-    ctx->state.sector_y = (uint8_t)ow->y;
+    /* Publish the working position into the DS mirror before anything reads it this
+     * frame — the turn log runs inside this function, so the log and the frame are
+     * taken from the same instant. See u2_sector_publish. */
+    u2_sector_publish(ctx, ow);
 
     /* CP7: a dungeon-shaped sector is not drawn with tiles at all. asm/6000 is a
      * first-person wireframe over the paged grid, and it draws nothing while the
@@ -2358,8 +2354,6 @@ static void victory_flight(u2_ctx *ctx, u2_overworld *ow, int steps)
     for (int s = 0; steps < 0 || s < steps; s++) {
         ow->x = (ow->x + 1) & (U2_SECTOR_EDGE - 1);
         ow->y = (ow->y + 1) & (U2_SECTOR_EDGE - 1);
-        ctx->state.sector_x = ow->x;
-        ctx->state.sector_y = ow->y;
         u2_overworld_draw(ctx, ow);
         if (seam_present_frame(ctx)) break;   /* window closed mid-flight */
         if (ctx->clock && ctx->clock->sleep_ms)
@@ -2500,15 +2494,9 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             else if (ctx->state.world == 0x0A) dm = U2_DEMO_MODE_SPACE;
             else if (ctx->state.sector_second) dm = U2_DEMO_MODE_SITE;
             u2_demo_quiescent(ctx, dm, &ow->world);
-            if (ctx->demo_restamp_pending) {
-                /* The checkpoint just landed. The draw path mirrors ow->x/ow->y back
-                 * into DS:00/01 every frame and the grid was stamped from the freshly
-                 * loaded monx, so both have to be re-synced before anything draws. */
-                ctx->demo_restamp_pending = 0;
-                ow->x = ctx->state.sector_x;
-                ow->y = ctx->state.sector_y;
-                u2_monsters_restamp(ctx, &ow->world);
-            }
+            /* A checkpoint that just landed writes the DS mirror, and the mirror is not
+             * the overworld's working position: absorb pulls it back and restamps. */
+            u2_sector_absorb(ctx, ow);
         }
 
         u2_overworld_draw(ctx, ow);

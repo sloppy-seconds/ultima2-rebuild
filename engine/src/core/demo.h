@@ -163,7 +163,8 @@ int u2_demo_pending_transition(const u2_ctx *ctx);
  * recorder's checkpoint and the player's first delivered key straddle the same point
  * in the same loop, so resuming anywhere else measures a different instant. When a
  * world-mode checkpoint lands, `ctx->demo_restamp_pending` goes up and the overworld
- * loop re-syncs its position and rebuilds the grid before it draws (hazard 2). */
+ * loop re-syncs its position and rebuilds the grid before it draws, through
+ * u2_sector_absorb (game/residency.c) — hazard 2. */
 void u2_demo_quiescent(u2_ctx *ctx, u2_demo_mode mode, const u2_world *world);
 
 /* The idle auto-PASS, from the overworld loop's idle arm only.
