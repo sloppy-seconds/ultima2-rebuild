@@ -124,6 +124,10 @@ run "sdl_probe selftest" engine/tools/sdl_probe.sh -- bash engine/tests/sdl_prob
 run "space_check selftest" engine/tests/space_check_selftest.sh -- bash engine/tests/space_check_selftest.sh
 run "warp_step selftest" engine/tests/warp_step_selftest.sh -- bash engine/tests/warp_step_selftest.sh
 run "shrine selftest" engine/tests/shrine_selftest.sh -- bash engine/tests/shrine_selftest.sh
+# The seed module derives its offsets from state.h at runtime and cross-checks the two
+# independent forms the header carries, so the selftest is the gate that keeps a drift in
+# state.h from becoming a test that writes into the wrong byte and passes.
+run "u2_seed selftest" engine/tests/u2_seed.py -- python3 engine/tests/u2_seed.py --selftest
 # The modifier table in the key injector. A wrong control byte does not error, it sends a
 # different command to the game and the capture reads a plausible wrong answer, so the
 # conventions are pinned against externally checkable values (Ctrl-Z = 0x1A is the DOS EOF

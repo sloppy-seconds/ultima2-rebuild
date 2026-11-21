@@ -524,6 +524,24 @@ For a **real** sector, copy the game content and edit the save record with the s
 sector geometry the case needs) and prints what it placed. That is the tool to extend rather than
 re-implement; `docs/commerce.md` explains what each case is asserting.
 
+For a **state checkpoint** rather than a scenario — the `--dump-ds` / `--load-ds` hex format — use
+`engine/tests/u2_seed.py`:
+
+```sh
+python3 engine/tests/u2_seed.py show /var/tmp/base.ds hp gold
+python3 engine/tests/u2_seed.py set /var/tmp/base.ds --at 3,2 --where 38,5 --hp 45 --gold 1234
+python3 engine/tests/u2_seed.py --selftest
+```
+
+It takes intent and derives every offset from `core/state.h` at runtime, cross-checking the two
+independent forms that header carries (the `/* 0xNN */` comment and the `_Static_assert`), so a
+decode that moves a field cannot leave a test writing into the wrong byte and passing. It also owns
+the encodings: HP is one packed-BCD byte, and `gold_lo` is the *high* byte of gold despite the
+name, which is not a thing to rediscover per test. `--selftest` is wired into
+`tools/check_all.sh`. It seeds state and refuses to simulate — no pathfinding, no legal-world
+synthesis, and no quiet move to the nearest walkable cell, because a seed that fixes up its own
+input makes a test pass for a reason unrelated to what it asserts.
+
 To drive it unattended and read what happened:
 
 ```sh
