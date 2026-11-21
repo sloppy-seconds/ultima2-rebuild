@@ -19,11 +19,7 @@
 # symbols it needed.
 set -uo pipefail
 
-cd "$(dirname "$0")/.." || exit 1
-# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
-# A check program must never be held to a weaker bar than the code it checks.
-U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
-U2_CC="${U2_CC:-cc}"
+. "$(dirname "$0")/harness.sh"   # cds to the engine root; sets U2_CC, U2_CCFLAGS; provides u2_check
 
 # Pinned to the original mode, for the same reason as run_cp5.sh and with a sharper
 # edge here: the dungeon renderer is geometry, and the gates below look for ink in
@@ -523,8 +519,7 @@ if [ "$fail" -eq 0 ]; then echo "CP7 DUNGEON SPEC: PASS"; else echo "CP7 DUNGEON
 # asm/277B 0x28B1. A trap with no tools jumps to the death handler (instant death,
 # no damage amount); with tools it spends one and escapes. Deterministic because the
 # trap roll is the first rand_byte in u2_dungeon_advance. See tests/trap_check.c.
-if "$U2_CC" $U2_CCFLAGS -o "$WORK/trap_check" \
-        tests/trap_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/trap.build"; then
+if u2_check "$WORK/trap_check" tests/trap_check.c 2>"$WORK/trap.build"; then
     if "$WORK/trap_check" > "$WORK/trap.out" 2>&1; then
         n=$(sed -n 's/^trap_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/trap.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -547,8 +542,7 @@ fi
 # armour on odd floor) on roll<0x40. The register is a feedback shift register, so a
 # seeded state replays byte for byte and the first roll is the decision roll. See
 # tests/chest_check.c.
-if "$U2_CC" $U2_CCFLAGS -o "$WORK/chest_check" \
-        tests/chest_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/chest.build"; then
+if u2_check "$WORK/chest_check" tests/chest_check.c 2>"$WORK/chest.build"; then
     if "$WORK/chest_check" > "$WORK/chest.out" 2>&1; then
         n=$(sed -n 's/^chest_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/chest.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -572,8 +566,7 @@ fi
 # screen and still print -BLOCKED-. The mutant control (write 0x01 instead of 0) takes this
 # red on the walk assertion specifically; see tests/passwall_check.c for why the stamp half
 # of that mask is also pinned. See docs/outstanding.md § 2 for the open divergence.
-if "$U2_CC" $U2_CCFLAGS -o "$WORK/passwall_check" \
-        tests/passwall_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/passwall.build"; then
+if u2_check "$WORK/passwall_check" tests/passwall_check.c 2>"$WORK/passwall.build"; then
     if "$WORK/passwall_check" > "$WORK/passwall.out" 2>&1; then
         n=$(sed -n 's/^passwall_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/passwall.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -598,8 +591,7 @@ fi
 # march geometry is observed in dive-sweep-rate and must match position for position,
 # while 103 ms is 492,074 cycles divided by a nominal clock and is a LOWER BOUND, because
 # Spice86 models no 8088 bus wait states. See tests/dive_pace_check.c.
-if "$U2_CC" $U2_CCFLAGS -o "$WORK/dive_pace_check" \
-        tests/dive_pace_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/dive.build"; then
+if u2_check "$WORK/dive_pace_check" tests/dive_pace_check.c 2>"$WORK/dive.build"; then
     if "$WORK/dive_pace_check" > "$WORK/dive.out" 2>&1; then
         n=$(sed -n 's/^dive_pace_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/dive.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -620,8 +612,7 @@ fi
 # The wireframe is authored in 320x200 CGA space; in classic EGA it must scale by
 # the frame scale to fill the map window, not sit in the top-left quarter. CGA stays
 # CGA-sized. See tests/dungeon_scale_check.c.
-if "$U2_CC" $U2_CCFLAGS -o "$WORK/dungeon_scale_check" \
-        tests/dungeon_scale_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/dsc.build"; then
+if u2_check "$WORK/dungeon_scale_check" tests/dungeon_scale_check.c 2>"$WORK/dsc.build"; then
     if "$WORK/dungeon_scale_check" --selftest >"$WORK/dsc-st.out" 2>&1; then
         if "$WORK/dungeon_scale_check" >"$WORK/dsc.out" 2>&1; then
             n=$(sed -n 's/^dungeon_scale_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/dsc.out")
@@ -646,8 +637,7 @@ fi
 # ---- enhanced 3D dungeon: a filled perspective corridor, not the wireframe ----
 # The enhanced map window draws the flat-shaded corridor (docs/enhanced-dungeon-3d.md
 # § 7a step 1). CGA and classic EGA keep the wireframe. See tests/dungeon3d_check.c.
-if "$U2_CC" $U2_CCFLAGS -o "$WORK/dungeon3d_check" \
-        tests/dungeon3d_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/d3d.build"; then
+if u2_check "$WORK/dungeon3d_check" tests/dungeon3d_check.c 2>"$WORK/d3d.build"; then
     if "$WORK/dungeon3d_check" --selftest >"$WORK/d3d-st.out" 2>&1; then
         if "$WORK/dungeon3d_check" >"$WORK/d3d.out" 2>&1; then
             n=$(sed -n 's/^dungeon3d_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/d3d.out")

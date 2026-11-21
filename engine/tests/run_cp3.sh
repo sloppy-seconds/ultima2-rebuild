@@ -8,11 +8,7 @@
 # lands on the rows/columns the asm says it lands on.
 set -uo pipefail
 
-cd "$(dirname "$0")/.." || exit 1
-# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
-# A check program must never be held to a weaker bar than the code it checks.
-U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
-U2_CC="${U2_CC:-cc}"
+. "$(dirname "$0")/harness.sh"   # cds to the engine root; sets U2_CC, U2_CCFLAGS; provides u2_check
 fail=0
 ok()  { printf '  PASS  %s\n' "$1"; }
 bad() { printf '  FAIL  %s\n' "$1"; fail=1; }

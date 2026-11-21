@@ -8,12 +8,7 @@
 # the run is reproducible, and --trace cites asm addresses.
 set -uo pipefail
 
-cd "$(dirname "$0")/.." || exit 1
-# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
-# A check program must never be held to a weaker bar than the code it checks.
-U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
-U2_CC="${U2_CC:-cc}"
-U2_OBJDIR="${U2_OBJDIR:-build}"
+. "$(dirname "$0")/harness.sh"   # cds to the engine root; sets U2_CC, U2_CCFLAGS; provides u2_check
 fail=0
 ok()   { printf '  PASS  %s\n' "$1"; }
 bad()  { printf '  FAIL  %s\n' "$1"; fail=1; }
@@ -81,14 +76,7 @@ rm -f "$tr"
 # creation screen acts like the Down arrow" survived to be reported from play — no
 # capture could produce the third answer. So the contract is pinned here instead,
 # with a backend that can say all three.
-if "$U2_CC" $U2_CCFLAGS -o "${WORK:-/var/tmp}/keywait_check" \
-        tests/keywait_check.c src/core/seam.c src/core/vram.c src/core/state.c \
-        src/game/sound.c src/game/feedback.c \
-        src/core/config.c src/core/config_write.c src/core/ini.c \
-        src/core/demo.c src/core/world.c src/core/roots.c src/core/slot.c \
-        src/core/font.c src/core/frame.c src/core/view.c src/core/rng.c \
-        src/core/timer.c src/core/replay.c src/core/sha256.c src/core/version.c \
-        src/debug/trace.c src/debug/dump_state.c 2>"${WORK:-/var/tmp}/keywait.build"; then
+if u2_check "${WORK:-/var/tmp}/keywait_check" tests/keywait_check.c 2>"${WORK:-/var/tmp}/keywait.build"; then
     if "${WORK:-/var/tmp}/keywait_check" > "${WORK:-/var/tmp}/keywait.out" 2>&1; then
         n=$(sed -n 's/^  ok  \([0-9]\{1,\}\) checks.*/\1/p' "${WORK:-/var/tmp}/keywait.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -109,14 +97,7 @@ fi
 # South's (0x19) is not among them, so south is the one direction a player can type —
 # the answer to G30, which had been parked as needing a capture and could not be settled
 # by one, because Spice86's send_keyboard_key applies Shift but ignores Ctrl.
-if "$U2_CC" $U2_CCFLAGS -o "${WORK:-/var/tmp}/dirkey_check" \
-        tests/dirkey_check.c src/core/seam.c src/core/vram.c src/core/state.c \
-        src/game/sound.c src/game/feedback.c \
-        src/core/config.c src/core/config_write.c src/core/ini.c \
-        src/core/demo.c src/core/world.c src/core/roots.c src/core/slot.c \
-        src/core/font.c src/core/frame.c src/core/view.c src/core/rng.c \
-        src/core/timer.c src/core/replay.c src/core/sha256.c src/core/version.c \
-        src/debug/trace.c src/debug/dump_state.c 2>"${WORK:-/var/tmp}/dirkey.build"; then
+if u2_check "${WORK:-/var/tmp}/dirkey_check" tests/dirkey_check.c 2>"${WORK:-/var/tmp}/dirkey.build"; then
     if "${WORK:-/var/tmp}/dirkey_check" > "${WORK:-/var/tmp}/dirkey.out" 2>&1; then
         n=$(sed -n 's/^  ok  \([0-9]\{1,\}\) checks.*/\1/p' "${WORK:-/var/tmp}/dirkey.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -138,8 +119,7 @@ fi
 # choice — orbit is byte-identical to its launch pad in sector/position/DS:12/DS:13/DS:14,
 # and a dungeon shares the one observable that separates orbit from the pad. Both of those
 # came from captures, and the second one only after the synthetic tests were already green.
-if "$U2_CC" $U2_CCFLAGS -o "${WORK:-/var/tmp}/mode_check" \
-        tests/mode_check.c src/core/state.c 2>"${WORK:-/var/tmp}/mode.build"; then
+if u2_check_raw "${WORK:-/var/tmp}/mode_check" tests/mode_check.c src/core/state.c 2>"${WORK:-/var/tmp}/mode.build"; then
     if "${WORK:-/var/tmp}/mode_check" > "${WORK:-/var/tmp}/mode.out" 2>&1; then
         n=$(sed -n 's/^  ok  \([0-9]\{1,\}\) checks.*/\1/p' "${WORK:-/var/tmp}/mode.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -161,9 +141,7 @@ fi
 # from asm/6B3D on 2026-11-16 after two earlier readings of the same routine were wrong.
 # The y half of the table is only eight entries deep, so the test pins the REFUSAL to
 # step beyond it: a later session must settle G89 rather than guess a ninth value.
-if "$U2_CC" $U2_CCFLAGS -o "${WORK:-/var/tmp}/warp_step_check" \
-        tests/warp_step_check.c $(find "$U2_OBJDIR/src" -name '*.o' ! -name 'main.o' | tr '\n' ' ') \
-        2>"${WORK:-/var/tmp}/warp_step.build"; then
+if u2_check "${WORK:-/var/tmp}/warp_step_check" tests/warp_step_check.c 2>"${WORK:-/var/tmp}/warp_step.build"; then
     if "${WORK:-/var/tmp}/warp_step_check" > "${WORK:-/var/tmp}/warp_step.out" 2>&1; then
         n=$(sed -n 's/^  ok  \([0-9]\{1,\}\) checks.*/\1/p' "${WORK:-/var/tmp}/warp_step.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -197,8 +175,7 @@ vec2=$(./u2 --seed 0x20 --rng-sequence 6)
 # asm/0100 can only reach 256 of 2^48 register states, so a replay that has to pick up mid-session
 # needs a raw load. The harness carries its own corrupt-register control: a load that silently did
 # nothing would still "roll something", and that is the failure this has to catch.
-if "$U2_CC" $U2_CCFLAGS -o "${WORK:-/var/tmp}/rng_check" \
-        tests/rng_check.c src/core/rng.c src/core/state.c 2>"${WORK:-/var/tmp}/rng.build"; then
+if u2_check_raw "${WORK:-/var/tmp}/rng_check" tests/rng_check.c src/core/rng.c src/core/state.c 2>"${WORK:-/var/tmp}/rng.build"; then
     if "${WORK:-/var/tmp}/rng_check" > "${WORK:-/var/tmp}/rng.out" 2>&1; then
         n=$(sed -n 's/^rng_check: \([0-9]\{1,\}\) checks.*/\1/p' "${WORK:-/var/tmp}/rng.out")
         if [ "${n:-0}" -eq 0 ]; then

@@ -27,11 +27,7 @@
 # could not be re-run — see AGENTS.md § 5 on a control nobody can re-run.
 set -uo pipefail
 
-cd "$(dirname "$0")/.." || exit 1
-# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
-# A check program must never be held to a weaker bar than the code it checks.
-U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
-U2_CC="${U2_CC:-cc}"
+. "$(dirname "$0")/harness.sh"   # cds to the engine root; sets U2_CC, U2_CCFLAGS; provides u2_check
 
 # CP5 is the original-fidelity checkpoint: nearly every gate below asserts what the
 # bytes say the ORIGINAL did — EXP and GOLD wrapping past 9999 rather than clamping,
@@ -239,9 +235,7 @@ fi
 # make every cell's density zero and the land-half check goes red while the charge and
 # the two refusal controls stay green, which is what proves the gate tests the picture
 # and not the handler.
-if "$U2_CC" $U2_CCFLAGS -Isrc/platform \
-        -o "$WORK/helm_map_check" tests/helm_map_check.c src/core/*.c src/game/*.c \
-        src/debug/*.c 2>"$WORK/helm.build"; then
+if u2_check "$WORK/helm_map_check" -Isrc/platform tests/helm_map_check.c 2>"$WORK/helm.build"; then
     if "$WORK/helm_map_check" > "$WORK/helm.out" 2>&1; then
         n=$(sed -n 's/^helm_map_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/helm.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -267,9 +261,7 @@ fi
 # the enhanced game caps. Fidelity keeps the wrap, because it is byte-proven and the
 # fidelity run is the differential, so every assertion here is a pair and a change that
 # fixes only one mode goes red.
-if "$U2_CC" $U2_CCFLAGS \
-        -o "$WORK/saturation_check" tests/saturation_check.c src/core/*.c src/game/*.c \
-        src/debug/*.c 2>"$WORK/sat.build"; then
+if u2_check "$WORK/saturation_check" tests/saturation_check.c 2>"$WORK/sat.build"; then
     if "$WORK/saturation_check" > "$WORK/sat.out" 2>&1; then
         n=$(sed -n 's/^saturation_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/sat.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -291,8 +283,7 @@ fi
 # captures/spice86/cp5-weak-fight/death1.png. It links the whole game core rather
 # than one file because the tail prints through the seam and repaints the status
 # band, and a stub of either would let the test pass on a half-implemented death.
-if "$U2_CC" $U2_CCFLAGS -o "$WORK/death_check" \
-        tests/death_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/death.build"; then
+if u2_check "$WORK/death_check" tests/death_check.c 2>"$WORK/death.build"; then
     if "$WORK/death_check" "$WORK/death-save" > "$WORK/death.out" 2>&1; then
         n=$(sed -n 's/^death_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/death.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -415,8 +406,7 @@ fi
 # asm/0A6D..0AB5 and asm/2122..2260. Links the whole game core for the same
 # reason the death check does: the turn prints, rolls, and moves bytes that the
 # renderer and the passability test both read.
-if "$U2_CC" $U2_CCFLAGS -o "$WORK/ai_check" \
-        tests/ai_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/ai.build"; then
+if u2_check "$WORK/ai_check" tests/ai_check.c 2>"$WORK/ai.build"; then
     if "$WORK/ai_check" > "$WORK/ai.out" 2>&1; then
         n=$(sed -n 's/^ai_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/ai.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -441,8 +431,7 @@ fi
 # the next character walks past it as scenery. This gate enforces that the save path can
 # SEE the class (control: remove the counter in core/world.c and it goes red); the fix
 # itself belongs to the producer, and docs/map-format.md says why it is not the writer.
-if "$U2_CC" $U2_CCFLAGS -o "$WORK/baked_cells_check" \
-        tests/baked_cells_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/baked.build"; then
+if u2_check "$WORK/baked_cells_check" tests/baked_cells_check.c 2>"$WORK/baked.build"; then
     mkdir -p "$WORK/baked"
     if "$WORK/baked_cells_check" "$WORK/baked" > "$WORK/baked.out" 2>&1; then
         n=$(sed -n 's/^baked-cells ok: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/baked.out")
@@ -465,8 +454,7 @@ fi
 # g30-clockcal/ gives DS:74, DS:554 and the DS:558 multiplier table, and the engine must
 # reproduce the DS:580 slots the original had actually stored. Model only -- nothing in
 # the engine calls it yet, because what each of the 20 slots gates is still unknown.
-if "$U2_CC" $U2_CCFLAGS -o "$WORK/speed_check" \
-        tests/speed_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/speed.build"; then
+if u2_check "$WORK/speed_check" tests/speed_check.c 2>"$WORK/speed.build"; then
     if "$WORK/speed_check" > "$WORK/speed.out" 2>&1; then
         n=$(sed -n 's/^speed_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/speed.out")
         if [ "${n:-0}" -eq 0 ]; then
@@ -488,8 +476,7 @@ fi
 # content is present, against every gate cell in every world sector: each must name
 # a sector file that exists. Without a content dir the data half SKIPs and the
 # table half still runs.
-if "$U2_CC" $U2_CCFLAGS -o "$WORK/site_check" \
-        tests/site_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/site.build"; then
+if u2_check "$WORK/site_check" tests/site_check.c 2>"$WORK/site.build"; then
     SITEDATA=""
     for d in ../original ../../original; do
         [ -f "$d/mapx00" ] && SITEDATA="$d" && break
