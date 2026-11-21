@@ -2452,6 +2452,179 @@ static void victory_rocket_mode(u2_ctx *ctx)
     ctx->state.sector_y     = 0;
 }
 
+/* ---------------------------------------------------------------------------
+ * Commands that end by waiting for a direction.
+ *
+ * Six letters print a prompt and consume the NEXT key as an aim rather than as a
+ * step: UNLOCK (U), TRANSACT (T), STEAL DIRECT (S), OFFER GOLD DIRECT (O), FIRE
+ * DIRECT (F) and ATTACK (A). Five of them share one shape, and the shape is the
+ * original's, not a convenience: the handler chain calls the asm/2362 aim gate and
+ * every exit from it is a tail jump to asm/0A33_cmd_done, so the direction word
+ * lands on the command line, the epilogue is the shared one, and a turn passes even
+ * when the aim was refused. That last part is what used to be got wrong, per arm.
+ *
+ * So the arms collapse to a table with three live fields:
+ *
+ *   print_word     echo the direction word on the prompt line, no CR. TRANSACT,
+ *                  STEAL and OFFER do; UNLOCK does not, and ATTACK's own body
+ *                  prints it as part of `ATTACK--EAST--HIT!!!`.
+ *   redraw_status  the handler can move a number the status band shows. TRANSACT
+ *                  (gold, food, mount, owned) and OFFER (a stat raise) do; STEAL
+ *                  does not, and asm/3F5D's exits prove the original lets that
+ *                  number go stale too, so matching it means NOT redrawing.
+ *   on_direction   the handler.
+ *
+ * A fourth field was expected to be `is_turn`, and it is not needed: every one of
+ * these arms passes a turn, including the refusals, which is the finding rather
+ * than an omission — see the bytes and corpus cited in cont_attack below.
+ *
+ * FIRE is deliberately not in this table. Its epilogue is interleaved with its own
+ * result handling: a kill prints a separate `KILLED--GOLD+n--EXP.+m` line and
+ * returns before the shared prompt, so forcing it in would mean a field that says
+ * "this entry ignores the epilogue", which is the table admitting it is the wrong
+ * shape. It keeps its own arm, beside this table.
+ */
+typedef struct u2_cmd_cont {
+    char letter;
+    int print_word;
+    int redraw_status;
+    void (*on_direction)(u2_ctx *ctx, u2_overworld *ow, int dx, int dy,
+                         const char *word);
+} u2_cmd_cont;
+
+/* A direction arriving while UNLOCK DIRECTION- is on the line answers the unlock and
+ * is not a step. asm/4310 and asm/4345 both end at jmp L_000c30 and asm/435E at
+ * jmp L_000c33, and every one of those reaches cmd_done, so the post-command sweep
+ * runs on the refusal as well as on the success -- the same consequence § 15.2 of
+ * docs/monster-spawn.md derives for the command path in general. The player does not
+ * move. */
+static void cont_unlock(u2_ctx *ctx, u2_overworld *ow, int dx, int dy, const char *word)
+{
+    (void)word;                       /* UNLOCK prints no direction word */
+    const int tx = ow->x + dx;
+    const int ty = ow->y;
+    const int off = tx < 0 || tx >= U2_SECTOR_EDGE || ty < 0 || ty >= U2_SECTOR_EDGE;
+    const uint8_t target = off ? 0 : u2_world_tile_at(&ow->world, tx, ty);
+    switch (u2_unlock_rule(dx, target, ctx->state.keys)) {
+    case U2_UNLOCK_NO_AIM:
+    case U2_UNLOCK_NO_DOOR:
+        /* One print, not two: the original has a single NO DOOR THERE! site
+         * (asm/4310) and reaches it from both causes. */
+        seam_str_out(ctx, U2_S_NO_DOOR_THERE);
+        break;
+    case U2_UNLOCK_NO_KEYS:
+        seam_str_out(ctx, U2_S_NO_KEYS_FIT);
+        break;
+    default: {
+        /* asm/435E: spend one key, then pave the cell with the ground the
+         * player is standing on. terrain_put, not tile_put: creature_turn() runs
+         * immediately below and rebuilds the grid from map_base, so a tile_put
+         * paving is erased before the player's next key -- the door would
+         * re-close the instant it was opened. Measured in the original
+         * 2026-10-29: openings survived a walk through a town with 32 live
+         * creatures. Gate: tests/site_state.py case C, which failed here
+         * (cell came back 0xa0) before this line changed. */
+        ctx->state.keys = u2_unlock_spend_key(ctx->state.keys);
+        const uint8_t ground = u2_world_tile_at(&ow->world, ow->x, ow->y);
+        u2_world_terrain_put(&ow->world, tx, ty, u2_unlock_replacement(ground));
+        break;
+    }
+    }
+}
+
+/* TRANSACT: the direction is the ray. asm/405D calls the same aim gate cmd_A and
+ * cmd_U use (asm/2362), which prints the direction word and leaves the delta in
+ * DS:19/1A; asm/4060 then seeds the cursor and asm/4063 stores the gate's own
+ * counter byte. The word therefore lands on the TRANSACT- line, exactly as
+ * `CMD: TRANSACT-NORTH` reads in the captures. The ray does not move the player,
+ * and it is a turn: every exit from asm/4050 is a tail jump (asm/1590, asm/0A33,
+ * asm/4209, asm/4249) and the two refusal exits reach the post-command tail like
+ * any other command. */
+static void cont_transact(u2_ctx *ctx, u2_overworld *ow, int dx, int dy, const char *word)
+{
+    (void)word;
+    u2_commerce_transact(ctx, ow, dx, dy);
+    /* A purchase moves gold, food, the mount byte or an owned count, and the band
+     * would otherwise go on showing the pre-purchase number for the rest of the
+     * session. The original's post-command tail reaches the status block; the
+     * engine's creature_turn() does not redraw it, so the redraw belongs here,
+     * where the mutation happened. u2_status_draw restores the cursor, which is
+     * why it is safe to print the prompt after it. */
+    u2_status_draw(ctx);
+}
+
+/* STEAL DIRECT: same shape as TRANSACT and for the same byte-level reason: asm/3F36
+ * calls the asm/2362 gate inside the handler chain, so the letter alone is not a
+ * completed turn and the word lands on the STEAL DIRECT- line. No status redraw
+ * here, unlike TRANSACT: a successful steal moves food or an owned count, and
+ * asm/3F5D's exits all tail-jump to asm/0C33 without touching the status block, so
+ * the original lets the number go stale too. */
+static void cont_steal(u2_ctx *ctx, u2_overworld *ow, int dx, int dy, const char *word)
+{
+    (void)word;
+    u2_commerce_steal(ctx, ow, dx, dy);
+}
+
+/* OFFER GOLD DIRECT: the direction names the recipient. Same shape again, and the
+ * same byte-level reason: asm/3C2E calls the asm/2362 aim gate inside the handler
+ * chain. The amount prompt follows inside u2_commerce_offer, because the original
+ * asks for it only once a recipient exists. Unlike STEAL, and like TRANSACT, this
+ * can move the ledger: a raise lands in a stat byte and the status band shows
+ * stats, so it redraws. */
+static void cont_offer(u2_ctx *ctx, u2_overworld *ow, int dx, int dy, const char *word)
+{
+    (void)word;
+    u2_commerce_offer(ctx, ow, dx, dy);
+}
+
+/* ATTACK: the direction is the swing, not a step -- the original consumed it inside
+ * the cmd_A chain and never moved the player. Live: `ATTACK--EAST--HIT!!!` with the
+ * player standing still. The body prints the direction word itself, which is why
+ * print_word is off for this entry.
+ *
+ * The swing is the turn: the original's monsters advance on the expiry of a
+ * half-typed `A` too (`ATTACK--PASS`), so an attack that was actually completed
+ * cannot sensibly advance nothing.
+ *
+ * And the ARMS-PARALYSIS REFUSAL is a turn as well. This used to be
+ * `if (ctx->state.paral_arms == 0) creature_turn(...)`, which made arm paralysis
+ * permanent for anyone who kept trying to swing - the same stranding the owner had
+ * already reported for legs. Two independent proofs, both found without a new
+ * capture:
+ *
+ * BYTES: the refusal is asm/2BAD, whose whole tail is `jmp L_000c30`. That is
+ * asm/0A30, the 3-byte stub that falls through to asm/0A33_cmd_done and so to
+ * asm/0A38_post_command_tail - the IDENTICAL target of asm/0A15, the terrain refusal
+ * whose tick was proven by forced-poke. Same jump, same tail, same tick. asm/2052,
+ * asm/228A and asm/277B refuse their way to the same address too.
+ *
+ * CORPUS: captures/spice86/fight-20261021-castle03/turns, 3000 per-turn DS dumps.
+ * DS:26C fell 6 times, every one of them with the food odometer UNCHANGED, and zero
+ * times with food changed. A counter that only decremented on spent turns would show
+ * the opposite. Legs in the same corpus: 91 decrements, all same-food.
+ *
+ * So the guard is gone: a completed ATTACK command always reaches the tail. */
+static void cont_attack(u2_ctx *ctx, u2_overworld *ow, int dx, int dy, const char *word)
+{
+    u2_overworld_attack_dir(ctx, ow, word, dx, dy);
+}
+
+static const u2_cmd_cont k_cmd_cont[] = {
+    { 'U', 0, 0, cont_unlock },
+    { 'T', 1, 1, cont_transact },
+    { 'S', 1, 0, cont_steal },
+    { 'O', 1, 1, cont_offer },
+    { 'A', 0, 0, cont_attack },
+};
+
+static const u2_cmd_cont *cont_for(char letter)
+{
+    for (size_t i = 0; i < sizeof k_cmd_cont / sizeof k_cmd_cont[0]; i++)
+        if (k_cmd_cont[i].letter == letter)
+            return &k_cmd_cont[i];
+    return NULL;
+}
+
 int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
 {
     /* The handoff is complete from here on: any key the play API parked while the title flow
@@ -2717,109 +2890,25 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             }
         }
 
-        /* A direction arriving while UNLOCK DIRECTION- is on the line answers the
-         * unlock and is not a step. asm/4310 and asm/4345 both end at jmp L_000c30 and
-         * asm/435E at jmp L_000c33, and every one of those reaches cmd_done, so the
-         * post-command sweep runs on the refusal as well as on the success -- the same
-         * consequence § 15.2 of docs/monster-spawn.md derives for the command path in
-         * general. The player does not move. */
-        if (ow->pending_cmd == 'U' && word != NULL) {
-            ow->pending_cmd = 0;
-            const int tx = ow->x + dx;
-            const int ty = ow->y;
-            const int off = tx < 0 || tx >= U2_SECTOR_EDGE || ty < 0 || ty >= U2_SECTOR_EDGE;
-            const uint8_t target = off ? 0 : u2_world_tile_at(&ow->world, tx, ty);
-            switch (u2_unlock_rule(dx, target, ctx->state.keys)) {
-            case U2_UNLOCK_NO_AIM:
-            case U2_UNLOCK_NO_DOOR:
-                /* One print, not two: the original has a single NO DOOR THERE! site
-                 * (asm/4310) and reaches it from both causes. */
-                seam_str_out(ctx, U2_S_NO_DOOR_THERE);
-                break;
-            case U2_UNLOCK_NO_KEYS:
-                seam_str_out(ctx, U2_S_NO_KEYS_FIT);
-                break;
-            default: {
-                /* asm/435E: spend one key, then pave the cell with the ground the
-                 * player is standing on. terrain_put, not tile_put: creature_turn() runs
-                 * immediately below and rebuilds the grid from map_base, so a tile_put
-                 * paving is erased before the player's next key -- the door would
-                 * re-close the instant it was opened. Measured in the original
-                 * 2026-10-29: openings survived a walk through a town with 32 live
-                 * creatures. Gate: tests/site_state.py case C, which failed here
-                 * (cell came back 0xa0) before this line changed. */
-                ctx->state.keys = u2_unlock_spend_key(ctx->state.keys);
-                const uint8_t ground = u2_world_tile_at(&ow->world, ow->x, ow->y);
-                u2_world_terrain_put(&ow->world, tx, ty, u2_unlock_replacement(ground));
-                break;
+        /* A command that ended by waiting for a direction gets the shared epilogue:
+         * the word on the prompt line if that command echoes it, the handler, the
+         * status band if the handler can move a number it shows, then CR, prompt and
+         * the creature sweep. See k_cmd_cont above for why these five share a shape
+         * and why FIRE does not. */
+        if (word != NULL) {
+            const u2_cmd_cont *cont = cont_for(ow->pending_cmd);
+            if (cont) {
+                ow->pending_cmd = 0;
+                if (cont->print_word)
+                    seam_str_out(ctx, word);   /* no CR: same line as the prompt */
+                cont->on_direction(ctx, ow, dx, dy, word);
+                if (cont->redraw_status)
+                    u2_status_draw(ctx);
+                seam_char_print(ctx, '\r');
+                seam_str_out(ctx, U2_S_CMD_PROMPT);
+                creature_turn(ctx, ow);
+                continue;
             }
-            }
-            seam_char_print(ctx, '\r');
-            seam_str_out(ctx, U2_S_CMD_PROMPT);
-            creature_turn(ctx, ow);
-            continue;
-        }
-
-        /* A direction arriving while TRANSACT- is on the line is the ray, not a step.
-         * asm/405D calls the same aim gate cmd_A and cmd_U use (asm/2362), which prints the
-         * direction word and leaves the delta in DS:19/1A; asm/4060 then seeds the cursor
-         * and asm/4063 stores the gate's own counter byte. The word therefore lands on the
-         * TRANSACT- line, exactly as `CMD: TRANSACT-NORTH` reads in the captures.
-         *
-         * The ray does not move the player, and it is a turn: every exit from asm/4050 is a
-         * tail jump (asm/1590, asm/0A33, asm/4209, asm/4249) and the two refusal exits
-         * reach the post-command tail like any other command. */
-        if (ow->pending_cmd == 'T' && word != NULL) {
-            ow->pending_cmd = 0;
-            seam_str_out(ctx, word);              /* no CR: same line as TRANSACT- */
-            u2_commerce_transact(ctx, ow, dx, dy);
-            /* A purchase moves gold, food, the mount byte or an owned count, and the band
-             * would otherwise go on showing the pre-purchase number for the rest of the
-             * session. The original's post-command tail reaches the status block; the
-             * engine's creature_turn() does not redraw it, so the redraw belongs here,
-             * where the mutation happened. u2_status_draw restores the cursor, which is
-             * why it is safe to print the prompt after it. */
-            u2_status_draw(ctx);
-            seam_char_print(ctx, '\r');
-            seam_str_out(ctx, U2_S_CMD_PROMPT);
-            creature_turn(ctx, ow);
-            continue;
-        }
-
-        /* A direction arriving while STEAL DIRECT- is on the line is the ray, not a step.
-         * Same shape as TRANSACT above, and for the same byte-level reason: asm/3F36 calls the
-         * asm/2362 gate inside the handler chain, so the letter alone is not a completed turn
-         * and the word lands on the STEAL DIRECT- line. No status redraw here, unlike the
-         * TRANSACT arm: a successful steal moves food or an owned count, and asm/3F5D's exits
-         * all tail-jump to asm/0C33 without touching the status block, so the original lets the
-         * number go stale too. */
-        if (ow->pending_cmd == 'S' && word != NULL) {
-            ow->pending_cmd = 0;
-            seam_str_out(ctx, word);              /* no CR: same line as STEAL DIRECT- */
-            u2_commerce_steal(ctx, ow, dx, dy);
-            seam_char_print(ctx, '\r');
-            seam_str_out(ctx, U2_S_CMD_PROMPT);
-            creature_turn(ctx, ow);
-            continue;
-        }
-
-        /* A direction arriving while OFFER GOLD DIRECT- is on the line is the recipient, not
-         * a step. Same shape as TRANSACT and STEAL, and the same byte-level reason: asm/3C2E
-         * calls the asm/2362 aim gate inside the handler chain. The amount prompt follows
-         * inside u2_commerce_offer, because the original asks for it only once a recipient
-         * exists. */
-        if (ow->pending_cmd == 'O' && word != NULL) {
-            ow->pending_cmd = 0;
-            seam_str_out(ctx, word);              /* no CR: same line as OFFER GOLD DIRECT- */
-            u2_commerce_offer(ctx, ow, dx, dy);
-            /* Unlike STEAL, and like TRANSACT, this can move the ledger: a raise lands in a
-             * stat byte and the status band shows stats. Redraw for the same reason the
-             * TRANSACT arm does. */
-            u2_status_draw(ctx);
-            seam_char_print(ctx, '\r');
-            seam_str_out(ctx, U2_S_CMD_PROMPT);
-            creature_turn(ctx, ow);
-            continue;
         }
 
         /* A direction arriving while FIRE DIRECT- is on the line is the cannon's bearing.
@@ -2877,39 +2966,6 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
                 u2_feedback(ctx, note);
             }
             seam_str_out(ctx, U2_S_CMD_PROMPT);
-            creature_turn(ctx, ow);
-            continue;
-        }
-
-        /* A direction arriving while ATTACK-- is on the line is the attack's
-         * direction, not a step: the original consumed it inside the cmd_A chain
-         * and never moved the player. Live: `ATTACK--EAST--HIT!!!` with the
-         * player standing still. */
-        if (ow->pending_cmd == 'A' && word != NULL) {
-            ow->pending_cmd = 0;
-            u2_overworld_attack_dir(ctx, ow, word, dx, dy);
-            /* The swing is the turn: the original's monsters advance on the
-             * expiry of a half-typed `A` too (`ATTACK--PASS`), so an attack that
-             * was actually completed cannot sensibly advance nothing.
-             *
-             * And the ARMS-PARALYSIS REFUSAL is a turn as well. This used to be
-             * `if (ctx->state.paral_arms == 0) creature_turn(...)`, which made arm
-             * paralysis permanent for anyone who kept trying to swing - the same stranding
-             * the owner had already reported for legs. Two independent proofs, both found
-             * without a new capture:
-             *
-             * BYTES: the refusal is asm/2BAD, whose whole tail is `jmp L_000c30`. That is
-             * asm/0A30, the 3-byte stub that falls through to asm/0A33_cmd_done and so to
-             * asm/0A38_post_command_tail - the IDENTICAL target of asm/0A15, the terrain
-             * refusal whose tick was proven by forced-poke. Same jump, same tail, same tick.
-             * asm/2052, asm/228A and asm/277B refuse their way to the same address too.
-             *
-             * CORPUS: captures/spice86/fight-20261021-castle03/turns, 3000 per-turn DS dumps.
-             * DS:26C fell 6 times, every one of them with the food odometer UNCHANGED, and
-             * zero times with food changed. A counter that only decremented on spent turns
-             * would show the opposite. Legs in the same corpus: 91 decrements, all same-food.
-             *
-             * So the guard is gone: a completed ATTACK command always reaches the tail. */
             creature_turn(ctx, ow);
             continue;
         }
