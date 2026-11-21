@@ -212,7 +212,31 @@ int main(int argc, char **argv)
     snprintf(p_tiles, sizeof p_tiles, "%.400s/TILES", out);
     snprintf(p_dng, sizeof p_dng, "%.400s/DNGWALL.TILE", out);
     CHECK(u2_file_size(p_ini) == 1019, "THEME.INI is the expected size");
-    CHECK(u2_file_size(p_map) == 1495, "MAP.TSV is the expected size");
+    /* MAP.TSV is asserted structurally, not by byte length. It used to be pinned
+     * to 1495 bytes, and that pin broke twice within one day on legitimate
+     * crosswalk changes -- first the terrain rows, then the avatar rows -- because
+     * the third column repeats BANK/tile tokens whose text length is exactly what
+     * a remap edits. A golden byte count on a generated text file is a check on
+     * the wording of the crosswalk, not on the theme. What actually matters is
+     * that every art index is present exactly once, which is what this counts. */
+    {
+        char mp[4096];
+        FILE *f = fopen(p_map, "rb");
+        size_t n = f ? fread(mp, 1, sizeof mp - 1, f) : 0;
+        if (f) fclose(f);
+        mp[n] = '\0';
+        int rows = 0, seen[256];
+        memset(seen, 0, sizeof seen);
+        for (char *ln = strtok(mp, "\n"); ln; ln = strtok(NULL, "\n")) {
+            if (*ln == '#' || *ln == '\0') continue;
+            unsigned v;
+            if (sscanf(ln, "%2x", &v) == 1 && v < 64) { rows++; seen[v] = 1; }
+        }
+        int dupes = 0;
+        for (int i = 0; i < 64; i++) if (!seen[i]) dupes++;
+        CHECK(rows == 64 && dupes == 0,
+              "MAP.TSV carries exactly one row for each of the 64 art indices");
+    }
     CHECK(u2_file_size(p_pal) == 48, "PALETTE.RGB is 16 x 3");
     CHECK(u2_file_size(p_tiles) == 80 * 512, "TILES holds 80 tiles of 512 bytes");
     CHECK(u2_file_size(p_dng) == 1024, "DNGWALL.TILE is one 32x32 tile of indices");
