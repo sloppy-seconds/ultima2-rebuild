@@ -109,7 +109,7 @@ DEPS     := $(OBJS:.o=.d)
 SDLOBJS  := $(patsubst %.c,$(BUILD)-sdl/%.o,$(SRCS))
 SDL_DEPS := $(SDLOBJS:.o=.d)
 
-.PHONY: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo test-api clean content content-check licenses licenses-check compile-commands compile-commands-check fmtowns-map fmtowns-map-check dungeon-sprites dungeon-sprites-check sdl sdl-probe-check sdl-run sdl-win sdl-static play help fresh ccflags test-asan analyze
+.PHONY: all run headless test lib test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo test-api clean content content-check licenses licenses-check compile-commands compile-commands-check fmtowns-map fmtowns-map-check dungeon-sprites dungeon-sprites-check sdl sdl-probe-check sdl-run sdl-win sdl-static play help fresh ccflags test-asan analyze
 
 all: $(BIN)
 
@@ -248,6 +248,31 @@ $(BIN): $(OBJS)
 $(BUILD)/%.o: %.c $(GEN) Makefile
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(STAMP_TERMINAL) -MMD -MP -c $< -o $@
+
+# --- static library for the test checks ---------------------------------------
+# The C checks under tests/ used to name the engine sources they needed on their own
+# command line, and every such list went stale the first time a module gained a
+# dependency: adding residency.c for #15 meant editing three scripts by hand. A list
+# that is wrong in the missing direction is a link error, which is at least loud, but
+# it is still a second copy of a fact the build already knows.
+#
+# So the checks link this instead: the same objects the binary links, minus main.c.
+# A static archive rather than a wildcard on the command line because a .a contributes
+# only the objects a check actually references, which keeps a check from accidentally
+# succeeding by dragging in a module it was supposed to be independent of.
+#
+# Checks that exist to PROVE independence (dungeon_art_neutral, anything that asserts
+# one module does not reach another) must keep an explicit source list: linking the
+# whole archive would make their premise unfalsifiable. See tests/harness.sh.
+LIB_OBJS := $(filter-out $(BUILD)/src/main.o,$(OBJS))
+LIB      := $(BUILD)/libu2.a
+
+lib: $(LIB)
+
+$(LIB): $(LIB_OBJS)
+	@mkdir -p $(dir $@)
+	@rm -f $@
+	ar rcs $@ $(LIB_OBJS)
 
 # Interactive terminal play.
 run: $(BIN)

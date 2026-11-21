@@ -7,11 +7,7 @@
 # and write-back right without a single game byte in the repository.
 set -uo pipefail
 
-cd "$(dirname "$0")/.." || exit 1
-# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
-# A check program must never be held to a weaker bar than the code it checks.
-U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
-U2_CC="${U2_CC:-cc}"
+. "$(dirname "$0")/harness.sh"   # cds to the engine root; sets U2_CC, U2_CCFLAGS; provides u2_check
 fail=0
 ok()  { printf '  PASS  %s\n' "$1"; }
 bad() { printf '  FAIL  %s\n' "$1"; fail=1; }
@@ -262,12 +258,7 @@ fi
 # The owner's test: walk, Q saves the live position into the record, restart,
 # P lands where the player stood. Plus the outdoors guard and the CP11
 # save-anywhere policy hook.
-"$U2_CC" $U2_CCFLAGS -o "$WORK/save_q_check" \
-   tests/save_q_check.c src/game/residency.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/game/space_view.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/dungeon3d.c src/game/dungeon_assets.c src/game/flash.c src/game/sound.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c src/core/config.c src/core/config_write.c \
-   src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c src/core/demo.c \
-   src/core/vram.c src/core/state.c src/core/font.c src/core/frame.c \
-   src/core/view.c src/core/rng.c src/core/timer.c src/core/replay.c \
-   src/debug/trace.c src/debug/dump_state.c 2>"$WORK/cc-saveq.err"
+u2_check "$WORK/save_q_check" tests/save_q_check.c 2>"$WORK/cc-saveq.err"
 if [ $? -ne 0 ]; then
     bad "save-Q test harness did not build: $(head -5 "$WORK/cc-saveq.err")"
 else
@@ -282,12 +273,7 @@ fi
 # --- time passes: the PASS action spends food, starvation kills -----------
 # file 0x0B0D spends 10 food per PASS and file 0x0B2E sends a borrow to the
 # death handler at runtime 0x0E62 (asm/0C62), which zeroes DS:51..59.
-"$U2_CC" $U2_CCFLAGS -o "$WORK/food_check" \
-   tests/food_check.c src/game/residency.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/game/space_view.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/dungeon3d.c src/game/dungeon_assets.c src/game/flash.c src/game/sound.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c src/core/config.c src/core/config_write.c \
-   src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c src/core/demo.c \
-   src/core/vram.c src/core/state.c src/core/font.c src/core/frame.c \
-   src/core/view.c src/core/rng.c src/core/timer.c src/core/replay.c \
-   src/debug/trace.c src/debug/dump_state.c 2>"$WORK/cc-food.err"
+u2_check "$WORK/food_check" tests/food_check.c 2>"$WORK/cc-food.err"
 if [ $? -ne 0 ]; then
     bad "food test harness did not build: $(head -5 "$WORK/cc-food.err")"
 else
