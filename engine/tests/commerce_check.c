@@ -422,75 +422,75 @@ int main(void)
      * that file (the embedded CRs are 0x0d in the original; a plain space keeps the
      * record one record, which is all this test reads from it). */
     {
-        u2_ctx ctx; u2_overworld ow;
+        u2_ctx tctx; u2_overworld ow;
 
         /* The writer: Planet X (world 9), a castle sector (ones digit 3), role 0x81.
          * The buffer is laid out the way the real files are: tlkx93 begins with a NUL,
          * so record 1 -- the one a role byte of 0x81 selects -- starts at offset 1. A
          * fixture that put the text at offset 0 reads back empty, which is how this test
          * first failed. */
-        arm_offer(&ctx, &ow, 0x81, 0, 9, 3);
-        ctx.state.world = 9;
+        arm_offer(&tctx, &ow, 0x81, 0, 9, 3);
+        tctx.state.world = 9;
         ow.world.tlkx[0] = 0;
         memcpy(ow.world.tlkx + 1,
                "FATHER ANTOS CHANTS: YOU HAVE EARNED MY BLESSING. RETURN AND CLAIM THE RING!",
                sizeof "FATHER ANTOS CHANTS: YOU HAVE EARNED MY BLESSING. RETURN AND CLAIM THE RING!");
         ow.world.tlkx_loaded = 1;
-        CHECK(u2_commerce_transact(&ctx, &ow, 1, 0) == U2_TRANSACT_TREATED,
+        CHECK(u2_commerce_transact(&tctx, &ow, 1, 0) == U2_TRANSACT_TREATED,
               "a role-0x81 slot on Planet X takes the scripted talk arm");
-        CHECK(grid_has(&ctx, "FATHER ANTOS CHANTS"),
+        CHECK(grid_has(&tctx, "FATHER ANTOS CHANTS"),
               "Antos speaks his tlkx93 record before anything else happens");
-        CHECK(ctx.state.blessing == 1,
+        CHECK(tctx.state.blessing == 1,
               "asm/4209:422B -- the blessing byte DS:6C is the writer's store, not a guess");
 
         /* Controls: each of the three conditions alone is not enough. */
-        arm_offer(&ctx, &ow, 0x81, 0, 9, 3);
-        ctx.state.world = 0;                       /* same castle, wrong world */
+        arm_offer(&tctx, &ow, 0x81, 0, 9, 3);
+        tctx.state.world = 0;                       /* same castle, wrong world */
         ow.world.tlkx[0] = 0;
         memcpy(ow.world.tlkx + 1, "FATHER ANTOS CHANTS: BLESSING",
                sizeof "FATHER ANTOS CHANTS: BLESSING");
         ow.world.tlkx_loaded = 1;
-        (void)u2_commerce_transact(&ctx, &ow, 1, 0);
-        CHECK(ctx.state.blessing == 0,
+        (void)u2_commerce_transact(&tctx, &ow, 1, 0);
+        CHECK(tctx.state.blessing == 0,
               "control: the same words from the same role on Earth do not bless you");
 
-        arm_offer(&ctx, &ow, 0x81, 0, 9, 2);       /* Planet X, but a town not a castle */
-        ctx.state.world = 9;
+        arm_offer(&tctx, &ow, 0x81, 0, 9, 2);       /* Planet X, but a town not a castle */
+        tctx.state.world = 9;
         ow.world.tlkx[0] = 0;
         memcpy(ow.world.tlkx + 1, "FATHER ANTOS CHANTS: BLESSING",
                sizeof "FATHER ANTOS CHANTS: BLESSING");
         ow.world.tlkx_loaded = 1;
-        (void)u2_commerce_transact(&ctx, &ow, 1, 0);
-        CHECK(ctx.state.blessing == 0,
+        (void)u2_commerce_transact(&tctx, &ow, 1, 0);
+        CHECK(tctx.state.blessing == 0,
               "control: role 0x81 in a Planet X town does not bless you either");
 
-        arm_offer(&ctx, &ow, 0x82, 0, 9, 3);       /* the castle, but a different role */
-        ctx.state.world = 9;
+        arm_offer(&tctx, &ow, 0x82, 0, 9, 3);       /* the castle, but a different role */
+        tctx.state.world = 9;
         ow.world.tlkx[0] = 0;
         memcpy(ow.world.tlkx + 1, "SING LEE THE COOK YELLS: KICHEN CLOST",
                sizeof "SING LEE THE COOK YELLS: KICHEN CLOST");
         ow.world.tlkx_loaded = 1;
-        (void)u2_commerce_transact(&ctx, &ow, 1, 0);
-        CHECK(ctx.state.blessing == 0,
+        (void)u2_commerce_transact(&tctx, &ow, 1, 0);
+        CHECK(tctx.state.blessing == 0,
               "control: the cook in the same castle does not bless you");
 
         /* The reader, unblessed: the line is EARN THE RING! and the slot stays empty. */
-        arm_offer(&ctx, &ow, 0x82, 0, 3, 2);
-        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_EARN_RING,
+        arm_offer(&tctx, &ow, 0x82, 0, 3, 2);
+        CHECK(u2_commerce_offer(&tctx, &ow, 1, 0) == U2_OFFER_EARN_RING,
               "500 gold to the sector-32 role-0x82 man without the blessing");
-        CHECK(grid_has(&ctx, U2_S_OFFER_EARN_RING), "EARN THE RING! is what he says");
-        CHECK(ctx.state.items_held[0] == 0, "and no ring changes hands");
-        CHECK(ctx.state.gold_lo == 0x94 && ctx.state.gold_hi == 0x99,
+        CHECK(grid_has(&tctx, U2_S_OFFER_EARN_RING), "EARN THE RING! is what he says");
+        CHECK(tctx.state.items_held[0] == 0, "and no ring changes hands");
+        CHECK(tctx.state.gold_lo == 0x94 && tctx.state.gold_hi == 0x99,
               "and the 500 was taken even though he refused: 9999 -> 9499 (%02x%02x)",
-              ctx.state.gold_lo, ctx.state.gold_hi);
+              tctx.state.gold_lo, tctx.state.gold_hi);
 
         /* The reader, blessed: THE RING IS YOURS! and DS:D6 goes to 1. */
-        arm_offer(&ctx, &ow, 0x82, 1, 3, 2);
-        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_RING,
+        arm_offer(&tctx, &ow, 0x82, 1, 3, 2);
+        CHECK(u2_commerce_offer(&tctx, &ow, 1, 0) == U2_OFFER_RING,
               "the same offer after the blessing");
-        CHECK(grid_has(&ctx, U2_S_OFFER_RING_IS_YOURS), "THE RING IS YOURS! is what he says");
-        CHECK(ctx.state.items_held[0] == 1, "DS:D6, the RING slot, is set to 1");
-        CHECK(ctx.state.gold_lo == 0x94 && ctx.state.gold_hi == 0x99,
+        CHECK(grid_has(&tctx, U2_S_OFFER_RING_IS_YOURS), "THE RING IS YOURS! is what he says");
+        CHECK(tctx.state.items_held[0] == 1, "DS:D6, the RING slot, is set to 1");
+        CHECK(tctx.state.gold_lo == 0x94 && tctx.state.gold_hi == 0x99,
               "the grant costs the same 500 (9999 -> 9499)");
 
         /* Broke: the exact state the owner was in on 2026-11-11, 317 gold against a 500 ask.
@@ -499,53 +499,53 @@ int main(void)
          * real screen — `YOU DONT HAVE` on one row, `THAT MUCH!` on the next, status band
          * interleaved — so both halves are looked for rather than the whole sentence, which
          * grid_has() could never match across a row boundary. */
-        arm_offer(&ctx, &ow, 0x82, 1, 3, 2);
-        ctx.state.gold_lo = 0x03;               /* 317 gold */
-        ctx.state.gold_hi = 0x17;
-        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_BROKE,
+        arm_offer(&tctx, &ow, 0x82, 1, 3, 2);
+        tctx.state.gold_lo = 0x03;               /* 317 gold */
+        tctx.state.gold_hi = 0x17;
+        CHECK(u2_commerce_offer(&tctx, &ow, 1, 0) == U2_OFFER_BROKE,
               "317 gold against a 500 ask is refused for money, not for the blessing");
-        CHECK(grid_has(&ctx, "YOU DONT HAVE"),
+        CHECK(grid_has(&tctx, "YOU DONT HAVE"),
               "YOU DONT HAVE THAT MUCH! is on the grid (first half: the line wraps, and the "
               "wrap point moves with the right margin)");
-        CHECK(ctx.state.gold_lo == 0x03 && ctx.state.gold_hi == 0x17,
+        CHECK(tctx.state.gold_lo == 0x03 && tctx.state.gold_hi == 0x17,
               "and the add-back left the purse untouched (%02x%02x)",
-              ctx.state.gold_lo, ctx.state.gold_hi);
-        CHECK(ctx.state.items_held[0] == 0, "and no ring, of course");
+              tctx.state.gold_lo, tctx.state.gold_hi);
+        CHECK(tctx.state.items_held[0] == 0, "and no ring, of course");
 
         /* The charge is not a quest-arm thing. asm/2052 runs before the role gate, so a plain
          * recipient is paid too — which is also what makes the Hotel clerk's stat raise a
          * service bought at 100 gold per 4 points rather than a free gift. */
-        arm_offer(&ctx, &ow, 0x01, 0, 3, 2);    /* role bit 7 clear: THANK YOU */
-        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_THANK_YOU,
+        arm_offer(&tctx, &ow, 0x01, 0, 3, 2);    /* role bit 7 clear: THANK YOU */
+        CHECK(u2_commerce_offer(&tctx, &ow, 1, 0) == U2_OFFER_THANK_YOU,
               "a plain recipient still says THANK YOU VERY MUCH!");
-        CHECK(ctx.state.gold_lo == 0x94 && ctx.state.gold_hi == 0x99,
+        CHECK(tctx.state.gold_lo == 0x94 && tctx.state.gold_hi == 0x99,
               "and still cost 500, because asm/2052 runs before the role gate (%02x%02x)",
-              ctx.state.gold_lo, ctx.state.gold_hi);
+              tctx.state.gold_lo, tctx.state.gold_hi);
 
         /* Controls on the reader: the sector gate and the amount gate. */
-        arm_offer(&ctx, &ow, 0x82, 1, 3, 1);       /* sector 31: blessed, wrong town */
-        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_THANK_YOU,
+        arm_offer(&tctx, &ow, 0x82, 1, 3, 1);       /* sector 31: blessed, wrong town */
+        CHECK(u2_commerce_offer(&tctx, &ow, 1, 0) == U2_OFFER_THANK_YOU,
               "control: the whole quest arm is gated on sector 32, not on the blessing");
-        CHECK(ctx.state.items_held[0] == 0, "control: no ring outside sector 32");
+        CHECK(tctx.state.items_held[0] == 0, "control: no ring outside sector 32");
 
         /* The chain as the owner walked it: bless on Planet X, go back to 1990, pay the
          * man. One run, both halves, and the ring only exists because of the first. */
-        arm_offer(&ctx, &ow, 0x81, 0, 9, 3);
-        ctx.state.world = 9;
+        arm_offer(&tctx, &ow, 0x81, 0, 9, 3);
+        tctx.state.world = 9;
         ow.world.tlkx[0] = 0;
         memcpy(ow.world.tlkx + 1, "FATHER ANTOS CHANTS: YOU HAVE EARNED MY BLESSING",
                sizeof "FATHER ANTOS CHANTS: YOU HAVE EARNED MY BLESSING");
         ow.world.tlkx_loaded = 1;
-        (void)u2_commerce_transact(&ctx, &ow, 1, 0);
-        CHECK(ctx.state.blessing == 1, "chain: the blessing is earned");
-        ctx.state.sector_first = 3;                /* the trip back through time */
-        ctx.state.sector_second = 2;
-        ctx.state.world = 0;
-        ctx.state.mon_role[5] = 0x82;              /* and the man in town */
+        (void)u2_commerce_transact(&tctx, &ow, 1, 0);
+        CHECK(tctx.state.blessing == 1, "chain: the blessing is earned");
+        tctx.state.sector_first = 3;                /* the trip back through time */
+        tctx.state.sector_second = 2;
+        tctx.state.world = 0;
+        tctx.state.mon_role[5] = 0x82;              /* and the man in town */
         offer_digit_left = 1;
-        CHECK(u2_commerce_offer(&ctx, &ow, 1, 0) == U2_OFFER_RING,
+        CHECK(u2_commerce_offer(&tctx, &ow, 1, 0) == U2_OFFER_RING,
               "chain: Antos's blessing is what makes the ring obtainable");
-        CHECK(ctx.state.items_held[0] == 1, "chain: the ring is in the inventory at the end");
+        CHECK(tctx.state.items_held[0] == 1, "chain: the ring is in the inventory at the end");
 
         /* A scripted role whose record index runs past the sector's dialogue is SILENT, not
          * refused. asm/4209 has no branch on whether a record came out, and
@@ -555,11 +555,11 @@ int main(void)
          * role" — text the original never had, in the one place the bytes are silent. */
         {
             u2_transact_result r;
-            arm_offer(&ctx, &ow, 0x8F, 0, 3, 1);   /* role 0x8F -> record 15 */
+            arm_offer(&tctx, &ow, 0x8F, 0, 3, 1);   /* role 0x8F -> record 15 */
             ow.world.tlkx[0] = 0;
             memcpy(ow.world.tlkx + 1, "ONE RECORD ONLY", sizeof "ONE RECORD ONLY");
             ow.world.tlkx_loaded = 1;
-            r = u2_commerce_transact(&ctx, &ow, 1, 0);
+            r = u2_commerce_transact(&tctx, &ow, 1, 0);
             CHECK(r == U2_TRANSACT_SILENT,
                   "an out-of-range tlkx index is silent, not refused (got %d)", (int)r);
             CHECK(r != U2_TRANSACT_NO_DEALER,

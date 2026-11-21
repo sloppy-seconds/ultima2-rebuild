@@ -15,6 +15,10 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
+# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
+# A check program must never be held to a weaker bar than the code it checks.
+U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
+U2_CC="${U2_CC:-cc}"
 fail=0
 skips=0
 ok()   { printf '  PASS  %s\n' "$1"; }
@@ -41,7 +45,7 @@ printf 'engine demo record/playback test\n'
 [ -x "$U2" ] || { bad "engine not built: run make first"; exit 1; }
 
 # --- W1: the framing, in one process, with its own controls ------------------
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/demo_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/demo_check" \
        tests/demo_check.c src/core/demo.c src/core/state.c src/core/vram.c \
        src/core/font.c src/core/frame.c src/core/view.c src/core/rng.c \
        src/core/timer.c src/core/sha256.c src/core/version.c src/core/replay.c \

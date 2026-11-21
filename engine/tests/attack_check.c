@@ -23,6 +23,7 @@
 #include "core/world.h"   /* the kill restores the corpse's cell, so the grid is in scope */
 #include "game/combat.h"
 #include "game/monsters.h"
+#include "game/victory.h"   /* the stub below must match the real prototype */
 
 static int fails, checks;
 
@@ -374,8 +375,8 @@ int main(void)
         w.map_base[kc] = ground;
         w.map[kc]      = sprite;              /* the live creature's own stamp */
 
-        u2_attack a;
-        CHECK(u2_combat_cast_kill(&k, &w, slot, &a) == 2, "KILL reports killed");
+        u2_attack kill_a;
+        CHECK(u2_combat_cast_kill(&k, &w, slot, &kill_a) == 2, "KILL reports killed");
         CHECK(k.state.mon_type[slot] == 0, "death clears the type");
         CHECK(k.state.mon_kind[slot] == 0,
               "death clears the terrain byte too (file 0x30D2..0x30DC) — which is why the "

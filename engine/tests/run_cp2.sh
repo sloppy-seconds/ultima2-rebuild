@@ -9,6 +9,10 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
+# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
+# A check program must never be held to a weaker bar than the code it checks.
+U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
+U2_CC="${U2_CC:-cc}"
 fail=0
 ok()  { printf '  PASS  %s\n' "$1"; }
 bad() { printf '  FAIL  %s\n' "$1"; fail=1; }
@@ -19,7 +23,7 @@ trap 'rm -rf "$WORK"' EXIT
 printf 'engine CP2 test\n'
 
 # --- the digest primitive the evidence rests on --------------------------
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/sha256_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/sha256_check" \
    tests/sha256_check.c src/core/sha256.c 2>"$WORK/cc.err"
 if [ $? -ne 0 ]; then
     bad "sha256 test harness did not build: $(head -2 "$WORK/cc.err")"

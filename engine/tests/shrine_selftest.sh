@@ -23,6 +23,11 @@
 # under a second.
 set -u
 cd "$(dirname "$0")/.." || exit 1
+# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
+# A check program must never be held to a weaker bar than the code it checks.
+U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
+U2_CC="${U2_CC:-cc}"
+U2_OBJDIR="${U2_OBJDIR:-build}"
 SRC=src/game/commerce.c
 WORK="${TMPDIR:-/var/tmp}/u2-shrine-selftest.$$"
 mkdir -p "$WORK"
@@ -43,12 +48,12 @@ run_control() {
     # way run_cp6.sh does, so a tree that never ran `make` still gets a real control instead
     # of a skip that would look like a pass.
     local objs
-    objs=$(find build/src -name '*.o' ! -name 'main.o' ! -path '*commerce*' 2>/dev/null | tr '\n' ' ')
+    objs=$(find "$U2_OBJDIR/src" -name '*.o' ! -name 'main.o' ! -path '*commerce*' 2>/dev/null | tr '\n' ' ')
     if [ -n "$objs" ]; then
-        cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/mut" \
+        "$U2_CC" $U2_CCFLAGS -o "$WORK/mut" \
             tests/commerce_check.c "$mfile" $objs 2>"$WORK/build.err"
     else
-        cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/mut" \
+        "$U2_CC" $U2_CCFLAGS -o "$WORK/mut" \
             tests/commerce_check.c src/core/*.c "$mfile" \
             $(ls src/game/*.c | grep -v '/commerce\.c$') src/debug/*.c 2>"$WORK/build.err"
     fi

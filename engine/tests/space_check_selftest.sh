@@ -7,11 +7,15 @@
 # only checks the mutants can pass while the gate itself is broken.
 set -u
 cd "$(dirname "$0")/.." || exit 1
+# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
+# A check program must never be held to a weaker bar than the code it checks.
+U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
+U2_CC="${U2_CC:-cc}"
 
 WORK=$(mktemp -d /var/tmp/u2-space-selftest.XXXXXX)
 trap 'rm -rf "$WORK"' EXIT
 
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/space_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/space_check" \
    tests/space_check.c src/game/space.c 2>"$WORK/cc.err"
 if [ $? -ne 0 ]; then
     echo "SPACE SELFTEST: FAIL — harness did not build"

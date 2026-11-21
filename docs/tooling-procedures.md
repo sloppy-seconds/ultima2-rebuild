@@ -373,6 +373,58 @@ bug CI cannot see.
 a flags change rebuilds everything (4.5 s) instead of leaving the gate red with no remedy but
 `make clean`. A red that `make` cannot clear is a red people learn to ignore.
 
+### One flag set, and three things that read it
+
+`engine/Makefile` is the only place the C flag set is written. It exports three variables and
+the test scripts consume them, so nothing can drift:
+
+| variable | what it is | the script fallback when run by hand |
+| --- | --- | --- |
+| `U2_CCFLAGS` | `$(STD) $(WARN) $(CPPFLAGS)` | `make -s ccflags` |
+| `U2_CC` | the compiler, so `make CC=clang test` builds the checks with clang too | `cc` |
+| `U2_OBJDIR` | where the built objects live, so a check links objects compiled with its own flags | `build` |
+
+Before this, the ~50 ad-hoc `cc -std=c11 -Wall -Wextra -Werror` lines in `engine/tests/` silently
+omitted `-Wshadow`, `-Wstrict-prototypes`, `-Wmissing-prototypes` and `-pedantic`. Turning them on
+found **25 real defects in the check programs** — shadowed locals, and definitions whose
+prototypes lived in a header the fixture never included, which means a positive control could
+drift from the contract it exists to prove. Parity is the cheap half of this change; the
+sanitizers below are the expensive half and they found what parity could not.
+
+### `make test-asan` and `make analyze`
+
+**`make test-asan`** rebuilds the engine and every check program with ASan and UBSan and runs the
+same suites, into `engine/build/asan` so the ordinary build tree is untouched. It restores the
+ordinary `./u2` afterwards whatever the suites decide, because a red sanitizer run otherwise
+leaves the `fresh` gate reporting a stale binary nobody asked for. Leak checking is off, and that
+is a decision rather than an oversight: the engine holds its content tables until exit, so
+LeakSanitizer reports a fixed set of non-defects, and a gate that is always noisy is a gate that
+gets skipped. Memory *errors* are the target.
+
+This host's gcc has no `libasan`, so the target probes by linking a trivial program and prints
+`SKIP` with the linker's own words rather than exiting 0 having checked nothing; `ASAN_REQUIRED=1`
+flips the skip into a failure, and that is what CI sets. Measured cost, in an ubuntu container with
+the runtimes installed and the suite run as an unprivileged user: **all of CP0..CP7, demo and api
+pass under ASan and UBSan in about ten minutes**, against 54 s on the host. Run it as yourself and
+not as root — the suite has read-only-directory tests, and root ignores file permissions, so a root
+run reports failures that belong to the container.
+
+**`make analyze`** runs `tools/analyzer_gate.py`, which is `gcc -fanalyzer` over all 72 engine
+translation units at zero tolerance. Measured **9.5 s**, which is why it is a `--fast` gate; the
+estimate of ~90 s came from a scan script that also carried the full warning set with `-Werror`.
+Three things about it are load-bearing and each was learned the hard way, in the order written:
+`-fsyntax-only` disables the analyzer entirely and the gate reported a clean tree while analyzing
+nothing; inheriting `-Werror` turns findings into errors so gcc stops at the first per file and a
+parser matching `warning:` under-reports; and the gate's `--selftest` compiles a planted null
+dereference through the same code path, which is what caught both. It carries two suppressions,
+each with its reason in the file: `malloc-leak` globally for the same reason as `detect_leaks=0`,
+and `file-leak` in `src/core/world.c` for a path the analyzer misattributes to an inlined helper
+that opens no file.
+
+Both are in CI: the analyzer as a step in `gate-suite.yml`, the sanitizer run and a clang build as
+jobs in `engine-tests.yml`. `check_all.sh` runs the analyzer in its full form and skips it under
+`--fast`, naming where it does run.
+
 ## Play in a browser, both binaries
 
 Two containers, same shape, different binaries. Both run on `ai` and need nothing from the host

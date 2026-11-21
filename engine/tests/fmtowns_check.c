@@ -138,8 +138,8 @@ static int make_iso(const char *path, char *err, size_t errsz)
             memset(bank + BANK_HDR + (long)t * TILE_BYTES, filler(b, t), TILE_BYTES);
         const long base_sector = next + (long)b * bank_sectors;
         for (long i = 0; i < bank_bytes; i++) {
-            const long off = (base_sector + i / DSIZE) * SEC + 16 + (i % DSIZE);
-            img[off] = bank[i];
+            const long io = (base_sector + i / DSIZE) * SEC + 16 + (i % DSIZE);
+            img[io] = bank[i];
         }
     }
     free(bank);

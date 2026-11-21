@@ -8,6 +8,10 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
+# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
+# A check program must never be held to a weaker bar than the code it checks.
+U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
+U2_CC="${U2_CC:-cc}"
 fail=0
 ok()  { printf '  PASS  %s\n' "$1"; }
 bad() { printf '  FAIL  %s\n' "$1"; fail=1; }
@@ -18,7 +22,7 @@ trap 'rm -rf "$WORK"' EXIT
 printf 'engine CP4 test\n'
 
 # --- the sector loader ----------------------------------------------------
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/world_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/world_check" \
    tests/world_check.c src/core/world.c src/core/roots.c src/core/slot.c 2>"$WORK/cc.err"
 if [ $? -ne 0 ]; then
     bad "world test harness did not build: $(head -5 "$WORK/cc.err")"
@@ -37,7 +41,7 @@ fi
 # two legs that were watched live as well as on the properties, which is the control.
 # Evidence: docs/moongates.md sections 3 and 3b, captures/spice86/moongate-cycle,
 # tools/gate_graph.py.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/gate_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/gate_check" \
    tests/gate_check.c src/game/gates.c src/game/monsters.c src/core/rng.c src/core/world.c src/core/roots.c src/core/slot.c src/core/state.c 2>"$WORK/cc-gate.err"
 if [ $? -ne 0 ]; then
     bad "gate test harness did not build: $(head -5 "$WORK/cc-gate.err")"
@@ -56,7 +60,7 @@ fi
 # player's own executable at run time. The synthetic-image half of this test
 # always runs and proves the assertions reject a wrong layout; the real-binary
 # half SKIPs when no copy is here, so CI stays green and honest.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/tiles_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/tiles_check" \
    tests/tiles_check.c src/core/tiles.c src/core/roots.c src/core/sha256.c 2>"$WORK/cc-tiles.err"
 if [ $? -ne 0 ]; then
     bad "tiles test harness did not build: $(head -5 "$WORK/cc-tiles.err")"
@@ -98,7 +102,7 @@ else
     ok "cleanroom art: committed header matches the SVG sources (no drift)"
 fi
 
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/tiles_art_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/tiles_art_check" \
    tests/tiles_art_check.c src/core/tiles_builtin.c 2>"$WORK/cc-art.err"
 if [ $? -ne 0 ]; then
     bad "cleanroom art harness did not build: $(head -5 "$WORK/cc-art.err")"
@@ -134,7 +138,7 @@ fi
 # The viewport is where a map byte becomes something drawable, so the whole CP4
 # render contract rests on these rules: geometry, the index formula, the
 # off-sector fallback and the underlay suppression.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/view_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/view_check" \
    tests/view_check.c src/core/view.c 2>"$WORK/cc-view.err"
 if [ $? -ne 0 ]; then
     bad "viewport test harness did not build: $(head -5 "$WORK/cc-view.err")"
@@ -152,7 +156,7 @@ fi
 # The SDL backend fits the 320x200 frame into a resized window by integer scale.
 # The fit is pure integer arithmetic in core/scale.c, so it is tested here in the
 # cc-only build with no SDL and no display, on exactly the code the backend calls.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/scale_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/scale_check" \
    tests/scale_check.c src/core/scale.c 2>"$WORK/cc-scale.err"
 if [ $? -ne 0 ]; then
     bad "scale test harness did not build: $(head -5 "$WORK/cc-scale.err")"
@@ -173,7 +177,7 @@ fi
 # rocket, and the descent assertions are the interesting ones: that rule was written
 # from bytes before anyone had launched, and then predicted both live landings to the
 # cell. Mutants are driven by tests/space_check_selftest.sh.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/space_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/space_check" \
    tests/space_check.c src/game/space.c 2>"$WORK/cc-space.err"
 if [ $? -ne 0 ]; then
     bad "space test harness did not build: $(head -5 "$WORK/cc-space.err")"
@@ -202,7 +206,7 @@ fi
 
 # --- the framebuffer ------------------------------------------------------
 # Every display backend sits behind this, so a mistake here reaches all of them.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/frame_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/frame_check" \
    tests/frame_check.c src/core/frame.c src/core/view.c 2>"$WORK/cc-frame.err"
 if [ $? -ne 0 ]; then
     bad "framebuffer test harness did not build: $(head -5 "$WORK/cc-frame.err")"
@@ -219,7 +223,7 @@ fi
 # CP4b: text in the framebuffer is drawn with the vendored public-domain
 # 8x8 font, so every string screen (status band, menu, creation) rests on
 # these glyph semantics.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/font_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/font_check" \
    tests/font_check.c src/core/font.c src/core/frame.c src/core/view.c 2>"$WORK/cc-font.err"
 if [ $? -ne 0 ]; then
     bad "font test harness did not build: $(head -5 "$WORK/cc-font.err")"
@@ -236,7 +240,7 @@ fi
 # CP4b task 1: the owner's model of the block — four rows, live prompt at the
 # bottom, completed commands scrolling up, status block outside the scroll
 # rect — as tested behaviour, not folklore.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/status_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/status_check" \
    tests/status_check.c src/game/status.c src/core/seam.c src/core/vram.c \
    src/game/sound.c src/game/feedback.c \
    src/core/state.c src/core/demo.c src/core/font.c src/core/frame.c src/core/view.c \
@@ -258,7 +262,7 @@ fi
 # The owner's test: walk, Q saves the live position into the record, restart,
 # P lands where the player stood. Plus the outdoors guard and the CP11
 # save-anywhere policy hook.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/save_q_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/save_q_check" \
    tests/save_q_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/game/space_view.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/dungeon3d.c src/game/dungeon_assets.c src/game/flash.c src/game/sound.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c src/core/config.c src/core/config_write.c \
    src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c src/core/demo.c \
    src/core/vram.c src/core/state.c src/core/font.c src/core/frame.c \
@@ -278,7 +282,7 @@ fi
 # --- time passes: the PASS action spends food, starvation kills -----------
 # file 0x0B0D spends 10 food per PASS and file 0x0B2E sends a borrow to the
 # death handler at runtime 0x0E62 (asm/0C62), which zeroes DS:51..59.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/food_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/food_check" \
    tests/food_check.c src/game/overworld.c src/core/panel.c src/game/commands.c src/game/space.c src/game/space_view.c src/debug/turnlog.c src/game/ai.c src/game/combat.c src/game/kill_drop.c src/game/victory.c src/game/monsters.c src/game/gates.c src/game/commerce.c src/game/dungeon.c src/game/dungeon3d.c src/game/dungeon_assets.c src/game/flash.c src/game/sound.c src/game/feedback.c src/core/tiles_builtin.c src/game/status.c src/core/world.c src/core/roots.c src/core/slot.c src/core/config.c src/core/config_write.c \
    src/core/save.c src/core/tiles.c src/core/tiles_ega.c src/core/ini.c src/core/sha256.c src/core/seam.c src/core/demo.c \
    src/core/vram.c src/core/state.c src/core/font.c src/core/frame.c \
@@ -462,7 +466,7 @@ fi
 # census cannot tell the right layout from a swapped one, which is why the checks are
 # row- and quadrant-level. Needs the player's own picdra, so it skips without the content.
 if [ -r "$MAPDIR/picdra" ] || [ -r "$MAPDIR/PICDRA" ]; then
-    cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/pic_check" \
+    "$U2_CC" $U2_CCFLAGS -o "$WORK/pic_check" \
        tests/pic_check.c src/core/pic.c src/core/pic_ega.c src/core/roots.c src/core/frame.c src/core/font.c src/core/view.c src/debug/trace.c \
         >"$WORK/cc-pic.err" 2>&1 \
         && "$WORK/pic_check" >"$WORK/pic.out" 2>&1 \
@@ -479,7 +483,7 @@ fi
 # inside the binary when the fan pack is absent (CI has no references/ or
 # original/updated/), so this block runs unconditionally and never goes red for a
 # missing pack. See docs/ega-graphics-plan.md.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/ega_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/ega_check" \
    tests/ega_check.c src/core/frame.c src/core/view.c src/core/tiles_ega.c src/core/ini.c \
    src/core/pic_ega.c src/core/pic.c src/core/roots.c src/debug/trace.c \
     >"$WORK/cc-ega.err" 2>&1 \
@@ -487,14 +491,14 @@ cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/ega_check" \
     && ok "EGA pipeline: palette, 4bpp blit, atlas + PIC*-E loaders ($(grep -c '^  ok' "$WORK/ega.out") checks)" \
     || { bad "EGA pipeline failed:"; tail -16 "$WORK/ega.out" 2>/dev/null | sed 's/^/        /'; tail -4 "$WORK/cc-ega.err" | sed 's/^/        /'; }
 
-# Format v2 (docs/handoff-themes-builder.md § 4): a theme with a manifest, so the
+# Format v2 (docs/archive/handoff-themes-builder.md § 4): a theme with a manifest, so the
 # loader has geometry, a tile pool, an indirection table and a palette to get
 # wrong. Most of this check is controls — six themes that MUST be refused — because
 # a format that accepts a bad file and draws a guess is how a plausible wrong
 # screen reaches a player. The fixtures are written under /var/tmp, so the check
 # runs in CI with no media; only the FM Towns letter-row assertions skip when
 # themes/fmtowns has not been built, and they say so out loud.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/theme_v2_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/theme_v2_check" \
    tests/theme_v2_check.c src/core/frame.c src/core/view.c src/core/tiles_ega.c src/core/ini.c \
    src/core/font.c src/core/vram.c src/debug/trace.c \
     >"$WORK/cc-v2.err" 2>&1 \
@@ -513,7 +517,7 @@ cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/theme_v2_check" \
 # v1 EGATILES files, so this needs no art and no media and runs in CI.
 rm -rf "$WORK/artauto"
 mkdir -p "$WORK/artauto"
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/artauto_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/artauto_check" \
    tests/artauto_check.c src/core/tiles_ega.c src/core/ini.c src/core/frame.c \
    src/core/view.c src/core/state.c src/core/rng.c >"$WORK/cc-artauto.err" 2>&1 \
    && "$WORK/artauto_check" "$WORK/artauto" >"$WORK/artauto.out" 2>&1; then
@@ -703,7 +707,7 @@ fi
 # path that is not a directory and an over-long value are all refusals rather than
 # silent defaults, and precedence is flag > ini > nothing. The fixtures are written
 # under $WORK, so this runs in CI with no media. docs/install-design.md § 4.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/config_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/config_check" \
    tests/config_check.c src/core/config.c src/core/config_write.c src/core/ini.c >"$WORK/cc-cfg.err" 2>&1 \
     && "$WORK/config_check" "$WORK" >"$WORK/cfg.out" 2>&1 \
     && ok "config.ini: precedence, path resolution, 8 refusals ($(grep -c '^  ok' "$WORK/cfg.out") checks)" \
@@ -718,7 +722,7 @@ cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/config_check" \
 # The assertion that matters most is the last: the engine pointed at the installed
 # tree with no other flags loads Earth AND an outer planet, which is the only one
 # that catches "copied everything, the planets still do not work".
-cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/install_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/install_check" \
    tests/install_check.c src/core/install.c src/core/themes.c src/core/fmtowns.c \
    src/core/copy.c src/core/roots.c src/core/sha256.c \
    src/core/world.c src/core/slot.c src/core/config.c src/core/ini.c >"$WORK/cc-inst.err" 2>&1 \
@@ -762,7 +766,7 @@ python3 tests/overlay_map_control.py "$WORK/overlay" >"$WORK/ovl.out" 2>&1 \
 # pool must be numbered identically -- that runs everywhere. TILES depends on the
 # art, so it is checked structurally here and byte-for-byte against the Python
 # output when references/fmtowns is present, and it says so out loud when it skips.
-cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/fmtowns_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/fmtowns_check" \
    tests/fmtowns_check.c src/core/fmtowns.c src/core/copy.c src/core/sha256.c \
     >"$WORK/cc-fm.err" 2>&1 \
     && "$WORK/fmtowns_check" "$WORK" ../references/fmtowns ../themes/fmtowns \

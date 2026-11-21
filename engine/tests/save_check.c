@@ -156,7 +156,10 @@ int main(int argc, char **argv)
     mkdir(bigslot, 0755);
     snprintf(bigfile, sizeof bigfile, "%s/PLAYER", bigslot);
     f = fopen(bigfile, "wb");
-    if (f) { memset(buf, 0xEE, sizeof buf); fwrite(buf, 1, 500, f); fclose(f); }
+    /* sizeof buf, not a literal: the fixture only needs to be longer than the 384-byte
+     * record, and a hand-picked 500 read past the end of the buffer to get there.
+     * AddressSanitizer found this the first time the suite ran under it. */
+    if (f) { memset(buf, 0xEE, sizeof buf); fwrite(buf, 1, sizeof buf, f); fclose(f); }
     memset(&bad, 0, sizeof bad);
     bad.save_dir = bigdir;
     CHECK(u2_save_load(&bad) == U2_SAVE_NOT_READY, "an oversized PLAYER file is refused");
@@ -245,9 +248,9 @@ int main(int argc, char **argv)
         snprintf(hdtmp,  sizeof hdtmp,  "%s/.PLAYER.migrating", hd);
         mkdir(hd, 0755);
         f = fopen(hdflat, "wb");
-        if (f) { fwrite("x", 1, U2_PLAYER_FILE_SIZE, f); fclose(f); }
+        if (f) { memset(buf, 'x', sizeof buf); fwrite(buf, 1, U2_PLAYER_FILE_SIZE, f); fclose(f); }
         f = fopen(hdtmp, "wb");
-        if (f) { fwrite("y", 1, U2_PLAYER_FILE_SIZE, f); fclose(f); }
+        if (f) { memset(buf, 'y', sizeof buf); fwrite(buf, 1, U2_PLAYER_FILE_SIZE, f); fclose(f); }
         u2_ctx hdctx;
         memset(&hdctx, 0, sizeof hdctx);
         hdctx.save_dir = hd;

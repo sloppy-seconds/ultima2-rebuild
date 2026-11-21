@@ -189,6 +189,48 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-21 — `-fsyntax-only` silently disables `-fanalyzer`, so a static-analysis gate
+  built on it reports a clean tree while analyzing nothing at all.** The first version of this
+  project's analyzer gate reported zero findings over 72 translation units, which read as
+  unusually good code rather than as a broken gate. It took a deliberate null dereference in a
+  scratch file to show the analyzer had never run. The general shape: an analysis pass that
+  depends on code generation is switched off by the flag people reach for when they want a
+  check to be fast, and the tool reports success rather than complaining. A gate whose output
+  is "nothing found" cannot tell an empty corpus from a clean one, so its control has to be a
+  planted defect on the gate's own code path, not a unit test of its parser.
+  → Tier 1, verification discipline.
+* **2026-11-21 — Inheriting `-Werror` into a static-analysis pass turns the analyzer's findings
+  into errors, which stops the compiler at the first one per file and breaks any parser
+  matching the word `warning`.** The gate under-reported, silently, in the direction of
+  approval. A diagnostic-collecting gate wants the build's strictness flags stripped and its
+  own exit code as the only enforcement: `-Werror` is the build's policy, not the analyzer's.
+  Same family as the entry above — both were caught by running the gate's own control.
+  → Tier 1, verification discipline.
+* **2026-11-21 — Sanitizer runtimes are not part of "a C compiler", and a sanitizer gate that
+  cannot tell "no runtime installed" from "no bugs found" is worse than no sanitizer gate.**
+  On this host gcc turns `-fsanitize=address` into a linker error, so a naive target would exit
+  0 having checked nothing. The rule that works: probe by linking a trivial program, print SKIP
+  with the linker's own words when the runtime is absent, and have the environment that is
+  supposed to have it set a variable that turns the skip into a failure. The probe costs one
+  compile; the false green costs the control.
+  → Tier 1, toolchain assumptions.
+* **2026-11-21 — The first sanitizer run found out-of-bounds reads in the test fixtures, not in
+  the engine.** Two check programs passed a hand-picked length to `fwrite` larger than the
+  buffer they named (`fwrite(buf, 1, 500, f)` over a 392-byte array, and `fwrite("x", 1, 32, f)`
+  over a two-byte literal). Neither could fail a test, because the bytes read past the end were
+  never compared against anything; they only made a fixture file slightly wrong. The reason it
+  went unseen is structural: the harness compiled its check programs with a shorter flag list
+  than the code under test, so the warnings that would have caught it were switched off exactly
+  where the careless code lived. Single-source the flag set, export it to the test scripts, and
+  hold the test code to the same bar as the product.
+  → Tier 1, verification discipline.
+* **2026-11-21 — A check program that links the object files of the code under test must link
+  the ones built with the same flags, or the failure names a relocation instead of the cause.**
+  Under `-fsanitize=address`, linking a check program against the ordinary build's objects died
+  with `relocation R_X86_64_32 ... recompile with -fPIE`, which reads like a toolchain defect
+  and is really a second build tree nobody told the script about. The object directory is part
+  of the interface between the build and the suites: export it, do not hardcode it in a `find`.
+  → Tier 1, toolchain assumptions.
 * **2026-11-21 — A test suite that inherits stdin passes in CI and hangs on a human terminal,
   and the two states look identical right up until they do not.** An emulator or game binary
   launched without a scripted input source falls back to the console, so under CI, where stdin

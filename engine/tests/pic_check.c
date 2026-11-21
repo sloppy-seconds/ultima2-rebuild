@@ -176,9 +176,9 @@ int main(void)
         u2_vram v;
         memset(&v, 0, sizeof v);
         for (int r = 0; r < U2_ROWS; r++)
-            for (int c = 0; c < U2_COLS; c++) {
-                v.cell[r][c].ch = ' ';
-                v.cell[r][c].attr = 0x07;
+            for (int col = 0; col < U2_COLS; col++) {
+                v.cell[r][col].ch = ' ';
+                v.cell[r][col].attr = 0x07;
             }
         static const char cap[] = "BATTLE STRANGE CREATURES";
         for (int i = 0; cap[i]; i++)

@@ -9,6 +9,10 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
+# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
+# A check program must never be held to a weaker bar than the code it checks.
+U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
+U2_CC="${U2_CC:-cc}"
 fail=0
 ok()  { printf '  PASS  %s\n' "$1"; }
 bad() { printf '  FAIL  %s\n' "$1"; fail=1; }
@@ -23,7 +27,7 @@ printf 'ESC\nP\n' > "$WORK/p_after.keys"
 printf 'engine CP3 test\n'
 
 # --- the save record is byte-compatible with the original -----------------
-cc -std=c11 -Wall -Wextra -Werror -Isrc -o "$WORK/save_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/save_check" \
    tests/save_check.c src/core/save.c src/core/slot.c src/core/state.c 2>"$WORK/cc.err"
 if [ $? -ne 0 ]; then
     bad "save test harness did not build: $(head -3 "$WORK/cc.err")"

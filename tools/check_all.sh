@@ -217,6 +217,14 @@ else
     run "mutate_stepgate" engine/content/gen_content.h -- bash tools/mutate_stepgate.sh
 fi
 
+echo "== static analyzer (gcc -fanalyzer over every engine TU) =="
+# Measured 9.5 s for all 72 translation units, so this is a --fast gate after all; the
+# estimate of ~90 s came from a scan script that also ran the full warning set with
+# -Werror. Selftest first, because the gate's first selftest passed while the analyzer
+# was not running at all.
+run "analyzer_gate selftest" tools/analyzer_gate.py -- python3 tools/analyzer_gate.py --selftest
+run "analyzer_gate" tools/analyzer_gate.py -- python3 tools/analyzer_gate.py
+
 echo "== DOS string atlas (needs original/, gitignored by policy) =="
 opt_run "strings_atlas selftest" original/ultimaii.exe asm -- python3 tools/strings_atlas.py --selftest
 opt_run "str_out_audit selftest" original/ultimaii.exe asm -- python3 tools/str_out_audit.py --selftest

@@ -57,3 +57,37 @@ jobs:
         run: bash engine/tests/mutate_speed.sh
       - name: Step gate mutations (prove ai_check can fail)
         run: bash tools/mutate_stepgate.sh
+
+  # A second compiler. gcc-only plus -Werror is a blind spot rather than a choice: the
+  # two compilers disagree about which warnings fire, and every one of clang's is a
+  # warning gcc never emits. `make CC=clang` also reaches the check programs, because
+  # the test scripts take their compiler from U2_CC rather than hardcoding cc.
+  clang:
+    name: Build and test with clang
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Build engine with clang
+        run: make -C engine CC=clang
+      - name: Acceptance tests with clang
+        run: make -C engine CC=clang test
+
+  # ASan + UBSan over the same suites. This is not decoration: the first run found a
+  # 108-byte stack over-read in save_check.c's own fixture (fwrite of 500 from a
+  # 392-byte buffer), which no test could see because the bytes it read were never
+  # checked. ASAN_REQUIRED makes a missing sanitizer runtime a failure rather than a
+  # skip, so the job cannot go green by checking nothing.
+  sanitizer:
+    name: Acceptance tests under ASan and UBSan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sanitizer runtimes
+        run: sudo apt-get update && sudo apt-get install -y libasan8 libubsan1
+      - name: test-asan
+        env:
+          ASAN_REQUIRED: "1"
+        run: make -C engine test-asan
+

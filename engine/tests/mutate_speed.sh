@@ -7,6 +7,10 @@
 # A mutation that leaves it green means the 20-slot table does not actually cover that clause.
 set -uo pipefail
 cd "$(dirname "$0")/.."
+# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
+# A check program must never be held to a weaker bar than the code it checks.
+U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
+U2_CC="${U2_CC:-cc}"
 
 SRCS=$(ls src/core/*.c src/game/*.c src/debug/*.c | grep -v 'game/speed.c')
 pass=0; fail=0
@@ -23,7 +27,7 @@ if old not in s:
 open(p,'w').write(s.replace(old,new,1))
 PY
     if [ $? -ne 0 ]; then echo "  MISSED  $name (pattern not found)"; fail=$((fail+1)); return; fi
-    if ! cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o /var/tmp/speed_mut \
+    if ! "$U2_CC" $U2_CCFLAGS -o /var/tmp/speed_mut \
             tests/speed_check.c /var/tmp/speed_mut.c $SRCS 2>/dev/null; then
         # Not a skip: a mutant that will not compile checked nothing. Usual cause is an
         # unbuilt engine — the committed header is content/gen_content.h.

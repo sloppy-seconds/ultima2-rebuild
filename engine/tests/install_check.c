@@ -365,10 +365,10 @@ int main(int argc, char **argv)
         if (devnull) {
             FILE *saved = stdin;
             stdin = devnull;
-            u2_install_request q;
-            memset(&q, 0, sizeof q);
+            u2_install_request preq;
+            memset(&preq, 0, sizeof preq);
             u2_install_answers ans;
-            const int pr = u2_install_prompt(&q, &ans, log, err, sizeof err);
+            const int pr = u2_install_prompt(&preq, &ans, log, err, sizeof err);
             stdin = saved;
             fclose(devnull);
             CHECK(pr == -1, "a prompt with no terminal refuses instead of blocking");

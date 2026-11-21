@@ -35,6 +35,10 @@
 #include "core/ctx.h"
 #include "core/rng.h"
 #include "core/state.h"
+/* The contract header, so these definitions are checked against the prototypes the
+ * engine actually declares. Without it the model could drift from combat.h and still
+ * compile, which is the one thing a positive control must not do. */
+#include "game/combat.h"
 
 #define C_LEGS   0x26B
 #define C_ARMS   0x26C

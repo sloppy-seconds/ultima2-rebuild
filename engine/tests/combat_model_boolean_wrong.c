@@ -27,6 +27,9 @@
 #include "core/ctx.h"
 #include "core/rng.h"
 #include "core/state.h"
+/* The contract header, so this negative control differs from the positive one only in
+ * the semantics the spec must reject, never in the signatures it declares. */
+#include "game/combat.h"
 
 #define C_LEGS   0x26B
 #define C_ARMS   0x26C

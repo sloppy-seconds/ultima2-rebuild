@@ -18,6 +18,11 @@
 # "mutator failed", the code moved — fix the pattern, do not delete the control.
 set -u
 cd "$(dirname "$0")/.." || exit 1
+# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
+# A check program must never be held to a weaker bar than the code it checks.
+U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
+U2_CC="${U2_CC:-cc}"
+U2_OBJDIR="${U2_OBJDIR:-build}"
 
 SRC=src/game/space_view.c
 WORK="${WORK:-/var/tmp/u2/warp-step-selftest}"
@@ -25,9 +30,9 @@ mkdir -p "$WORK"
 fails=0
 controls=0
 
-OBJS=$(find build/src -name '*.o' ! -name 'main.o' | tr '\n' ' ')
+OBJS=$(find "$U2_OBJDIR/src" -name '*.o' ! -name 'main.o' | tr '\n' ' ')
 if [ -z "$OBJS" ]; then
-    echo "SKIP: no build/src objects — run 'make -C engine' first"
+    echo "SKIP: no $U2_OBJDIR/src objects — run 'make -C engine' first"
     exit 0
 fi
 
@@ -42,8 +47,8 @@ run_control() {
         echo "  BAD  $name: mutant is identical to the source — the pattern no longer matches"
         fails=$((fails+1)); return
     fi
-    if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/mut" \
-        tests/warp_step_check.c "$mfile" $(find build/src -name '*.o' ! -name 'main.o' \
+    if "$U2_CC" $U2_CCFLAGS -o "$WORK/mut" \
+        tests/warp_step_check.c "$mfile" $(find "$U2_OBJDIR/src" -name '*.o' ! -name 'main.o' \
             ! -path '*space_view*' | tr '\n' ' ') 2>"$WORK/mut.build"; then
         if "$WORK/mut" > "$WORK/mut.out" 2>&1; then
             echo "  FAIL $name: mutant passed — the check does not assert it"

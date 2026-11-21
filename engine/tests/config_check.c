@@ -291,7 +291,7 @@ int main(int argc, char **argv)
      * supposed to change one line. */
     {
         const char *p = "cfgw.ini";
-        char err[256];
+        char werr[256];
 
         /* 1. a commented example becomes the live line, and there is only one. */
         write_text(p,
@@ -301,7 +301,7 @@ int main(int argc, char **argv)
             "\n"
             "[game]\n"
             "# mode = enhanced\n");
-        CHECK(u2_config_set(p, "themes", "theme", "alt", err, sizeof err) == 0,
+        CHECK(u2_config_set(p, "themes", "theme", "alt", werr, sizeof werr) == 0,
               "setting a commented key succeeds");
         char *t = read_text(p);
         CHECK(t && strstr(t, "theme = alt\n") && !strstr(t, "# theme = alt"),
@@ -322,7 +322,7 @@ int main(int argc, char **argv)
         {
             u2_config c;
             char e2[256];
-            CHECK(u2_config_set("cfgw2.ini", "themes", "theme", "alt", err, sizeof err) == 0
+            CHECK(u2_config_set("cfgw2.ini", "themes", "theme", "alt", werr, sizeof werr) == 0
                   && u2_config_load("cfgw2.ini", &c, e2, sizeof e2) == U2_CONFIG_OK
                   && !strcmp(c.theme, "alt"),
                   "the written file loads and carries the new theme");
@@ -330,7 +330,7 @@ int main(int argc, char **argv)
 
         /* 3. a key absent from a section that exists lands inside that section. */
         write_text(p, "[themes]\ndir = themes\n\n[game]\n# mode = enhanced\n");
-        CHECK(u2_config_set(p, "game", "sound", "off", err, sizeof err) == 0,
+        CHECK(u2_config_set(p, "game", "sound", "off", werr, sizeof werr) == 0,
               "setting a key the section does not have succeeds");
         t = read_text(p);
         CHECK(t && strstr(t, "sound = off") && strstr(t, "sound = off") > strstr(t, "[game]"),
@@ -341,14 +341,14 @@ int main(int argc, char **argv)
 
         /* 4. a section that does not exist is created. */
         write_text(p, "[paths]\ndata = .\n");
-        CHECK(u2_config_set(p, "game", "sound", "on", err, sizeof err) == 0
+        CHECK(u2_config_set(p, "game", "sound", "on", werr, sizeof werr) == 0
               && ((t = read_text(p)) != NULL)
               && strstr(t, "[game]") && strstr(t, "sound = on") && (free(t), 1),
               "a missing section is appended with its key");
 
         /* 5. a file that does not exist is created rather than the change lost. */
         remove(p);
-        CHECK(u2_config_set(p, "game", "sound", "off", err, sizeof err) == 0
+        CHECK(u2_config_set(p, "game", "sound", "off", werr, sizeof werr) == 0
               && ((t = read_text(p)) != NULL)
               && strstr(t, "[game]") && strstr(t, "sound = off") && (free(t), 1),
               "no config.ini is not a reason to accept a preference and then lose it");

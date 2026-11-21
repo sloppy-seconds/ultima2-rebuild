@@ -28,6 +28,10 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
+# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
+# A check program must never be held to a weaker bar than the code it checks.
+U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
+U2_CC="${U2_CC:-cc}"
 
 # CP5 is the original-fidelity checkpoint: nearly every gate below asserts what the
 # bytes say the ORIGINAL did — EXP and GOLD wrapping past 9999 rather than clamping,
@@ -83,7 +87,7 @@ else
 fi
 
 # --- 1. the spec is well-formed C (always runs, guards the contract) --------
-cc -std=c11 -Wall -Wextra -Werror -Wshadow -Wstrict-prototypes -Wmissing-prototypes \
+"$U2_CC" $U2_CCFLAGS \
    -Isrc -fsyntax-only tests/combat_check.c 2>"$WORK/syn.err"
 if [ $? -ne 0 ]; then
     bad "CP5 spec did not syntax-check:"
@@ -99,7 +103,7 @@ fi
 # (must fail) on every run, before combat.c exists at all.
 run_model() {
     local m="$1" want="$2"
-    if ! cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/$m" \
+    if ! "$U2_CC" $U2_CCFLAGS -o "$WORK/$m" \
             tests/combat_check.c "tests/$m.c" src/game/kill_drop.c \
             src/core/rng.c src/core/state.c \
             2>"$WORK/$m.build"; then
@@ -158,7 +162,7 @@ fi
 # reads from. Runs whether or not combat exists, and takes the real monx31 when
 # the player's content is present, because that is the only input that can
 # falsify the offset table rather than check the copy.
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/monsters_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/monsters_check" \
         tests/monsters_check.c src/game/monsters.c src/core/world.c src/core/roots.c src/core/slot.c src/core/state.c \
         src/core/save.c src/core/rng.c 2>"$WORK/mon.build"; then
     MONREAL=""
@@ -184,7 +188,7 @@ fi
 # gate that keeps the engine's copy of it honest, plus the spawner's refusals —
 # which matter more than its successes, because a wrong refusal rate is a wrong
 # monster density and nothing else would notice.
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/wander_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/wander_check" \
         tests/wander_check.c src/game/monsters.c src/core/world.c src/core/roots.c src/core/slot.c src/core/state.c \
         src/core/save.c src/core/rng.c 2>"$WORK/wander.build"; then
     if "$WORK/wander_check" > "$WORK/wander.out" 2>&1; then
@@ -206,7 +210,7 @@ fi
 # --- 1e. the attack (CP5 W3) ------------------------------------------------
 # Direct test of combat.c, not part of combat_check.c: the attack is implemented,
 # so it is tested against the real thing rather than specified against fixtures.
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/attack_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/attack_check" \
         tests/attack_check.c src/game/combat.c src/game/kill_drop.c src/game/monsters.c \
         src/core/rng.c src/core/state.c 2>"$WORK/atk.build"; then
     if "$WORK/attack_check" > "$WORK/atk.out" 2>&1; then
@@ -235,7 +239,7 @@ fi
 # make every cell's density zero and the land-half check goes red while the charge and
 # the two refusal controls stay green, which is what proves the gate tests the picture
 # and not the handler.
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -Isrc/platform \
+if "$U2_CC" $U2_CCFLAGS -Isrc/platform \
         -o "$WORK/helm_map_check" tests/helm_map_check.c src/core/*.c src/game/*.c \
         src/debug/*.c 2>"$WORK/helm.build"; then
     if "$WORK/helm_map_check" > "$WORK/helm.out" 2>&1; then
@@ -263,7 +267,7 @@ fi
 # the enhanced game caps. Fidelity keeps the wrap, because it is byte-proven and the
 # fidelity run is the differential, so every assertion here is a pair and a change that
 # fixes only one mode goes red.
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent \
+if "$U2_CC" $U2_CCFLAGS \
         -o "$WORK/saturation_check" tests/saturation_check.c src/core/*.c src/game/*.c \
         src/debug/*.c 2>"$WORK/sat.build"; then
     if "$WORK/saturation_check" > "$WORK/sat.out" 2>&1; then
@@ -287,7 +291,7 @@ fi
 # captures/spice86/cp5-weak-fight/death1.png. It links the whole game core rather
 # than one file because the tail prints through the seam and repaints the status
 # band, and a stub of either would let the test pass on a half-implemented death.
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/death_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/death_check" \
         tests/death_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/death.build"; then
     if "$WORK/death_check" "$WORK/death-save" > "$WORK/death.out" 2>&1; then
         n=$(sed -n 's/^death_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/death.out")
@@ -411,7 +415,7 @@ fi
 # asm/0A6D..0AB5 and asm/2122..2260. Links the whole game core for the same
 # reason the death check does: the turn prints, rolls, and moves bytes that the
 # renderer and the passability test both read.
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/ai_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/ai_check" \
         tests/ai_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/ai.build"; then
     if "$WORK/ai_check" > "$WORK/ai.out" 2>&1; then
         n=$(sed -n 's/^ai_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/ai.out")
@@ -437,7 +441,7 @@ fi
 # the next character walks past it as scenery. This gate enforces that the save path can
 # SEE the class (control: remove the counter in core/world.c and it goes red); the fix
 # itself belongs to the producer, and docs/map-format.md says why it is not the writer.
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/baked_cells_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/baked_cells_check" \
         tests/baked_cells_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/baked.build"; then
     mkdir -p "$WORK/baked"
     if "$WORK/baked_cells_check" "$WORK/baked" > "$WORK/baked.out" 2>&1; then
@@ -461,7 +465,7 @@ fi
 # g30-clockcal/ gives DS:74, DS:554 and the DS:558 multiplier table, and the engine must
 # reproduce the DS:580 slots the original had actually stored. Model only -- nothing in
 # the engine calls it yet, because what each of the 20 slots gates is still unknown.
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/speed_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/speed_check" \
         tests/speed_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/speed.build"; then
     if "$WORK/speed_check" > "$WORK/speed.out" 2>&1; then
         n=$(sed -n 's/^speed_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/speed.out")
@@ -484,7 +488,7 @@ fi
 # content is present, against every gate cell in every world sector: each must name
 # a sector file that exists. Without a content dir the data half SKIPs and the
 # table half still runs.
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/site_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/site_check" \
         tests/site_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/site.build"; then
     SITEDATA=""
     for d in ../original ../../original; do
@@ -524,7 +528,7 @@ if [ ! -f src/game/combat.c ]; then
     exit "$fail"
 fi
 
-cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/combat_check" \
+"$U2_CC" $U2_CCFLAGS -o "$WORK/combat_check" \
    tests/combat_check.c src/game/combat.c src/game/kill_drop.c src/game/monsters.c \
    src/core/rng.c src/core/state.c \
    2>"$WORK/cc.err"

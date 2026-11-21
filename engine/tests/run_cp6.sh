@@ -23,6 +23,10 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
+# Compiled with the engine's own flag set; engine/Makefile is the only home for it.
+# A check program must never be held to a weaker bar than the code it checks.
+U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
+U2_CC="${U2_CC:-cc}"
 fail=0
 ok()   { printf '  PASS  %s\n' "$1"; }
 bad()  { printf '  FAIL  %s\n' "$1"; fail=1; }
@@ -32,7 +36,7 @@ WORK=$(mktemp -d "${TMPDIR:-/var/tmp}/u2-cp6.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
 
 # --- 1. the pure spec --------------------------------------------------------
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/commerce_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/commerce_check" \
         tests/commerce_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/cc.err"; then
     "$WORK/commerce_check" > "$WORK/cc.out" 2>&1
     rc=$?
@@ -49,7 +53,7 @@ else
 fi
 
 # --- 1b. the failed-steal alarm (asm/3F5D L_00417e -> asm/113A) --------------
-if cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o "$WORK/steal_alarm_check" \
+if "$U2_CC" $U2_CCFLAGS -o "$WORK/steal_alarm_check" \
         tests/steal_alarm_check.c src/core/*.c src/game/*.c src/debug/*.c 2>"$WORK/sac.err"; then
     "$WORK/steal_alarm_check" > "$WORK/sac.out" 2>&1
     rc=$?

@@ -45,3 +45,11 @@ jobs:
       # why they are not part of check_all --ci.
       - name: Body guard controls (prove the gate can still go red)
         run: bash engine/tests/asm_body_guard_selftest.sh
+      # gcc's own static analyzer over every engine translation unit, zero tolerance.
+      # It runs here rather than in engine-tests because it needs no build tree: it
+      # compiles each TU itself with the flag set `make -s ccflags` prints. The control
+      # is not ceremony -- a first draft inherited -Werror, which turns each analyzer
+      # finding into an error the parser was not matching, and the gate reported a clean
+      # 72 TUs while the analyzer was in fact printing findings.
+      - name: Static analyzer gate (gcc -fanalyzer)
+        run: python3 tools/analyzer_gate.py --selftest && python3 tools/analyzer_gate.py

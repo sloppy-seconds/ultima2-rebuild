@@ -17,9 +17,30 @@ STD      ?= -std=c11
 # core/config.h.
 WARN     := -Wall -Wextra -Werror -Wshadow -Wstrict-prototypes -Wmissing-prototypes \
             -Wpointer-arith -Wwrite-strings -Wno-unused-parameter -pedantic
-
+# -g1 rather than no debug info at all: it costs a few seconds of link and a little
+# binary size, and it is the difference between a crash that names a line and a crash
+# that names an address. -g0 would strip the backtraces the sanitizer target relies on.
+OPT      ?= -O2 -g1
 CPPFLAGS += -Isrc -Icontent
 CFLAGS   += $(STD) $(WARN) $(OPT)
+# The flag set every C translation unit in this project is compiled with, exported to
+# the test scripts so a check program is never held to a weaker bar than the engine it
+# checks. Before this, the ad-hoc `cc -std=c11 -Wall -Wextra -Werror` lines in
+# engine/tests/ silently omitted -Wshadow, -Wmissing-prototypes, -Wstrict-prototypes
+# and -pedantic, and 25 real defects were hiding in the check programs behind that.
+# Scripts run by hand rather than through make fall back to `make -s ccflags`, so the
+# list has exactly one home.
+U2_CCFLAGS  = $(STD) $(WARN) $(CPPFLAGS)
+export U2_CCFLAGS
+# The compiler the check programs are built with, so `make CC=clang test` compiles the
+# tests with clang too and not only the engine. A script run by hand falls back to cc.
+U2_CC       = $(CC)
+export U2_CC
+# Where the built objects live, so a check program that links engine objects links the
+# ones compiled with the same flags it was built with. `test-asan` points this at its
+# own tree; a script run by hand falls back to the ordinary build directory.
+U2_OBJDIR   = $(BUILD)
+export U2_OBJDIR
 
 # ---- build stamp ------------------------------------------------------------
 #
@@ -49,7 +70,9 @@ STAMP_SDLSTATIC = $(call STAMP,sdl-static,sdl3,static,,release)
 STAMP_SDLWIN    = $(call STAMP,sdl-win,sdl3,static,,release)
 
 BIN      := u2
-
+# Overridable so a sanitizer run can build into its own tree (see `test-asan`) without
+# disturbing the objects the ordinary build and the `fresh` gate use.
+BUILD    ?= build
 CONTENT  := content
 GEN      := $(CONTENT)/gen_content.h
 # --- freshness stamps (see the `fresh` target) --------------------------------
@@ -86,7 +109,7 @@ DEPS     := $(OBJS:.o=.d)
 SDLOBJS  := $(patsubst %.c,$(BUILD)-sdl/%.o,$(SRCS))
 SDL_DEPS := $(SDLOBJS:.o=.d)
 
-.PHONY: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo clean content content-check licenses licenses-check compile-commands compile-commands-check fmtowns-map fmtowns-map-check dungeon-sprites dungeon-sprites-check sdl sdl-probe-check sdl-run sdl-win sdl-static play help fresh
+.PHONY: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo test-api clean content content-check licenses licenses-check compile-commands compile-commands-check fmtowns-map fmtowns-map-check dungeon-sprites dungeon-sprites-check sdl sdl-probe-check sdl-run sdl-win sdl-static play help fresh ccflags test-asan analyze
 
 all: $(BIN)
 
@@ -235,6 +258,48 @@ headless: $(BIN)
 	./$(BIN) --headless --script tests/title.keys --dump-state
 
 test: test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 test-cp5 test-cp6 test-cp7 test-demo test-api
+
+# --- sanitizer build ----------------------------------------------------------
+# ASan + UBSan over the same suites `make test` runs. This is the one control that can
+# see the class of defect the type system cannot: the engine's whole job is reading
+# byte layouts it does not own (save records, mapx/monx/tlkx, theme directories), and
+# the `fresh` gate's own header records a struct mismatch that surfaced as a hang with
+# no error anywhere. Nothing in the suite would have caught that class.
+#
+# Objects go in $(BUILD)/asan so the ordinary build tree is untouched. The link rule
+# still writes ./u2, so the recipe restores the ordinary binary afterwards whatever
+# the suites decide — otherwise a red sanitizer run would leave the `fresh` gate
+# reporting a stale binary the developer never asked for.
+#
+# Leak checking is off, and that is a recorded decision rather than an oversight: the
+# engine allocates its content tables once and lets the process exit with them held,
+# so LeakSanitizer reports a fixed set of non-defects and a gate that is always noisy
+# is a gate that gets skipped. Memory errors, not garbage collection, are the target.
+# ASan and UBSan run together because the CP suites are the expensive part, not the
+# instrumentation.
+SANFLAGS := -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all \
+            -fsanitize-address-use-after-scope
+ASAN_OPTIONS  ?= detect_leaks=0:halt_on_error=1:abort_on_error=1
+UBSAN_OPTIONS ?= print_stacktrace=1:halt_on_error=1
+
+test-asan:
+	@probe=$$(mktemp -d); printf 'int main(void){return 0;}\n' > $$probe/p.c; \
+	 if $(CC) $(SANFLAGS) -o $$probe/p $$probe/p.c 2>$$probe/err; then rc=0; else rc=1; fi; \
+	 if [ $$rc -ne 0 ]; then \
+	   if [ "$${ASAN_REQUIRED:-0}" = 1 ]; then \
+	     echo "test-asan: required here, but $(CC) cannot link the sanitizer runtime:"; \
+	     sed 's/^/    /' $$probe/err; rm -rf $$probe; exit 1; \
+	   fi; \
+	   echo "SKIP test-asan: $(CC) has no sanitizer runtime (install libasan and libubsan)"; \
+	   sed 's/^/    /' $$probe/err | head -2; rm -rf $$probe; exit 0; \
+	 fi; rm -rf $$probe; \
+	 echo "test-asan: $(SANFLAGS)"; \
+	 status=0; \
+	 ASAN_OPTIONS="$(ASAN_OPTIONS)" UBSAN_OPTIONS="$(UBSAN_OPTIONS)" \
+	   $(MAKE) --no-print-directory BUILD=$(BUILD)/asan OPT="-O1 -g $(SANFLAGS)" \
+	     LDFLAGS="$(SANFLAGS)" U2_CCFLAGS="$(U2_CCFLAGS) $(SANFLAGS)" test || status=$$?; \
+	 $(MAKE) --no-print-directory -B $(BIN) >/dev/null 2>&1 || true; \
+	 [ $$status -eq 0 ] && echo "test-asan: PASS"; exit $$status
 
 # Re-record the real playthroughs and verify every one under three backends. Needs the
 # gitignored game content AND the save slot those recordings started from, so it is not
@@ -520,7 +585,16 @@ fresh:
 	fi; \
 	echo "fresh: every binary matches its input stamp"
 
+ccflags:
+	@printf '%s\n' "$(U2_CCFLAGS)"
+
+# gcc's static analyzer over every engine TU. The gate lives in tools/ so it can carry
+# its own control and its two documented suppressions; this target is the discoverable
+# entry point, not a second implementation.
+analyze:
+	@python3 ../tools/analyzer_gate.py
+
 help:
-	@echo "targets: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 sdl sdl-run play clean content content-check compile-commands compile-commands-check fresh help"
+	@echo "targets: all run headless test test-cp0 test-cp1 test-cp2 test-cp3 test-cp4 sdl sdl-run play clean content content-check compile-commands compile-commands-check fresh ccflags test-asan help"
 
 -include $(DEPS) $(SDL_DEPS)

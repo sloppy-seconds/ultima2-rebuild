@@ -87,6 +87,12 @@ static int write_atomic(const char *dst, FILE *src_stream, const char *buf, size
 {
     char tmp[1200];
     snprintf(tmp, sizeof tmp, "%.1190s.u2tmp", dst);
+    /* The two sources are exclusive: a buffer, or a stream to copy. Neither means
+     * the fread below would run on a null stream, which is what -fanalyzer reports
+     * through u2_write_verified's callers. No caller does it today, and a refusal is
+     * cheaper than proving that every future one cannot. */
+    if (!buf && !src_stream)
+        return -1;
     FILE *o = fopen(tmp, "wb");
     if (!o)
         return -1;

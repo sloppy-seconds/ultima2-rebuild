@@ -145,7 +145,13 @@ static u2_tiles_ega_result broken(const char *what, u2_tiles_ega *t, char *why, 
         fputs("[theme]\ntile_w = 32\ntile_h = 32\nbpp = 3\n", f);
         fclose(f);
         snprintf(p, sizeof p, "%s/%s/TILES", root, dir);
-        f = fopen(p, "wb"); fwrite("x", 1, 32, f); fclose(f);
+        /* A real buffer, not a string literal: the loader wants a file that is too
+         * short to be an atlas, and fwrite("x", 1, 32, f) read 30 bytes past the end
+         * of the literal to get it. AddressSanitizer found this as a
+         * global-buffer-overflow the first time the suite ran under it. */
+        f = fopen(p, "wb");
+        { char stub[32]; memset(stub, 'x', sizeof stub); fwrite(stub, 1, sizeof stub, f); }
+        fclose(f);
     } else if (!strcmp(what, "mapoutside")) {
         snprintf(p, sizeof p, "%s/%s/THEME.INI", root, dir);
         FILE *f = fopen(p, "wb");
@@ -296,9 +302,9 @@ int main(void)
         fclose(kf);
 
         u2_tiles_ega kt;
-        char why[256];
-        CHECK(load("keyed", &kt, why, sizeof why) == U2_TILES_EGA_OK,
-              "the keyed fixture theme loads (%s)", why);
+        char kwhy[256];
+        CHECK(load("keyed", &kt, kwhy, sizeof kwhy) == U2_TILES_EGA_OK,
+              "the keyed fixture theme loads (%s)", kwhy);
         CHECK(kt.transparent_index == 0, "transparent_index = 0 is parsed");
 
         u2_frame kf2;
@@ -545,8 +551,8 @@ int main(void)
     }
     {
         char next[32], first[32] = "";
-        u2_ctx ctx;
-        memset(&ctx, 0, sizeof ctx);
+        u2_ctx mctx;
+        memset(&mctx, 0, sizeof mctx);
         const int n = u2_tiles_ega_next_theme("/var/tmp/u2-theme-v2-check/mixed",
                                               "default", next, sizeof next);
         snprintf(first, sizeof first, "%s", next);
@@ -564,10 +570,10 @@ int main(void)
         /* And both must load through the same entry point. */
         u2_tiles_ega a, b;
         memset(&a, 0, sizeof a); memset(&b, 0, sizeof b);
-        CHECK(u2_tiles_ega_open_in(&ctx, &a, "/var/tmp/u2-theme-v2-check/mixed", "v1one")
+        CHECK(u2_tiles_ega_open_in(&mctx, &a, "/var/tmp/u2-theme-v2-check/mixed", "v1one")
                   == U2_TILES_EGA_OK && a.scale == 1,
               "the v1 theme in a mixed directory still loads as v1");
-        CHECK(u2_tiles_ega_open_in(&ctx, &b, "/var/tmp/u2-theme-v2-check/mixed", "v2two")
+        CHECK(u2_tiles_ega_open_in(&mctx, &b, "/var/tmp/u2-theme-v2-check/mixed", "v2two")
                   == U2_TILES_EGA_OK && b.scale == 1,
               "the v2 theme in a mixed directory loads through the same call");
     }
