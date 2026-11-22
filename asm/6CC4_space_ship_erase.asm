@@ -2,7 +2,7 @@
 # name-evidence: the routine's ONLY callee is L_004daa (asm/4BAA_pixel_erase), and it calls
 #           it thirteen times in two perpendicular sweeps centred on the ship's screen
 #           position DS:47B (x) / DS:47C (y):
-#               vertical stroke: x fixed at DS:47B, y from DS:47C-3 to DS:47C+2 (6 calls)
+#               vertical stroke: x fixed at DS:47B, y from DS:47C-3 to DS:47C+3 (7 calls)
 #               horizontal stroke: y fixed at DS:47C, x from DS:47B-3 to DS:47B+3 (7 calls)
 #           i.e. it erases a plus/cross of pixels at the ship, which is exactly what you do
 #           to a sprite's old position before drawing it at the new one. The paired DRAW is

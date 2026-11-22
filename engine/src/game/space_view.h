@@ -41,17 +41,23 @@ typedef struct u2_ctx u2_ctx;
 #define U2_SPACE_CENTRE_X (U2_SPACE_VIEW_COLS / 2)
 #define U2_SPACE_CENTRE_Y (U2_SPACE_VIEW_ROWS / 2)
 
-/* The ship sprite, measured rather than drawn to taste. asm/6CC4_space_ship_erase
- * calls asm/4BAA_pixel_erase thirteen times in two perpendicular sweeps centred on
- * the ship's screen position DS:47B (x) / DS:47C (y):
+/* The ship sprite: a symmetric 7x7 plus, 13 pixels, centred on the ship's screen
+ * position DS:47B (x) / DS:47C (y).
  *
- *   vertical   x fixed at DS:47B, y from DS:47C-3 to DS:47C+2   (6 pixels)
- *   horizontal y fixed at DS:47C, x from DS:47B-3 to DS:47B+3   (7 pixels)
+ *   vertical   x fixed at DS:47B, y from DS:47C-3 to DS:47C+3   (7 pixels)
+ *   horizontal y fixed at DS:47C, x from DS:47B-3 to DS:47B+3   (7 pixels, centre shared)
  *
- * i.e. a plus/cross, which is what the capture frames show. The draw is the mirror of
- * the erase, so these offsets ARE the sprite and not an approximation of it. */
+ * Both arms enumerated from the body of asm/6D83_space_ship_draw and corroborated pixel
+ * for pixel by its mirror asm/6CC4_space_ship_erase, which calls pixel_erase at the same
+ * thirteen offsets.
+ *
+ * CORRECTION 2026-11-23: this used to read `vertical ... -3 to +2 (6 pixels)`, taken from
+ * asm/6CC4's header, and the engine drew an off-centre plus. The body makes seven vertical
+ * calls with six increments between them. The horizontal arm steps over x=0 because the
+ * vertical arm already plotted the centre, so the two arms share it rather than doubling it;
+ * plotting it twice would be a no-op here, but the offsets below are the real shape. */
 #define U2_SPACE_SHIP_V_FROM (-3)
-#define U2_SPACE_SHIP_V_TO   (+2)
+#define U2_SPACE_SHIP_V_TO   (+3)
 #define U2_SPACE_SHIP_H_FROM (-3)
 #define U2_SPACE_SHIP_H_TO   (+3)
 

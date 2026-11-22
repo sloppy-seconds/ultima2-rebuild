@@ -61,6 +61,15 @@ static int cross_at(const u2_frame *f, const u2_space_scene *s, int vx, int vy)
     return 1;
 }
 
+/* Is one VIEW pixel lit? Used with literal offsets below, because a check written in terms
+ * of U2_SPACE_SHIP_V_FROM/_TO cannot notice those defines being changed. */
+static int view_lit(const u2_frame *f, const u2_space_scene *s, int vx, int vy)
+{
+    const int sc = s->scale > 0 ? s->scale : 1;
+    const int px = s->ox + vx * sc, py = s->oy + vy * sc;
+    return px >= 0 && py >= 0 && px < f->w && py < f->h && f->px[py][px] != 0;
+}
+
 /* How many of the table's own mapped positions are lit. This is the direct question —
  * did the renderer read the table — and it is the only assertion that cannot be satisfied
  * by a field that happens to light a similar number of pixels. */
@@ -206,6 +215,25 @@ int main(void)
     CHECK(cross_at(&f, &ss, U2_SPACE_SHIP_X0, U2_SPACE_SHIP_Y0),
           "at the entry preset the cross sits at the field centre, which is all that "
           "g90-warp-table ever saw and what got misread as a pin");
+
+    /* The sprite's EXTENT, pinned with literals. asm/6D83 makes seven vertical calls with
+     * six increments between them, so the vertical arm reaches ship_y+3 and the plus is
+     * symmetric; asm/6CC4's header said -3..+2 and the engine drew an off-centre plus for
+     * it. Every other cross assertion here is written in terms of the defines, so without
+     * this block nothing in the suite could see V_TO go back to +2. */
+    {
+        const int cx = U2_SPACE_SHIP_X0, cy = U2_SPACE_SHIP_Y0;
+        int arms_ok = 1;
+        for (int d = -3; d <= 3; d++) {
+            if (!view_lit(&f, &ss, cx, cy + d)) arms_ok = 0;          /* vertical */
+            if (!view_lit(&f, &ss, cx + d, cy)) arms_ok = 0;          /* horizontal */
+        }
+        CHECK(arms_ok,
+              "the sprite is a symmetric 7x7 plus: all thirteen pixels at ship +/- 3 on "
+              "each axis are lit (asm/6D83_space_ship_draw)");
+        CHECK(!view_lit(&f, &ss, cx + 4, cy) && !view_lit(&f, &ss, cx, cy + 4),
+              "and it stops at +/- 3 -- the arms are 7 pixels, not a longer stroke");
+    }
 
     ctx.state.space_ship_x = U2_SPACE_SHIP_LEFT_X;
     ctx.state.space_ship_y = U2_SPACE_SHIP_Y0;
