@@ -25,6 +25,14 @@ ENGINE = os.path.join(REPO, "engine")
 sys.path.insert(0, HERE)
 from target import U2_BIN, DS_LEN, Spice86Target, EngineTarget   # noqa: E402
 
+# Offsets come from engine/src/core/state.h through the seed module, at runtime. This gate
+# used to hand-write 0x49, 0x51, 0x137 + slot and the rest, which is the exact thing
+# bot/target.py's header forbids: a second copy of the layout that a field move edits
+# silently. See issue #5.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "engine", "tests"))
+import u2_seed                                                   # noqa: E402
+
 checks = 0
 fails = []
 
@@ -60,14 +68,21 @@ def decode(blob):
 
 
 # --- 1. the decode reads the documented offsets --------------------------------------
-# Offsets are the original's DS, cited in engine/src/core/state.h. Only the ones a bot
-# acts on first: position, sector pair, name, and the packed-decimal counters.
-blob = ds_blob({0x00: 25, 0x01: 7})
-for i, ch in enumerate(b"BOTTEST"):
-    blob[0x36 + i] = ch
-blob[0x49] = 0x04; blob[0x4A] = 0x00          # sector digits: 40, wilderness
-blob[0x51] = 0x42; blob[0x52] = 0x00          # hp, packed decimal
-blob[0x58] = 0x12; blob[0x59] = 0x34          # gold, packed decimal
+# "Documented" means state.h, and the addresses are read out of it rather than copied, so
+# a field that moves in state.h moves here too. If the engine's decoder follows, the gate
+# stays green; if it does not, the blob lands at the new address, the decoder reads the old
+# one, and the gate goes red. With copied literals the second case passed while asserting
+# nothing, which is the failure this file existed to prevent.
+blob = u2_seed.DsBlock(bytearray(DS_LEN))
+blob.set_raw("sector_x", 25)
+blob.set_raw("sector_y", 7)
+blob.set_name("BOTTEST")
+blob.set_at(4, 0)                              # sector 40, wilderness
+blob.set_raw("hp", 0x42)                       # packed decimal: 4200
+blob.set_raw("unk_52", 0x00)
+blob.set_raw("gold_lo", 0x12)                  # packed decimal: 1234
+blob.set_raw("gold_hi", 0x34)
+blob = blob.data
 
 obs = decode(blob)
 inner = obs["state"]["state"]
@@ -184,14 +199,22 @@ except Exception as ex:                       # noqa: BLE001
 # Per neighbour in N,E,S,W: 1 attackable, 0 empty, -1 present but NOT targetable.
 try:
     def p8_blob(extra):
-        d = {0x00: 10, 0x01: 10, 0x49: 4, 0x4A: 0}   # sector 40, Earth wilderness
-        for i, c in enumerate(b"BOT"):
-            d[0x36 + i] = c                          # a nameless record reads as title
+        blk = u2_seed.DsBlock(bytearray(DS_LEN))
+        blk.set_raw("sector_x", 10)
+        blk.set_raw("sector_y", 10)
+        blk.set_at(4, 0)                       # sector 40, Earth wilderness
+        blk.set_name("BOT")                    # a nameless record reads as title
+        d = blk.to_map()
         d.update(extra)
         return ds_blob(d)
 
     def mon(slot, x, y, hp=20, typ=0x60):
-        return {0x137 + slot: x, 0x157 + slot: y, 0x177 + slot: hp, 0x197 + slot: typ}
+        blk = u2_seed.DsBlock(bytearray(DS_LEN))
+        blk.set_slot("mon_x", slot, x)
+        blk.set_slot("mon_y", slot, y)
+        blk.set_slot("mon_hp", slot, hp)
+        blk.set_slot("mon_type", slot, typ)
+        return blk.to_map()
 
     def both(a, b):
         # dict(a, **b) would be the idiom but `**` needs string keys; these are offsets.

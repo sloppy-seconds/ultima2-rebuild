@@ -188,6 +188,35 @@ class DsBlock:
         off = self._off(key)
         return self.data[off]
 
+    def off(self, key, slot=0):
+        """The offset of a field relative to THIS block (for a save record, the file byte).
+        The counterpart of addr(), which is absolute; a patcher that takes file offsets
+        wants this one, and neither is a literal in the caller."""
+        return self._off(key) + slot
+
+    def addr(self, key, slot=0):
+        """The absolute DS address of a field, or of one slot in an array field.
+
+        For callers that must hand over a sparse {address: value} map instead of a block:
+        the bot's fixtures are dicts because a fixture is composed by merging several of
+        them. The address still comes from state.h, which is the point — a moved field moves
+        here too, and a gate that asserts on it goes red instead of quietly pointing at the
+        wrong byte."""
+        return self._off(key) + self.base + slot
+
+    def set_slot(self, key, slot, value):
+        """Write one element of an array field, e.g. set_slot('mon_x', 3, 12)."""
+        self.data[self._off(key) + slot] = value & 0xFF
+
+    def to_map(self):
+        """Sparse {DS address: byte} over the non-zero bytes of this block.
+
+        Zero-valued fields are absent, which is what the bot's merge-composed fixtures
+        expect: a block starts zeroed, so omitting a zero and writing one are the same
+        thing unless a later merge is trying to undo an earlier write, and nothing here
+        does that."""
+        return {self.base + i: b for i, b in enumerate(self.data) if b}
+
     def set_raw(self, key, value):
         self.data[self._off(key)] = value & 0xFF
 
