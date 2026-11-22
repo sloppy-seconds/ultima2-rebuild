@@ -60,7 +60,7 @@ fi
 # The space_view_gate.py legs, wired 2026-11-15. That gate runs in CP4, but its control
 # lived only as prose in the gate's own header — and a control nobody executes is a comment,
 # which is the exact defect docs/outstanding.md § 2 named. So: the clean gate must pass, and
-# the same gate run against a commands.c with the dive wait deleted must go red.
+# the same gate run against a flight.c with the dive wait deleted must go red.
 total=$((total+1))
 if python3 tests/space_view_gate.py >/dev/null 2>&1; then
     echo "  ok    space_view_gate clean run passes"
@@ -70,13 +70,13 @@ else
 fi
 
 total=$((total+1))
-grep -v 'seam_wait_ms(ctx, U2_DIVE_STEP_MS);' src/game/commands.c > "$WORK/commands_nowait.c"
+grep -v 'seam_wait_ms(ctx, U2_DIVE_STEP_MS);' src/game/flight.c > "$WORK/flight_nowait.c"
 # A mutation that fails to mutate is the classic false green, so the deletion is proved
 # before the mutant is trusted.
-if [ "$(wc -l < "$WORK/commands_nowait.c")" -ge "$(wc -l < src/game/commands.c)" ]; then
+if [ "$(wc -l < "$WORK/flight_nowait.c")" -ge "$(wc -l < src/game/flight.c)" ]; then
     echo "  BAD   the nowait mutant is identical to the source — it proves nothing"
     fails=$((fails+1))
-elif U2_DIVE_GATE_SRC="$WORK/commands_nowait.c" python3 tests/space_view_gate.py \
+elif U2_DIVE_GATE_SRC="$WORK/flight_nowait.c" python3 tests/space_view_gate.py \
         >/dev/null 2>&1; then
     echo "  BAD   the dive-wait mutant was not caught — the pacing leg cannot fail"
     fails=$((fails+1))
@@ -85,11 +85,11 @@ else
 fi
 
 total=$((total+1))
-sed 's/u2_space_warp_sweep(frame)/u2_space_warp_sweep(0)/' src/game/commands.c > "$WORK/commands_nowarp.c"
-if cmp -s "$WORK/commands_nowarp.c" src/game/commands.c; then
+sed 's/u2_space_warp_sweep(frame)/u2_space_warp_sweep(0)/' src/game/flight.c > "$WORK/flight_nowarp.c"
+if cmp -s "$WORK/flight_nowarp.c" src/game/flight.c; then
     echo "  BAD   the nowarp mutant is identical to the source — it proves nothing"
     fails=$((fails+1))
-elif U2_DIVE_GATE_SRC="$WORK/commands_nowarp.c" python3 tests/space_view_gate.py \
+elif U2_DIVE_GATE_SRC="$WORK/flight_nowarp.c" python3 tests/space_view_gate.py \
         >/dev/null 2>&1; then
     echo "  BAD   a frozen sweep was not caught — the sweep-driven leg cannot fail"
     fails=$((fails+1))
@@ -119,8 +119,8 @@ fi
 # so the control worth having is the sign flip: a one-character edit to phase B that makes the
 # tone fall where it should rise, sounds merely odd, and is invisible to every other check.
 total=$((total+1))
-grep -v 'seam_tone(ctx, divisor' src/game/commands.c > "$WORK/cmd_notone.c"
-if [ "$(wc -l < "$WORK/cmd_notone.c")" -ge "$(wc -l < src/game/commands.c)" ]; then
+grep -v 'seam_tone(ctx, divisor' src/game/flight.c > "$WORK/cmd_notone.c"
+if [ "$(wc -l < "$WORK/cmd_notone.c")" -ge "$(wc -l < src/game/flight.c)" ]; then
     echo "  BAD   the no-tone mutant is identical to the source — it proves nothing"
     fails=$((fails+1))
 elif U2_DIVE_GATE_SRC="$WORK/cmd_notone.c" python3 tests/space_view_gate.py \
@@ -133,8 +133,8 @@ fi
 
 total=$((total+1))
 sed 's/int rising = u2_space_warp_sweep(frame + 1).value > sw.value;/int rising = 1;/' \
-    src/game/commands.c > "$WORK/cmd_signflip.c"
-if cmp -s "$WORK/cmd_signflip.c" src/game/commands.c; then
+    src/game/flight.c > "$WORK/cmd_signflip.c"
+if cmp -s "$WORK/cmd_signflip.c" src/game/flight.c; then
     echo "  BAD   the sign-flip mutant is identical to the source — it proves nothing"
     fails=$((fails+1))
 elif U2_DIVE_GATE_SRC="$WORK/cmd_signflip.c" python3 tests/space_view_gate.py \

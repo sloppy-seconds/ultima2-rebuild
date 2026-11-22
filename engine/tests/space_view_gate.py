@@ -39,11 +39,11 @@ inside the loop between the present and the key poll, and that the stated millis
 with the cited cycle count -- so retuning the number without the measurement goes red.
 
 Control for leg 5, demonstrated rather than asserted: the gate takes the source path from
-U2_DIVE_GATE_SRC, so a copy of commands.c with the wait deleted can be run against it. From the
-repo root: copy engine/src/game/commands.c somewhere scratch (under /var/tmp, not /tmp), delete
+U2_DIVE_GATE_SRC, so a copy of flight.c with the wait deleted can be run against it. From the
+repo root: copy engine/src/game/flight.c somewhere scratch (under /var/tmp, not /tmp), delete
 the `seam_wait_ms(ctx, U2_DIVE_STEP_MS);` line from the copy, and run
 
-    U2_DIVE_GATE_SRC=/var/tmp/commands_nowait.c python3 engine/tests/space_view_gate.py
+    U2_DIVE_GATE_SRC=/var/tmp/flight_nowait.c python3 engine/tests/space_view_gate.py
 
 which must report the two pacing checks and the ordering check as FAIL. The copy is what makes
 this a control instead of a comment: the gate is shown going red on the real file shape, from the
@@ -65,7 +65,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-CMD = os.environ.get("U2_DIVE_GATE_SRC") or os.path.join(ROOT, "engine", "src", "game", "commands.c")
+CMD = os.environ.get("U2_DIVE_GATE_SRC") or os.path.join(ROOT, "engine", "src", "game", "flight.c")
 VIEW_H = os.path.join(ROOT, "engine", "src", "game", "space_view.h")
 ASM = os.path.join(ROOT, "asm", "6CC4_space_ship_erase.asm")
 
@@ -91,7 +91,7 @@ src = read(CMD)
 PACE = os.environ.get("U2_PACE_GATE_SRC") or os.path.join(ROOT, "engine", "src", "game", "space.h")
 pace = read(PACE)
 m = re.search(r"static void space_loop\(.*?\n\}\n", src, re.S)
-check(m is not None, "space_loop found in commands.c")
+check(m is not None, "space_loop found in the flight source")
 body = m.group(0) if m else ""
 
 # Strip comments before looking for code shapes. The function's own comment quotes the
@@ -190,7 +190,7 @@ if dm:
               f"(expected {round(cycles / PERIOD_HZ * 1000)} ms)")
 
 dm_loop = re.search(r"static void rocket_descent\(.*?\n\}\n", src, re.S)
-check(dm_loop is not None, "rocket_descent found in commands.c")
+check(dm_loop is not None, "rocket_descent found in the flight source")
 if dm_loop:
     dbody = re.sub(r"/\*.*?\*/", "", dm_loop.group(0), flags=re.S)
     dbody = re.sub(r"//[^\n]*", "", dbody)
@@ -220,7 +220,7 @@ if dm_loop:
 # at every lookup, so the rate was the cost of drawing, and a deleted wait or a folded driver
 # turns a warp into one frame. The control in space_check_selftest.sh deletes the sweep walk.
 wm = re.search(r"static void space_warp_frame\(.*?\n\}\n", src, re.S)
-check(wm is not None, "space_warp_frame found in commands.c")
+check(wm is not None, "space_warp_frame found in the flight source")
 if wm:
     wbody = re.sub(r"/\*.*?\*/", "", wm.group(0), flags=re.S)
     i_p = wbody.find("seam_present_frame")
@@ -314,7 +314,7 @@ if tone:
 # Owner playtest 2026-11-10, two symptoms: the hyperwarp target prompt never appeared, and
 # letters were missing from the HP/FOOD display. Both were the readout colliding with the CMD
 # pane, and the bytes name the three things that keep them apart (see space_values' note in
-# commands.c): the labels draw at column 30 under a wide margin, the values draw at column 37
+# flight.c): the labels draw at column 30 under a wide margin, the values draw at column 37
 # as two BCD digits, and asm/6FA3 then narrows the scroll margin to 0x1f and parks the cursor
 # at column 0 of the bottom row. The gate checks the bytes are still modelled, and then -- the
 # part that matters -- checks the RENDERED GRID, because every one of these failures left the
