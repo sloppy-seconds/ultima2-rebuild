@@ -1188,3 +1188,24 @@ rewritten by the radial rule it is the same mechanism as the warp, if only a sys
 coordinate moved then the field genuinely does not change. A frame is required for each
 side, not just the memory: the question is what the player sees move.
 
+**Progress 2026-11-23 — the engine side is now measured, and it is nothing.** Seeded to
+Planet X sector 90 cell (11,22) with the rocket at (10,22), boarded with `West` then
+`BOARD ROCKET`, launched with `L`, confirmed in orbit by the `FUEL=/XENO=/YAKO=/ZABO=`
+readout. Frames through noVNC, before and after one `Up` and after three: the view panel
+(x 0..447) differs by **0 pixels**, while the text pane differs by 3836. So the key reaches
+`space_fly`, the log prints, `st->space_ship_x/y` moves by `U2_SPACE_SHIP_STEP`, and
+nothing visible happens. Filed as issue #21.
+
+**Owner report on the original, which partly conflicts with `ship.txt`.** "if you pressed
+UP the cross hairs moved up slightly and the stars starting moving down to give you the
+appearance of the rocket turning upwards." The stars half is exactly what G92 asks about.
+The crosshair half contradicts the 120-frame reading of `DS:47B/47C`, so it is a thing to
+re-check in the same capture rather than to dismiss: if the field scrolls under a fixed
+cross, the scene shifts and that is easy to remember as the cross moving.
+
+**One blocker to clear first.** Today's launch spent the only tri-lithium and showed
+`FUEL=00`, so we may never have held the plain orbit state this question is about. The
+capture needs a seed with fuel to spare, and `tools/u2_edit.py` has no field name for the
+rocket's parked state, so check whether tri-lithium alone is enough before assuming a new
+field is needed.
+
