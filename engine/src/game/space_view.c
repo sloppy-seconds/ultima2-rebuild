@@ -163,8 +163,8 @@ void u2_space_warp_seed(uint8_t *sx, uint8_t *sy, int n, uint32_t seed)
 
 int u2_space_warp_sweep_frames(void)
 {
-    return U2_SWEEP_DESCEND + U2_SWEEP_ZERO + U2_SWEEP_ONE
-         + U2_SWEEP_ASCEND + U2_SWEEP_TOP_HOLD;
+    return U2_SWEEP_DESCEND + U2_SWEEP_HOLD2 + U2_SWEEP_ZERO
+         + U2_SWEEP_ONE + U2_SWEEP_ASCEND;
 }
 
 u2_warp_sweep u2_space_warp_sweep(int frame)
@@ -173,23 +173,23 @@ u2_warp_sweep u2_space_warp_sweep(int frame)
     if (frame < 0) frame = 0;
 
     if (frame < U2_SWEEP_DESCEND) {
-        /* 127 decrements spread over 192 frames. Interpolated, so the value is monotone
-         * and lands exactly on 1 at the end of the leg; the original's own cadence inside
-         * this leg is not recoverable from what was sampled. */
-        s.value = 128 - (frame * 127) / U2_SWEEP_DESCEND;
+        /* One `decb DS:4C7` per pass, from 128 down to 2. Stepped, not interpolated: the
+         * leg is a literal loop in asm/6DFD, so there is nothing to fit. */
+        s.value = 128 - frame;
         s.accumulate = 0;
-    } else if (frame < U2_SWEEP_DESCEND + U2_SWEEP_ZERO) {
+    } else if (frame < U2_SWEEP_DESCEND + U2_SWEEP_HOLD2) {
+        s.value = 2;
+        s.accumulate = 0;
+    } else if (frame < U2_SWEEP_DESCEND + U2_SWEEP_HOLD2 + U2_SWEEP_ZERO) {
         s.value = 0;
         s.accumulate = 1;          /* asm/6B3D skips the erase here: this is the trail */
-    } else if (frame < U2_SWEEP_DESCEND + U2_SWEEP_ZERO + U2_SWEEP_ONE) {
+    } else if (frame < U2_SWEEP_DESCEND + U2_SWEEP_HOLD2 + U2_SWEEP_ZERO + U2_SWEEP_ONE) {
         s.value = 1;
         s.accumulate = 0;
-    } else if (frame < U2_SWEEP_DESCEND + U2_SWEEP_ZERO + U2_SWEEP_ONE + U2_SWEEP_ASCEND) {
-        int f = frame - (U2_SWEEP_DESCEND + U2_SWEEP_ZERO + U2_SWEEP_ONE);
-        s.value = 2 * (f + 1);
-        s.accumulate = 0;
     } else {
-        s.value = 128;
+        int f = frame - (U2_SWEEP_DESCEND + U2_SWEEP_HOLD2
+                         + U2_SWEEP_ZERO + U2_SWEEP_ONE);
+        s.value = 2 * (f + 1);
         s.accumulate = 0;
     }
     return s;

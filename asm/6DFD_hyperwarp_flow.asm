@@ -69,19 +69,34 @@
 #                both bits are set it prints SHIP OFF COURSE! and randomises DS:4CA/4CB/4CC
 #                with three `rand & 7`; then `call L_007230` (asm/7030) and `ret`.
 #
-#           CONFLICT, recorded not resolved: the engine's sweep constants in space_view.h are
-#           DESCEND 192 (128 -> 1), ZERO 128, ONE 128, ASCEND 63, TOP_HOLD 81, and ZERO/ONE/
-#           ASCEND agree with the bytes above. DESCEND and TOP_HOLD have no counterpart here:
-#           nothing in this routine decrements DS:4C7, and nothing holds it at 128 -- 128 is
-#           the value that *ends* phase C. Those two constants came from
-#           captures/spice86/g90-warp-table/full-sweep.txt, a 600-frame read at asm/6B3D's
-#           entry, which reported a `128 -> 0` descent over 328 frames and a hold at 128.
-#           The stop site is shared, so the likely explanation is that the capture sampled
-#           asm/6B3D being called from somewhere other than this routine -- the orbit loop or
-#           the landing path -- and the shape is that caller's, not the warp's. Not fixed on
-#           the strength of static reading alone, because the capture is observed and this
-#           routine is only one of its callers: settling it needs the phase read alongside
-#           the caller identity at the stop site.
+#           CORRECTION TO THIS CORRECTION, same day: the paragraph below claimed nothing in
+#           this routine decrements DS:4C7, and that was a partial read -- the same mistake
+#           this file exists to document. The sweep DOES descend, in the 'H' arm, which is
+#           the real hyperwarp command and sits AFTER L_0070c4. Full order:
+#
+#             'H' arm (L_0070c5): if DS:E5 == 0 print NO FUEL! and return to the orbit loop;
+#               else DS:E5 = DS:E5 - 1 in packed decimal (`sbb $1 ; das`), erase the ship at
+#               its old position, RESET THE SHIP to DS:47B=0x80, DS:47C=0x40, print
+#               "HYPERWARP TO:" and read three single decimal digits -- `L_00717f` draws the
+#               field, delays, polls, and accepts only 0x30..0x39, returning the digit minus
+#               0x30 -- into DS:4CA, DS:4CB, DS:4CC. So the destination is TYPED, one digit
+#               per axis, and each digit redraws the field while it waits.
+#             print "PREPARE FOR HYPERWARP!"
+#             PRE1: do { field draw ; delay 0x1a ; decb DS:4C7 } while (DS:4C7 != 2)
+#                   -- the descend, and it descends TO 2, from whatever the last warp left.
+#             PRE2: DS:4C8 = 0x40 ; 64 x { field draw ; delay 0x1a } at sweep 2.
+#             then `call L_006ffd`, the three phases above, then back to the orbit loop.
+#
+#           So the engine's U2_SWEEP_DESCEND is in the right family and was right to exist;
+#           what the bytes say and the constant does not is the target (2, not 1) and the
+#           starting value: nothing initialises DS:4C7 before PRE1, so it descends from
+#           whatever the previous warp left, which is 128 after the first warp and therefore
+#           126 passes -- not a fixed 192. U2_SWEEP_TOP_HOLD still has no counterpart: 128 is
+#           the value that ENDS phase C via the sign test and nothing holds it there. Both are
+#           now decidable from the bytes, so this is engine work, not a capture question.
+#
+#           THE SUPERSEDED PARAGRAPH, kept because it is the record of a wrong claim: it said
+#           the engine's sweep constants in space_view.h are
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 hyperwarp_flow:
 L_006ffd:

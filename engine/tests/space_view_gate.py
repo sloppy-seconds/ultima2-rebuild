@@ -245,16 +245,23 @@ if wm:
     check("u2_space_warp_sweep(frame)" in wbody,
           "the warp frame is driven by the sweep, not by a phase counter")
 
-# The sweep's own shape, asserted against the measurement rather than remembered.
+# The sweep's own shape, asserted against asm/6DFD's literal loops rather than remembered.
+# These are the leg lengths the binary runs, not a fit to a sampled capture: PRE1 decrements
+# to 2, PRE2 holds 2 for 64, then 0 for 128, 1 for 128, and 2,4,..,126 for 63. There is no
+# top hold -- 128 is what ENDS the last leg.
 view_c = read(VIEW_C)
-legs = {"U2_SWEEP_DESCEND": 192, "U2_SWEEP_ZERO": 128, "U2_SWEEP_ONE": 128,
-        "U2_SWEEP_ASCEND": 63, "U2_SWEEP_TOP_HOLD": 81}
+legs = {"U2_SWEEP_DESCEND": 126, "U2_SWEEP_HOLD2": 64, "U2_SWEEP_ZERO": 128,
+        "U2_SWEEP_ONE": 128, "U2_SWEEP_ASCEND": 63}
 for name, want in legs.items():
     m = re.search(r"#define\s+" + name + r"\s+(\d+)", read(VIEW_H))
     check(m is not None and int(m.group(1)) == want,
-          f"{name} is {want} (measured in full-sweep.txt), got "
+          f"{name} is {want} (asm/6DFD's loop bounds), got "
           f"{m.group(1) if m else 'absent'}")
-check("U2_SWEEP_DESCEND + U2_SWEEP_ZERO" in src,
+check(re.search(r"#define\s+U2_SWEEP_TOP_HOLD", read(VIEW_H)) is None,
+      "there is no top-hold leg: 128 ends the ascend via the sign test and nothing parks there")
+check(sum(legs.values()) == 509,
+      f"the legs sum to the warp length the live capture measured (509), got {sum(legs.values())}")
+check("U2_SWEEP_DESCEND + U2_SWEEP_HOLD2 + U2_SWEEP_ZERO" in src,
       "the warp driver splits its two calls at the end of the accumulate window, which is "
       "where asm/6DFD's PREPARE line falls")
 

@@ -245,19 +245,27 @@ void u2_space_warp_seed(uint8_t *sx, uint8_t *sy, int n, uint32_t seed);
  *   descend   128 -> 1   ~192 frames
  *   hold      0          128 frames     <- accumulate: erase skipped every star, every frame
  *   hold      1          128 frames
- *   ascend    2,4,..,126  63 frames     (step +2)
- *   hold      128        ~81 frames
+ *   ascend    2,4,..,126  63 frames     (phase C, step +2; 128 ENDS it via the sign test)
  *
- * The leg lengths and the zero-window length are measured. The descend rate is fitted: the
- * leg is ~192 frames for 127 decrements, which is not an integer, so `value` is interpolated
- * rather than stepped and that approximation is labelled rather than hidden.
+ * CORRECTED 2026-11-23 from asm/6DFD read end to end, replacing a shape fitted to a
+ * sampled capture. The legs are literal loops in the binary, not a fitted curve: PRE1 does
+ * `decb DS:4C7` until it equals 2, starting from whatever the previous warp left -- 128
+ * after the first warp, so 126 passes, not an interpolated 192 for 127 decrements. PRE2
+ * runs 64 passes at sweep 2. Then phase A holds 0 for 128 (the accumulate window), B holds
+ * 1 for 128, C steps 2,4,..,126 for 63. There is NO top hold: 128 is the value that ends
+ * phase C and nothing parks there, so the old U2_SWEEP_TOP_HOLD is gone.
  *
- * Out of range it returns the final hold, so a caller that walks past the end settles. */
-#define U2_SWEEP_DESCEND   192      /* 128 -> 1 */
-#define U2_SWEEP_ZERO      128      /* held at 0: the accumulate window */
-#define U2_SWEEP_ONE       128      /* held at 1 */
-#define U2_SWEEP_ASCEND     63      /* 2,4,...,126 */
-#define U2_SWEEP_TOP_HOLD   81      /* held at 128 */
+ * The five legs sum to 509, which is the length the live capture measured for a whole warp
+ * (captures/spice86/g90-warp-table, and cited in renderer_sdl.c and space.h). The old legs
+ * summed to 592, so the capture's own frame count is the corroboration that this shape is
+ * right and the fitted one was wrong.
+ *
+ * Out of range it returns the last ascend value, so a caller that walks past the end settles. */
+#define U2_SWEEP_DESCEND   126      /* PRE1: 128 -> 2, one decb per pass */
+#define U2_SWEEP_HOLD2      64      /* PRE2: 64 passes at sweep 2 */
+#define U2_SWEEP_ZERO      128      /* phase A: held at 0 -- the accumulate window */
+#define U2_SWEEP_ONE       128      /* phase B: held at 1 */
+#define U2_SWEEP_ASCEND     63      /* phase C: 2,4,...,126 */
 
 typedef struct { int value; int accumulate; } u2_warp_sweep;
 u2_warp_sweep u2_space_warp_sweep(int frame);

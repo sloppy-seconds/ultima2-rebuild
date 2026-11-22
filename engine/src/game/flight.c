@@ -709,9 +709,10 @@ static void space_warp_frame(u2_ctx *ctx, u2_overworld *ow, int frame)
     seam_wait_ms(ctx, U2_WARP_FRAME_MS);
 }
 
-/* Frames the first call owns: the descend and the accumulate window. The rest falls to
- * space_warp_engage, which asm/6DFD reaches only after the PREPARE line. */
-#define U2_WARP_FIELD_FRAMES  (U2_SWEEP_DESCEND + U2_SWEEP_ZERO)
+/* Frames the first call owns: PRE1's descend and PRE2's hold at 2 and the accumulate
+ * window. The rest falls to space_warp_engage, which asm/6DFD reaches only after the
+ * PREPARE line -- so the split sits at the end of the zero leg, after both pre-legs. */
+#define U2_WARP_FIELD_FRAMES  (U2_SWEEP_DESCEND + U2_SWEEP_HOLD2 + U2_SWEEP_ZERO)
 
 void space_warp_field(u2_ctx *ctx, u2_overworld *ow)
 {

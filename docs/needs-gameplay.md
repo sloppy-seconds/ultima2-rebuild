@@ -1162,13 +1162,19 @@ now named `view_mode`.
 A CP4 test had been asserting the opposite behaviour by name and passing; it is replaced
 and the replacement says why.
 
-## G93 — where does the warp sweep's descend and top-hold come from? `[ ]`
+## G93 — where does the warp sweep's descend and top-hold come from? `[x]`
 
-**Who can do it: agent, and it is a probe change rather than a play session.** The stop site
-is already instrumented (`captures/spice86/g90-warp-table` stopped at `asm/6B3D`'s entry for
-600 frames); what was missing was the caller.
+**Resolved 2026-11-23 from the bytes, without a capture.** It was filed as a probe question
+and that framing was wrong: the question was "what writes `DS:4C7`", which is a grep, not a
+run. Grepping `asm/` for writers of `0x4c7` found a `decb` in `asm/6DFD` itself, in the `'H'`
+arm — the part of that routine not yet read when the question was filed. The sweep does
+descend, in the warp's own PRE1 phase, and it descends **to 2**, from whatever the previous
+warp left (128 after the first, so 126 passes). So `U2_SWEEP_DESCEND` was right to exist and
+wrong in both its target and its fixed count. `U2_SWEEP_TOP_HOLD` still has no counterpart:
+128 is the value that *ends* phase C via the sign test and nothing holds it. Both are engine
+constants to correct, not observations to explain.
 
-**The question.** `asm/6DFD`'s three phases are literal and they agree with the engine on
+**The question as filed.** `asm/6DFD`'s three phases are literal and they agree with the engine on
 three of five sweep constants: sweep 0 for 128 passes (the accumulate window), sweep 1 for
 128, then 2,4,...,126 for 63. But the engine also carries `U2_SWEEP_DESCEND 192` (128 -> 1)
 and `U2_SWEEP_TOP_HOLD 81` (held at 128), and **nothing in `asm/6DFD` decrements `DS:4C7`
@@ -1184,12 +1190,12 @@ observed evidence while the routine is one of three callers. Overriding an obser
 static read of one caller is exactly the move that produced the G90 and G85 corrections, so
 it waits for evidence.
 
-**What a session would do.** Stop at `asm/6B3D`'s entry as before, but record the return
-address on the stack (or `CS:IP` of the caller) alongside `DS:4C7` and `DS:4C8` each hit.
-One hyperwarp and one idle orbit stretch answers it: if the descend and the top hold appear
-only with an orbit or landing return address, the constants belong to those paths and the
-warp's phase counts stand as decoded; if they appear under a `6DFD` return address, the
-phase decode is incomplete and needs revisiting.
+**What was proposed, and why it was not needed.** Stop at `asm/6B3D`'s entry as before and
+record the return address alongside `DS:4C7` and `DS:4C8`. That would have answered it, but
+the static route answered it first and cheaper. The general lesson is already in
+`docs/harness-portability.md` § 6 and is worth repeating here because it was re-learned twice
+in one day: **before reaching for the emulator, ask whether the question is about what a
+value does or about what writes it.** The second is a search.
 
 ---
 
