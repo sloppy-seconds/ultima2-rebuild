@@ -73,6 +73,25 @@ else
     fi
 fi
 
+# --- verified copy and write (issue #8) ------------------------------------
+# The guarantee is that a copy is not a copy until it has been hashed back from disk.
+# install_check only ever exercised the paths that pass, which is the half that would
+# keep passing if the verification were deleted.
+"$U2_CC" $U2_CCFLAGS -o "$WORK/copy_check" \
+   tests/copy_check.c src/core/copy.c src/core/sha256.c 2>"$WORK/copy.err"
+if [ $? -ne 0 ]; then
+    bad "copy test harness did not build: $(head -2 "$WORK/copy.err")"
+else
+    rm -rf /var/tmp/u2_copy_check
+    "$WORK/copy_check" > "$WORK/copy.txt" 2>&1
+    if grep -q ', 0 failures' "$WORK/copy.txt"; then
+        ok "CP2 copy: $(head -1 "$WORK/copy.txt")"
+    else
+        bad "CP2 copy: $(head -1 "$WORK/copy.txt")"
+        sed 's/^/    /' "$WORK/copy.txt" | head -12
+    fi
+fi
+
 # --- the report: emitted, parseable, and free of game content ------------
 # An explicit --save-dir, and a fresh one each time. Without it the run uses
 # "saves" beside the binary, so the report depends on whatever a previous session

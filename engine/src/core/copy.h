@@ -36,7 +36,9 @@ int u2_mkdir_p(const char *path);
 
 /* Copy `src` to `dst` through a temp file and rename, then hash the destination
  * and compare against `want_size` / `want_sha`. Non-zero on any mismatch, with the
- * temp removed: a copy that cannot be proved is not a copy. */
+ * temp removed and, for any failure found after the rename, the destination removed
+ * too: a copy that cannot be proved is not a copy, and leaving unproven bytes at the
+ * final path is the one outcome a caller must not be able to ship. */
 int u2_copy_verified(const char *src, const char *dst, long want_size,
                      const char want_sha[U2_HASH_LEN + 1]);
 

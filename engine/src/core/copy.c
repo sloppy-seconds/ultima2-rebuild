@@ -122,6 +122,20 @@ static int write_atomic(const char *dst, FILE *src_stream, const char *buf, size
     return (int)total;
 }
 
+/* copy.h's guarantee is "a copy that cannot be proved is not a copy", and the proof
+ * happens AFTER the rename, because the rename is what makes a crash leave either the
+ * old file or the new one and never a half-written one. So every failure found after
+ * this point must remove the destination as well as report the failure: leaving the
+ * unproven bytes at `dst` means a caller that ignores the return ships a corrupt file,
+ * and the old file at that path is already gone either way. Measured before this was
+ * written: a wrong expected hash left a full-size dst on disk, and copy_check now
+ * asserts that it does not. */
+static int unproven(const char *dst)
+{
+    unlink(dst);
+    return -1;
+}
+
 int u2_copy_verified(const char *src, const char *dst, long want_size,
                      const char want_sha[U2_HASH_LEN + 1])
 {
@@ -134,14 +148,14 @@ int u2_copy_verified(const char *src, const char *dst, long want_size,
     const int wrote = write_atomic(dst, f, NULL, 0);
     fclose(f);
     if (wrote < 0 || (long)wrote != want_size)
-        return -1;
+        return unproven(dst);
 
     char sha[U2_HASH_LEN + 1];
     long after = 0;
     if (u2_hash_file(dst, sha, &after) != 0)
-        return -1;
+        return unproven(dst);
     if (after != want_size || strcmp(sha, want_sha) != 0)
-        return -1;
+        return unproven(dst);
     return 0;
 }
 
@@ -153,8 +167,8 @@ int u2_write_verified(const char *dst, const char *data, size_t len,
     char sha[U2_HASH_LEN + 1];
     long after = 0;
     if (u2_hash_file(dst, sha, &after) != 0)
-        return -1;
+        return unproven(dst);
     if ((size_t)after != len || strcmp(sha, want_sha) != 0)
-        return -1;
+        return unproven(dst);
     return 0;
 }
