@@ -206,7 +206,7 @@ static void creature_turn(u2_ctx *ctx, u2_overworld *ow)
      * is already zero, which is why sleeping does not go negative. */
     status_tick(ctx);
 
-    const u2_ai_report rep = u2_ai_creature_turn(ctx, &ow->world, ow->x, ow->y);
+    const u2_ai_report rep = u2_ai_creature_turn(ctx, &ow->world, ctx->state.sector_x, ctx->state.sector_y);
     /* Step 2c-ii: the move-path rebuild is gone. asm/2199 has no occupancy clause —
      * the stamp in the grid IS the rule that stops one creature walking onto another —
      * so the stamp has to be current per creature, and ai.c commits it inside the loop
@@ -447,8 +447,8 @@ static void site_enter(u2_ctx *ctx, u2_overworld *ow, int digit,
                        int ax, int ay)
 {
     /* asm/341E: the cell you pressed E on becomes the return point. */
-    ctx->state.entry_x = (uint8_t)ow->x;
-    ctx->state.entry_y = (uint8_t)ow->y;
+    ctx->state.entry_x = (uint8_t)ctx->state.sector_x;
+    ctx->state.entry_y = (uint8_t)ctx->state.sector_y;
 
     /* The original saves here, silently, before the sector changes. asm/343F at
      * L_003650 is the clearest of five sites that share the shape — record the return
@@ -481,8 +481,8 @@ static void site_enter(u2_ctx *ctx, u2_overworld *ow, int digit,
 
     ow->sector_lo = digit;
     ctx->state.sector_second = (uint8_t)digit;
-    ow->x = ax;
-    ow->y = ay;
+    ctx->state.sector_x = (uint8_t)ax;
+    ctx->state.sector_y = (uint8_t)ay;
     if (site_reload(ctx, ow) != 0)
         ow->reload_failed = 1;
 }
@@ -533,8 +533,8 @@ int u2_site_edge_crossed(int sector_second, int raw_x, int raw_y)
 
 void u2_overworld_site_leave(u2_ctx *ctx, u2_overworld *ow)
 {
-    ow->x = ctx->state.entry_x;
-    ow->y = ctx->state.entry_y;
+    ctx->state.sector_x = ctx->state.entry_x;
+    ctx->state.sector_y = ctx->state.entry_y;
     ow->sector_lo = 0;
     ctx->state.sector_second = 0;
     /* The mode goes back with the digit it was derived from. asm/0C1F sets DS:12 to 4, reads
@@ -763,8 +763,8 @@ static int food_spend(u2_ctx *ctx, unsigned bcd_sub)
  * without inheriting the sector writes that do not belong to it. */
 static void save_snapshot(u2_ctx *ctx, u2_overworld *ow)
 {
-    ctx->state.entry_x       = (uint8_t)ow->x;
-    ctx->state.entry_y       = (uint8_t)ow->y;
+    ctx->state.entry_x       = (uint8_t)ctx->state.sector_x;
+    ctx->state.entry_y       = (uint8_t)ctx->state.sector_y;
     ctx->state.sector_first  = (uint8_t)ow->sector_hi;
     ctx->state.sector_second = (uint8_t)ow->sector_lo;
 }
@@ -1491,7 +1491,7 @@ void u2_overworld_enter(u2_ctx *ctx, u2_overworld *ow)
         seam_str_out(ctx, U2_S_CMD_PROMPT);
         return;
     }
-    const uint8_t tile = u2_world_tile_at(&ow->world, ow->x, ow->y);
+    const uint8_t tile = u2_world_tile_at(&ow->world, ctx->state.sector_x, ctx->state.sector_y);
 
     /* asm/3389's tile dispatch has a signpost arm (art 0x0A, tile 0x28) that is not a
      * door: it prints "-THE SIGN READS:" (asm/3525) then the era label for the sector
@@ -1653,11 +1653,14 @@ static int overworld_open(u2_ctx *ctx, u2_overworld *ow)
  * The save load places the persisted 256 bytes, and overworld_open then loads mapx and monx and
  * positions the player from entry_x/entry_y. Together those clobber the player position, the
  * creature arrays and the RNG register — exactly the fields a mid-session checkpoint carries and
- * the save does not. So the checkpoint has to land after all of it, and then re-sync the
- * overworld's own copies: the draw path mirrors ow->x/ow->y back into DS:00/01 every frame, so a
- * resumed position left only in the state would be erased on the first frame. That is not
- * hypothetical — loading before overworld_open produced exactly that, a checkpoint that read back
- * correct and then silently reverted to the entry point.
+ * the save does not. So the checkpoint has to land after all of it.
+ *
+ * Position needs no second step now. DS:00/01 used to be a mirror the draw path
+ * republished every frame, which meant a resumed position held only in the state was
+ * erased on the first frame — loading before overworld_open produced exactly that, a
+ * checkpoint that read back correct and then silently reverted to the entry point.
+ * Since the mirror became the owner, writing DS:00/01 IS writing the position, and the
+ * hazard that needed the re-sync cannot be formed.
  *
  * The grid is rebuilt from the resumed arrays as well, because it was stamped from the freshly
  * loaded monx; without the restamp the first frame draws the world as it was at load rather than
@@ -1733,8 +1736,6 @@ static int overworld_resume(u2_ctx *ctx, u2_overworld *ow)
                 ctx->state.sector_first, ctx->state.sector_second, sec_hi, sec_lo);
         return -1;
     }
-    ow->x = ctx->state.sector_x;
-    ow->y = ctx->state.sector_y;
     u2_monsters_restamp(ctx, &ow->world);
     return 0;
 }
@@ -1743,8 +1744,8 @@ int u2_overworld_init(u2_ctx *ctx, u2_overworld *ow)
 {
     if (!ctx || !ow) return -1;
     memset(ow, 0, sizeof *ow);
-    ow->x = U2_OVERWORLD_PROBE_X;
-    ow->y = U2_OVERWORLD_PROBE_Y;
+    ctx->state.sector_x = U2_OVERWORLD_PROBE_X;
+    ctx->state.sector_y = U2_OVERWORLD_PROBE_Y;
     ow->sector_hi = U2_OVERWORLD_PROBE_SECTOR_HI;
     ow->sector_lo = U2_OVERWORLD_PROBE_SECTOR_LO;
     ow->view_mode = 0xFF;         /* DS:12 in the live capture */
@@ -1772,8 +1773,8 @@ int u2_overworld_init_state(u2_ctx *ctx, u2_overworld *ow)
      * save -- so it has to be dropped here rather than at the wait, or the new session
      * would unwind on its first empty poll. */
     ctx->death_pending = 0;
-    ow->x = ctx->state.entry_x;
-    ow->y = ctx->state.entry_y;
+    ctx->state.sector_x = ctx->state.entry_x;
+    ctx->state.sector_y = ctx->state.entry_y;
     ow->sector_hi = ctx->state.sector_first;
     ow->sector_lo = ctx->state.sector_second;
     /* Not a constant. asm/0C1F sets DS:12 to 4, reads DS:4A, and falls through to asm/0C2B,
@@ -1931,11 +1932,9 @@ static void compose_text_layer(u2_ctx *ctx, u2_overworld *ow, int space_readout)
 
 void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
 {
-    /* Publish the working position into the DS mirror before anything reads it this
-     * frame — the turn log runs inside this function, so the log and the frame are
-     * taken from the same instant. See u2_sector_publish. */
-    u2_sector_publish(ctx, ow);
-
+    /* No position step here any more. DS:00/01 is the position rather than a mirror of
+     * one, so the turn log that runs inside this function and the frame being drawn
+     * cannot disagree — there is one value, and both read it. */
     /* CP7: a dungeon-shaped sector is not drawn with tiles at all. asm/6000 is a
      * first-person wireframe over the paged grid, and it draws nothing while the
      * light counter is zero — that branch is the darkness, and it is a byte in
@@ -1956,7 +1955,7 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
 
     /* The last argument is DS:12 -- a mode byte, not a tile. The fill loop only
      * reaches for it when no sector is resident; see core/view.c. */
-    u2_view_fill(&ow->view, &ow->world, ow->x, ow->y,
+    u2_view_fill(&ow->view, &ow->world, ctx->state.sector_x, ctx->state.sector_y,
                  ow->view_mode, NULL, U2_OVERWORLD_EMPTY_GATE);
 
     /* Screen-to-grid bridge, added 2026-11-11 because every creature-coordinate argument
@@ -1967,10 +1966,10 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
      * on three sides" and "the gate refused tile=10" cannot be compared at all, and a
      * correct rule checked against the wrong cell looks identical to a broken one. */
     u2_trace(ctx, "view", "5AB1", "player=(%d,%d) origin=(%d,%d) tile_here=%02x",
-             ow->x, ow->y,
-             (ow->x - u2_view_player_col()) & (U2_SECTOR_EDGE - 1),
-             (ow->y - 5) & (U2_SECTOR_EDGE - 1),
-             u2_world_tile_at(&ow->world, ow->x, ow->y));
+             ctx->state.sector_x, ctx->state.sector_y,
+             (ctx->state.sector_x - u2_view_player_col()) & (U2_SECTOR_EDGE - 1),
+             (ctx->state.sector_y - 5) & (U2_SECTOR_EDGE - 1),
+             u2_world_tile_at(&ow->world, ctx->state.sector_x, ctx->state.sector_y));
 
     /* The time door is stamped into the VIEW, not into the sector. The original stamps
      * 0xC0 into the resident grid, and whether that survives a save back into mapxNN is
@@ -1987,8 +1986,8 @@ void u2_overworld_draw(u2_ctx *ctx, u2_overworld *ow)
         ctx->gate_present = 1;
         ctx->gate_x = gate_x;
         ctx->gate_y = gate_y;
-        const int col = gate_x - (ow->x - ow->view.player_col);
-        const int row = gate_y - (ow->y - ow->view.player_row);
+        const int col = gate_x - (ctx->state.sector_x - ow->view.player_col);
+        const int row = gate_y - (ctx->state.sector_y - ow->view.player_row);
         if (col >= 0 && col < ow->view.cols && row >= 0 && row < ow->view.rows)
             ow->view.tile[row * ow->view.cols + col] = U2_GATE_STAGING;
     }
@@ -2160,8 +2159,8 @@ void u2_overworld_attack_dir(u2_ctx *ctx, u2_overworld *ow, const char *word, in
         return;
     }
 
-    const int tx = (ow->x + dx) & U2_SECTOR_MASK;
-    const int ty = (ow->y + dy) & U2_SECTOR_MASK;
+    const int tx = (ctx->state.sector_x + dx) & U2_SECTOR_MASK;
+    const int ty = (ctx->state.sector_y + dy) & U2_SECTOR_MASK;
     /* asm/2BC4 calls asm/23E6 to find the target, and that scan never examines slot 0, so a
      * creature in slot 0 is invulnerable (G78). u2_monsters_at_attackable reproduces it; the
      * plain u2_monsters_at would let the player kill a creature the original makes unkillable. */
@@ -2352,8 +2351,8 @@ static void victory_fade(u2_ctx *ctx, u2_overworld *ow)
 static void victory_flight(u2_ctx *ctx, u2_overworld *ow, int steps)
 {
     for (int s = 0; steps < 0 || s < steps; s++) {
-        ow->x = (ow->x + 1) & (U2_SECTOR_EDGE - 1);
-        ow->y = (ow->y + 1) & (U2_SECTOR_EDGE - 1);
+    ctx->state.sector_x = (uint8_t)((ctx->state.sector_x + 1) & (U2_SECTOR_EDGE - 1));
+    ctx->state.sector_y = (uint8_t)((ctx->state.sector_y + 1) & (U2_SECTOR_EDGE - 1));
         u2_overworld_draw(ctx, ow);
         if (seam_present_frame(ctx)) break;   /* window closed mid-flight */
         if (ctx->clock && ctx->clock->sleep_ms)
@@ -2550,8 +2549,6 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             seam_str_out(ctx, U2_S_WIN_UNIVERSE);         /* 754F */
             seam_str_out(ctx, U2_S_WIN_FOUND_IN);         /* 75AE */
             victory_rocket_mode(ctx);                     /* 75CF..75DE */
-            ow->x = ctx->state.sector_x;
-            ow->y = ctx->state.sector_y;
             seam_present_frame(ctx);
             /* Interactive: fly forever, as the original does. Headless: bounded, or every
              * victory gate would hang.
@@ -2766,8 +2763,8 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
         if (ow->pending_cmd == 'F' && word != NULL) {
             ow->pending_cmd = 0;
             seam_str_out(ctx, word);              /* no CR: same line as FIRE DIRECT- */
-            const int cx = (ow->x + dx) & (U2_SECTOR_EDGE - 1);
-            const int cy = (ow->y + dy) & (U2_SECTOR_EDGE - 1);
+            const int cx = (ctx->state.sector_x + dx) & (U2_SECTOR_EDGE - 1);
+            const int cy = (ctx->state.sector_y + dy) & (U2_SECTOR_EDGE - 1);
             u2_attack at;
             const int cslot = u2_monsters_at(ctx, cx, cy);   /* before firing: the swap moves her */
             const int fired = u2_combat_cannon(ctx, &ow->world, cx, cy, &at);
@@ -2815,8 +2812,8 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
          * refused out-of-range steps and cited that as faithful to the
          * original's refusal of an invalid move; that was a guess, and the
          * live capture disproved it. */
-        const int raw_x = ow->x + dx;
-        const int raw_y = ow->y + dy;
+        const int raw_x = ctx->state.sector_x + dx;
+        const int raw_y = ctx->state.sector_y + dy;
 
         /* asm/242D/2434: the edge test runs on the unmasked coordinate, and it
          * only leaves anywhere when the sector is a site. On the world map the
@@ -2978,8 +2975,8 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
             continue;
         }
 
-        ow->x = nx;
-        ow->y = ny;
+        ctx->state.sector_x = (uint8_t)nx;
+        ctx->state.sector_y = (uint8_t)ny;
 
         /* The echo, reproduced as the original prints it: one compound string
          * "NORTH\rCMD: " (asm/38B0, file 0x3ce5 — direction word, CR, prompt).
@@ -3024,7 +3021,7 @@ int u2_overworld_loop(u2_ctx *ctx, u2_overworld *ow)
          * refused-step): a refused mounted step onto a swamp DOES cost the 5, so the
          * ladder now runs on the refused arm too via u2_tile_effect_ladder(), computed on
          * the destination cell. The accepted arm calls the same helper. */
-        u2_tile_effect_ladder(ctx, ow, ow->x, ow->y);
+        u2_tile_effect_ladder(ctx, ow, ctx->state.sector_x, ctx->state.sector_y);
 
         /* A time door fires on the step onto its cell — no prompt, no key, unlike a town
          * or tower gate, which is why this sits in the move path and not in cmd_E. Observed

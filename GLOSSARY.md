@@ -20,27 +20,34 @@ note — and the order is load-bearing. It currently has no module and three cal
 the defect [issue #14](https://github.com/sloppy-seconds/ultima2-rebuild/issues/14) exists to
 close.
 
-**Ruled 2026-11-21.** The **DS mirror** (`engine/src/core/state.h`) is authoritative for
-position, sector and view mode; the residency module publishes to it at one quiescent point
-through named accessors. The overworld does not own a second copy.
+**Ruled 2026-11-21, built 2026-11-22.** The **DS mirror** (`engine/src/core/state.h`) is
+authoritative for position, sector and view mode, and it is the *owner* rather than a mirror of
+something else: a movement site writes `ctx->state.sector_x` and every reader reads the same
+byte. The overworld holds no second copy, so there is no publish step and no ordering between
+two copies to get wrong.
 
 ## Quiescent point
 
-The one moment in a turn at which state may be published to the DS mirror: after the world has
-settled and before the next key is read. Publishing anywhere else is what produced the silent
-revert recorded at `overworld.c:1793-1798`, where a resumed position correct on read-back
-reverted to the entry point on the first drawn frame.
+The one moment in a turn at which a demo checkpoint is taken and at which a checkpoint that
+just landed is absorbed: after the world has settled and before the next key is read. Absorb
+is the creature-grid restamp; position needs no absorbing now that the mirror owns it.
+
+The reason the point is named at all is the silent revert recorded at `overworld.c:1793-1798`,
+where a resumed position correct on read-back reverted to the entry point on the first drawn
+frame. That hazard could only exist while the draw path republished a second copy.
 
 ## Command tail
 
 The shared epilogue every command owes the player: the echoed word, the prompt, a status redraw
-where one is due, and the creature turn. Today it has no owner — six handlers set a bare letter
-and six hand-written arms in the walk loop each re-assemble it, so whether the sweep and the
-band redraw run is a fact about a call site rather than a fact about the command.
+where one is due, and the creature turn. Before 2026-11-22 it had no owner — six handlers set a
+bare letter and six hand-written arms in the walk loop each re-assembled it, so whether the
+sweep and the band redraw run was a fact about a call site rather than a fact about the command.
 
-**Ruled 2026-11-21.** A handler awaiting a direction returns a continuation — the word, the
-direction callback, whether the status redraws, whether it counts as a turn — and one
-`u2_cmd_tail` owns the epilogue. The loop stops switching on a letter.
+**Ruled 2026-11-21, built 2026-11-22.** `k_cmd_cont` in `game/commands.c` carries the
+continuation — the word, the direction callback, whether the status redraws — reached through
+`u2_cmd_continuation(letter)`, and `u2_cmd_tail` in `game/overworld.c` owns the epilogue. The
+loop asks one question and never switches on a letter. A fourth field, `is_turn`, turned out not
+to be needed: every one of these commands passes a turn, refusals included.
 
 ## Seed module
 

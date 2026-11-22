@@ -76,7 +76,7 @@ static void arm(u2_ctx *ctx, u2_overworld *ow, uint8_t helm, uint8_t site)
             ow->world.map[y * U2_SECTOR_EDGE + x] = (y < 32) ? 0x0C : 0x00;
     ctx->state.items_held[5] = helm;      /* DS:DB, the HELM count */
     ctx->state.sector_second = site;      /* DS:4A, the site-kind digit */
-    ow->x = 4; ow->y = 4;
+    ctx->state.sector_x = 4; ctx->state.sector_y = 4;
     keys_left = 1;
 }
 

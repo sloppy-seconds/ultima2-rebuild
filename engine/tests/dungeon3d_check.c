@@ -91,7 +91,7 @@ static void setup(u2_ctx *ctx, u2_overworld *ow, int enhanced)
 {
     memset(ctx, 0, sizeof *ctx);
     memset(ow, 0, sizeof *ow);
-    ow->x = 5; ow->y = 5;
+    ctx->state.sector_x = 5; ctx->state.sector_y = 5;
     ctx->state.face_dx = 1;
     ctx->state.face_dy = 0;
     ctx->enhanced_layout = enhanced;
@@ -188,7 +188,7 @@ static void test_doors(void)
      * opening reappears on the far face one cell ahead. */
     setup(&ctx, &ow, 1); enh_frame(&ow);
     build_doorwall(&ow, U2_DG_DOOR);
-    ow.x = 6; ow.y = 5;   /* stand in the door cell */
+    ctx.state.sector_x = 6; ctx.state.sector_y = 5;   /* stand in the door cell */
     u2_dungeon_render(&ctx, &ow, 1);
     CHECK(count_index(&ow.frame, 6) > 0,
           "door: standing in the doorway should show the frame on the far face");

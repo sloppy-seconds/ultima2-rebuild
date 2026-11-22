@@ -55,8 +55,8 @@ static void arm(u2_ctx *ctx, u2_overworld *ow, uint8_t ahead)
     ctx->state.spell_counts[4] = 1;
     ctx->state.face_dx = 1;
     ctx->state.face_dy = 0;
-    ow->x = 5;
-    ow->y = 5;
+    ctx->state.sector_x = 5;
+    ctx->state.sector_y = 5;
 
     u2_world *w = &ow->world;
     for (int i = 0; i < U2_SECTOR_TILES; i++) w->map[i] = 0x80;
@@ -80,11 +80,11 @@ int main(void)
           u2_world_dungeon_at(&ow.world, 0, 6, 5));
     CHECK(ctx.state.spell_counts[4] == 0, "and the charge was spent");
 
-    const int x_before = ow.x;
+    const int x_before = ctx.state.sector_x;
     (void)u2_dungeon_advance(&ctx, &ow);
-    CHECK(ow.x == x_before + 1,
+    CHECK(ctx.state.sector_x == x_before + 1,
           "and you can WALK through it: x went %d -> %d, expected %d",
-          x_before, ow.x, x_before + 1);
+          x_before, ctx.state.sector_x, x_before + 1);
 
     /* ---- 2. control: open floor refuses, and still costs the spell -------------- */
     arm(&ctx, &ow, 0x00);
@@ -102,17 +102,17 @@ int main(void)
 
     /* ---- 4. the other half of the mask: a stamp blocks, whatever the rock says --- */
     arm(&ctx, &ow, 0x01);
-    const int x_stamped = ow.x;
+    const int x_stamped = ctx.state.sector_x;
     (void)u2_dungeon_advance(&ctx, &ow);
-    CHECK(ow.x == x_stamped,
+    CHECK(ctx.state.sector_x == x_stamped,
           "a low-nibble stamp alone blocks the step (x stayed %d, went to %d) — this is "
           "why a stamp landing back in a PASSWALL-cleared cell would matter",
-          x_stamped, ow.x);
+          x_stamped, ctx.state.sector_x);
 
     arm(&ctx, &ow, 0x81);
-    const int x_both = ow.x;
+    const int x_both = ctx.state.sector_x;
     (void)u2_dungeon_advance(&ctx, &ow);
-    CHECK(ow.x == x_both, "and rock-with-a-stamp blocks the same way");
+    CHECK(ctx.state.sector_x == x_both, "and rock-with-a-stamp blocks the same way");
 
     printf("passwall_check: %d checks, %d failures\n", checks, fails);
     return fails != 0;

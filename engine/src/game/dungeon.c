@@ -48,7 +48,7 @@ void u2_dungeon_probe(u2_ctx *ctx, const u2_overworld *ow)
     int dx, dy;
     u2_dungeon_facing(ctx, &dx, &dy);
     const int fl = (int8_t)ctx->state.site_floor;
-    const int px = ow->x, py = ow->y;
+    const int px = ctx->state.sector_x, py = ctx->state.sector_y;
 
     ctx->state.mode_a    = cell(ow, fl, px, py);
     ctx->state.mode_walk = cell(ow, fl, px + dx, py + dy);
@@ -113,8 +113,8 @@ static int dg_step(u2_ctx *ctx, u2_overworld *ow, int forward)
         if ((c & 0x8f) != 0) return 0;
     }
 
-    ow->x = (ow->x + dx) & 0x3f;
-    ow->y = (ow->y + dy) & 0x3f;
+    ctx->state.sector_x = (uint8_t)((ctx->state.sector_x + dx) & 0x3f);
+    ctx->state.sector_y = (uint8_t)((ctx->state.sector_y + dy) & 0x3f);
     u2_dungeon_probe(ctx, ow);
     return 1;
 }
@@ -230,7 +230,7 @@ u2_cmd_result u2_dungeon_get(u2_ctx *ctx, u2_overworld *ow)
      * own mapx is therefore never written and is re-read on every entry. Pinned by
      * two checks in tests/site_check.c ("G81: ..."). */
     u2_world_dungeon_terrain_put(&ow->world, (int8_t)ctx->state.site_floor,
-                                 ow->x, ow->y, 0);
+                                 ctx->state.sector_x, ctx->state.sector_y, 0);
 
     /* asm/363B_cmd_G.asm L_00396a..L_0038d8. The loot is NOT a flat roll.
        TRI-LITHIUM is gated on the site floor being 0xf — the deepest floor of a
@@ -439,7 +439,7 @@ void u2_dg_scan_build(const u2_ctx *ctx, const u2_overworld *ow, u2_dg_scan *s)
     int dx, dy;
     u2_dungeon_facing(ctx, &dx, &dy);
     const int fl = (int8_t)ctx->state.site_floor;
-    const int px = ow->x, py = ow->y;
+    const int px = ctx->state.sector_x, py = ctx->state.sector_y;
 
     int lx = px + dy, ly = py - dx;      /* DS:479 / DS:47A */
     int cx = px,      cy = py;           /* DS:47B / DS:47C */
@@ -763,7 +763,7 @@ static void dg_inspect_setup(u2_ctx *ctx, u2_overworld *ow)
     u2_world_dungeon_put(&ow->world, fl, 10, 5, 0x40);   /* chest   */
     u2_world_dungeon_put(&ow->world, fl, 13, 3, 0x10);   /* up ladder   */
     u2_world_dungeon_put(&ow->world, fl, 13, 7, 0x20);   /* down ladder */
-    ow->x = 2; ow->y = 5;
+    ctx->state.sector_x = 2; ctx->state.sector_y = 5;
     ctx->state.site_floor = 0;
     ctx->state.face_dx = 1; ctx->state.face_dy = 0;
     ctx->state.moved_flag = 0x96;   /* a full torch (the aliased light counter), so the
@@ -921,7 +921,7 @@ u2_dg_ai_report u2_dungeon_creatures(u2_ctx *ctx, u2_overworld *ow)
 {
     u2_state *st = &ctx->state;
     u2_dg_ai_report rep = { 0 };
-    const int px = ow->x, py = ow->y;
+    const int px = ctx->state.sector_x, py = ctx->state.sector_y;
 
     /* asm/1151 runtime 0x1360. */
     u2_dungeon_spawn(ctx, ow);

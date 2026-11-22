@@ -700,7 +700,7 @@ static u2_cmd_result cmd_X(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
     seam_str_out(ctx, U2_S_XIT);
 
     const uint8_t stamp = ctx->state.player_stamp;
-    const uint8_t mode_a = (uint8_t)(u2_world_tile_at(&ow->world, ow->x, ow->y) >> 1);
+    const uint8_t mode_a = (uint8_t)(u2_world_tile_at(&ow->world, ctx->state.sector_x, ctx->state.sector_y) >> 1);
 
     switch (u2_dismount_rule(stamp, mode_a)) {
     case U2_DISMOUNT_ON_FOOT:
@@ -712,7 +712,7 @@ static u2_cmd_result cmd_X(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
     default:
         /* A terrain write, same reasoning as BOARD: the tile has to survive the creature turn
          * that follows, or the vehicle vanishes the moment anything moves. */
-        u2_world_terrain_put(&ow->world, ow->x, ow->y, u2_dismount_tile(stamp));
+        u2_world_terrain_put(&ow->world, ctx->state.sector_x, ctx->state.sector_y, u2_dismount_tile(stamp));
         ctx->state.player_stamp = u2_foot_stamp(ctx->state.pclass);
         break;
     }
@@ -873,7 +873,7 @@ static void board_vehicle(u2_ctx *ctx, u2_overworld *ow, uint8_t mode, uint8_t l
      * u2_world_terrain_put's note in core/world.h — without this the boarded tile is
      * back the next time anything moves, which the live capture rules out.
      */
-    u2_world_terrain_put(&ow->world, ow->x, ow->y, leaves);
+    u2_world_terrain_put(&ow->world, ctx->state.sector_x, ctx->state.sector_y, leaves);
 }
 
 static u2_cmd_result cmd_B(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
@@ -882,7 +882,7 @@ static u2_cmd_result cmd_B(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
 
     seam_str_out(ctx, U2_S_BOARD);
 
-    switch (u2_world_tile_at(&ow->world, ow->x, ow->y) >> 1) {
+    switch (u2_world_tile_at(&ow->world, ctx->state.sector_x, ctx->state.sector_y) >> 1) {
     case U2_MODE_HORSE:
         seam_str_out(ctx, U2_S_BOARD_HORSE);
         board_vehicle(ctx, ow, U2_MODE_HORSE, U2_TILE_AFTER_BOARD_LAND);
@@ -1052,7 +1052,7 @@ static u2_cmd_result launch_plane(u2_ctx *ctx, u2_overworld *ow)
             case U2_KEY_LEFT:  dx = -1; dy =  0; flight_line(ctx, U2_S_DIR_WEST);  break;
             case 'L': case 'l':
                 /* asm/3D47: the tile under the player, compared to 0x08 after and 0x7F. */
-                if ((u2_world_tile_at(&ow->world, ow->x, ow->y) & 0x7F) == 0x08) {
+                if ((u2_world_tile_at(&ow->world, ctx->state.sector_x, ctx->state.sector_y) & 0x7F) == 0x08) {
                     seam_str_out(ctx, U2_S_LAND_PLANE);
                     cmd_done(ctx);
                     return U2_CMD_DONE;
@@ -1066,8 +1066,8 @@ static u2_cmd_result launch_plane(u2_ctx *ctx, u2_overworld *ow)
 
         /* asm/3C9B: x += dx, y += dy, both masked, with the carry chain intact so a
          * negative delta is the byte 0xFF and wraps the same way it does on the 8088. */
-        ow->x = (int)(((uint8_t)ow->x + (uint8_t)dx) & 0x3Fu);
-        ow->y = (int)(((uint8_t)ow->y + (uint8_t)dy) & 0x3Fu);
+        ctx->state.sector_x = (uint8_t)(((uint8_t)ctx->state.sector_x + (uint8_t)dx) & 0x3Fu);
+        ctx->state.sector_y = (uint8_t)(((uint8_t)ctx->state.sector_y + (uint8_t)dy) & 0x3Fu);
         u2_overworld_draw(ctx, ow);
         /* The original's frame boundary, and the reason this loop stopped being a blur.
          * Owner report 2026-11-11: "planes have the same issues as rockets, once launched
@@ -1382,13 +1382,13 @@ static int space_hyperwarp(u2_ctx *ctx, u2_overworld *ow)
 static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
 {
     u2_state *st = &ctx->state;
-    ow->x = 0;
-    ow->y = 0;
+    ctx->state.sector_x = 0;
+    ctx->state.sector_y = 0;
     st->view_mode = 0xFF;
     seam_str_out(ctx, U2_S_PRESS_ANY_KEY);
 
     for (;;) {
-        u2_space_descent_step((uint8_t *)&ow->x, (uint8_t *)&ow->y);
+        u2_space_descent_step(&ctx->state.sector_x, &ctx->state.sector_y);
         u2_overworld_draw(ctx, ow);
         /* Audit class A. The draw was happening and being thrown away: nothing presented,
          * so the screen kept the space frame and the southward descent was invisible.
@@ -1406,7 +1406,7 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
         if (r < 0) return;                             /* input exhausted: original blocks */
         if (r == 0 && (ctx->exit_code || ctx->input_exhausted)) return;
         if (r) {
-            if (!u2_space_dive_survives(u2_world_tile_at(&ow->world, ow->x, ow->y))) {
+            if (!u2_space_dive_survives(u2_world_tile_at(&ow->world, ctx->state.sector_x, ctx->state.sector_y))) {
                 u2_death(ctx);
                 /* Do not fall through to the parked-rocket bookkeeping: a dead character
                  * leaves no rocket behind, and the handoff that asks for a key belongs to
@@ -1415,8 +1415,8 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
             } else if (st->world == 0) {
                 st->rocket_parked = 0;
             } else {
-                st->rocket_parked_x = (uint8_t)ow->x;
-                st->rocket_parked_y = (uint8_t)ow->y;
+                st->rocket_parked_x = (uint8_t)ctx->state.sector_x;
+                st->rocket_parked_y = (uint8_t)ctx->state.sector_y;
                 st->rocket_parked   = 1;
             }
             return;
@@ -1793,8 +1793,8 @@ static u2_cmd_result launch_rocket(u2_ctx *ctx, u2_overworld *ow)
      * did not. DS:69/6A/6B are the parked-rocket triple, modelled in state.h: the save
      * here is what makes a rocket left on a planet survive a restart. */
     if (ctx->state.world == 0 && ow->sector_lo == 0) {
-        ctx->state.rocket_parked_y = (uint8_t)ow->y;
-        ctx->state.rocket_parked_x = (uint8_t)ow->x;
+        ctx->state.rocket_parked_y = (uint8_t)ctx->state.sector_y;
+        ctx->state.rocket_parked_x = (uint8_t)ctx->state.sector_x;
         ctx->state.rocket_parked   = 1;
         (void)u2_overworld_autosave(ctx, ow);
     }
@@ -1959,7 +1959,7 @@ static u2_cmd_result cmd_G(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
      * in the VAULT of Lord British's castle, sector 23: standing
      * on the drawn shields and pressing G gives GET ARMOUR, on the drawn swords GET WEAPON,
      * each sometimes followed by EMPTY!, and a non-empty result lands in the inventory. */
-    const uint8_t under = (uint8_t)(u2_world_tile_at(&ow->world, ow->x, ow->y) >> 1);
+    const uint8_t under = (uint8_t)(u2_world_tile_at(&ow->world, ctx->state.sector_x, ctx->state.sector_y) >> 1);
     const int armour = (under == 0x2A);
     const int weapon = (under == 0x2C);
     if (!armour && !weapon) {
@@ -1973,7 +1973,7 @@ static u2_cmd_result cmd_G(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
     /* asm/361C runs BEFORE the roll, so the marker is consumed even when the roll comes
      * back EMPTY -- an empty chest is still gone. The stamp is 0x08, the plain land tile,
      * read via asm/3611's own header rather than re-derived here. */
-    u2_world_terrain_put(&ow->world, ow->x, ow->y, 0x08);
+    u2_world_terrain_put(&ow->world, ctx->state.sector_x, ctx->state.sector_y, 0x08);
 
     const unsigned mask = armour ? 0x3u : 0x7u;
     const unsigned idx = (unsigned)(u2_rand_byte(ctx) & mask);
@@ -2112,7 +2112,7 @@ static bool site_cell_has(u2_ctx *ctx, u2_overworld *ow, uint8_t bit)
         u2_dungeon_probe(ctx, ow);
         return (ctx->state.mode_a & bit) != 0;
     }
-    return (u2_world_tile_at(&ow->world, ow->x, ow->y) & bit) != 0;
+    return (u2_world_tile_at(&ow->world, ctx->state.sector_x, ctx->state.sector_y) & bit) != 0;
 }
 
 /* asm/37F1 cmd_K: KLIMB. Refuses outside a tower or dungeon, refuses unless the cell under
@@ -2188,8 +2188,8 @@ static int cast_target(u2_ctx *ctx, const u2_overworld *ow)
 {
     int dx, dy;
     u2_dungeon_facing(ctx, &dx, &dy);
-    const uint8_t tx = (uint8_t)(ow->x + dx);
-    const uint8_t ty = (uint8_t)(ow->y + dy);
+    const uint8_t tx = (uint8_t)(ctx->state.sector_x + dx);
+    const uint8_t ty = (uint8_t)(ctx->state.sector_y + dy);
     for (int i = U2_MON_SLOTS - 1; i >= 1; --i) {
         if (ctx->state.mon_type[i] == 0) continue;
         if (ctx->state.mon_kind[i] != ctx->state.site_floor) continue;
@@ -2223,7 +2223,7 @@ static bool cast_ladder_open(u2_ctx *ctx, const u2_overworld *ow, int floor)
     int dx, dy;
     u2_dungeon_facing(ctx, &dx, &dy);
     return u2_world_dungeon_at(&ow->world, floor,
-                               (ow->x - dx) & 0xff, (ow->y - dy) & 0xff) == 0;
+                               (ctx->state.sector_x - dx) & 0xff, (ctx->state.sector_y - dy) & 0xff) == 0;
 }
 
 /* asm/3A2A, the tail both ladder arms jump to when the move is allowed: CR, then
@@ -2345,8 +2345,8 @@ static u2_cmd_result cmd_C(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
     case 4: { /* PASSWALL. */
         int dx, dy;
         u2_dungeon_facing(ctx, &dx, &dy);
-        const int tx = (ow->x + dx) & 0xf;
-        const int ty = (ow->y + dy) & 0xf;
+        const int tx = (ctx->state.sector_x + dx) & 0xf;
+        const int ty = (ctx->state.sector_y + dy) & 0xf;
         /* The mask is a WRAP, not a bounds check, and that is a bug in the original rather
          * than a rule about edges. Standing at x = 0 facing west gives (0 - 1) & 0xf = 15, and
          * the cell on the far side of the map is then a perfectly ordinary target: filmed
@@ -2441,8 +2441,8 @@ static u2_cmd_result cmd_C(u2_ctx *ctx, u2_overworld *ow, uint8_t letter)
         const int ny = (int)((u2_rand_byte(ctx) & 0xfu) | 1u);
         if (u2_world_dungeon_at(&ow->world, st->site_floor, nx, ny) != 0)
             return cast_failed(ctx);
-        ow->x = nx;
-        ow->y = ny;
+        ctx->state.sector_x = (uint8_t)nx;
+        ctx->state.sector_y = (uint8_t)ny;
         cmd_done(ctx);
         return U2_CMD_DONE;
     }
@@ -2627,8 +2627,8 @@ int u2_cmd_implemented(char *out, int cap)
 static void cont_unlock(u2_ctx *ctx, u2_overworld *ow, int dx, int dy, const char *word)
 {
     (void)word;                       /* UNLOCK prints no direction word */
-    const int tx = ow->x + dx;
-    const int ty = ow->y;
+    const int tx = ctx->state.sector_x + dx;
+    const int ty = ctx->state.sector_y;
     const int off = tx < 0 || tx >= U2_SECTOR_EDGE || ty < 0 || ty >= U2_SECTOR_EDGE;
     const uint8_t target = off ? 0 : u2_world_tile_at(&ow->world, tx, ty);
     switch (u2_unlock_rule(dx, target, ctx->state.keys)) {
@@ -2651,7 +2651,7 @@ static void cont_unlock(u2_ctx *ctx, u2_overworld *ow, int dx, int dy, const cha
          * creatures. Gate: tests/site_state.py case C, which failed here
          * (cell came back 0xa0) before this line changed. */
         ctx->state.keys = u2_unlock_spend_key(ctx->state.keys);
-        const uint8_t ground = u2_world_tile_at(&ow->world, ow->x, ow->y);
+        const uint8_t ground = u2_world_tile_at(&ow->world, ctx->state.sector_x, ctx->state.sector_y);
         u2_world_terrain_put(&ow->world, tx, ty, u2_unlock_replacement(ground));
         break;
     }

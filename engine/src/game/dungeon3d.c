@@ -457,8 +457,8 @@ void u2_dungeon_render3d(u2_ctx *ctx, u2_overworld *ow, const u2_dg_scan *s)
     int dx, dy;
     u2_dungeon_facing(ctx, &dx, &dy);
     const int fl = (int8_t)ctx->state.site_floor;
-    const float px = (float)ow->x + 0.5f - DG3_BACK * (float)dx;
-    const float py = (float)ow->y + 0.5f - DG3_BACK * (float)dy;
+    const float px = (float)ctx->state.sector_x + 0.5f - DG3_BACK * (float)dx;
+    const float py = (float)ctx->state.sector_y + 0.5f - DG3_BACK * (float)dy;
     const float dirX = (float)dx, dirY = (float)dy;
     /* The camera plane is the facing turned to the player's RIGHT. The original
      * wireframe is the reference here: with the plane set the other way our view

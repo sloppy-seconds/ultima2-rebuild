@@ -48,7 +48,7 @@ static void setup(u2_ctx *ctx, u2_overworld *ow)
 {
     memset(ctx, 0, sizeof *ctx);
     memset(ow, 0, sizeof *ow);
-    ow->x = 5; ow->y = 5;
+    ctx->state.sector_x = 5; ctx->state.sector_y = 5;
     ctx->state.face_dx = 1;
     ctx->state.face_dy = 0;
     ctx->enhanced_layout = 0;      /* classic path: scale follows the frame */

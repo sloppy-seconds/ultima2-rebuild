@@ -106,8 +106,8 @@ static void arm_offer(u2_ctx *ctx, u2_overworld *ow, uint8_t role, uint8_t bless
      * its own rather than assumed away here. */
     ctx->state.gold_lo = 0x99;      /* DS:58, the HIGH byte despite the name */
     ctx->state.gold_hi = 0x99;      /* DS:59 */
-    ow->x = 10;
-    ow->y = 10;
+    ctx->state.sector_x = 10;
+    ctx->state.sector_y = 10;
     ow->world.map_loaded = 1;
     ctx->state.mon_type[5] = 0x60;
     ctx->state.mon_x[5] = 11;

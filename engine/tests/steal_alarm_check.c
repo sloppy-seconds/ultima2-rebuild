@@ -58,8 +58,8 @@ static void arm_steal(u2_ctx *ctx, u2_overworld *ow, uint8_t seed, int in_town)
     ctx->clock = &null_clock;
     ctx->state.sector_first = 2;
     ctx->state.sector_second = in_town ? 2 : 0;   /* 0 = world map: nobody to alert */
-    ow->x = 10;
-    ow->y = 10;
+    ctx->state.sector_x = 10;
+    ctx->state.sector_y = 10;
     ow->world.map_loaded = 1;
     u2_rng_seed(ctx, seed);
 }

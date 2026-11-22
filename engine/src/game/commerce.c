@@ -641,8 +641,8 @@ u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, i
      * `dec %di ; jne`, so slot 0 is never examined — recorded, not fixed: whether that is
      * a bug or a deliberate reserve slot is not established, and monx31 slot 0 is a
      * populated Guard. */
-    const int cx = (ow->x + dx) & (U2_SECTOR_EDGE - 1);
-    const int cy = (ow->y + dy) & (U2_SECTOR_EDGE - 1);
+    const int cx = (ctx->state.sector_x + dx) & (U2_SECTOR_EDGE - 1);
+    const int cy = (ctx->state.sector_y + dy) & (U2_SECTOR_EDGE - 1);
     int slot = 0;
     for (int i = U2_MON_SLOTS - 1; i >= 1; i--) {
         if (st->mon_type[i] == 0)
@@ -792,7 +792,7 @@ u2_transact_result u2_commerce_transact(u2_ctx *ctx, u2_overworld *ow, int dx, i
         return U2_TRANSACT_NO_DEALER;
     }
 
-    const u2_shop shop = u2_commerce_shop_for(ow->x, ow->y, st->sector_second);
+    const u2_shop shop = u2_commerce_shop_for(ctx->state.sector_x, ctx->state.sector_y, st->sector_second);
     switch (shop) {
     case U2_SHOP_ARMOUR:    return shop_armour(ctx);
     case U2_SHOP_WEAPONS:   return shop_weapons(ctx);
@@ -1065,8 +1065,8 @@ u2_steal_result u2_commerce_steal(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
     /* asm/3F37: one step, and asm/3F59's test on the cell there. Identical to TRANSACT's
      * near-cell rule — a sign tile (high bit set) or the counter tile 0x7C — because it is the
      * same ray, not a similar one. */
-    const int cx = (ow->x + dx) & (U2_SECTOR_EDGE - 1);
-    const int cy = (ow->y + dy) & (U2_SECTOR_EDGE - 1);
+    const int cx = (ctx->state.sector_x + dx) & (U2_SECTOR_EDGE - 1);
+    const int cy = (ctx->state.sector_y + dy) & (U2_SECTOR_EDGE - 1);
     const uint8_t near1 = u2_world_tile_at(&ow->world, cx, cy);
     if (!(near1 == TILE_SHOP_COUNTER || (near1 & 0x80u)))
         return steal_no_luck(ctx);
@@ -1096,13 +1096,14 @@ u2_steal_result u2_commerce_steal(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
     if (st->mon_role[0] == 1)
         return steal_no_luck(ctx);
 
-    /* The quadrant, on the player's own position and the site kind. It is ow->x/ow->y and NOT
+    /* The quadrant, on the player's own position and the site kind. It is DS:00/01 —
+     * ctx->state.sector_x/sector_y — and NOT
      * st->player_x: that field is named as though it were the player, but state.h puts it at
      * DS:0x23, which is the staged candidate cell the step gate and the ray cursor use, and
      * dump_state.c carries a warning about exactly that confusion. asm/3F5D reads DS:00/DS:01,
-     * which is the player, which is ow->x/ow->y — the same pair u2_commerce_shop_for is called
+     * which is the player, which is ctx->state.sector_x/sector_y — the same pair u2_commerce_shop_for is called
      * with. */
-    switch (u2_steal_loot_for(ow->x, ow->y, st->sector_second)) {
+    switch (u2_steal_loot_for(ctx->state.sector_x, ctx->state.sector_y, st->sector_second)) {
     case U2_STEAL_FOOD: {
         /* asm/3FDD: the village grocery. One unit of food, packed decimal, on DS:53 — the
          * same byte asm/181A moves when you BUY it, so a stolen meal and a bought one are
@@ -1175,8 +1176,8 @@ u2_offer_result u2_commerce_offer(u2_ctx *ctx, u2_overworld *ow, int dx, int dy)
      * because slot 0 is not a possible result, "nothing found" and "DS:1F == 0" are the same
      * value. asm/25E6's own body has not been read, so the extent is inherited from the
      * decoded scan rather than claimed for cmd_O's bytes. */
-    const int cx = (ow->x + dx) & (U2_SECTOR_EDGE - 1);
-    const int cy = (ow->y + dy) & (U2_SECTOR_EDGE - 1);
+    const int cx = (ctx->state.sector_x + dx) & (U2_SECTOR_EDGE - 1);
+    const int cy = (ctx->state.sector_y + dy) & (U2_SECTOR_EDGE - 1);
     int slot = 0;
     for (int i = U2_MON_SLOTS - 1; i >= 1; i--) {
         if (st->mon_type[i] == 0)

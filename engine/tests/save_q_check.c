@@ -78,7 +78,7 @@ static void open_world(u2_ctx *ctx, u2_overworld *ow)
     u2_world_open(ctx);
     u2_sector_id id = { 2, 0 };
     u2_world_load(ctx, &ow->world, 1, id);
-    ow->x = 30; ow->y = 40;
+    ctx->state.sector_x = 30; ctx->state.sector_y = 40;
     ow->sector_hi = 2; ow->sector_lo = 0;
     /* overworld_open() sets the on-foot stamp (DS:13 = 0x78) on the way into the world, and
      * this shortcut bypasses it. Without this line the fixture is a state the game cannot be
@@ -270,8 +270,8 @@ int main(int argc, char **argv)
          * happened, which is the claim captures/spice86/g82-planet-x-live refuted.) */
         u2_overworld bad = ow;
         bad.sector_lo = 2;
-        bad.x = 34;
-        bad.y = 20;
+        a.state.sector_x = 34;
+        a.state.sector_y = 20;
         a.state.world = 0;
         a.state.player_stamp = 0x28;          /* rocket */
         ok(u2_overworld_save(&a, &bad, &U2_SAVE_POLICY_ORIGINAL) == 1,
@@ -300,8 +300,8 @@ int main(int argc, char **argv)
          * lands on disk, so calling after the swap would store the site instead. */
         u2_overworld out = ow;
         out.sector_lo = 0;
-        out.x = 12;
-        out.y = 13;
+        a.state.sector_x = 12;
+        a.state.sector_y = 13;
         ok(u2_overworld_autosave(&a, &out) == 0, "auto-save on site entry writes");
         rf = fopen(saves_path, "rb");
         got = rf && fread(rec, 1, 256, rf) == 256;
@@ -321,8 +321,8 @@ int main(int argc, char **argv)
         ok(got, "the on-Earth auto-save left a record to compare against");
 
         a.state.world = 0x09;                 /* Planet X */
-        out.x = 77;
-        out.y = 78;
+        a.state.sector_x = 77;
+        a.state.sector_y = 78;
         ok(u2_overworld_autosave(&a, &out) == 0,
            "off Earth the auto-save reports no failure — refusing is not an error");
         rf = fopen(saves_path, "rb");
@@ -337,8 +337,8 @@ int main(int argc, char **argv)
          * 256-byte write of DS:36 and no sector write at all, so this is a different
          * contract from the store: it must move the record where the store would also
          * have flushed a dirty sector, and it must do nothing off Earth. */
-        out.x = 41;
-        out.y = 42;
+        a.state.sector_x = 41;
+        a.state.sector_y = 42;
         out.sector_lo = 0;
         ok(u2_overworld_autosave_record(&a, &out) == 0,
            "leaving a site on Earth saves");
@@ -350,8 +350,8 @@ int main(int argc, char **argv)
 
         memcpy(before, rec, 256);
         a.state.world = 9;                      /* Planet X */
-        out.x = 60;
-        out.y = 61;
+        a.state.sector_x = 60;
+        a.state.sector_y = 61;
         ok(u2_overworld_autosave_record(&a, &out) == 0,
            "off Earth the exit save reports no failure");
         rf = fopen(saves_path, "rb");

@@ -54,7 +54,11 @@ typedef struct u2_overworld {
                                    * knows where in the alphabetical cycle it is */
     u2_view  view;
     u2_frame frame;
-    int      x, y;                 /* position inside the sector, DS:00/01 */
+    /* No x/y here, and that is deliberate. The overworld used to keep a working
+     * position and publish it into DS:00/01 on every draw, which was two copies of
+     * one fact with an ordering between them; the ordering was the bug class. Since
+     * 2026-11-22 the DS mirror in core/state.h is the only owner, so a movement site
+     * writes ctx->state.sector_x and everything else reads the same byte. */
     /* A command that printed a prompt and is waiting for a direction key several
      * turns later: 'A' (ATTACK--) or 'U' (UNLOCK DIRECTION-), 0 when nothing is
      * pending. It lives here rather than as a local in u2_overworld_loop so the

@@ -267,29 +267,29 @@ int main(int argc, char **argv)
     memset(&ow, 0, sizeof ow);
     ctx.state.sector_first = 2;
     ctx.state.gate_index = 2;             /* slot 1 */
-    ow.x = 48; ow.y = 24;                 /* exactly era2 slot1, the live transit cell */
+    ctx.state.sector_x = 48; ctx.state.sector_y = 24;                 /* exactly era2 slot1, the live transit cell */
     CHECK(u2_gate_transit(&ctx, &ow) == 0,
           "no door before the first rotation stamps one (era 0 at load behaves so)");
     ow.gate_stamped = 1;
     ctx.state.gate_index = 0;             /* slot 0: stamped, but never observed a partner */
-    ow.x = 16; ow.y = 16;
+    ctx.state.sector_x = 16; ctx.state.sector_y = 16;
     /* The two slots the rule now fills. Asserted as a destination rather than as a driven
      * transit: u2_gate_transit ends in u2_world_load, which needs a sector store this harness
      * has none of, and a leg that half-applies an era change before failing to load is not
      * evidence of anything. The pairings themselves are pinned by the grid checks above. */
     ctx.state.gate_index = 0;             /* slot 0, era 2 -> era 0 */
-    ow.x = 16; ow.y = 16;
+    ctx.state.sector_x = 16; ctx.state.sector_y = 16;
     CHECK(u2_gate_partner_era(2, 0) == 0, "era2 slot0 has a destination now, not a refusal");
     int dx = 0, dy = 0;
     CHECK(u2_gate_cell(0, 0, &dx, &dy) && dx == 29 && dy == 56,
           "era2 slot0 arrives at era0 slot0 = (29,56), got (%d,%d)", dx, dy);
     ctx.state.gate_index = 6;             /* slot 3, era 2 -> era 4 */
-    ow.x = 19; ow.y = 52;
+    ctx.state.sector_x = 19; ctx.state.sector_y = 52;
     CHECK(u2_gate_partner_era(2, 3) == 4, "era2 slot3 has a destination now, not a refusal");
     CHECK(u2_gate_cell(4, 3, &dx, &dy) && dx == 8 && dy == 11,
           "era2 slot3 arrives at era4 slot3 = (8,11), got (%d,%d)", dx, dy);
     ctx.state.gate_index = 4;             /* slot 2, but the player is not standing on it */
-    ow.x = 1; ow.y = 1;
+    ctx.state.sector_x = 1; ctx.state.sector_y = 1;
     CHECK(u2_gate_transit(&ctx, &ow) == 0, "no transit unless the player is on the cell");
 
     /* --- the door's own cell, which is what the renderer stamps --------- */

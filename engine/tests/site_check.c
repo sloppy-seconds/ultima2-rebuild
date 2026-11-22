@@ -320,7 +320,7 @@ int main(int argc, char **argv)
             c.state.sector_first = eras[i].tens;
             c.state.sector_second = 0;         /* outdoors */
             c.state.player_stamp = 0x78;       /* on foot */
-            ow.x = 10; ow.y = 10;
+            c.state.sector_x = 10; c.state.sector_y = 10;
             ow.world.map_loaded = 1;
             ow.world.map[10 * U2_SECTOR_EDGE + 10] = 0x28;   /* the signpost */
             u2_overworld_enter(&c, &ow);
@@ -335,7 +335,7 @@ int main(int argc, char **argv)
         memset(&c, 0, sizeof c); memset(&ow, 0, sizeof ow);
         u2_vram_init(&c.vram); u2_state_init(&c.state);
         c.state.sector_second = 0; c.state.player_stamp = 0x78;
-        ow.x = 10; ow.y = 10; ow.world.map_loaded = 1;
+        c.state.sector_x = 10; c.state.sector_y = 10; ow.world.map_loaded = 1;
         ow.world.map[10 * U2_SECTOR_EDGE + 10] = 0x08;   /* grass, not a signpost */
         u2_overworld_enter(&c, &ow);
         CHECK(!grid_has(&c, "-THE SIGN READS:"),

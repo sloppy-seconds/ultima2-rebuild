@@ -54,29 +54,20 @@ int u2_sector_load(u2_ctx *ctx, u2_overworld *ow, u2_sector_id id, u2_residency 
 void u2_sector_leave(u2_ctx *ctx);
 
 /*
- * Publish the overworld's working position into the DS mirror (DS:00/01).
+ * Absorb a checkpoint that just landed in the DS mirror: restamp the grid, because
+ * the grid was stamped from the freshly loaded monx rather than from the resumed
+ * creature table.
  *
- * The mirror is the captured field, so anything that reads position — the turn log,
- * a demo record, --dump-state — has to see the same value the frame was drawn from.
- * That is why this is called from the draw path and not from each movement site:
- * u2_turnlog runs inside the draw, so mirroring beside it means the log and the
- * frame cannot disagree. A movement site that mirrored as well would be a second
- * copy of this rule, and victory_flight had exactly that duplicate until 2026-11-21.
- *
- * One direction only. When something writes the mirror from the other side — a demo
- * checkpoint landing at a quiescent point — that is u2_sector_absorb.
- */
-void u2_sector_publish(u2_ctx *ctx, const u2_overworld *ow);
-
-/*
- * Absorb a checkpoint that just landed in the DS mirror: pull DS:00/01 back into the
- * overworld's working position and restamp the grid, because the grid was stamped
- * from the freshly loaded monx rather than from the resumed creature table.
+ * Position is not here any more, and that is the point. DS:00/01 used to be a mirror
+ * the overworld published into every frame, which meant two copies of the player's
+ * coordinate and an ordering between them; since 2026-11-22 the mirror is the one
+ * owner, so a checkpoint that writes it needs no second step. What remains is the
+ * creature grid, which really is a second copy and really does need re-syncing.
  *
  * Returns non-zero when it did something, which today means ctx->demo_restamp_pending
  * was up; it clears the latch. The caller is the command loop at its quiescent point,
  * and the reason this lives here rather than inline there is the same reason the load
- * sequence does: the re-sync is three steps with an ordering, and an ordering written
+ * sequence does: the re-sync is a sequence with an ordering, and an ordering written
  * twice is a bug waiting to be half-fixed.
  */
 int u2_sector_absorb(u2_ctx *ctx, u2_overworld *ow);

@@ -162,7 +162,7 @@ int u2_gate_transit(u2_ctx *ctx, struct u2_overworld *ow)
     int gx = 0, gy = 0;
     if (!u2_gate_current_cell(ctx, ow, &gx, &gy))
         return 0;
-    if (ow->x != gx || ow->y != gy)
+    if (ctx->state.sector_x != gx || ctx->state.sector_y != gy)
         return 0;
 
     const int era = ctx->state.sector_first;
@@ -221,8 +221,8 @@ int u2_gate_transit(u2_ctx *ctx, struct u2_overworld *ow)
     ow->world.tlkx_loaded = 0;
     (void)u2_world_load_tlkx(ctx, &ow->world, id);
 
-    ow->x = px;
-    ow->y = py;
+    ctx->state.sector_x = (uint8_t)px;
+    ctx->state.sector_y = (uint8_t)py;
 
     /* Observed on arrival: the countdown is reloaded and the index has already advanced,
      * so the door you came through is not the one now standing open. */

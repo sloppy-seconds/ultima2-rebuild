@@ -23,28 +23,15 @@ void u2_sector_leave(u2_ctx *ctx)
     memset(s->mon_role, 0, sizeof s->mon_role);
 }
 
-void u2_sector_publish(u2_ctx *ctx, const u2_overworld *ow)
-{
-    /* Keep the original's own position mirror current. DS:00/01 is the player position
-     * in the captured segment — it read back as the seeded entry point in every live
-     * capture — and the engine kept the live coordinate only in ow->x/ow->y, so every
-     * turn log reported a position of 0,0 and a recording could not answer "where was
-     * the player standing". */
-    ctx->state.sector_x = (uint8_t)ow->x;
-    ctx->state.sector_y = (uint8_t)ow->y;
-}
-
 int u2_sector_absorb(u2_ctx *ctx, u2_overworld *ow)
 {
     if (!ctx->demo_restamp_pending)
         return 0;
-    /* The checkpoint just landed. The draw path publishes ow->x/ow->y into DS:00/01,
-     * so a resumed position left only in the state would be erased on the next frame,
-     * and the grid was stamped from the freshly loaded monx rather than from the
-     * resumed creature table. Both have to be re-synced before anything draws. */
+    /* The checkpoint just landed. The grid was stamped from the freshly loaded monx
+     * rather than from the resumed creature table, so it has to be re-stamped before
+     * anything draws. Position needs no second step: DS:00/01 IS the position, not a
+     * copy of one, so a checkpoint that wrote the mirror wrote the position. */
     ctx->demo_restamp_pending = 0;
-    ow->x = ctx->state.sector_x;
-    ow->y = ctx->state.sector_y;
     u2_monsters_restamp(ctx, &ow->world);
     return 1;
 }
