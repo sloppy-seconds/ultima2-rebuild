@@ -102,13 +102,23 @@ def saved_record(work):
     return bytearray(open(G.record(work), "rb").read())
 
 
-def case(label, work, keys, expect, extra=(), site=False, tiles=None, ds6d=0):
+def case(label, work, keys, expect, extra=None, site=False, tiles=None, ds6d=0):
     """Run one guard and assert both halves of it: the words, and whether the record moved.
 
     Every case walks one step first. Without that, a save that happened anyway would write a
     byte-identical record — the entry pair only moves if the position did — and the "nothing
     was saved" assertion would pass on the very bug it is meant to catch.
+
+    The guard cases must name the mode. The three Q guards are dropped by design in enhanced
+    mode (that is what cases 5 and 6 assert), and the default fidelity is enhanced, so a
+    case that passes no mode flag runs enhanced rules while claiming to test the original
+    ones. That is how this gate went red with six failures and stayed red: the refusals were
+    never printed because the engine was correctly not refusing, and the record moved
+    because enhanced mode saves anywhere. `--classic` is the opt-out and it is now explicit
+    rather than inherited from a default that has since moved.
     """
+    if extra is None:
+        extra = ["--classic"]
     work = build(work, site=site, tiles=tiles, ds6d=ds6d)
     keys = ["DOWN"] + list(keys) if keys[0] != "DOWN" else list(keys)
     before = bytes(saved_record(work))
