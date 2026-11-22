@@ -2509,3 +2509,19 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   → Tier 1, verification discipline: when a check summarises geometry into a histogram, ask which
   two layouts it cannot tell apart, and assert that pair positionally. Then write the control that
   makes it red; if no input can make it fail, it is decoration.
+- 2026-11-23 — **a launcher that always passes a switch turns an env-var-presence test permanently
+  on, and the flag meant to control it can never go red.** A dev-only affordance read its variable
+  as "is it set" rather than "what is its value", and the container launcher passed `-e NAME=0` on
+  every launch so the flag had a default. Every session got the dev behaviour; passing the flag and
+  omitting it produced identical results, so the documented switch had one observable state and the
+  off state had no representation at all. Nine days passed before anyone noticed, because the only
+  consumer was a human looking at a screen and the dev behaviour resembled a plausible game state
+  rather than a mode. Two rules come out of it. **Read a switch by value, and treat the empty string
+  and `0` as off** — the sibling switch in the same file already did, which is the tell and the
+  reason the bug survived review. And **do not set a switch the caller did not ask for**; omitting it
+  keeps presence and truth in agreement even when a reader gets the first rule wrong. The general
+  shape: a flag whose two states are indistinguishable to every observer is a flag with one state, so
+  a dev affordance that changes what the program boots into must announce itself on stderr or in the
+  state dump, and must have a control proving the off state is reachable.
+  → Tier 1, deploy discipline: env switches are read by value and left unset when false, and a
+  mode that changes the boot target says so where a log or a dump will show it.

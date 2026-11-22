@@ -6,6 +6,11 @@
 #   ./up.sh --load-save     # skip the intro and boot the saved character into the world
 #   ./up.sh --enhanced      # enhanced mode: EGA art, 1024x512 canvas, 3D dungeon
 #   ./up.sh --cleanroom     # deliberately ship the substitute art instead
+#   ./up.sh --inspect       # dev hall: boot straight into a synthetic dungeon that
+#                           # shows every creature stamp, a chest and both ladders.
+#                           # Not game behaviour; see engine/src/game/dungeon.c.
+#   ./up.sh --dual          # dev side-by-side: 3D renderer and the original CGA
+#                           # wireframe in one frame.
 #   ./up.sh --port N        # host port (default 6082; 6081 is taken by another container)
 #   ./up.sh --down          # stop and remove the container
 #   ./up.sh --status        # report what the running container is actually drawing
@@ -278,6 +283,15 @@ GEOM=640x400x24
 [ "$ENHANCED" = 1 ] && GEOM=1024x512x24
 
 podman rm -f "$CONTAINER" >/dev/null 2>&1 || true
+# The two dev switches are passed only when asked for, and the engine reads their
+# value rather than their presence. Both halves matter. Passing `-e U2_DG_INSPECT=0`
+# on every launch is what made the dev hall unconditional for nine days: the engine
+# tested presence, so the literal "0" read as on and --inspect changed nothing.
+# Not setting them at all is what makes presence and truth agree from this side too.
+DEV_ENV=()
+[ "${DUAL:-0}" = 1 ]    && DEV_ENV+=(-e U2_DG_DUAL=1)
+[ "${INSPECT:-0}" = 1 ] && DEV_ENV+=(-e U2_DG_INSPECT=1)
+
 # The cache moved out of the save directory (docs/save-scoped-worlds.md D4), so a
 # tiles.u2tl here is a leftover from the old layout rather than anything the engine
 # reads. Delete it anyway: the cleanroom path never overwrites it, and a stale one
@@ -287,8 +301,7 @@ mkdir -p "$SAVES_HOST"
 podman run -d --name "$CONTAINER" -p "$HOST_PORT:6081" \
     -e U2_ARGS="$U2_ARGS" \
     -e GEOMETRY="$GEOM" \
-    -e U2_DG_DUAL="${DUAL:-0}" \
-    -e U2_DG_INSPECT="${INSPECT:-0}" \
+    ${DEV_ENV[@]+"${DEV_ENV[@]}"} \
     -v "$ROOT/original:/content:ro,z" \
     -v "$SAVES_HOST:/saves:z" \
     "$IMAGE:latest" >/dev/null

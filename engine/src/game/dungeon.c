@@ -739,11 +739,21 @@ void u2_dungeon_tick(u2_ctx *ctx, u2_overworld *ow)
  * each stamp 1..7 lined up across the view, plus a chest and both ladders, so
  * every piece of dungeon art can be eyeballed in a single frame. It overwrites
  * the loaded floor in memory only — nothing is saved — and the creature sweep is
- * suppressed while it is on so the subjects hold still. Not game behaviour. */
+ * suppressed while it is on so the subjects hold still. Not game behaviour.
+ *
+ * The value decides, not the presence, and that is a fix rather than a tidiness.
+ * This tested `getenv(...) ? 1 : 0` from 2026-11-14 to 2026-11-23, and deploy/novnc/
+ * up.sh passes `-e U2_DG_INSPECT=0` unconditionally, so every noVNC session booted
+ * into the hall and `--inspect` was indistinguishable from not asking for it. A
+ * deploy layer that always sets a switch makes presence-based truthiness always
+ * true; u2_dg_dual_mode below was already reading the value. */
 static int dg_inspect(void)
 {
     static int cached = -1;
-    if (cached < 0) cached = getenv("U2_DG_INSPECT") ? 1 : 0;
+    if (cached < 0) {
+        const char *e = getenv("U2_DG_INSPECT");
+        cached = e && e[0] && e[0] != '0';
+    }
     return cached;
 }
 
