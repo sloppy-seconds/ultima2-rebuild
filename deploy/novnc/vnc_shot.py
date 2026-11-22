@@ -195,7 +195,7 @@ def grab(host, port, timeout):
 KEYSYMS = {
     "Up": 0xFF52, "Down": 0xFF54, "Right": 0xFF53, "Left": 0xFF51,
     "Return": 0xFF0D, "Enter": 0xFF0D, "Esc": 0xFF1B, "Escape": 0xFF1B,
-    "Space": 0xFF20, "Tab": 0xFF09, "BackSpace": 0xFF08,
+    "Space": 0x0020, "Tab": 0xFF09, "BackSpace": 0xFF08,
 }
 
 
