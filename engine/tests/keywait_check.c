@@ -29,6 +29,10 @@ static const int ANSWERS[4] = { 1, -1, 0, -1 };
 static int next_answer;
 static uint8_t delivered;
 
+/* This file deliberately does NOT use tests/u2_scenario.h. The fake backend below is the
+ * subject, not the harness: it is the only backend in the tree that can answer all three
+ * of the seam's answers, and the trap it pins is that nothing is written to *out on 0 and
+ * -1. A shared fixture would put the thing under test inside the harness. */
 static int fake_init(u2_ctx *ctx) { (void)ctx; return 0; }
 static int fake_poll(u2_ctx *ctx, u2_key *out) { (void)ctx; (void)out; return 0; }
 static int fake_wait(u2_ctx *ctx, u2_key *out)

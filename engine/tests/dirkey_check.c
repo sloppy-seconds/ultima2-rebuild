@@ -38,6 +38,10 @@ static int failures = 0;
 static uint8_t delivered;
 static int has_key = 1;
 
+/* This file deliberately does NOT use tests/u2_scenario.h. The fake backend below is the
+ * subject, not the harness: the seam's answer alphabet includes -1, and the trap this
+ * pins is that the backend writes nothing to *out on 0 and -1. A shared fixture would
+ * put the thing under test inside the harness. */
 static int fake_init(u2_ctx *ctx) { (void)ctx; return 0; }
 static int fake_poll(u2_ctx *ctx, u2_key *out)
 {

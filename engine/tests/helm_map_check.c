@@ -24,6 +24,8 @@
 #include "game/commands.h"
 #include "game/overworld.h"
 
+#include "u2_scenario.h"   /* the arming: scripted input, null clock, vram/state/frame init */
+
 static int checks, fails;
 #define CHECK(cond, ...) do {                                        \
         ++checks;                                                    \
@@ -32,52 +34,22 @@ static int checks, fails;
         printf(__VA_ARGS__); printf("\n");                           \
     } while (0)
 
-/* One key, then the input is finished. The map waits for a keypress, so a check that
- * never supplies one would hang rather than fail, and a spent script must end the wait
- * instead of blocking it. */
-static int keys_left = 1;
-static int in_init(u2_ctx *c) { (void)c; return 0; }
-static int in_poll(u2_ctx *c, u2_key *out)
-{
-    (void)c;
-    if (keys_left > 0) {
-        keys_left--;
-        if (out) out->ch = ' ';
-        return 1;
-    }
-    return -1;
-}
-static int in_wait(u2_ctx *c, u2_key *out) { return in_poll(c, out); }
-static void in_shutdown(u2_ctx *c) { (void)c; }
-static const u2_input test_input = {
-    .name = "helm-map-input", .init = in_init, .poll = in_poll,
-    .wait = in_wait, .shutdown = in_shutdown,
-};
-static void clock_sleep(u2_ctx *c, uint32_t ms) { (void)c; (void)ms; }
-static uint64_t clock_tick(u2_ctx *c) { (void)c; return 0; }
-static const u2_clock test_clock = {
-    .name = "helm-map-clock", .tick = clock_tick, .sleep_ms = clock_sleep,
-};
+/* One key, then the input is finished: the map waits for a keypress, so a check that
+ * never supplies one would hang rather than fail. The script and the null clock come
+ * from u2_scenario.h with everything else the arming needs. */
 
 /* A sector that is land in its top half and water in its bottom half, so "the map was
  * drawn" has an unambiguous shape: lit pixels above the midline, none below it. */
 static void arm(u2_ctx *ctx, u2_overworld *ow, uint8_t helm, uint8_t site)
 {
-    memset(ctx, 0, sizeof *ctx);
-    memset(ow, 0, sizeof *ow);
-    u2_vram_init(&ctx->vram);
-    u2_state_init(&ctx->state);
-    ctx->input = &test_input;
-    ctx->clock = &test_clock;
-    u2_frame_init(&ow->frame, 1);
-    ow->world.map_loaded = 1;
+    u2_sc_arm(ctx, ow, " ");
     for (int y = 0; y < U2_SECTOR_EDGE; y++)
         for (int x = 0; x < U2_SECTOR_EDGE; x++)
             ow->world.map[y * U2_SECTOR_EDGE + x] = (y < 32) ? 0x0C : 0x00;
+    ow->world.map_loaded = 1;
     ctx->state.items_held[5] = helm;      /* DS:DB, the HELM count */
     ctx->state.sector_second = site;      /* DS:4A, the site-kind digit */
     ctx->state.sector_x = 4; ctx->state.sector_y = 4;
-    keys_left = 1;
 }
 
 /* Count lit pixels in the map band, split at the vertical middle of the drawn picture.
@@ -131,7 +103,7 @@ int main(void)
     arm(&ctx, &ow, 7, 0);                 /* site 0 = wilderness, which the gate allows */
     u2_cmd_dispatch(&ctx, &ow, 'V');
     CHECK(ctx.state.items_held[5] == 6, "7 helms -> 6 after one view");
-    keys_left = 1;
+    u2_sc_replay(&ctx, " ");
     u2_cmd_dispatch(&ctx, &ow, 'V');
     CHECK(ctx.state.items_held[5] == 5, "and 5 after two — the charge is per press");
     u2_frame_free(&ow.frame);

@@ -28,72 +28,24 @@
 #include "game/commerce.h"
 #include "game/monsters.h"
 #include "game/overworld.h"
+
+#include "u2_scenario.h"   /* the arming: scripted input, null clock, vram/state/frame init */
 #include "platform/platform.h"
 #include "gen_content.h"
 
 static int checks, fails;
 
-/* read_digit goes through seam_key_poll, so an offer test needs an input backend. One
- * digit of hundreds is the whole script: the amount is one key, and the second poll
- * reports the input finished so nothing downstream can block on a human. */
-static int offer_digit_left = 1;
-
-static int offer_poll(u2_ctx *ctx, u2_key *out)
-{
-    (void)ctx;
-    if (offer_digit_left <= 0) return -1;
-    offer_digit_left = 0;
-    memset(out, 0, sizeof *out);
-    out->ch = '5';
-    return 1;
-}
-
-/* wait is not optional. seam_key_wait calls input->wait, and the read_digit path behind
- * an offer goes through it, so a backend that only fills .poll is a call through a NULL
- * pointer -- which is exactly how this test first failed, at address 0x0. The scripted
- * answer is the same either way: the key is already in the queue. */
-static int offer_wait(u2_ctx *ctx, u2_key *out) { return offer_poll(ctx, out); }
-
-static const u2_input offer_input = {
-    .name = "commerce-check-script", .poll = offer_poll, .wait = offer_wait,
-};
-
-/* The amount prompt waits on the screen between polls, and the wait goes through the
- * clock seam. The test links the game core and not the platform layer, so it brings its
- * own clock that does nothing: the digit is already in the queue, so a real delay would
- * only slow the run down. */
-static uint64_t offer_tick(u2_ctx *ctx) { (void)ctx; return 0; }
-static void offer_sleep(u2_ctx *ctx, uint32_t ms) { (void)ctx; (void)ms; }
-static const u2_clock offer_clock = {
-    .name = "commerce-check-null", .tick = offer_tick, .sleep_ms = offer_sleep,
-};
-
-/* Does the needle appear anywhere on the grid? Row and column are not asserted because
- * the placement of a transact line is one of the things asm/4209 grades as low
- * confidence -- the bytes prove the printer runs, not where the text lands. */
-static int grid_has(u2_ctx *ctx, const char *needle)
-{
-    char row[U2_COLS + 1];
-    for (int r = 0; r < U2_ROWS; r++) {
-        for (int c = 0; c < U2_COLS; c++) row[c] = (char)ctx->vram.cell[r][c].ch;
-        row[U2_COLS] = '\0';
-        if (strstr(row, needle)) return 1;
-    }
-    return 0;
-}
+/* The input script and the null clock come from u2_scenario.h: read_digit goes through
+ * seam_key_poll, so an offer test needs a backend, and one digit of hundreds is the whole
+ * script — the amount is one key, and a spent script reports the input finished so
+ * nothing downstream can block on a human or on a NULL .wait. */
 
 /* A site with one creature standing one step east of the player, so both rays in
  * u2_commerce_transact and u2_commerce_offer land on it. */
 static void arm_offer(u2_ctx *ctx, u2_overworld *ow, uint8_t role, uint8_t blessing,
                       int first, int second)
 {
-    memset(ctx, 0, sizeof *ctx);
-    memset(ow, 0, sizeof *ow);
-    u2_vram_init(&ctx->vram);
-    u2_state_init(&ctx->state);
-    ctx->input = &offer_input;
-    ctx->clock = &offer_clock;
-    offer_digit_left = 1;
+    u2_sc_arm(ctx, ow, "5");
     ctx->state.sector_first = (uint8_t)first;
     ctx->state.sector_second = (uint8_t)second;
     ctx->state.blessing = blessing;
@@ -438,7 +390,7 @@ int main(void)
         ow.world.tlkx_loaded = 1;
         CHECK(u2_commerce_transact(&tctx, &ow, 1, 0) == U2_TRANSACT_TREATED,
               "a role-0x81 slot on Planet X takes the scripted talk arm");
-        CHECK(grid_has(&tctx, "FATHER ANTOS CHANTS"),
+        CHECK(u2_sc_grid_has(&tctx, "FATHER ANTOS CHANTS"),
               "Antos speaks his tlkx93 record before anything else happens");
         CHECK(tctx.state.blessing == 1,
               "asm/4209:422B -- the blessing byte DS:6C is the writer's store, not a guess");
@@ -478,7 +430,7 @@ int main(void)
         arm_offer(&tctx, &ow, 0x82, 0, 3, 2);
         CHECK(u2_commerce_offer(&tctx, &ow, 1, 0) == U2_OFFER_EARN_RING,
               "500 gold to the sector-32 role-0x82 man without the blessing");
-        CHECK(grid_has(&tctx, U2_S_OFFER_EARN_RING), "EARN THE RING! is what he says");
+        CHECK(u2_sc_grid_has(&tctx, U2_S_OFFER_EARN_RING), "EARN THE RING! is what he says");
         CHECK(tctx.state.items_held[0] == 0, "and no ring changes hands");
         CHECK(tctx.state.gold_lo == 0x94 && tctx.state.gold_hi == 0x99,
               "and the 500 was taken even though he refused: 9999 -> 9499 (%02x%02x)",
@@ -488,7 +440,7 @@ int main(void)
         arm_offer(&tctx, &ow, 0x82, 1, 3, 2);
         CHECK(u2_commerce_offer(&tctx, &ow, 1, 0) == U2_OFFER_RING,
               "the same offer after the blessing");
-        CHECK(grid_has(&tctx, U2_S_OFFER_RING_IS_YOURS), "THE RING IS YOURS! is what he says");
+        CHECK(u2_sc_grid_has(&tctx, U2_S_OFFER_RING_IS_YOURS), "THE RING IS YOURS! is what he says");
         CHECK(tctx.state.items_held[0] == 1, "DS:D6, the RING slot, is set to 1");
         CHECK(tctx.state.gold_lo == 0x94 && tctx.state.gold_hi == 0x99,
               "the grant costs the same 500 (9999 -> 9499)");
@@ -498,13 +450,13 @@ int main(void)
          * the trial subtract is added back so a refusal costs nothing. The line WRAPS on a
          * real screen — `YOU DONT HAVE` on one row, `THAT MUCH!` on the next, status band
          * interleaved — so both halves are looked for rather than the whole sentence, which
-         * grid_has() could never match across a row boundary. */
+         * u2_sc_grid_has() could never match across a row boundary. */
         arm_offer(&tctx, &ow, 0x82, 1, 3, 2);
         tctx.state.gold_lo = 0x03;               /* 317 gold */
         tctx.state.gold_hi = 0x17;
         CHECK(u2_commerce_offer(&tctx, &ow, 1, 0) == U2_OFFER_BROKE,
               "317 gold against a 500 ask is refused for money, not for the blessing");
-        CHECK(grid_has(&tctx, "YOU DONT HAVE"),
+        CHECK(u2_sc_grid_has(&tctx, "YOU DONT HAVE"),
               "YOU DONT HAVE THAT MUCH! is on the grid (first half: the line wraps, and the "
               "wrap point moves with the right margin)");
         CHECK(tctx.state.gold_lo == 0x03 && tctx.state.gold_hi == 0x17,
@@ -542,7 +494,7 @@ int main(void)
         tctx.state.sector_second = 2;
         tctx.state.world = 0;
         tctx.state.mon_role[5] = 0x82;              /* and the man in town */
-        offer_digit_left = 1;
+        u2_sc_replay(&tctx, "5");
         CHECK(u2_commerce_offer(&tctx, &ow, 1, 0) == U2_OFFER_RING,
               "chain: Antos's blessing is what makes the ring obtainable");
         CHECK(tctx.state.items_held[0] == 1, "chain: the ring is in the inventory at the end");

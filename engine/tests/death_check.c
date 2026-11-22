@@ -31,70 +31,47 @@
 #include "game/status.h"
 #include "gen_content.h"
 
+#include "u2_scenario.h"   /* the arming: scripted input, null clock, vram/state init */
+
 static int fails, checks;
 #define CHECK(cond, ...) do { checks++; if (!(cond)) { fails++; \
     printf("  FAIL  " __VA_ARGS__); printf("\n"); } } while (0)
 
-/* A hand-built input backend, because this test links the game core and not the
- * platform layer: the handoff waits on seam_key_poll, and with no input wired that
- * poll dereferences a NULL pointer. keys_left is the whole script: one key, then
- * finished for good, which is the scripted stand-in for a player who walked away. */
-static int keys_left = 1;
+/* The script and the clock come from u2_scenario.h — one key, then finished for good,
+ * which is the scripted stand-in for a player who walked away. What this file adds is a
+ * hook at the instant the wait polls: "the prompt is on screen" cannot be asserted after
+ * the handoff returns, because it clears the screen on the way out, and asserting it
+ * before the call would only prove u2_death printed. This is the moment the old defect
+ * was about: a message written into a frame nobody had shown. */
 static char prompt_at_wait[U2_COLS + 1];
 
-static int handoff_poll(u2_ctx *ctx, u2_key *out)
+static void snapshot_prompt(void *user)
 {
-    (void)ctx;
-    if (keys_left <= 0) return -1;
-    /* Snapshot the screen at the instant the wait polls. "The prompt is on screen"
-     * cannot be asserted after the handoff returns -- it clears the screen on the way
-     * out -- and asserting it before the call would only prove u2_death printed. This
-     * is the moment the old defect was about: a message written into a frame nobody
-     * had shown. */
-    if (prompt_at_wait[0] == '\0') {
-        int n = 0;
-        /* Columns 0..29: the message area. Row 23 also carries the status band, and a
-         * snapshot of the whole row reads "(PRESS ANY KEY)    GOLD=0000". */
-        for (int c = 0; c < 30; c++) prompt_at_wait[n++] = (char)ctx->vram.cell[23][c].ch;
-        while (n > 0 && prompt_at_wait[n - 1] == ' ') n--;
-        prompt_at_wait[n] = '\0';
-        char *p = prompt_at_wait;
-        while (*p == ' ') p++;
-        if (p != prompt_at_wait) memmove(prompt_at_wait, p, strlen(p) + 1);
-    }
-    keys_left--;
-    memset(out, 0, sizeof *out);
-    out->ch = 'x';
-    return 1;
-}
-
-static const u2_input handoff_input = {
-    .name = "death-check-script",
-    .poll = handoff_poll,
-};
-
-static const char *row_text(u2_ctx *ctx, int row, char *buf, int c0, int c1)
-{
+    u2_ctx *ctx = (u2_ctx *)user;
+    if (prompt_at_wait[0] != '\0') return;      /* the first poll is the one that counts */
+    /* Columns 0..29: the message area. Row 23 also carries the status band, and a
+     * snapshot of the whole row reads "(PRESS ANY KEY)    GOLD=0000". */
     int n = 0;
-    for (int c = c0; c <= c1 && n < U2_COLS; c++)
-        buf[n++] = (char)ctx->vram.cell[row][c].ch;
-    while (n > 0 && buf[n - 1] == ' ') n--;
-    buf[n] = '\0';
-    char *p = buf;
+    for (int c = 0; c < 30; c++) prompt_at_wait[n++] = (char)ctx->vram.cell[23][c].ch;
+    while (n > 0 && prompt_at_wait[n - 1] == ' ') n--;
+    prompt_at_wait[n] = '\0';
+    char *p = prompt_at_wait;
     while (*p == ' ') p++;
-    return p;
+    if (p != prompt_at_wait) memmove(prompt_at_wait, p, strlen(p) + 1);
 }
 
-#define msg_text(ctx, row, buf)    row_text((ctx), (row), (buf), 0, 29)
-#define status_text(ctx, row, buf) row_text((ctx), (row), (buf), 30, 39)
+/* Row reads come from u2_scenario.h; the two macros are the column split the status
+ * band and the message area actually use. */
+#define msg_text(ctx, row, buf)    u2_sc_row((ctx), (row), (buf), 0, 29)
+#define status_text(ctx, row, buf) u2_sc_row((ctx), (row), (buf), 30, 39)
 
 /* A character as the weak-fight capture had it: named G23MAX, 30 HP, food and
  * gold non-zero, so a zero field after the call is a store and not a leftover. */
 static void arm(u2_ctx *ctx)
 {
-    memset(ctx, 0, sizeof *ctx);
-    u2_vram_init(&ctx->vram);
-    u2_state_init(&ctx->state);
+    u2_sc_arm_ctx(ctx, "x");
+    u2_sc_in.on_poll = snapshot_prompt;
+    u2_sc_in.user = ctx;
 
     memcpy(ctx->state.name, "G23MAX", 6);          /* NUL-terminated by the memset */
     ctx->state.hp       = 0x00;
@@ -181,9 +158,8 @@ int main(int argc, char **argv)
      * because the scripted run cannot reach the --play-map entry that was the one
      * missing the wait. */
     arm(&ctx);
-    keys_left = 1;
+    u2_sc_replay(&ctx, "x");
     prompt_at_wait[0] = '\0';
-    ctx.input = &handoff_input;
     u2_death(&ctx);
     CHECK(ctx.death_pending == 1,
           "death records that the session ended dead, so the loops unwind instead of ending");
@@ -196,7 +172,7 @@ int main(int argc, char **argv)
           "the game ending with this message still in an unshown frame");
     CHECK(ctx.death_pending == 1,
           "the handoff leaves the flag set: it is how the caller knows to reload the save");
-    CHECK(keys_left == 0,
+    CHECK(u2_sc_in.at == 1,
           "the handoff waited for a key rather than falling straight through");
     CHECK(msg_text(&ctx, 22, buf)[0] != '\0'
           && strcmp(msg_text(&ctx, 23, buf), U2_S_PRESS_ANY_KEY) == 0,
@@ -206,9 +182,8 @@ int main(int argc, char **argv)
     /* Control: a spent script must not hang the harness. seam_key_poll returns -1 and
        the handoff has to come back anyway. */
     arm(&ctx);
-    keys_left = 0;
+    u2_sc_replay(&ctx, "");
     prompt_at_wait[0] = '\0';
-    ctx.input = &handoff_input;
     u2_death(&ctx);
     u2_death_handoff(&ctx);
     /* Reaching this line at all is the assertion: with no key coming, a wait written as
