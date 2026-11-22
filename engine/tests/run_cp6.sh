@@ -704,6 +704,21 @@ else
         unst=$(sed -n 's/.*"unstamped":\([0-9]\{1,\}\).*/\1/p' "$WORK/locktown.out" | tail -1)
         [ "$unst" = "0" ] && ok "CP6 stamp: every creature is stamped on the very first frame -- no invisible monsters on entry" \
                           || bad "CP6 stamp: $unst creature(s) are in the table but not on the grid after entry"
+        # The load-moment latch, on the synthetic town. This is the case that can fail, and
+        # it is free: the run above already dumped the state.
+        #
+        # The synthetic town places its guard on a cell whose authored byte is NOT the
+        # creature's type, so the grid only matches the table if something stamps. Measured
+        # both ways: 0 as shipped, 1 with the load restamp and the stamp in
+        # u2_monsters_spawn both neutered. The real sector-22 case below cannot do this —
+        # mapx22 ships the creature bytes already drawn, so its latch reads 0 no matter what
+        # the code does — which is the whole of issue #18, and this is the answer to it.
+        lat=$(sed -n 's/.*"unstamped_at_load":\([0-9]\{1,\}\).*/\1/p' "$WORK/locktown.out" | tail -1)
+        case "${lat:-}" in
+            0)  ok "CP6 stamp: the load path stamped the synthetic town's guard into the grid (latch 0, $tcount creature)" ;;
+            '') bad "CP6 stamp: the synthetic town produced no unstamped_at_load reading" ;;
+            *)  bad "CP6 stamp: $lat creature(s) in the synthetic town are invisible on entry — the load path did not stamp" ;;
+        esac
         gh=$(sed -n 's/.*"ghosts":\([0-9]\{1,\}\).*/\1/p' "$WORK/locktown.out" | tail -1)
         [ "$gh" = "0" ] && ok "CP6 stamp: no ghost cells either -- nothing baked into the map survived as terrain" \
                         || bad "CP6 stamp: $gh ghost cell(s) after entry"

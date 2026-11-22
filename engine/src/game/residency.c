@@ -94,17 +94,23 @@ int u2_sector_load(u2_ctx *ctx, u2_overworld *ow, u2_sector_id id, u2_residency 
     if (mr == U2_WORLD_OK)
         u2_monsters_restamp(ctx, &ow->world);
     /* Latched AFTER the load path has finished, so it measures what a player would actually
-     * see on the first frame of the new sector. Read it honestly: on the real sector 22 this
-     * is 0 whether or not any stamping code runs. Measured 2026-11-22 by neutering BOTH
-     * stampers — this call, and the `w->map[cell] = s->mon_type[i]` in u2_monsters_spawn's
-     * slot loop — and the latch stayed 0 with a live table of 32 and map_loaded set. The
-     * reason is the data: mapx22 was authored with the creature bytes already drawn at the
-     * cells monx puts them on, so `map[cell] != mon_type[i]` is false before anything runs.
-     * So this latch is a smoke test on this sector, not a proof that the stamping works, and
-     * the gate that reads it cannot go red by the route its old comment named. See issue #18
-     * for the measurement and what a discriminating case would need (a cell whose authored
-     * byte differs from the creature's type — the wandering spawner's creatures are exactly
-     * that, which is where a real gate should be built). */
+     * see on the first frame of the new sector.
+     *
+     * It is only a real measurement on data where the authored map byte at a creature's cell
+     * differs from the creature's type. On the real sector 22 it reads 0 whatever the code
+     * does — mapx22 ships the creature bytes already drawn where monx places them — and that
+     * is how a gate on it sat unable to fail for a whole session (issue #18). The synthetic
+     * CP6 town does place a guard on ordinary ground, so there the latch is 0 as shipped and
+     * 1 with the stamping neutered, and that is the case CP6 now gates on. Both measurements
+     * are recorded in the issue; the short version is that a latch of 0 means nothing until
+     * you know the data could have made it non-zero.
+     *
+     * What stamps, in order of who does the work: u2_monsters_spawn() writes every live
+     * slot into the grid as it fills the table, and u2_monsters_restamp() restores the grid
+     * from map_base and re-stamps. At this point the grid is pristine, so the restamp's
+     * restore is a no-op and spawn's stamp is what holds. The restamp stays because the demo
+     * delta applied above can leave the grid differing from map_base, and this is the one
+     * place that reconciles them before anything draws. */
     ctx->diag_unstamped_at_load = u2_monsters_unstamped_cells(ctx, &ow->world);
 
     /* The digest-and-delta capture, at the one point where the loaded bytes are both
