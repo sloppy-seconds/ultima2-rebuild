@@ -90,8 +90,21 @@ src = read(CMD)
 # the rate is a named constant citing a measurement, not where the file sits.
 PACE = os.environ.get("U2_PACE_GATE_SRC") or os.path.join(ROOT, "engine", "src", "game", "space.h")
 pace = read(PACE)
-m = re.search(r"static void space_loop\(.*?\n\}\n", src, re.S)
-check(m is not None, "space_loop found in the flight source")
+# The loop body moved to space_fly when space_loop became the wrapper that installs and
+# restores ctx->present_now (issue #17). The wrapper is five lines of seam plumbing and has
+# none of these shapes in it; reading it would make every check below vacuously false, which
+# is the failure mode this file's own comment warns about -- a gate that matches the wrong
+# region reports a defect that is not there. So: the wrapper is checked for the seam, and
+# the body is checked for the pacing.
+m_wrap = re.search(r"static void space_loop\([^)]*\)\s*\{.*?\n\}\n", src, re.S)
+check(m_wrap is not None, "space_loop found in the flight source")
+wrap_code = re.sub(r"/\*.*?\*/", "", m_wrap.group(0) if m_wrap else "", flags=re.S)
+check("ctx->present_now = space_present_now" in wrap_code
+      and "ctx->present_now = saved_present" in wrap_code,
+      "space_loop installs its own present_now and restores the caller's, so the space "
+      "screen presents the space screen and the walk loop's seam does not outlive it")
+m = re.search(r"static void space_fly\([^)]*\)\s*\{.*?\n\}\n", src, re.S)
+check(m is not None, "space_fly (the loop body) found in the flight source")
 body = m.group(0) if m else ""
 
 # Strip comments before looking for code shapes. The function's own comment quotes the
@@ -101,7 +114,7 @@ body = m.group(0) if m else ""
 body_code = re.sub(r"/\*.*?\*/", "", body, flags=re.S)
 body_code = re.sub(r"//[^\n]*", "", body_code)
 
-check("seam_present_frame" in body_code,
+check("seam_present_frame" in body_code or "space_present_now(ctx)" in body_code,
       "space_loop presents a frame while it waits for a key (no invisible 100% spin)")
 # ...and WHERE it presents. Presenting is not enough: the frame is a composite, and the
 # paint that copies the text grid into it used to run before the prompt was printed, so
@@ -109,7 +122,9 @@ check("seam_present_frame" in body_code,
 # suite stayed green while the owner saw nothing at all (2026-11-11, second report).
 _body_prompt = body_code.find("seam_str_out(ctx, U2_S_CMD_PROMPT)")
 _body_poll = body_code.find("seam_key_poll(ctx, &k)", _body_prompt)
-_body_paint = body_code.find("space_paint(ctx, ow);", _body_prompt)
+_body_paint = body_code.find("space_present_now(ctx);", _body_prompt)
+if _body_paint < 0:
+    _body_paint = body_code.find("space_paint(ctx, ow);", _body_prompt)
 check(_body_prompt >= 0 and _body_poll > _body_prompt
       and _body_paint > _body_prompt and _body_paint < _body_poll,
       "the frame is repainted between the prompt print and the key poll (paint-first is what "

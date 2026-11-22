@@ -360,6 +360,7 @@ static void space_orbit_determine(u2_ctx *ctx, const uint8_t dest[3])
  * mid-entry (the original blocks); 1 means the warp resolved and the loop should
  * continue. */
 static void space_paint(u2_ctx *ctx, u2_overworld *ow);   /* defined below, with the loop */
+static void space_fly(u2_ctx *ctx, u2_overworld *ow);     /* the loop body; space_loop wraps it */
 void space_warp_field(u2_ctx *ctx, u2_overworld *ow);     /* asm/6DFD phases A/B/C */
 void space_warp_engage(u2_ctx *ctx, u2_overworld *ow);    /* asm/6DFD phases D/E */
 
@@ -713,7 +714,44 @@ void space_warp_engage(u2_ctx *ctx, u2_overworld *ow)
     }
 }
 
+/* The space screen's own answer to "put the current screen on the window".
+ *
+ * Before this, ctx->present_now still named overworld_present_now for the whole flight:
+ * cmd_L runs inside the walk loop, so the pointer the walk loop installed stayed in place,
+ * and anything that presents before it blocks -- seam_key_wait_shown, which four command
+ * handlers in commands.c reach through -- would have repainted the OVERWORLD over the
+ * starfield. The space loop never hit that path, so nothing showed it: the seam was
+ * installed by one view and silently borrowed by another for the whole flight.
+ *
+ * Same shape as the overworld's: a file-static, because u2_overworld is a game-layer type
+ * the core must not name, and there is exactly one flight per process. Set at loop entry
+ * and cleared at loop exit by the wrapper below, so it cannot be read unset while the loop
+ * that reads it is running. */
+static u2_overworld *s_space_ow;
+
+static void space_present_now(u2_ctx *ctx)
+{
+    if (!s_space_ow)
+        return;
+    space_paint(ctx, s_space_ow);
+    seam_present_frame(ctx);
+}
+
 static void space_loop(u2_ctx *ctx, u2_overworld *ow)
+{
+    /* Registered and restored here rather than inside the body because the body has five
+     * exits -- window closed, input exhausted, death pending, victory, and the ordinary
+     * return -- and a seam left installed past the screen that installed it is exactly the
+     * defect this replaces. */
+    void (*saved_present)(u2_ctx *) = ctx->present_now;
+    s_space_ow = ow;
+    ctx->present_now = space_present_now;
+    space_fly(ctx, ow);
+    ctx->present_now = saved_present;
+    s_space_ow = NULL;
+}
+
+static void space_fly(u2_ctx *ctx, u2_overworld *ow)
 {
     u2_state *st = &ctx->state;
 
@@ -740,8 +778,11 @@ static void space_loop(u2_ctx *ctx, u2_overworld *ow)
          * on 2026-11-11 at 550% CPU with the main thread parked in sdl_upload, which is
          * what the owner saw as a crash: "i'm in space and hit H but its not showing the
          * hyperjump dialog". */
-        space_paint(ctx, ow);
-        seam_present_frame(ctx);
+        /* Paint and present through the seam registered above, so there is one owner of
+         * "the current space screen on the window" and the loop cannot drift from it. The
+         * ordering this preserves is the measured one: prompt first, then the paint that
+         * copies the text grid into the frame, then the wait. */
+        space_present_now(ctx);
 
         /* Wait for a key WITHOUT burning the CPU. The old shape was `if (!r) continue;`
          * back to the prompt print, which both spun at 100% and flooded the text pane with
