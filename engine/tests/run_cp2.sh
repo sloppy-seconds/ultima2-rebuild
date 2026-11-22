@@ -37,6 +37,24 @@ PY
         || bad "in-tree sha256 disagrees with hashlib"
 fi
 
+# --- the key alphabet, at its own boundary (issue #8) ----------------------
+# core/keys.c is the one alphabet shared by --script files and the play API, and it had
+# zero direct tests: it was only ever exercised through a script backend, which would have
+# kept working if a name had been dropped. Two files, no archive — the module is pure.
+"$U2_CC" $U2_CCFLAGS -o "$WORK/keys_check" \
+   tests/keys_check.c src/core/keys.c 2>"$WORK/keys.err"
+if [ $? -ne 0 ]; then
+    bad "keys test harness did not build: $(head -2 "$WORK/keys.err")"
+else
+    "$WORK/keys_check" > "$WORK/keys.txt" 2>&1
+    if grep -q ', 0 failures' "$WORK/keys.txt"; then
+        ok "CP2 keys: $(head -1 "$WORK/keys.txt")"
+    else
+        bad "CP2 keys: $(head -1 "$WORK/keys.txt")"
+        sed 's/^/    /' "$WORK/keys.txt" | head -12
+    fi
+fi
+
 # --- the report: emitted, parseable, and free of game content ------------
 # An explicit --save-dir, and a fresh one each time. Without it the run uses
 # "saves" beside the binary, so the report depends on whatever a previous session
