@@ -55,6 +55,24 @@ else
     fi
 fi
 
+# --- the content roots, in precedence order (issue #8) ---------------------
+# The order IS the install-layout rule, and world.c, tiles.c and pic.c all read it.
+# Temp dirs only; the module reads ctx->data_dir and nothing else.
+"$U2_CC" $U2_CCFLAGS -o "$WORK/roots_check" \
+   tests/roots_check.c src/core/roots.c 2>"$WORK/roots.err"
+if [ $? -ne 0 ]; then
+    bad "roots test harness did not build: $(head -2 "$WORK/roots.err")"
+else
+    rm -rf /var/tmp/u2_roots_check
+    "$WORK/roots_check" > "$WORK/roots.txt" 2>&1
+    if grep -q ', 0 failures' "$WORK/roots.txt"; then
+        ok "CP2 roots: $(head -1 "$WORK/roots.txt")"
+    else
+        bad "CP2 roots: $(head -1 "$WORK/roots.txt")"
+        sed 's/^/    /' "$WORK/roots.txt" | head -12
+    fi
+fi
+
 # --- the report: emitted, parseable, and free of game content ------------
 # An explicit --save-dir, and a fresh one each time. Without it the run uses
 # "saves" beside the binary, so the report depends on whatever a previous session
