@@ -2,17 +2,16 @@
 # tests/run_cp5.sh — CP5 combat acceptance SPEC (tickets C1, C2, C6).
 #
 # src/game/combat.c exists and implements C1/C2/C6, so the behavioural run is the
-# main event. The SKIP path is kept for the case where combat.c is removed again
-# (a revert, a branch bisect) so the spec can still land ahead of the code. This
-# runner does three things:
+# main event, and combat.c is REQUIRED here rather than optional: five other
+# harnesses in this script link it (attack_check.c directly, and others through
+# ai.c's u2_combat_special and saturation_check.c's u2_combat_attack). This runner
+# does three things:
 #
 #   1. Always syntax-check tests/combat_check.c, so the specification is proven
 #      to be well-formed C and its API contract is pinned. This runs in CI.
 #   2. Always run the two fixture controls, so the spec is proven to discriminate
-#      whether or not combat.c is present.
-#   3. Run the behavioural spec against src/game/combat.c. If that file is
-#      absent, each ticket is reported SKIP with the exact missing hook named and
-#      the suite stays green (a skipped spec must not turn the gate red).
+#      independently of any implementation.
+#   3. Run the behavioural spec against src/game/combat.c.
 #
 # The spec (combat_check.c) is written to DISCRIMINATE: a boolean-immunity
 # resist, a wrong roll threshold, a fixed (non-random) counter, or a theft that
@@ -497,24 +496,23 @@ else
     sed 's/^/        /' "$WORK/site.build"
 fi
 
-# --- 2. the behavioural run, only when the combat hook exists ---------------
-if [ ! -f src/game/combat.c ]; then
-    skip "C1 three independent counters DS:26B/26C/26D (0..15) — needs src/game/combat.c"
-    skip "C2 ~75% resist roll on a live item slot (DS:D9/DA/E4) — needs src/game/combat.c"
-    skip "C6 theft deletes from the item array, nothing restored — needs src/game/combat.c"
-    # Must honour $fail. This branch used to `exit 0` unconditionally, which
-    # swallowed every earlier failure in the script — a syntax-check break or a
-    # control regression printed FAIL and still reported PASS to CI. A gate that
-    # cannot go red is worse than no gate.
-    printf '\n'
-    if [ "$fail" -eq 0 ]; then
-        printf 'CP5 SPEC: PASS (spec landed; combat not implemented — by design)\n'
-    else
-        printf 'CP5 SPEC: FAIL (controls or spec contract broken; behavioural run skipped)\n'
-    fi
-    exit "$fail"
-fi
-
+# --- 2. the behavioural run -------------------------------------------------
+#
+# There used to be a `if [ ! -f src/game/combat.c ]` branch here that reported the
+# three tickets SKIP and exited green, described as a fallback for a revert or a
+# bisect onto a commit before combat.c. It was removed, for two reasons.
+#
+# It could not do the thing it claimed. With combat.c moved aside, the branch is
+# taken but the run still reports FAIL, because the attack, H1 and S1 harnesses
+# above it link combat.c unconditionally and fail to build. A skip path that
+# cannot reach green is not a fallback, and its comment promised exactly the
+# safety property it could not deliver.
+#
+# And it read as a live skip list. Three SKIP lines naming C1, C2 and C6 sit in a
+# script whose combat is implemented and gated, and an architecture review read
+# them as truth and reported three shipped claims as asserted nowhere. A dead
+# branch that misdescribes the shipped tree is a reader trap with a green check on
+# it.
 "$U2_CC" $U2_CCFLAGS -o "$WORK/combat_check" \
    tests/combat_check.c src/game/combat.c src/game/kill_drop.c src/game/monsters.c \
    src/core/rng.c src/core/state.c \
