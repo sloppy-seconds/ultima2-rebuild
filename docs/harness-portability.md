@@ -189,6 +189,22 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-23 — a harness helper that builds a test binary is not a gate, and a wrapper that
+  reports the build's exit status as the test's verdict can never go red.** This project's
+  shell harness has a helper that links a check against the library and returns the compiler's
+  status. Most call sites nest a second step that actually runs the binary and capture its
+  output; one site did not, so a check with several assertions reported PASS for as long as it
+  compiled, and its own header comment recorded controls that had been demonstrated by hand and
+  never through the gate. Four candidate sites were suspected and only one was real, which is
+  the trap: the pattern looks like a style difference between call sites rather than a defect,
+  and the passing line is indistinguishable from the other passing lines. The general shape: any
+  harness helper whose name describes construction (`build_check`, `compile_test`, `u2_check`)
+  must be paired with execution at every call site, and the gate's success message should quote
+  something only a run can produce -- a check count, a case count -- because a hand-written
+  label hides the difference between "it passed" and "it built". A control that only inverts
+  production code cannot find this at all; the control is a deliberately failing check observed
+  going red *through the gate*, not through a manual invocation of the binary.
+  → Tier 1, verification discipline.
 * **2026-11-21 — `-fsyntax-only` silently disables `-fanalyzer`, so a static-analysis gate
   built on it reports a clean tree while analyzing nothing at all.** The first version of this
   project's analyzer gate reported zero findings over 72 translation units, which read as

@@ -207,7 +207,18 @@ fi
 # test dropped from the draw's guard, the "hash mode does not reproduce the table" check
 # goes red; with the builder's default removed, the first check goes red.
 if u2_check "$WORK/space_warp_check" tests/space_warp_check.c 2>"$WORK/swarp.build"; then
-    ok "space warp field: the table mode draws the table, and the mode is named"
+    # The binary has to be RUN. This gate used to report ok on a successful compile alone,
+    # so every assertion in space_warp_check -- including the warp_source controls recorded
+    # just above, which were demonstrated by hand and never through this gate -- was
+    # invisible to `make test`. Control, run 2026-11-23: with the enhanced geometry in
+    # u2_space_scene_from disabled, the check exits 1 with 2 failures and this line goes
+    # red; with it intact the gate reports the check count.
+    if "$WORK/space_warp_check" > "$WORK/swarp.run" 2>&1; then
+        ok "space warp field: $(tail -1 "$WORK/swarp.run")"
+    else
+        sed 's/^/        /' "$WORK/swarp.run" | tail -12
+        bad "space_warp_check failed"
+    fi
 else
     sed 's/^/        /' "$WORK/swarp.build" | tail -4
     bad "space_warp_check failed"
