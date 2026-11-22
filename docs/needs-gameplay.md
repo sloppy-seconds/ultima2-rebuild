@@ -1162,6 +1162,37 @@ now named `view_mode`.
 A CP4 test had been asserting the opposite behaviour by name and passing; it is replaced
 and the replacement says why.
 
+## G93 — where does the warp sweep's descend and top-hold come from? `[ ]`
+
+**Who can do it: agent, and it is a probe change rather than a play session.** The stop site
+is already instrumented (`captures/spice86/g90-warp-table` stopped at `asm/6B3D`'s entry for
+600 frames); what was missing was the caller.
+
+**The question.** `asm/6DFD`'s three phases are literal and they agree with the engine on
+three of five sweep constants: sweep 0 for 128 passes (the accumulate window), sweep 1 for
+128, then 2,4,...,126 for 63. But the engine also carries `U2_SWEEP_DESCEND 192` (128 -> 1)
+and `U2_SWEEP_TOP_HOLD 81` (held at 128), and **nothing in `asm/6DFD` decrements `DS:4C7`
+or holds it at 128** -- 128 is the value that *ends* phase C via the sign test. Those two
+came from `full-sweep.txt`, which reported a `128 -> 0` descent over 328 frames and a hold
+at 128.
+
+**Why it is open rather than fixed.** `asm/6B3D`'s entry is a shared stop site: the orbit
+loop (`asm/6999`), the warp phases (`asm/6DFD`) and the landing path (`asm/7030`) all call
+it. The most likely explanation is that the 600-frame read sampled a caller other than the
+warp and recorded that caller's sweep shape, but that is inference, and the capture is
+observed evidence while the routine is one of three callers. Overriding an observation on a
+static read of one caller is exactly the move that produced the G90 and G85 corrections, so
+it waits for evidence.
+
+**What a session would do.** Stop at `asm/6B3D`'s entry as before, but record the return
+address on the stack (or `CS:IP` of the caller) alongside `DS:4C7` and `DS:4C8` each hit.
+One hyperwarp and one idle orbit stretch answers it: if the descend and the top hold appear
+only with an orbit or landing return address, the constants belong to those paths and the
+warp's phase counts stand as decoded; if they appear under a `6DFD` return address, the
+phase decode is incomplete and needs revisiting.
+
+---
+
 ## G92 — what a direction key does to the star field in the orbit view `[x]`
 
 **Resolved 2026-11-23 from the decoded asm, not from a capture.** The question was

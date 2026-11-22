@@ -52,6 +52,36 @@
 #           (armed), 24-arrive.png (deep space, 7/1/1), 26-h999-after.png (on course,
 #           9/9/9, 'YOU ARE ORBITING X.').
 # confidence: high for both arms of the gate, each observed on a different fuel count
+#   READ END TO END 2026-11-23 -- the warp is THREE phases, and their counts and sweep
+#           values are literal in the body. `DS:4C8` is the per-phase iteration counter,
+#           `DS:4C7` the sweep value asm/6B3D reads:
+#
+#             print "HYPERWARP ENGAGED!"
+#             cs:0x6990 = 0x2200 ; cs:0x6992 = 0xffff      (RNG seed and step)
+#             A: 0x4C7 = 0 ; 128 x { call asm/6B3D ; delay 0x16 }
+#                sweep 0 means asm/6B3D skips the erase, so these 128 passes accumulate --
+#                this is the streak window, and it is 128 passes at 0, not a hold at 1.
+#             B: 0x4C7 = 1 ; cs:0x6992 = 1 ; 128 x { call asm/6B3D ; delay 0x16 }
+#                erase on, RNG step 1.
+#             C: cs:0x6994 = 1 ; sweep += 2 each pass: draws at 2,4,...,126 (63 passes),
+#                then 128 sets the sign bit and `jns` exits ; delay 0x18.
+#             then the off-course gate on DS:E5 (tri-lithium): two `rcr $1` tests, and if
+#                both bits are set it prints SHIP OFF COURSE! and randomises DS:4CA/4CB/4CC
+#                with three `rand & 7`; then `call L_007230` (asm/7030) and `ret`.
+#
+#           CONFLICT, recorded not resolved: the engine's sweep constants in space_view.h are
+#           DESCEND 192 (128 -> 1), ZERO 128, ONE 128, ASCEND 63, TOP_HOLD 81, and ZERO/ONE/
+#           ASCEND agree with the bytes above. DESCEND and TOP_HOLD have no counterpart here:
+#           nothing in this routine decrements DS:4C7, and nothing holds it at 128 -- 128 is
+#           the value that *ends* phase C. Those two constants came from
+#           captures/spice86/g90-warp-table/full-sweep.txt, a 600-frame read at asm/6B3D's
+#           entry, which reported a `128 -> 0` descent over 328 frames and a hold at 128.
+#           The stop site is shared, so the likely explanation is that the capture sampled
+#           asm/6B3D being called from somewhere other than this routine -- the orbit loop or
+#           the landing path -- and the shape is that caller's, not the warp's. Not fixed on
+#           the strength of static reading alone, because the capture is observed and this
+#           routine is only one of its callers: settling it needs the phase read alongside
+#           the caller identity at the stop site.
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 hyperwarp_flow:
 L_006ffd:
