@@ -92,6 +92,23 @@ else
     fi
 fi
 
+# --- the save slot: what lives in it, and what may rotate (issue #8) --------
+# slot.h:104-115 documents that a rotated directory must stay distinguishable from a
+# slot "or a rotated world becomes a selectable save that is really a corpse", and
+# nothing tested any of it. Links the archive: slot.c is one of many callers of save_dir.
+if u2_check "$WORK/slot_check" tests/slot_check.c 2>"$WORK/slot.err"; then
+    rm -rf /var/tmp/u2_slot_check
+    "$WORK/slot_check" > "$WORK/slot.txt" 2>&1
+    if grep -q ', 0 failures' "$WORK/slot.txt"; then
+        ok "CP2 slot: $(tail -1 "$WORK/slot.txt")"
+    else
+        bad "CP2 slot: $(tail -1 "$WORK/slot.txt")"
+        sed 's/^/    /' "$WORK/slot.txt" | head -12
+    fi
+else
+    bad "slot test harness did not build: $(head -2 "$WORK/slot.err")"
+fi
+
 # --- the report: emitted, parseable, and free of game content ------------
 # An explicit --save-dir, and a fresh one each time. Without it the run uses
 # "saves" beside the binary, so the report depends on whatever a previous session
