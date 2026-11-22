@@ -539,6 +539,14 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
  * `U2_SPACE_SHIP_STEP 4` here was invented and its own comment said UNMEASURED -- the
  * question it was trying to answer did not exist. */
 
+/* The orbit field's tables, owned by the loop that animates them -- the same reasoning that
+ * left `keep_frame` here rather than in the builder: this is warp-loop state, not a byte of
+ * the world, and it is not saved. Seeded once when the screen comes up and stepped once per
+ * pass, which is what makes the field keep moving after a turn instead of shifting once. */
+static uint8_t s_orbit_x[U2_SPACE_ORBIT_STARS];
+static uint8_t s_orbit_y[U2_SPACE_ORBIT_STARS];
+static int s_orbit_seeded;
+
 static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
                              int warp_frame, int keep_frame)
 {
@@ -553,6 +561,9 @@ static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
     sc.warping = warping;
     sc.warp_frame = warp_frame;
     sc.keep_frame = keep_frame;
+    /* The stateful orbit field, when this loop has seeded one. Left NULL during the warp,
+     * which draws its own radial field. */
+    if (!warping && s_orbit_seeded) { sc.orbit_x = s_orbit_x; sc.orbit_y = s_orbit_y; }
     /* The enhanced doubling of the field is NOT here any more. It moved into
      * u2_space_scene_from, which owns it because it follows from ctx->enhanced_layout
      * and nothing else (issue #17). What stays here is exactly the state the builder
@@ -754,6 +765,12 @@ static void space_fly(u2_ctx *ctx, u2_overworld *ow)
 {
     u2_state *st = &ctx->state;
 
+    /* Seed the field once for this trip into orbit, the way asm/6D3E fills the tables when
+     * the screen comes up. Fixed seed rather than the run's RNG so a capture and a gate can
+     * both name the field they are looking at. */
+    u2_space_orbit_init(s_orbit_x, s_orbit_y, 0x517u);
+    s_orbit_seeded = 1;
+
     /* The frame is drawn once here and again after every handled command, not on
      * every poll: the original repaints the starfield when the ship moves, not when
      * nothing happens. */
@@ -781,6 +798,20 @@ static void space_fly(u2_ctx *ctx, u2_overworld *ow)
          * "the current space screen on the window" and the loop cannot drift from it. The
          * ordering this preserves is the measured one: prompt first, then the paint that
          * copies the text grid into the frame, then the wait. */
+        /* One pass of the field, toward wherever the cross now sits. The tables are state
+         * and every pass pulls each star a step toward the ship, strongest near it, so the
+         * field converges instead of shifting once and freezing. asm/6B3D; see
+         * u2_space_orbit_pull for the arm structure.
+         *
+         * GRADE, and it is a real open question: this steps once per handled command,
+         * because that is the only cadence the decoded orbit loop supports -- asm/6999's
+         * head is a status pass, a prompt and a blocking key read, and nothing in it calls
+         * the field draw. Whether the original also runs asm/6B3D on a timer while it waits
+         * for the key has not been established, and the owner's description ("the stars
+         * start moving") points at yes. Settling it needs a capture that watches the field
+         * with no key pressed, which is a different probe from anything taken so far. */
+        u2_space_orbit_pull(s_orbit_x, s_orbit_y, st->space_ship_x, st->space_ship_y);
+
         space_present_now(ctx);
 
         /* Wait for a key WITHOUT burning the CPU. The old shape was `if (!r) continue;`

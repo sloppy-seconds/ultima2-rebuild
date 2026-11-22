@@ -215,6 +215,46 @@ static const uint8_t u2_warp_step_y[16] = {
     0x79, 0x04, 0xa0, 0x7c                  /* cs:0x6cc8..0x6ccb, code */
 };
 
+/* The two CS tables, decoded by a live read (see asm/6B3D_space_field_draw's header): the
+ * x table at cs:0x6cac is 16 entries of 1..16, the y table at cs:0x6cbc is 8 entries of
+ * 1..8. Neither has file backing, so these literals ARE the record of that read. */
+static const uint8_t orbit_pull_x[16] = {
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+};
+static const uint8_t orbit_pull_y[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
+
+void u2_space_orbit_init(uint8_t *sx, uint8_t *sy, uint32_t seed)
+{
+    uint32_t h = seed ? seed : 1u;
+    for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++) {
+        h = star_hash(h);
+        sx[i] = (uint8_t)(h & 0xffu);                 /* asm/6D3E: x = rand */
+        sy[i] = (uint8_t)((h >> 16) & 0x7fu);         /* asm/6D3E: y = rand & 0x7f */
+    }
+}
+
+/* One step of one axis toward the cross. `old >= ship` is the asm's byte compare after the
+ * `sbb`, i.e. a plain unsigned compare, and the two arms are the sbb and the adc the
+ * listing actually takes. */
+static uint8_t orbit_step_axis(uint8_t old, int ship, const uint8_t *tbl, int tbl_mask)
+{
+    const int diff = (old - ship) & 0xff;
+    if (old >= ship) {
+        const int di = ((~diff) & 0xff) >> 4;
+        return (uint8_t)((old - tbl[di & tbl_mask]) & 0xff);
+    }
+    const int di = diff >> 4;
+    return (uint8_t)((old + tbl[di & tbl_mask]) & 0xff);
+}
+
+void u2_space_orbit_pull(uint8_t *sx, uint8_t *sy, int ship_x, int ship_y)
+{
+    for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++) {
+        sx[i] = orbit_step_axis(sx[i], ship_x, orbit_pull_x, 15);
+        sy[i] = orbit_step_axis(sy[i], ship_y, orbit_pull_y, 7);
+    }
+}
+
 int u2_space_warp_advance(uint8_t *sx, uint8_t *sy, int n, int ship_x, int ship_y)
 {
     /* asm/6B3D's four arms, transcribed. Two things the first version of this function got
@@ -340,27 +380,20 @@ void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s)
                 view_plot(f, s, U2_SPACE_CENTRE_X + dx, U2_SPACE_CENTRE_Y + dy);
             }
         }
+    } else if (s->orbit_x && s->orbit_y) {
+        /* The stateful field: plot the tables, which the caller has already stepped with
+         * u2_space_orbit_pull. This is the shape asm/6B3D actually has -- the table entry is
+         * the screen coordinate, so drawing is a read and the motion lives in the step. */
+        for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++)
+            view_plot(f, s, s->orbit_x[i], s->orbit_y[i]);
     } else {
-        /* Orbit field: scattered points across the view. ~64 of them, measured.
-         *
-         * The field is offset by the ship's displacement from its entry preset, so moving
-         * the ship up slides the field down. GRADE: inferred, not measured. What is
-         * measured is that `asm/6B3D` "recomputes each entry relative to the ship at
-         * DS:47B/DS:47C through the delta table at cs:0x6cac" -- the stars' positions are
-         * a function of the ship, not absolute. How exactly the delta table maps a ship
-         * displacement onto a star has not been decoded, so this is the cheapest shape that
-         * has the documented property (field responds to the ship) and the right sign (the
-         * owner's report: press Up, the stars go down). Wrapping on both axes is what the
-         * original's masked byte arithmetic does. A before/after frame pair per direction
-         * in the original is what would settle the exact mapping; see issue #21. */
-        const int offx = (U2_SPACE_CENTRE_X - s->ship_x) % U2_SPACE_VIEW_COLS;
-        const int offy = (U2_SPACE_CENTRE_Y - s->ship_y) % U2_SPACE_VIEW_ROWS;
+        /* Orbit field fallback: a hash scatter across the view, ~64 points, measured. Used
+         * when no tables are installed (a gate building a scene from state alone). */
         for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++) {
             h = star_hash(h);
             const int x = (int)(h % U2_SPACE_VIEW_COLS);
             const int y = (int)((h >> 16) % U2_SPACE_VIEW_ROWS);
-            view_plot(f, s, (x + offx + U2_SPACE_VIEW_COLS) % U2_SPACE_VIEW_COLS,
-                            (y + offy + U2_SPACE_VIEW_ROWS) % U2_SPACE_VIEW_ROWS);
+            view_plot(f, s, x, y);
         }
     }
 

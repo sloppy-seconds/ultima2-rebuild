@@ -13,6 +13,7 @@
  * is dropped, or if the builder stops defaulting to the hash field.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "core/frame.h"
@@ -58,21 +59,6 @@ static int cross_at(const u2_frame *f, const u2_space_scene *s, int vx, int vy)
             if (px < 0 || py < 0 || px >= f->w || py >= f->h || !f->px[py][px]) return 0;
         }
     return 1;
-}
-
-/* Where the lit pixels are rather than how many: a field that slides under the ship keeps
- * its count and changes its positions, so a count would not see the thing being claimed. */
-static long lit_sum(const u2_frame *f, const u2_space_scene *s)
-{
-    const int sc = s->scale > 0 ? s->scale : 1;
-    long n = 0;
-    for (int vy = 0; vy < U2_SPACE_VIEW_ROWS; vy++)
-        for (int vx = 0; vx < U2_SPACE_VIEW_COLS; vx++) {
-            int px = s->ox + vx * sc, py = s->oy + vy * sc;
-            if (px >= 0 && py >= 0 && px < f->w && py < f->h && f->px[py][px])
-                n += (long)py * f->w + px;
-        }
-    return n;
 }
 
 /* How many of the table's own mapped positions are lit. This is the direct question —
@@ -217,7 +203,6 @@ int main(void)
     ss.warping = 0; ss.keep_frame = 0;
     u2_frame_clear(&f, 0);
     u2_space_scene_draw(&f, &ss);
-    long sum_centre = lit_sum(&f, &ss);
     CHECK(cross_at(&f, &ss, U2_SPACE_SHIP_X0, U2_SPACE_SHIP_Y0),
           "at the entry preset the cross sits at the field centre, which is all that "
           "g90-warp-table ever saw and what got misread as a pin");
@@ -251,9 +236,56 @@ int main(void)
     u2_space_scene_draw(&f, &ss);
     CHECK(cross_at(&f, &ss, U2_SPACE_SHIP_X0, U2_SPACE_SHIP_CLIMB_Y),
           "CLIMB stores 0x80/0x10 and the cross is drawn there");
-    CHECK(lit_sum(&f, &ss) != sum_centre,
-          "and the star field is not where it was: the field responds to the ship, which "
-          "is the owner-reported press-Up-stars-go-down");
+
+    /* --- the field is state, and it converges on the cross ------------------------
+     * asm/6B3D rewrites DS:4CD/DS:50D in place and the store puts the new value into both
+     * the table and the plot coordinates, so a table entry IS a screen coordinate and the
+     * motion lives in the step, not in the draw. A hash scatter cannot express this, which
+     * is why the engine grew real tables. */
+    uint8_t ox[U2_SPACE_ORBIT_STARS], oy[U2_SPACE_ORBIT_STARS];
+    u2_space_orbit_init(ox, oy, 0x517u);
+    int ymask_ok = 1;
+    for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++)
+        if (oy[i] > 0x7f) ymask_ok = 0;
+    CHECK(ymask_ok, "asm/6D3E masks the y byte to 0..127 and the init reproduces it");
+
+    uint8_t bx[U2_SPACE_ORBIT_STARS], by[U2_SPACE_ORBIT_STARS];
+    memcpy(bx, ox, sizeof bx); memcpy(by, oy, sizeof by);
+    long d_before = 0;
+    for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++) {
+        int dx = abs((int)bx[i] - 0x20), dy = abs((int)by[i] - 0x40);
+        d_before += dx + dy;
+    }
+    u2_space_orbit_pull(ox, oy, 0x20, 0x40);
+    long d_after = 0;
+    for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++) {
+        int dx = abs((int)ox[i] - 0x20), dy = abs((int)by[i] - 0x40);
+        d_after += dx + dy;
+    }
+    CHECK(memcmp(bx, ox, sizeof bx) != 0 || memcmp(by, oy, sizeof by) != 0,
+          "one pass actually moves stars: the field is stepped, not recomputed from a seed");
+    CHECK(d_after < d_before,
+          "and the whole field is closer to the cross than it was (%ld -> %ld): the pull is "
+          "toward the ship on both axes, which is what asm/6B3D's sbb/adc arms do",
+          d_before, d_after);
+
+    /* Convergence, not a one-shot shift: repeated passes keep closing the distance. This is
+     * the property the owner described -- the field keeps moving after a turn -- and it is
+     * the one a static offset cannot fake. The exact per-bucket magnitudes (1..16 on x,
+     * 1..8 on y) are implemented from the live CS read but are NOT pinned by exact-value
+     * tests here: which arm a star takes depends on a byte-compare/borrow boundary that the
+     * listing supports more than one reading of, and encoding a guessed expectation as a
+     * check would be worse than leaving it open. A live read of the tables across one pass
+     * pins it; see G92. */
+    for (int pass = 0; pass < 8; pass++) u2_space_orbit_pull(ox, oy, 0x20, 0x40);
+    long d_later = 0;
+    for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++) {
+        int dx = abs((int)ox[i] - 0x20), dy = abs((int)oy[i] - 0x40);
+        d_later += dx + dy;
+    }
+    CHECK(d_later < d_after,
+          "and eight more passes close it further (%ld -> %ld): the field converges on the "
+          "cross over time rather than moving once", d_after, d_later);
 
     ctx.state.space_ship_x = U2_SPACE_SHIP_X0;
     ctx.state.space_ship_y = U2_SPACE_SHIP_DIVE_Y;

@@ -96,6 +96,15 @@ typedef struct u2_space_scene {
     uint8_t zabo;
     int ship_x;
     int ship_y;
+    /* The orbit field's own two 64-entry tables of SCREEN coordinates, or NULL to fall
+     * back to the hash scatter. These are the engine's counterpart to DS:4CD/DS:50D, which
+     * `asm/6B3D` rewrites in place on every pass: the store at `L_006e22`/`L_006e2c` puts
+     * the new value into BOTH the table and the plot coordinates, so a table entry IS a
+     * screen coordinate and the field is stateful, not a function of the frame index.
+     * That is what makes the original's field keep moving after a turn: every pass pulls
+     * each star a step toward wherever the cross currently sits. See u2_space_orbit_pull. */
+    uint8_t *orbit_x;
+    uint8_t *orbit_y;
     /* Non-zero while the hyperwarp animation is playing. The warp field and the orbit
      * field are visibly different screens in the capture -- the orbit field is ~64
      * scattered points, the warp field is 1,900..6,000 lit pixels arranged radially --
@@ -175,6 +184,31 @@ typedef struct u2_space_scene {
  * program's own instructions. That is a known divergence, not a guess: see G89.
  *
  * Returns the number of stars that moved. */
+/* Seed the orbit field's tables the way `asm/6D3E_sub_6d3e` fills them: 64 entries, x
+ * from one random byte, y from one masked to 0..127 (`and $0x7f,%al`). Deterministic for a
+ * given seed so a capture and a test can both name the field they drew. */
+void u2_space_orbit_init(uint8_t *sx, uint8_t *sy, uint32_t seed);
+
+/* One pass of the field, the way `asm/6B3D` steps it. Each star is pulled TOWARD the
+ * cross, on both axes, by the table value for its distance bucket:
+ *
+ *   old >= ship:  di = (~(old-ship)) >> 4 ;  new = old - table[di]     (asm sbb arm)
+ *   old <  ship:  di =  (old-ship)  >> 4 ;  new = old + table[di]      (asm adc arm)
+ *
+ * with the x table `cs:0x6cac` = 16 entries of 1..16 and the y table `cs:0x6cbc` = 8
+ * entries of 1..8, read live because that CS data area has no file backing. The complement
+ * in the first arm is what makes the pull strongest NEAR the cross (di=15, pull 16) and
+ * weakest at the far edge (di=0, pull 1). Arithmetic is mod 256, so the field is a torus
+ * and a star just past the cross is pulled the short way round.
+ *
+ * GRADE, the stagger: `asm/6B3D` also gates each star's update on a comparison against the
+ * global counter at DS:4C3, so only part of the field moves on a given pass -- that is what
+ * makes the warp's rays read as sparse dots. The exact predicate is not decoded, so this
+ * steps every star every pass: same direction, same per-star magnitude, faster convergence.
+ * Marked here rather than hidden because a plausible stagger invented from prose is worse
+ * than an honest faster one. */
+void u2_space_orbit_pull(uint8_t *sx, uint8_t *sy, int ship_x, int ship_y);
+
 int u2_space_warp_advance(uint8_t *sx, uint8_t *sy, int n, int ship_x, int ship_y);
 
 /* Fill a warp field with `n` starting positions from `seed`. The original's initialiser is
