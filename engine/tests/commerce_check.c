@@ -26,6 +26,8 @@
 #include "core/state.h"
 #include "core/vram.h"
 #include "game/commerce.h"
+#include "game/commands.h"   /* u2_cmd_continuation: the tail's per-letter fields */
+#include "game/status.h"     /* u2_status_draw: what redraw_status actually asks for */
 #include "game/monsters.h"
 #include "game/overworld.h"
 
@@ -608,6 +610,44 @@ int main(void)
      * pass a one-directional test, and change nothing. */
     CHECK(u2_shrine_uses_sister(U2_FIDELITY_ENHANCED, 1) == 0,
           "enhanced mode must test 'F', not the original's broken immediate 1");
+
+    /* --- the command tail's status repaint (issue #20) -------------------------------
+     * TRANSACT spends gold, and the tail is what puts the new number on the status band.
+     * Nothing covered that: setting the TRANSACT entry's redraw_status from 1 to 0 left the
+     * whole suite green, because no gate read the band after a purchase. The purchase still
+     * happened, the bytes still moved, and the screen kept showing the pre-purchase number.
+     *
+     * Why this is asserted here and not in a shell gate: the band is drawn at absolute vram
+     * positions, and the headless run's stdout does not carry a readable band. Measured on
+     * the CP6 grocery case — flattened output holds exactly one `GOLD=`, and it reads the
+     * same `GOLD=9979` whether redraw_status is 1 or 0, so a grep on run output cannot
+     * distinguish the two states and a gate built on it would pass either way. The vram is
+     * the only place the repaint is visible, and reading it needs to be in-process. */
+    {
+        const u2_cmd_cont *t = u2_cmd_continuation('T');
+        CHECK(t != NULL && t->redraw_status,
+              "TRANSACT must carry redraw_status: a purchase that leaves the old gold on "
+              "the band is the defect issue #20 was filed for");
+
+        /* The field has to buy something real, or asserting it is asserting a bit. Draw the
+         * band at one value, change the value, draw again, and the band must follow. */
+        u2_ctx rc;
+        memset(&rc, 0, sizeof rc);
+        u2_sc_arm_ctx(&rc, "");
+        rc.state.gold_lo = 0x12;    /* DS:58 is the HIGH byte despite the name */
+        rc.state.gold_hi = 0x34;    /* DS:59 is the low one */
+        u2_status_draw(&rc);
+        char band[U2_COLS + 1];
+        CHECK(strcmp(u2_sc_row(&rc, 23, band, 30, 79), "GOLD=1234") == 0,
+              "the status band must show gold from DS:58/59 at row 23 col 30, got '%s'",
+              u2_sc_row(&rc, 23, band, 30, 79));
+        rc.state.gold_lo = 0x99;
+        rc.state.gold_hi = 0x79;
+        u2_status_draw(&rc);
+        CHECK(strcmp(u2_sc_row(&rc, 23, band, 30, 79), "GOLD=9979") == 0,
+              "redrawing the band after a spend must show the new number, got '%s'",
+              u2_sc_row(&rc, 23, band, 30, 79));
+    }
 
     printf("commerce_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
