@@ -189,6 +189,29 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-23 -- a capture-hungry agent builds an observation-shaped reconstruction, not a
+  code-shaped one, and the harness should refuse the substitution by default.** Across one
+  session this project was asked for a capture or an owner observation four times and answered
+  from the bytes every time: a sprite "pinned" by 120 idle frames was a preset the capture
+  never left; a field-animation question framed as needing a probe was answered by the loop
+  structure of the routine that draws it; a sweep value "that nothing decrements" decrements in
+  an arm of the same routine that had not been read; and a descent filed as needing a return
+  address at a breakpoint was found by grepping the data address across the disassembly tree.
+  The failure is not laziness in the ordinary sense -- it presents as rigour, because `observed`
+  outranks `inferred` in the evidence table, so reaching for a capture looks like reaching for
+  the best evidence while actually deferring the expensive part. The cost is structural: an
+  observation bounds the reconstruction to the states someone visited, and the states nobody
+  visited are exactly where a reimplementation is wrong. Two harness consequences. **Make decode
+  the cheaper path**, by indexing the disassembly so "what writes this address" is one command
+  rather than a grep over hundreds of files -- a lookup table for address and data ownership is
+  what makes reading cheaper than watching. And **make the deferral visible**: a worklist of
+  things blocked on observation will be treated as permission to defer, so each row must name
+  what makes the answer unreachable from the binary, and the list needs periodic audit against
+  that claim. Auditing this project's list found six of nine open items were decodable and had
+  been misfiled.
+  → Tier 1, evidence discipline: the default is decode, an observation is the exception and must
+  justify itself, and a generated index of data-address ownership is what keeps that default
+  affordable.
 * **2026-11-23 -- a value that never changes across a capture is only evidence about the
   states that capture visited, and a constant read over many frames is the most convincing
   shape a wrong generalisation can take.** A runtime probe sampled one sprite-position pair

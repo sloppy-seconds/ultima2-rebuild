@@ -185,6 +185,54 @@ never be committed to git.** The `.gitignore` enforces this; do not work around 
 
 ---
 
+## 0a. Decode First (READ BEFORE ASKING FOR ANY OBSERVATION — HARD RULE)
+
+**Never ask for an observation — a capture, a screenshot, a play session, or the owner's
+memory — without first attempting to answer the question by decoding the original.**
+
+The reason is not effort, it is what the two produce. **A game rebuilt from observation of it
+plays like the observation. A game rebuilt from its code is true to its code.** A capture
+tells you what happened in the states it visited; the code tells you what the program does,
+including every state nobody visited. The orbit cross is the clean case: 120 captured frames
+of a constant `0x80/0x40` were read as "the cross is pinned", and the recollection that it
+moves was correct — the capture had only ever sampled the entry preset, because it pressed
+nothing.
+
+The failure has a specific shape and it is worth naming, because it disguises itself as
+rigour. `observed` sits above `inferred` in the evidence table in § 5, so reaching for a
+capture *looks* like reaching for the best evidence. In practice it was avoidance: grepping
+one address is cheap, reading a 506-line function is not, and asking for a run defers the work
+and transfers it to the owner. Every time this project asked for an observation and was pushed
+back on, the answer was in the bytes. **That is the base rate, and it is the default
+assumption: the answer is in the code.**
+
+So before asking, an agent must have read — not grepped, **read** — the whole routine that
+owns the behaviour, and must name in the reply which files it read end to end. Whole means
+including the arms that are not on the happy path: the command-key arm, the error branch, the
+tail after the `ret`. Three findings in one day were wrong for exactly this reason — `asm/6B3D`
+'s "stagger", `asm/6DFD`'s "nothing decrements the sweep" (it does, in the `H` arm), and a
+ship sprite read off a header comment instead of the body, which made the engine draw an
+off-centre plus.
+
+**A question only escapes the bytes when** it depends on data the binary does not contain —
+third-party names, disc art, real-hardware timing — or on a state unreachable without play.
+Naming which of those it is, and why, is the price of asking. "I grepped and could not find
+it" does not qualify; that is a partial read, not a decode.
+
+Two corollaries:
+
+* **A frame confirms a decode, it does not substitute for one.** The § 3 rule that a
+  behavioural claim needs a frame applies to a claim already derived from the code. It never
+  licenses skipping the derivation.
+* **Before reaching for the emulator, ask whether the question is *what a value does* or
+  *what writes it*.** The second is a grep. "Where does `DS:4C7` descend?" was filed as a
+  probe question and answered by `grep -rn 0x4c7 asm/` in ten seconds.
+
+`docs/needs-gameplay.md` is not a licence to defer. Its rows carry a decode-first obligation,
+and an item belongs there only when the rule above has been applied and named.
+
+---
+
 ## 1. Domain Context: Compiler & Tool Selection
 
 *Ultima II* was hand-coded in 6502 assembly for Apple II and ported to x86 MS-DOS
