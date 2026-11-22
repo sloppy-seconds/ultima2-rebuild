@@ -39,7 +39,14 @@ Usage: g2_step_food.py DIR water-poor|grass-poor|water-rich|none-poor
 import os
 import sys
 
-F0 = 0x53 - 0x36          # PLAYER file offset of DS:53, the food triple
+# The seeders share one offset source: state.h, read at runtime by u2_seed.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import u2_seed                                  # noqa: E402
+
+# The file offset of DS:53, the food triple, named rather than written. patch() below takes
+# file offsets with an expected-old byte, so this wants the block-relative offset.
+_rec = u2_seed.PlayerRecord()
+F0 = _rec.off("food")
 POOR = (0x00, 0x00, 0x13)
 RICH = (0x99, 0x99, 0x00)
 ARMS = {

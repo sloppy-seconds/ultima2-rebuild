@@ -33,15 +33,14 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import u2_seed                                  # noqa: E402
 import u2_gate as G
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 SEED = os.path.join(REPO, "engine", "tests", "cp5_fight_seed.py")
 
 GRASS, TILE_HORSE = 0x08, 0x44
-DS6D = 0x6D - 0x36          # the world byte (0 Earth): non-zero is what the Earth gate reads
-ENTRY_X = 0x5A - 0x36       # the pair the save rewrites with the live position
-ENTRY_Y = 0x5B - 0x36
+# The fields are named through u2_seed, which reads the addresses from state.h at runtime.
 SITE_X, SITE_Y = 2, 0
 
 fails = []
@@ -76,12 +75,13 @@ def build(work, site=False, tiles=None, ds6d=0):
         open(mp, "wb").write(bytes(d))
 
     pp = G.record(work)
-    p = bytearray(open(pp, "rb").read())
+    p = u2_seed.PlayerRecord.load(pp)
     if site:
-        p[0x4A - 0x36] = 1
-        p[ENTRY_X], p[ENTRY_Y] = SITE_X, SITE_Y
-    p[DS6D] = ds6d
-    open(pp, "wb").write(bytes(p))
+        p.set_raw("sector_second", 1)
+        p.set_raw("entry_x", SITE_X)     # the pair the save rewrites with the live position
+        p.set_raw("entry_y", SITE_Y)
+    p.set_raw("world", ds6d)             # non-zero is what the Earth gate reads
+    p.write(pp)
     return work
 
 
@@ -153,7 +153,8 @@ def main():
     check(bytes(after) != before, "clean: the record was actually written")
     if st is not None:
         x, y = G.pos(st)
-        check(after[ENTRY_X] == x and after[ENTRY_Y] == y,
+        rec = u2_seed.PlayerRecord(bytearray(after))
+        check(rec.get("entry_x") == x and rec.get("entry_y") == y,
               "clean: the saved entry pair is the live position (%d,%d)" % (x, y))
     shutil.rmtree(work, ignore_errors=True)
 

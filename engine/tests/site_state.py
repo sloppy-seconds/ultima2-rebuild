@@ -32,6 +32,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import u2_seed                                  # noqa: E402
 import u2_gate as G
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -41,8 +42,7 @@ GRASS = 0x08
 TILE_HORSE = 0x44          # [DS:14] == 0x22: the horse arm of asm/2FAD, no item gate
 BOARD_LEAVES = 0x08        # what the horse arm writes through the cell pointer
 SITE_X, SITE_Y = 2, 0      # the cell the player starts on, on the north edge
-DS4A = 0x4A - 0x36         # sector second digit == site kind (1 = village)
-DS5A = 0x5A - 0x36         # entry x, which is also where the player is placed
+# The fields are named through u2_seed, which reads the addresses from state.h at runtime.
 
 
 def build(work):
@@ -65,10 +65,11 @@ def build(work):
     open(os.path.join(content, "monx01"), "wb").write(bytes(mon))
 
     pp = G.record(work)
-    p = bytearray(open(pp, "rb").read())
-    p[DS4A] = 1                        # sector 01: a site, so the edge leaves the site
-    p[DS5A], p[DS5A + 1] = SITE_X, SITE_Y
-    open(pp, "wb").write(bytes(p))
+    p = u2_seed.PlayerRecord.load(pp)
+    p.set_raw("sector_second", 1)      # sector 01: a site, so the edge leaves the site
+    p.set_raw("entry_x", SITE_X)       # entry x is also where the player is placed
+    p.set_raw("entry_y", SITE_Y)
+    p.write(pp)
 
     return {n: open(os.path.join(content, n), "rb").read()
             for n in ("mapx01", "monx01")}
@@ -163,9 +164,9 @@ def main():
     try:
         G.seed(work, tiles={(3, 0): 0xA0})          # a door one cell east of the player
         pp = G.record(work)
-        p = bytearray(open(pp, "rb").read())
-        p[0x65 - 0x36] = 0x05                        # keys: the unlock costs one
-        open(pp, "wb").write(bytes(p))
+        p = u2_seed.PlayerRecord.load(pp)
+        p.set_intent("keys", 5)                        # the unlock costs one
+        p.write(pp)
         mon_before = sector(work, "monx00")
 
         run(work, ["U", "RIGHT"] + ["DOWN"] * 6 + ["Q"], name="c")

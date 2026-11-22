@@ -28,10 +28,11 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import u2_seed                                  # noqa: E402
 import u2_gate as G          # noqa: E402
 
-HP_HI_OFF = 0x51 - 0x36
-HP_LO_OFF = 0x52 - 0x36
+# The HP pair is named through u2_seed (state.h's hp at DS:51 and the low byte it has not
+# been able to name, unk_52 at DS:52).
 fails = []
 
 
@@ -51,9 +52,10 @@ def seed_dying(name):
     the same HP 0004, so a reload comes back alive — which is the whole point."""
     work = G.seed("/var/tmp/u2-death-reload-%s" % name, tiles={G.EAST: 0x04})
     pp = G.record(work)
-    d = bytearray(open(pp, "rb").read())
-    d[HP_HI_OFF], d[HP_LO_OFF] = 0x00, 0x04
-    open(pp, "wb").write(bytes(d))
+    p = u2_seed.PlayerRecord.load(pp)
+    p.set_raw("hp", 0x00)
+    p.set_raw("unk_52", 0x04)
+    p.write(pp)
     return work
 
 
