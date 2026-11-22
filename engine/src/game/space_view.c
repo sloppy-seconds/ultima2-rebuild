@@ -341,12 +341,26 @@ void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s)
             }
         }
     } else {
-        /* Orbit field: scattered points across the view. ~64 of them, measured. */
+        /* Orbit field: scattered points across the view. ~64 of them, measured.
+         *
+         * The field is offset by the ship's displacement from its entry preset, so moving
+         * the ship up slides the field down. GRADE: inferred, not measured. What is
+         * measured is that `asm/6B3D` "recomputes each entry relative to the ship at
+         * DS:47B/DS:47C through the delta table at cs:0x6cac" -- the stars' positions are
+         * a function of the ship, not absolute. How exactly the delta table maps a ship
+         * displacement onto a star has not been decoded, so this is the cheapest shape that
+         * has the documented property (field responds to the ship) and the right sign (the
+         * owner's report: press Up, the stars go down). Wrapping on both axes is what the
+         * original's masked byte arithmetic does. A before/after frame pair per direction
+         * in the original is what would settle the exact mapping; see issue #21. */
+        const int offx = (U2_SPACE_CENTRE_X - s->ship_x) % U2_SPACE_VIEW_COLS;
+        const int offy = (U2_SPACE_CENTRE_Y - s->ship_y) % U2_SPACE_VIEW_ROWS;
         for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++) {
             h = star_hash(h);
             const int x = (int)(h % U2_SPACE_VIEW_COLS);
             const int y = (int)((h >> 16) % U2_SPACE_VIEW_ROWS);
-            view_plot(f, s, x, y);
+            view_plot(f, s, (x + offx + U2_SPACE_VIEW_COLS) % U2_SPACE_VIEW_COLS,
+                            (y + offy + U2_SPACE_VIEW_ROWS) % U2_SPACE_VIEW_ROWS);
         }
     }
 
@@ -356,19 +370,23 @@ void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s)
      * transform below converts screen to view once and then scales: at scale 1 with
      * the measured origin this reproduces the old absolute plot byte for byte. */
     const int sc = s->scale > 0 ? s->scale : 1;
-    /* The cross is at the CENTRE of the field and does not move. Measured, not
-     * inferred: g90-warp-table/ship.txt reads DS:47B and DS:47C as 0x80 and 0x40 — the
-     * middle of the 256x128 field — in all 120 frames it captured, while the star
-     * tables in the same capture are rewriting themselves every frame. So the original
-     * pins the crosshair and scrolls the field under it, and the engine had it the
-     * other way round: a static hash field with a travelling cross.
+    /* The cross is drawn AT THE SHIP, and the ship moves. `asm/6D83` plots the vertical
+     * stroke at `x = DS:47B`, `y = DS:47C-3..+3` and `asm/6CC4` erases the same thirteen
+     * pixels, so the sprite is wherever the ship's screen position says it is.
      *
-     * s->ship_x and s->ship_y are still what the step is measured against, because the
-     * centre IS the ship's screen position; they are simply no longer where the cross
-     * is drawn. What a direction key does to the field in the orbit view is still
-     * open and is NOT implemented here. */
-    const int svx = U2_SPACE_CENTRE_X;
-    const int svy = U2_SPACE_CENTRE_Y;
+     * An earlier note here claimed the cross was pinned at the field centre and the field
+     * scrolled under it, citing `g90-warp-table/ship.txt` reading 0x80/0x40 across 120
+     * frames. That was an over-generalisation: the capture was taken during hyperwarp with
+     * no direction key pressed, so it only ever saw the loop head's entry preset
+     * (`L_006ba3`), which happens to BE the centre. `asm/6999`'s arrow arms rewrite the
+     * pair to a preset per direction, and the owner's recollection of the cross moving was
+     * right. See the preset table in space_view.h.
+     *
+     * s->ship_x/ship_y are in screen coordinates, so the transform below converts screen
+     * to view once and then scales: at scale 1 with the measured origin, and with the ship
+     * at its entry preset, this reproduces the old absolute plot byte for byte. */
+    const int svx = s->ship_x;
+    const int svy = s->ship_y;
     for (int d = U2_SPACE_SHIP_V_FROM; d <= U2_SPACE_SHIP_V_TO; d++)
         for (int k = 0; k < sc; k++)
             u2_frame_pixel(f, s->ox + svx * sc + k, s->oy + (svy + d) * sc, U2_CGA_WHITE);

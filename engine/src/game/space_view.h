@@ -61,6 +61,23 @@ typedef struct u2_ctx u2_ctx;
 #define U2_SPACE_SHIP_X0 0x80
 #define U2_SPACE_SHIP_Y0 0x40
 
+/* The four direction presets. `asm/6999_space_status` is the orbit command loop and its
+ * arrow arms are at `L_006cb9..L_006d3c`. Each arm prints its word, calls `L_006ec4`
+ * (= `asm/6CC4`, file + 0x200, the ship-sprite erase at the OLD position), stores a FIXED
+ * PRESET into DS:47B/DS:47C, and `jmp`s back to the loop head:
+ *
+ *   L_006ce1  call L_006ec4
+ *   L_006ce4  mov $0x20,%al ; mov %al,0x47b      LEFT
+ *   L_006ce9  mov $0x40,%al ; mov %al,0x47c
+ *
+ * There is NO step and NO scroll offset: the ship is repositioned to a preset near the
+ * field edge, not moved by a delta. The entry preset above is the loop head's own value
+ * (`L_006ba3`), which is why a capture that never presses a key only ever sees 0x80/0x40. */
+#define U2_SPACE_SHIP_LEFT_X  0x20
+#define U2_SPACE_SHIP_RIGHT_X 0xDF
+#define U2_SPACE_SHIP_CLIMB_Y 0x10
+#define U2_SPACE_SHIP_DIVE_Y  0x6F
+
 /* The right-hand readout, in the order the original prints it. asm/6999_space_status
  * writes the three coordinates into DS:4CA/4CB/4CC from the world table, and the fuel
  * it labels is DS:E5 (TRI-LITHIUM). */

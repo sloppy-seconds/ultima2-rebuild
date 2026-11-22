@@ -40,6 +40,41 @@ static int lit_in_field(const u2_frame *f, const u2_space_scene *s)
     return n;
 }
 
+/* The ship cross exactly as asm/6D83 draws it: vertical stroke x fixed at ship_x, y from
+ * ship_y-3 to ship_y+2; horizontal stroke y fixed at ship_y, x from ship_x-3 to ship_x+3.
+ * True only when all thirteen land lit at the given VIEW position, so a stray star cannot
+ * satisfy it. */
+static int cross_at(const u2_frame *f, const u2_space_scene *s, int vx, int vy)
+{
+    const int sc = s->scale > 0 ? s->scale : 1;
+    for (int d = U2_SPACE_SHIP_V_FROM; d <= U2_SPACE_SHIP_V_TO; d++)
+        for (int k = 0; k < sc; k++) {
+            int px = s->ox + vx * sc + k, py = s->oy + (vy + d) * sc;
+            if (px < 0 || py < 0 || px >= f->w || py >= f->h || !f->px[py][px]) return 0;
+        }
+    for (int d = U2_SPACE_SHIP_H_FROM; d <= U2_SPACE_SHIP_H_TO; d++)
+        for (int k = 0; k < sc; k++) {
+            int px = s->ox + (vx + d) * sc, py = s->oy + vy * sc + k;
+            if (px < 0 || py < 0 || px >= f->w || py >= f->h || !f->px[py][px]) return 0;
+        }
+    return 1;
+}
+
+/* Where the lit pixels are rather than how many: a field that slides under the ship keeps
+ * its count and changes its positions, so a count would not see the thing being claimed. */
+static long lit_sum(const u2_frame *f, const u2_space_scene *s)
+{
+    const int sc = s->scale > 0 ? s->scale : 1;
+    long n = 0;
+    for (int vy = 0; vy < U2_SPACE_VIEW_ROWS; vy++)
+        for (int vx = 0; vx < U2_SPACE_VIEW_COLS; vx++) {
+            int px = s->ox + vx * sc, py = s->oy + vy * sc;
+            if (px >= 0 && py >= 0 && px < f->w && py < f->h && f->px[py][px])
+                n += (long)py * f->w + px;
+        }
+    return n;
+}
+
 /* How many of the table's own mapped positions are lit. This is the direct question —
  * did the renderer read the table — and it is the only assertion that cannot be satisfied
  * by a field that happens to light a similar number of pixels. */
@@ -163,6 +198,71 @@ int main(void)
     CHECK(lit_in_field(&f, &enh) > 0,
           "and the enhanced scene draws a non-empty field straight from ctx, which is "
           "what 'the builder owns the geometry' has to mean to be worth anything");
+
+    /* --- the cross is drawn AT THE SHIP, and the presets are the asm's ------------
+     * asm/6999 is the orbit command loop; its arrow arms (L_006cb9..L_006d3c) print the
+     * word, call asm/6CC4 to erase at the OLD position, and store a FIXED PRESET into
+     * DS:47B/DS:47C. There is no step. asm/6D83 then draws the sprite at that pair, so the
+     * cross lands on the preset and the field sits relative to it. Every assertion here
+     * fails if the cross is pinned back to the centre or the presets become a delta. */
+    u2_space_scene ss;
+    /* The enhanced block above leaves ctx.enhanced_layout set, and an enhanced scene is
+     * scale 2 -- which clips against this 320x200 frame and makes every position
+     * assertion below about clipping rather than about the sprite. The presets are screen
+     * coordinates in both modes, so classic is the honest place to pin them. */
+    ctx.enhanced_layout = 0;
+    ctx.state.space_ship_x = U2_SPACE_SHIP_X0;
+    ctx.state.space_ship_y = U2_SPACE_SHIP_Y0;
+    u2_space_scene_from(&ctx, &ss);
+    ss.warping = 0; ss.keep_frame = 0;
+    u2_frame_clear(&f, 0);
+    u2_space_scene_draw(&f, &ss);
+    long sum_centre = lit_sum(&f, &ss);
+    CHECK(cross_at(&f, &ss, U2_SPACE_SHIP_X0, U2_SPACE_SHIP_Y0),
+          "at the entry preset the cross sits at the field centre, which is all that "
+          "g90-warp-table ever saw and what got misread as a pin");
+
+    ctx.state.space_ship_x = U2_SPACE_SHIP_LEFT_X;
+    ctx.state.space_ship_y = U2_SPACE_SHIP_Y0;
+    u2_space_scene_from(&ctx, &ss);
+    ss.warping = 0; ss.keep_frame = 0;
+    u2_frame_clear(&f, 0);
+    u2_space_scene_draw(&f, &ss);
+    CHECK(cross_at(&f, &ss, U2_SPACE_SHIP_LEFT_X, U2_SPACE_SHIP_Y0),
+          "LEFT stores 0x20/0x40 (asm/6999 L_006ce4) and the cross is drawn there");
+    CHECK(!cross_at(&f, &ss, U2_SPACE_SHIP_X0, U2_SPACE_SHIP_Y0),
+          "and the centre carries no cross once the ship has moved: the sprite travels, "
+          "it is not pinned");
+
+    ctx.state.space_ship_x = U2_SPACE_SHIP_RIGHT_X;
+    ctx.state.space_ship_y = U2_SPACE_SHIP_Y0;
+    u2_space_scene_from(&ctx, &ss);
+    ss.warping = 0; ss.keep_frame = 0;
+    u2_frame_clear(&f, 0);
+    u2_space_scene_draw(&f, &ss);
+    CHECK(cross_at(&f, &ss, U2_SPACE_SHIP_RIGHT_X, U2_SPACE_SHIP_Y0),
+          "RIGHT stores 0xDF/0x40 (asm/6999 L_006d0a region) and the cross is drawn there");
+
+    ctx.state.space_ship_x = U2_SPACE_SHIP_X0;
+    ctx.state.space_ship_y = U2_SPACE_SHIP_CLIMB_Y;
+    u2_space_scene_from(&ctx, &ss);
+    ss.warping = 0; ss.keep_frame = 0;
+    u2_frame_clear(&f, 0);
+    u2_space_scene_draw(&f, &ss);
+    CHECK(cross_at(&f, &ss, U2_SPACE_SHIP_X0, U2_SPACE_SHIP_CLIMB_Y),
+          "CLIMB stores 0x80/0x10 and the cross is drawn there");
+    CHECK(lit_sum(&f, &ss) != sum_centre,
+          "and the star field is not where it was: the field responds to the ship, which "
+          "is the owner-reported press-Up-stars-go-down");
+
+    ctx.state.space_ship_x = U2_SPACE_SHIP_X0;
+    ctx.state.space_ship_y = U2_SPACE_SHIP_DIVE_Y;
+    u2_space_scene_from(&ctx, &ss);
+    ss.warping = 0; ss.keep_frame = 0;
+    u2_frame_clear(&f, 0);
+    u2_space_scene_draw(&f, &ss);
+    CHECK(cross_at(&f, &ss, U2_SPACE_SHIP_X0, U2_SPACE_SHIP_DIVE_Y),
+          "DIVE stores 0x80/0x6F and the cross is drawn there");
 
     u2_frame_free(&f);
     printf("space_warp_check: %d checks, %d failures\n", checks, fails);

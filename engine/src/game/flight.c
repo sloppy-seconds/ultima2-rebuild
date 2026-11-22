@@ -534,11 +534,10 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
  * screen only and change no coordinate, so the engine prints the direction word and
  * loops; that is the whole observable effect of an arrow. */
 
-/* How far an arrow moves the sprite. UNMEASURED -- the captures prove the sprite moves
- * and that no coordinate changes, but never read DS:47B across an arrow to get the
- * step. Named rather than inlined so it is a visible gap with a route to closing it:
- * peek 8be:47b before and after one Right in a live run. */
-#define U2_SPACE_SHIP_STEP 4
+/* There is no ship step. `asm/6999`'s arrow arms store a FIXED PRESET per direction into
+ * DS:47B/DS:47C, they do not add a delta; see the preset table in space_view.h. An earlier
+ * `U2_SPACE_SHIP_STEP 4` here was invented and its own comment said UNMEASURED -- the
+ * question it was trying to answer did not exist. */
 
 static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
                              int warp_frame, int keep_frame)
@@ -803,13 +802,17 @@ static void space_fly(u2_ctx *ctx, u2_overworld *ow)
          * then a fresh `CMD:` below it (g39 frame 22-right.png); without the CR the
          * echoes ran together as `CMD: RIGHTCMD: LEFT`. */
         case U2_KEY_LEFT:  seam_str_out(ctx, U2_S_SPACE_LEFT);  seam_char_print(ctx, '\r');
-            st->space_ship_x = (uint8_t)(st->space_ship_x - U2_SPACE_SHIP_STEP); break;
+            st->space_ship_x = U2_SPACE_SHIP_LEFT_X;
+            st->space_ship_y = U2_SPACE_SHIP_Y0; break;
         case U2_KEY_RIGHT: seam_str_out(ctx, U2_S_SPACE_RIGHT); seam_char_print(ctx, '\r');
-            st->space_ship_x = (uint8_t)(st->space_ship_x + U2_SPACE_SHIP_STEP); break;
+            st->space_ship_x = U2_SPACE_SHIP_RIGHT_X;
+            st->space_ship_y = U2_SPACE_SHIP_Y0; break;
         case U2_KEY_UP:    seam_str_out(ctx, U2_S_SPACE_CLIMB); seam_char_print(ctx, '\r');
-            st->space_ship_y = (uint8_t)(st->space_ship_y - U2_SPACE_SHIP_STEP); break;
+            st->space_ship_x = U2_SPACE_SHIP_X0;
+            st->space_ship_y = U2_SPACE_SHIP_CLIMB_Y; break;
         case U2_KEY_DOWN:  seam_str_out(ctx, U2_S_SPACE_DIVE);  seam_char_print(ctx, '\r');
-            st->space_ship_y = (uint8_t)(st->space_ship_y + U2_SPACE_SHIP_STEP); break;
+            st->space_ship_x = U2_SPACE_SHIP_X0;
+            st->space_ship_y = U2_SPACE_SHIP_DIVE_Y; break;
         case 'H': case 'h':
             if (!space_hyperwarp(ctx, ow)) return;
             /* Repaint the fixed cells. The readout is positioned now, not streamed, so
