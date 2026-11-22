@@ -198,16 +198,25 @@ void u2_space_orbit_init(uint8_t *sx, uint8_t *sy, uint32_t seed);
  * with the x table `cs:0x6cac` = 16 entries of 1..16 and the y table `cs:0x6cbc` = 8
  * entries of 1..8, read live because that CS data area has no file backing. The complement
  * in the first arm is what makes the pull strongest NEAR the cross (di=15, pull 16) and
- * weakest at the far edge (di=0, pull 1). Arithmetic is mod 256, so the field is a torus
- * and a star just past the cross is pulled the short way round.
+ * weakest at the far edge (di=0, pull 1).
  *
- * GRADE, the stagger: `asm/6B3D` also gates each star's update on a comparison against the
- * global counter at DS:4C3, so only part of the field moves on a given pass -- that is what
- * makes the warp's rays read as sparse dots. The exact predicate is not decoded, so this
- * steps every star every pass: same direction, same per-star magnitude, faster convergence.
- * Marked here rather than hidden because a plausible stagger invented from prose is worse
- * than an honest faster one. */
-void u2_space_orbit_pull(uint8_t *sx, uint8_t *sy, int ship_x, int ship_y);
+ * A pull that would run off the end RETIRES THE STAR rather than wrapping it: `L_006e8c`
+ * draws two fresh random bytes and puts the star somewhere else entirely -- asm/6D3E's fill
+ * rule applied one star at a time. The field is therefore neither wrapped nor drained; stars
+ * that reach the edge are recycled, which is what keeps the original populated late in a
+ * warp when a naive step empties it. `*rng` is the engine's stand-in for the game's live
+ * random stream (`L_006f68`), advanced once per star as the original advances it.
+ *
+ * The y bound is a real constraint, not a mask: the asm tests the sign of the result and
+ * reseeds at 0x80 or above, so y stays in 0..127 the way the initialiser's `and $0x7f` put
+ * it there. The listing indexes the 8-entry y table with a 0..15 bucket, which runs past it;
+ * this masks to the table's width rather than reproducing an overrun into whatever byte
+ * followed in the CS data area.
+ *
+ * Cadence is the caller's business and it matters: asm/6999's loop is draw, delay, poll,
+ * and no-key jumps back to the draw, so a pass runs continuously while the screen waits for
+ * input -- not once per command. That is why the field keeps moving after a turn. */
+void u2_space_orbit_pull(uint8_t *sx, uint8_t *sy, int ship_x, int ship_y, uint32_t *rng);
 
 int u2_space_warp_advance(uint8_t *sx, uint8_t *sy, int n, int ship_x, int ship_y);
 

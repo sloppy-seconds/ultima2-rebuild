@@ -233,25 +233,41 @@ void u2_space_orbit_init(uint8_t *sx, uint8_t *sy, uint32_t seed)
     }
 }
 
-/* One step of one axis toward the cross. `old >= ship` is the asm's byte compare after the
- * `sbb`, i.e. a plain unsigned compare, and the two arms are the sbb and the adc the
- * listing actually takes. */
-static uint8_t orbit_step_axis(uint8_t old, int ship, const uint8_t *tbl, int tbl_mask)
+/* One arm of one axis. Returns the new value, or -1 when the pull would run off the end and
+ * the star must be retired. `old >= ship` is the asm's byte compare after the `sbb`, i.e. a
+ * plain unsigned compare, and the two arms are the sbb and the adc the listing takes. */
+static int orbit_step_axis(int old, int ship, const uint8_t *tbl, int tbl_mask)
 {
     const int diff = (old - ship) & 0xff;
     if (old >= ship) {
         const int di = ((~diff) & 0xff) >> 4;
-        return (uint8_t)((old - tbl[di & tbl_mask]) & 0xff);
+        const int pull = tbl[di & tbl_mask];
+        if (old < pull) return -1;              /* asm's `cmc ; jb` underflow guard */
+        return old - pull;
     }
     const int di = diff >> 4;
-    return (uint8_t)((old + tbl[di & tbl_mask]) & 0xff);
+    const int v = old + tbl[di & tbl_mask];
+    return v > 0xff ? -1 : v;                   /* asm's `jae` carry guard */
 }
 
-void u2_space_orbit_pull(uint8_t *sx, uint8_t *sy, int ship_x, int ship_y)
+void u2_space_orbit_pull(uint8_t *sx, uint8_t *sy, int ship_x, int ship_y, uint32_t *rng)
 {
     for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++) {
-        sx[i] = orbit_step_axis(sx[i], ship_x, orbit_pull_x, 15);
-        sy[i] = orbit_step_axis(sy[i], ship_y, orbit_pull_y, 7);
+        int nx = orbit_step_axis(sx[i], ship_x, orbit_pull_x, 15);
+        int ny = nx < 0 ? sy[i] : orbit_step_axis(sy[i], ship_y, orbit_pull_y, 7);
+        /* The asm tests the y result's sign and treats 0x80-and-up as a failure, which is
+         * the same 0..127 bound the initialiser masks to. */
+        if (ny >= 0x80) ny = -1;
+        if (nx < 0 || ny < 0) {
+            /* L_006e8c: retire the star at a fresh random position. Both axes are replaced,
+             * because the asm stores into both after the reseed. */
+            *rng = star_hash(*rng);
+            nx = (int)(*rng & 0xffu);
+            ny = (int)((*rng >> 16) & 0x7fu);
+        }
+        sx[i] = (uint8_t)nx;
+        sy[i] = (uint8_t)ny;
+        *rng = star_hash(*rng);                 /* asm advances the RNG once per star */
     }
 }
 

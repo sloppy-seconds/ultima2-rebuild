@@ -162,6 +162,54 @@
 #           the body on 2026-11-15. The frame evidence for the star count is
 #           captures/spice86/ frames 014/049/050/096/097 as measured in space_view.h, which is
 #           corroboration of the count and not a claim that this routine executed.
+#   CORRECTED 2026-11-23 -- **THE WHOLE ROUTINE, READ END TO END. THERE IS NO STAGGER,
+#           AND THE UNDERFLOW BRANCH IS A RESEED.** An earlier note here read
+#           `mov 0x4c3,%al ; sbb %cs:0x6cac(%di),%al ; cmc ; jb` as "a per-x-bucket threshold
+#           and offset against a global counter at DS:4C3 -- a stagger, and the mechanism by
+#           which only part of the field updates on a given pass". That is wrong. `0x4c3` is
+#           not a global counter; it is written from `0x4cd(%si)` three instructions earlier,
+#           so it is simply this star's own `old_x` held in a scratch byte. Nothing staggers.
+#           What the branch actually is: an **underflow guard on the pull**, and its target
+#           `L_006e8c` is a **reseed**. Complete model, in order:
+#
+#           1. `call L_006f83` (= asm/6D83) draws the ship sprite at DS:47B/DS:47C.
+#           2. `%si = 0`, then for each of 64 stars:
+#              * `old_x = 0x4cd[%si]`, held at `0x4c3`. `diff = old_x - DS:47B`.
+#              * `old_x >= ship_x`: `di = (~diff) >> 4`; if `old_x >= table16[di]` then
+#                `new_x = old_x - table16[di]`, **else reseed**.
+#              * `old_x < ship_x`: `di = diff >> 4`; `new_x = old_x + table16[di]`; on carry,
+#                **reseed**.
+#              * y identical with `table8` at `cs:0x6cbc`, except the bound test is `jns` --
+#                `new_y` must stay below `0x80`, else reseed. That is the same 0x7f bound the
+#                initialiser masks to, enforced on every pass rather than only at seeding.
+#              * if `DS:4C7 != 0`, erase the pixel at the star's OLD position (`L_004daa`).
+#              * plot at the new position (`L_004d76`) and store the new value into BOTH the
+#                plot bytes `0x479/0x47A` and the tables. A table entry IS a screen coord.
+#              * advance the RNG: `cs:0x6990 += cs:0x6992`, then `call L_005ed2`. Once per
+#                star, which is why the reseed draws from a live stream.
+#           3. `++%si`; loop until `%bl == 0x40` (64). Then a nested delay loop that runs
+#              only when `DS:4C7 != 0`, and a tail that branches on `DS:4C7 >= 2`.
+#
+#           The reseed path, `L_006e8c`, is the answer G90 was asking about: it takes the
+#           star's current pair, calls the same `L_006f68` rand twice, and stores
+#           `new_x = rand`, `new_y = rand & 0x7f` -- asm/6D3E's fill rule, applied to one
+#           star at a time. So the field is not wrapped and not drained: a star pulled past
+#           the edge is **recycled at a random position**. That is what keeps the original
+#           populated at frame 509 when the engine's first attempt emptied it.
+#
+#           Consequences for the engine, all three of which it currently gets wrong:
+#             * the pull must **reseed on wrap**, not take the arithmetic mod 256. Wrapping
+#               keeps a star alive at the wrong place; the original retires it.
+#             * the cadence is **one pass per iteration of the caller's draw/delay/poll
+#               loop**, which runs continuously while it waits for a key -- see
+#               asm/6999_space_status `L_006c86..L_006c95`, where no-key jumps back to the
+#               `call L_006d3d`. Not once per command. This is why the field keeps moving
+#               after a turn with no further input.
+#             * the y bound is a real constraint (0..127), not a mask.
+#           Confidence high for the control flow and the reseed (every branch target and
+#           every store is in the body above); low only for what `L_005ed2` and `L_007442`
+#           do internally, which this routine merely calls.
+#
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 sub_6b3d:
 L_006d3d:

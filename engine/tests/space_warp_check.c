@@ -249,6 +249,7 @@ int main(void)
         if (oy[i] > 0x7f) ymask_ok = 0;
     CHECK(ymask_ok, "asm/6D3E masks the y byte to 0..127 and the init reproduces it");
 
+    uint32_t rng = 0x517u;
     uint8_t bx[U2_SPACE_ORBIT_STARS], by[U2_SPACE_ORBIT_STARS];
     memcpy(bx, ox, sizeof bx); memcpy(by, oy, sizeof by);
     long d_before = 0;
@@ -256,7 +257,7 @@ int main(void)
         int dx = abs((int)bx[i] - 0x20), dy = abs((int)by[i] - 0x40);
         d_before += dx + dy;
     }
-    u2_space_orbit_pull(ox, oy, 0x20, 0x40);
+    u2_space_orbit_pull(ox, oy, 0x20, 0x40, &rng);
     long d_after = 0;
     for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++) {
         int dx = abs((int)ox[i] - 0x20), dy = abs((int)by[i] - 0x40);
@@ -277,15 +278,34 @@ int main(void)
      * listing supports more than one reading of, and encoding a guessed expectation as a
      * check would be worse than leaving it open. A live read of the tables across one pass
      * pins it; see G92. */
-    for (int pass = 0; pass < 8; pass++) u2_space_orbit_pull(ox, oy, 0x20, 0x40);
+    for (int pass = 0; pass < 8; pass++) u2_space_orbit_pull(ox, oy, 0x20, 0x40, &rng);
     long d_later = 0;
+    int y_bound_ok = 1;
     for (int i = 0; i < U2_SPACE_ORBIT_STARS; i++) {
         int dx = abs((int)ox[i] - 0x20), dy = abs((int)oy[i] - 0x40);
         d_later += dx + dy;
+        if (oy[i] > 0x7f) y_bound_ok = 0;
     }
     CHECK(d_later < d_after,
           "and eight more passes close it further (%ld -> %ld): the field converges on the "
           "cross over time rather than moving once", d_after, d_later);
+    CHECK(y_bound_ok,
+          "and y never escaped 0..127 across the passes: a pull that would run off the end "
+          "retires the star at a fresh position (asm/6B3D L_006e8c) instead of wrapping it");
+
+    /* The bound needs a case that can actually break it, or the check above is decoration.
+     * y=0x7e with the cross at 0x7f takes the adc arm with diff 0xff, bucket 15 masked to 7,
+     * pull 8 -- which lands on 0x86, past the bound. Without the reseed it stays there.
+     * This case exists because running the control (disabling the bound) left every other
+     * check green, which is how the aggregate check above was caught being vacuous. */
+    uint8_t ex[1] = { 0x10 }, ey[1] = { 0x7e };
+    uint32_t erng = 0x9a7u;
+    u2_space_orbit_pull(ex, ey, 0x10, 0x7f, &erng);
+    CHECK(ey[0] <= 0x7f,
+          "a star whose pull lands at 0x86 is retired, not left there (got y=%d)",
+          (int)ey[0]);
+    CHECK(ex[0] != 0x10 || ey[0] != 0x7e,
+          "and the retirement replaces BOTH axes, as L_006e8c stores into both");
 
     ctx.state.space_ship_x = U2_SPACE_SHIP_X0;
     ctx.state.space_ship_y = U2_SPACE_SHIP_DIVE_Y;

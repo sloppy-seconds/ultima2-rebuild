@@ -545,7 +545,14 @@ static void rocket_descent(u2_ctx *ctx, u2_overworld *ow)
  * pass, which is what makes the field keep moving after a turn instead of shifting once. */
 static uint8_t s_orbit_x[U2_SPACE_ORBIT_STARS];
 static uint8_t s_orbit_y[U2_SPACE_ORBIT_STARS];
+static uint32_t s_orbit_rng;
 static int s_orbit_seeded;
+
+/* The wait between field passes. asm/6999 uses `mov $0x14,%bx ; call L_000911`, so the
+ * literal is 20; what unit L_000911 counts is not established here (BIOS ticks would be
+ * ~1.1 s and visibly steppy, milliseconds are ~50 fps and match the frames). Treated as
+ * milliseconds and named so the assumption is a symbol rather than a magic number. */
+#define U2_SPACE_FIELD_STEP_MS 20
 
 static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
                              int warp_frame, int keep_frame)
@@ -769,6 +776,7 @@ static void space_fly(u2_ctx *ctx, u2_overworld *ow)
      * the screen comes up. Fixed seed rather than the run's RNG so a capture and a gate can
      * both name the field they are looking at. */
     u2_space_orbit_init(s_orbit_x, s_orbit_y, 0x517u);
+    s_orbit_rng = 0x517u;
     s_orbit_seeded = 1;
 
     /* The frame is drawn once here and again after every handled command, not on
@@ -798,20 +806,6 @@ static void space_fly(u2_ctx *ctx, u2_overworld *ow)
          * "the current space screen on the window" and the loop cannot drift from it. The
          * ordering this preserves is the measured one: prompt first, then the paint that
          * copies the text grid into the frame, then the wait. */
-        /* One pass of the field, toward wherever the cross now sits. The tables are state
-         * and every pass pulls each star a step toward the ship, strongest near it, so the
-         * field converges instead of shifting once and freezing. asm/6B3D; see
-         * u2_space_orbit_pull for the arm structure.
-         *
-         * GRADE, and it is a real open question: this steps once per handled command,
-         * because that is the only cadence the decoded orbit loop supports -- asm/6999's
-         * head is a status pass, a prompt and a blocking key read, and nothing in it calls
-         * the field draw. Whether the original also runs asm/6B3D on a timer while it waits
-         * for the key has not been established, and the owner's description ("the stars
-         * start moving") points at yes. Settling it needs a capture that watches the field
-         * with no key pressed, which is a different probe from anything taken so far. */
-        u2_space_orbit_pull(s_orbit_x, s_orbit_y, st->space_ship_x, st->space_ship_y);
-
         space_present_now(ctx);
 
         /* Wait for a key WITHOUT burning the CPU. The old shape was `if (!r) continue;`
@@ -824,7 +818,15 @@ static void space_fly(u2_ctx *ctx, u2_overworld *ow)
         while ((r = seam_key_poll(ctx, &k)) == 0) {
             if (ctx->exit_code || ctx->input_exhausted) return;
             if (ctx->death_pending) return;    /* the dive killed you; unwind to the handoff */
-            seam_wait_ms(ctx, 16);             /* ~60 fps, the overworld loop's cadence */
+            /* asm/6999's wait is `call L_006d3d ; mov $0x14,%bx ; call L_000911 ;
+             * call L_00514d ; cmp $0xff,%ah ; jne L_006c86` -- draw, delay, poll, and no key
+             * jumps back to the DRAW. So the field advances continuously while the screen
+             * waits for input, which is the whole of "the stars keep moving after a turn".
+             * Stepping once per handled command, as this did, was wrong and the bytes said so. */
+            seam_wait_ms(ctx, U2_SPACE_FIELD_STEP_MS);
+            u2_space_orbit_pull(s_orbit_x, s_orbit_y,
+                                st->space_ship_x, st->space_ship_y, &s_orbit_rng);
+            space_present_now(ctx);
         }
         if (r < 0) return;                            /* input exhausted: original blocks */
 
