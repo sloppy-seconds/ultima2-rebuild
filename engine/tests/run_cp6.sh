@@ -711,11 +711,20 @@ else
 
     # The load-moment latch, against the real map files.
     #
-    # This one needs original/mapx20 and original/mapx22, and it is the only assertion that
-    # can see the defect at all: the synthetic town gives the guard somewhere to walk, so the
-    # post-command creature sweep restamps it and every end-of-run measurement reads clean
-    # whether or not the load path stamped. That is how a real bug sat behind a passing gate
-    # for a whole session. Measured here: 0 with the load restamp, 32 without it.
+    # This one needs original/mapx20 and original/mapx22. It asserts the property the
+    # synthetic town cannot see: on entry to a real sector, every creature in the table is
+    # already drawn on the grid, so nothing is invisible until it happens to move.
+    #
+    # CORRECTED 2026-11-22 (issue #18). This comment used to say the defect was visible
+    # only here and measured "0 with the load restamp, 32 without it". That premise is not
+    # just stale, it is structurally unreachable on this sector: neutering BOTH stampers —
+    # the restamp in u2_sector_load and the stamp in u2_monsters_spawn's slot loop — leaves
+    # the latch at 0 with 32 live creatures and the map loaded, because mapx22 was authored
+    # with the creature bytes already drawn where monx places them. Nothing has to stamp
+    # for the comparison to hold. So this assertion is a smoke test that the load ran and
+    # the table filled, and the vacuity guard below is what keeps even that honest. It is
+    # NOT a gate on the stamping code, and it stays unable to fail by that route until
+    # someone builds the discriminating case issue #18 names.
     #
     # It SKIPs without the player's copy rather than passing vacuously on synthetic data.
     if [ -r ../original/mapx20 ] && [ -r ../original/mapx22 ]; then
@@ -723,13 +732,23 @@ else
         python3 ../tools/u2_edit.py set ../original/player sector 20 -o "$WORK/realtown/save/PLAYER/PLAYER" >/dev/null 2>&1
         python3 ../tools/u2_edit.py setpos "$WORK/realtown/save/PLAYER/PLAYER" 36 29 >/dev/null 2>&1
         printf 'E\n' > "$WORK/realtown/k.keys"
-        real=$(./u2 --headless --play-map --data-dir ../original \
+        realout=$(./u2 --headless --play-map --data-dir ../original \
                     --save-dir "$WORK/realtown/save" --script "$WORK/realtown/k.keys" \
-                    --dump-state 2>&1 | sed -n 's/.*"unstamped_at_load":\([0-9]\{1,\}\).*/\1/p' | tail -1)
+                    --dump-state 2>&1)
+        real=$(printf '%s' "$realout" | sed -n 's/.*"unstamped_at_load":\([0-9]\{1,\}\).*/\1/p' | tail -1)
+        # Vacuity guard, the same shape the synthetic check above uses. A latch of 0 with an
+        # empty creature table would be true of a run that loaded nothing at all, and that
+        # is exactly how a stamping gate goes green while checking nothing.
+        rlive=$(printf '%s' "$realout" | sed -n 's/.*"mon_type":"\([^"]*\).*/\1/p' | tail -1 \
+                 | tr ' ' '\n' | grep -cv '^00$')
         case "${real:-}" in
-            0)  ok "CP6 stamp: real sector-22 entry leaves 0 of 32 creatures unstamped on the first frame" ;;
+            0)  if [ "${rlive:-0}" -gt 0 ]; then
+                    ok "CP6 stamp: real sector-22 entry leaves 0 of $rlive creatures unstamped on the first frame"
+                else
+                    bad "CP6 stamp: latch reads 0 but the creature table is empty — vacuous, the run loaded no creatures"
+                fi ;;
             '') bad "CP6 stamp: real town entry produced no unstamped_at_load reading" ;;
-            *)  bad "CP6 stamp: $real creatures are invisible on entry to the real sector 22 -- the load path did not stamp" ;;
+            *)  bad "CP6 stamp: $real of ${rlive:-?} creatures are invisible on entry to the real sector 22 — the load path did not stamp" ;;
         esac
     else
         skip "CP6 stamp: load-moment latch needs the player's mapx20/mapx22 (synthetic data cannot show this defect)"

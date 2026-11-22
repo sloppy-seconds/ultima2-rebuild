@@ -94,9 +94,17 @@ int u2_sector_load(u2_ctx *ctx, u2_overworld *ow, u2_sector_id id, u2_residency 
     if (mr == U2_WORLD_OK)
         u2_monsters_restamp(ctx, &ow->world);
     /* Latched AFTER the load path has finished, so it measures what a player would actually
-     * see on the first frame of the new sector: with the restamp in place it is 0, and with
-     * it removed it is the whole creature count, because nothing else stamps until a
-     * creature happens to move. */
+     * see on the first frame of the new sector. Read it honestly: on the real sector 22 this
+     * is 0 whether or not any stamping code runs. Measured 2026-11-22 by neutering BOTH
+     * stampers — this call, and the `w->map[cell] = s->mon_type[i]` in u2_monsters_spawn's
+     * slot loop — and the latch stayed 0 with a live table of 32 and map_loaded set. The
+     * reason is the data: mapx22 was authored with the creature bytes already drawn at the
+     * cells monx puts them on, so `map[cell] != mon_type[i]` is false before anything runs.
+     * So this latch is a smoke test on this sector, not a proof that the stamping works, and
+     * the gate that reads it cannot go red by the route its old comment named. See issue #18
+     * for the measurement and what a discriminating case would need (a cell whose authored
+     * byte differs from the creature's type — the wandering spawner's creatures are exactly
+     * that, which is where a real gate should be built). */
     ctx->diag_unstamped_at_load = u2_monsters_unstamped_cells(ctx, &ow->world);
 
     /* The digest-and-delta capture, at the one point where the loaded bytes are both
