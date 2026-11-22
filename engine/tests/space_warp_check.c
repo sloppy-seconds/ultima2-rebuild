@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include "core/frame.h"
+#include "core/layout.h"      /* U2_ENH_MAP_ROWS, the enhanced map area */
 #include "core/state.h"
 #include "game/space_view.h"
 
@@ -129,6 +130,39 @@ int main(void)
           "and it draws the same non-empty field the hash mode draws at rest (%d), so the "
           "table being ignored falls back to the orbit field rather than to a blank screen",
           orbit_lit);
+
+    /* --- the builder owns the canvas geometry (issue #17) -------------------
+     * The enhanced doubling used to live in flight.c's paint path, which meant a scene
+     * built from an enhanced ctx was only correct after a caller remembered to fix it.
+     * These assertions are what make the move load-bearing: without them the whole
+     * block can be deleted and the suite stays green, which is how a refactor that
+     * silently un-does itself passes review. */
+    ctx.enhanced_layout = 0;
+    u2_space_scene classic;
+    u2_space_scene_from(&ctx, &classic);
+    CHECK(classic.scale == 1 && classic.ox == U2_SPACE_VIEW_X
+          && classic.oy == U2_SPACE_VIEW_Y,
+          "a classic ctx gets the original's 1:1 rectangle at its measured offset");
+
+    ctx.enhanced_layout = 1;
+    u2_space_scene enh;
+    u2_space_scene_from(&ctx, &enh);
+    CHECK(enh.scale == 2 && enh.ox == 0,
+          "an enhanced ctx gets the doubled field with no caller involved");
+    CHECK(enh.oy == (U2_ENH_MAP_ROWS * 32 - U2_SPACE_VIEW_ROWS * enh.scale) / 2,
+          "and it is centred in the map area rather than pinned to its top");
+    CHECK(enh.oy >= 0
+          && enh.oy + U2_SPACE_VIEW_ROWS * enh.scale <= U2_ENH_MAP_ROWS * 32,
+          "the doubled field stays inside the map area, so it is offset, not clipped");
+
+    /* Drawable as-is is the actual claim. A scene built from an enhanced ctx must put
+     * stars on the frame with nothing but the builder and the draw. */
+    enh.keep_frame = 0;
+    u2_frame_clear(&f, 0);
+    u2_space_scene_draw(&f, &enh);
+    CHECK(lit_in_field(&f, &enh) > 0,
+          "and the enhanced scene draws a non-empty field straight from ctx, which is "
+          "what 'the builder owns the geometry' has to mean to be worth anything");
 
     u2_frame_free(&f);
     printf("space_warp_check: %d checks, %d failures\n", checks, fails);

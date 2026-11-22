@@ -553,16 +553,12 @@ static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
     sc.warping = warping;
     sc.warp_frame = warp_frame;
     sc.keep_frame = keep_frame;
-    /* The field's 256x128 rectangle was measured on the original's 320x200 screen,
-     * where it is most of the picture. On the 1024x512 enhanced canvas the same
-     * pixels are a stamp in the corner — owner, 2026-11-20: "space is squished".
-     * Doubled it fills the map area's height and runs 64 px under the panel, which is
-     * opaque chrome drawn after it, so the overlap is hidden rather than clipped. */
-    if (ctx->enhanced_layout) {
-        sc.scale = 2;
-        sc.ox = 0;
-        sc.oy = (U2_ENH_MAP_ROWS * 32 - U2_SPACE_VIEW_ROWS * sc.scale) / 2;
-    }
+    /* The enhanced doubling of the field is NOT here any more. It moved into
+     * u2_space_scene_from, which owns it because it follows from ctx->enhanced_layout
+     * and nothing else (issue #17). What stays here is exactly the state the builder
+     * cannot see: the warp triple, and keep_frame, which is asm/6B3D's sweep
+     * accumulate flag held by the caller's loop rather than a byte of the world.
+     * See captures/spice86/g90-warp-table/ for what that flag is measured against. */
     /* The sweep drives `keep_frame` above: asm/6B3D gates the erase of each star's own old
      * pixel on DS:4C7 being non-zero, and that byte sweeps 128->1, holds at 0 for 128
      * frames, holds at 1, climbs 2->126 step 2, holds at 128. The 128-frame zero window is

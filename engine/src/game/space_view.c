@@ -33,6 +33,7 @@
 
 #include "core/ctx.h"
 #include "core/state.h"     /* u2_bcd_dec1, the item and world bytes */
+#include "core/layout.h"     /* U2_ENH_MAP_ROWS, the enhanced map area */
 #include "game/overworld.h"  /* U2_ITEM_TRI_LITHIUM */
 #include "game/space.h"      /* u2_space_worlds, U2_WORLD_COUNT */
 
@@ -113,6 +114,24 @@ void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out)
     out->scale = 1;
     out->ox = U2_SPACE_VIEW_X;
     out->oy = U2_SPACE_VIEW_Y;
+    /* The field's 256x128 rectangle was measured on the original's 320x200 screen,
+     * where it is most of the picture. On the 1024x512 enhanced canvas the same
+     * pixels are a stamp in the corner -- owner, 2026-11-20: "space is squished".
+     * Doubled it fills the map area's height and runs 64 px under the panel, which is
+     * opaque chrome drawn after it, so the overlap is hidden rather than clipped.
+     *
+     * This moved out of flight.c's paint path on 2026-11-23 (issue #17) because it is a
+     * property of the canvas the ctx describes, not of the frame being painted: every
+     * caller that draws an enhanced scene needs the same doubling, and a caller that
+     * forgot would quietly draw the corner stamp again. A scene built from an enhanced
+     * ctx is now drawable as-is, which is what "the builder owns the geometry" means.
+     * The warp triple stays the caller's -- see the note above -- and so does
+     * keep_frame, which is the sweep's accumulate flag rather than anything in ctx. */
+    if (ctx->enhanced_layout) {
+        out->scale = 2;
+        out->ox = 0;
+        out->oy = (U2_ENH_MAP_ROWS * 32 - U2_SPACE_VIEW_ROWS * out->scale) / 2;
+    }
     out->star_seed = ((uint32_t)st->world << 16) ^
                      ((uint32_t)out->xeno << 8) ^ (uint32_t)out->yako;
 }
