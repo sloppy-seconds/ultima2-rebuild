@@ -270,6 +270,26 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
     esac
 fi
 
+# --- the flag contract, in-process -----------------------------------------
+# The rules below used to be testable only by exec'ing ./u2 and grepping stderr. Now that
+# parsing is u2_cli_parse() they are values: a disposition and a reason string. Control,
+# run 2026-11-22: with the `--script` needs `--headless` refusal deleted from cli.c, two
+# checks go red — the disposition and the reason text. The third check in that group ("with
+# --headless the same flags play") stays green by design: it is the positive control that
+# stops the refusal from being a blanket rejection, so deleting the refusal cannot redden
+# it, and that is what makes it a control. Restored, 43 checks green.
+if u2_check "${WORK:-/var/tmp}/cli_check" tests/cli_check.c 2>"${WORK:-/var/tmp}/cli.build"; then
+    if "${WORK:-/var/tmp}/cli_check" > "${WORK:-/var/tmp}/cli.log" 2>&1; then
+        ok "CP0 cli: $(tail -1 "${WORK:-/var/tmp}/cli.log")"
+    else
+        sed 's/^/        /' "${WORK:-/var/tmp}/cli.log" | tail -12
+        bad "cli_check failed"
+    fi
+else
+    sed 's/^/        /' "${WORK:-/var/tmp}/cli.build" | tail -6
+    bad "cli_check did not build"
+fi
+
 # --- renderer selection: a flag that cannot be honoured must refuse ----------
 # This is the terminal (cc-only) build, so --renderer=sdl is a request this binary
 # cannot serve. It used to be ignored in silence, which made the wrong binary plus

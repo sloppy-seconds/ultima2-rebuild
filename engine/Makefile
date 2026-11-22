@@ -97,7 +97,7 @@ define WRITE_STAMP
 	@$(FRESH_HASH) > $(STAMPDIR)/stamp.$@.tmp && mv -f $(STAMPDIR)/stamp.$@.tmp $(STAMPDIR)/stamp.$@
 endef
 EXE      ?= ../original/ultimaii.exe
-SRCS     := src/main.c \
+SRCS     := src/main.c src/cli.c \
             $(wildcard src/core/*.c) \
             $(wildcard src/game/*.c) \
             $(filter-out src/platform/time_win32.c,$(wildcard src/platform/*.c)) \
