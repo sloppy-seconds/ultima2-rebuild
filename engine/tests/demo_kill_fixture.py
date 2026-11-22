@@ -25,6 +25,11 @@ Usage: demo_kill_fixture.py DIR
 import os
 import sys
 
+# The seeders share one offset source: state.h, read at runtime by u2_seed. No DS address
+# is written down in this file.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import u2_seed                                  # noqa: E402
+
 GRASS = 0x08
 EDGE = 64
 SLOTS = 32
@@ -69,21 +74,18 @@ def main(out_dir):
     sector(os.path.join(content, "mapx70"))
     monx(os.path.join(content, "monx70"))
 
-    p = bytearray(384)
-    p[0:6] = b"GATEDE"[:6]
-    p[0x49 - 0x36] = 7                # sector first digit
-    p[0x4A - 0x36] = 0                # sector second digit: the world map
-    p[0x51 - 0x36] = 0x99             # HP high BCD byte
-    p[0x52 - 0x36] = 0x97             # HP low  -> H.P.=9997
-    p[0x53 - 0x36] = 0x99             # food, three bytes
-    p[0x54 - 0x36] = 0x99
-    p[0x55 - 0x36] = 0x99
-    p[0x4B - 0x36] = 0x40             # strength: the swing is (0*8 + 0x40) >> 2 = 16
-    p[0x4C - 0x36] = 0x80             # agility: every roll is a hit
-    p[0x5A - 0x36] = PLAYER_X         # entry x
-    p[0x5B - 0x36] = PLAYER_Y         # entry y
-    with open(os.path.join(save, "PLAYER"), "wb") as f:
-        f.write(bytes(p))
+    # Built through u2_seed so the addresses come from state.h. Six name characters
+    # because that is what this seeder wrote before; a move keeps its bytes.
+    p = u2_seed.PlayerRecord()
+    p.set_name("GATEDE")
+    p.set_at(7, 0)                     # sector 70; second digit is the site kind
+    p.set_intent("hp", 9997)
+    p.set_intent("food", 999999)
+    p.set_stat("str", 0x40)            # the swing is (0*8 + 0x40) >> 2 = 16
+    p.set_stat("agi", 0x80)            # every roll is a hit
+    p.set_raw("entry_x", PLAYER_X)
+    p.set_raw("entry_y", PLAYER_Y)
+    p.write(os.path.join(save, "PLAYER"))
     return 0
 
 

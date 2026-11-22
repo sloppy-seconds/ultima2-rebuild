@@ -35,6 +35,11 @@ import os
 import shutil
 import sys
 
+# The seeders share one offset source: state.h, read at runtime by u2_seed. No DS address
+# is written down in this file.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import u2_seed                                  # noqa: E402
+
 ROCK  = 0x80
 FLOOR = 0x00
 UP    = 0x10
@@ -97,44 +102,35 @@ def world() -> bytes:
 
 
 def player(cast: bool = False) -> bytes:
-    p = bytearray(384)
-    p[0:7] = b"DGTST01"
-    # The record is DS:36..DS:135, so file byte i is DS:(0x36 + i).
-    p[0x49 - 0x36] = 2                       # sector 20
-    p[0x4A - 0x36] = 0                       # ones digit 0 = the world map
-    p[0x5A - 0x36] = ENTRY[0]
-    p[0x5B - 0x36] = ENTRY[1]
-    p[0x51 - 0x36] = 0x99                    # HP 9999, so a trap cannot end the run
-    p[0x52 - 0x36] = 0x99
-    p[0x53 - 0x36] = 0x09                    # food, packed decimal
-    p[0x54 - 0x36] = 0x99
-    p[0x55 - 0x36] = 0x99
-    p[0x58 - 0x36] = 0x99                    # gold
-    p[0x59 - 0x36] = 0x99
-    # Stats. DS:4B is strength and the byte after it is dexterity; a zeroed
-    # character never lands a blow, which is the same reason CP5's fight scripts
-    # had to stop running --play-map on a blank state. Nine is the top of the
-    # human range and it makes the scripted ATTACK deterministic enough to gate on.
-    # The bytes are packed decimal, not counts: asm/2E3D's damage formula reads the
-    # raw byte, and asm/2BDA's hit test is `(rand >> 1) < [DS:4C]`. 0x99 makes every
-    # swing land, which is what a gate needs; a "realistic" 9 would miss 19 times in
-    # 20 and the gate would be a coin toss.
-    p[0x4B - 0x36] = 0x20                    # strength
-    p[0x4C - 0x36] = 0x99                    # agility: every scripted swing lands
-    p[0x61 - 0x36] = 0x01                    # the readied weapon, so damage is non-zero
-    p[0x64 - 0x36] = 0x50                    # fifty torches
-    p[0x65 - 0x36] = 0x05                    # keys
-    p[0x66 - 0x36] = 0x05                    # tools, so the trap's escape arm is reachable
+    p = u2_seed.PlayerRecord()
+    p.set_name("DGTST01")
+    p.set_at(2, 0)                         # sector 20; ones digit 0 = the world map
+    p.set_raw("entry_x", ENTRY[0])
+    p.set_raw("entry_y", ENTRY[1])
+    p.set_intent("hp", 9999)               # so a trap cannot end the run
+    p.set_intent("food", 99999)
+    p.set_intent("gold", 9999)
+    # Stats. A zeroed character never lands a blow, which is the same reason CP5's fight
+    # scripts had to stop running --play-map on a blank state. The bytes are packed
+    # decimal, not counts: asm/2E3D's damage formula reads the raw byte, and asm/2BDA's hit
+    # test is `(rand >> 1) < [DS:4C]`. 0x99 makes every swing land, which is what a gate
+    # needs; a "realistic" 9 would miss 19 times in 20 and the gate would be a coin toss.
+    p.set_stat("str", 0x20)
+    p.set_stat("agi", 0x99)                # every scripted swing lands
+    p.set_intent("readied", 1)             # so damage is non-zero
+    p.set_intent("torches", 50)
+    p.set_intent("keys", 5)
+    p.set_intent("tools", 5)               # so the trap's escape arm is reachable
     if cast:
         # The CAST cases need a caster, and one flag carries both halves because the gate
         # order is what most of those cases assert: the wand test runs before the stock test,
         # so a seed with spells and no wand proves the refusal order, and a seed with both
         # proves everything after it. A staff rather than a wand, because asm/3139 sums the
         # two bytes and the gate should not be able to pass only for the item it is named on.
-        p[0xD8 - 0x36] = 0x01                # DS:D8, the STAFF slot
+        p.set_gear("items_held", 2, 1)     # DS:D8, the STAFF slot
         for i in range(1, 10):
-            p[(0xB6 + i) - 0x36] = 0x01      # one charge each, packed decimal
-    return bytes(p)
+            p.set_gear("spell_counts", i, 1)   # one charge each, packed decimal
+    return bytes(p.data)
 
 
 def monx() -> bytes:

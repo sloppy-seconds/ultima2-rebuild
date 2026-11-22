@@ -109,8 +109,13 @@ def from_bcd(raw):
 # the wart and the asm site that proves it. Encoding through this table is the only
 # place that has to know.
 INTENTS = {
-    "hp":       ("hp", 2),
-    "food":     ("food", 2),
+    # hp and food span more than the field whose name they take. HP is 0x51:0x52 and the
+    # low byte is named unk_52 in state.h because nobody could name it from the bytes;
+    # food is three bytes, 0x53:0x55. Encoding through this table is the only place that
+    # has to know, and set_bcd refuses a digit count that does not match the field list,
+    # so a wrong entry here fails loudly instead of writing half a value.
+    "hp":       (("hp", "unk_52"), 4),
+    "food":     (("food", "food_hi", "food_lo"), 6),
     "torches":  ("torches", 2),
     "keys":     ("keys", 2),
     "tools":    ("tools", 2),
@@ -121,11 +126,35 @@ INTENTS = {
     "sex":      ("sex", 0),
     "view-mode": ("view_mode", 0),
     "world":    ("world", 0),
+    "stamp":    ("player_stamp", 0),
+    "blessing": ("blessing", 0),
+    "worn":     ("worn_armour", 0),
+    "readied":  ("readied_weapon", 0),
+    "spell-pick": ("spell_pick", 0),
+    "spawn":    ("spawn_selector", 0),
+    "stage":    ("stage_a", 0),
+    "story":    ("story_flag", 0),
+    "gate":     ("gate_index", 0),
+    "gate-countdown": ("gate_countdown", 0),
+    "str":      ("stat_str", 0),
+    "agi":      ("stat_agi", 0),
+    "sta":      ("stat_sta", 0),
+    "cha":      ("stat_cha", 0),
+    "wis":      ("stat_wis", 0),
+    "int":      ("stat_int", 0),
 }
 
 
 class DsBlock:
-    """A DS mirror in memory: the hex text --dump-ds writes."""
+    """A DS mirror in memory: the hex text --dump-ds writes.
+
+    `base` is the DS address of data[0]. For a DS dump that is 0x00; for a PLAYER save
+    file it is 0x36, because the save record is the DS window from 0x36 upward and
+    `file[i] == DS[0x36 + i]`. Every setter goes through _off, so the base is stated once
+    per block instead of being subtracted at each call site — which is the arithmetic the
+    eight hand-written seeders each repeated, in the form `p[0x49 - 0x36]`. """
+
+    base = 0
 
     def __init__(self, data, source="<memory>"):
         self.data = bytearray(data)
@@ -146,11 +175,14 @@ class DsBlock:
 
     def _off(self, key):
         try:
-            return self.offsets[key]
+            return self.offsets[key] - self.base
         except KeyError:
             raise SystemExit(
                 "no field %r in state.h. `u2_seed.py offsets` lists what there is; "
                 "guessing an offset here is the failure this module exists to stop." % key)
+
+    def has(self, key):
+        return key in self.offsets
 
     def get(self, key):
         off = self._off(key)
@@ -184,6 +216,64 @@ class DsBlock:
         self.set_raw("sector_x", x)
         self.set_raw("sector_y", y)
 
+    def set_intent(self, name, value):
+        """Set a named quantity, encoding it the way the game stores it.
+
+        The point is that a caller writes `set_intent("hp", 9997)` and never learns that HP
+        is two packed-decimal bytes, nor that gold and exp have their high byte named _lo.
+        Those two warts are recorded in state.h and encoded in INTENTS, and this is the
+        only place that has to know them.
+        """
+        try:
+            keys, digits = INTENTS[name]
+        except KeyError:
+            raise SystemExit("no intent %r; `u2_seed.py intents` lists the names" % name)
+        if digits:
+            self.set_bcd(keys, digits, value)
+        else:
+            self.set_raw(keys, value)
+
+    def set_stat(self, which, value):
+        """One of the six attributes. They are plain bytes, but the field names are
+        stat_str..stat_int and a caller should not have to remember that. """
+        self.set_raw("stat_" + which, value)
+
+    def set_gear(self, group, slot, value):
+        """One entry of the item / weapon / armour inventory.
+
+        `group` is items_held, weapons_owned or armour_owned; `slot` is the index within
+        the block. The engine decodes these as packed BCD nibbles, so a value of 1 means
+        one item and a value of 0x10 means ten — which is why this refuses anything that
+        is not a single BCD digit rather than writing a plausible-looking byte.
+        """
+        if not 0 <= value <= 0x99:
+            raise SystemExit("%s slot %d: %r is not a packed-decimal count" % (group, slot, value))
+        self.data[self._off(group) + slot] = value & 0xFF
+
+
+# The PLAYER save file, as the game writes it: 384 bytes starting at DS:36.
+class PlayerRecord(DsBlock):
+    """A PLAYER record under construction, or one loaded from disk.
+
+    Same fields as the DS mirror, based at 0x36. A test that needs a character in a
+    particular place builds one of these, writes it, and never names an offset.
+    """
+
+    base = 0x36
+    LENGTH = 384
+
+    def __init__(self, data=None, source="<new>"):
+        super().__init__(bytes(self.LENGTH) if data is None else data, source)
+
+    @classmethod
+    def load(cls, path):
+        return cls(open(path, "rb").read(), path)
+
+    def write(self, path):
+        with open(path, "wb") as fh:
+            fh.write(bytes(self.data))
+        return path
+
 
 # --------------------------------------------------------------------------
 # CLI
@@ -205,10 +295,17 @@ def _selftest():
     check(all(offs[k] == v for k, v in asserted.items()),
           "comment offsets disagree with the _Static_asserts")
 
-    blk = DsBlock(bytearray(256))
-    blk.set_bcd("hp", 2, 45)
-    check(blk.data[offs["hp"]] == 0x45, "hp 45 did not land as 0x45")
-    blk.set_bcd(("gold_lo", "gold_hi"), 4, 1234)
+    blk = DsBlock(bytearray(0x600))
+    blk.set_intent("hp", 45)
+    check(blk.data[offs["hp"]] == 0x00 and blk.data[offs["unk_52"]] == 0x45,
+          "hp 45 did not land as 00 45 across the two bytes HP actually occupies")
+    blk.set_intent("hp", 9997)
+    check(blk.data[offs["hp"]] == 0x99 and blk.data[offs["unk_52"]] == 0x97,
+          "hp 9997 did not land as 99 97 — the low byte is unk_52, not a second 'hp'")
+    blk.set_intent("food", 35990)
+    check(bytes(blk.data[offs["food"]:offs["food"] + 3]) == bytes([0x03, 0x59, 0x90]),
+          "food is three bytes and 35990 must pack across all three")
+    blk.set_intent("gold", 1234)
     check(blk.data[offs["gold_lo"]] == 0x12 and blk.data[offs["gold_hi"]] == 0x34,
           "gold 1234: gold_lo must be the HIGH byte (0x12), gold_hi the low (0x34)")
     check(from_bcd(bytes([blk.data[offs["gold_lo"]], blk.data[offs["gold_hi"]]])) == 1234,
@@ -221,6 +318,23 @@ def _selftest():
     check(blk.get("sector_first") == 3 and blk.get("sector_second") == 2
           and blk.get("sector_x") == 38 and blk.get("sector_y") == 5,
           "sector/position setters are wrong")
+    blk.set_stat("agi", 0x80)
+    check(blk.data[offs["stat_agi"]] == 0x80, "stat setter is wrong")
+    blk.set_gear("weapons_owned", 5, 1)
+    check(blk.data[offs["weapons_owned"] + 5] == 1, "gear setter is wrong")
+
+    # The save record is the same fields at a different base. This is the arithmetic eight
+    # seeders used to repeat by hand as p[0x49 - 0x36], so it is asserted once here.
+    rec = PlayerRecord()
+    rec.set_name("GATEDE")
+    rec.set_at(7, 0)
+    rec.set_intent("hp", 9997)
+    check(rec.data[0x36 - 0x36:0x36 - 0x36 + 6] == b"GATEDE", "record name is at file 0")
+    check(rec.data[0x49 - 0x36] == 7 and rec.data[0x4A - 0x36] == 0,
+          "the record base is wrong: sector_first must land at file byte 0x13")
+    check(rec.data[0x51 - 0x36] == 0x99 and rec.data[0x52 - 0x36] == 0x97,
+          "the record base is wrong for HP")
+    check(len(rec.data) == PlayerRecord.LENGTH, "a fresh record is 384 bytes")
 
     # Controls: the refusals have to refuse.
     for bad, why in ((100, "hp 100 does not fit two BCD digits"),
@@ -256,6 +370,8 @@ def main(argv=None):
     p_off.add_argument("--name", default=None)
     p_off.add_argument("--json", action="store_true")
 
+    sub.add_parser("intents", help="the intent names set_intent() accepts, and their fields")
+
     p_show = sub.add_parser("show")
     p_show.add_argument("file")
     p_show.add_argument("fields", nargs="*")
@@ -272,6 +388,13 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if args.selftest:
         return _selftest()
+
+    if args.cmd == "intents":
+        for name in sorted(INTENTS):
+            keys, digits = INTENTS[name]
+            where = keys if isinstance(keys, str) else "+".join(keys)
+            print("%-16s %-24s %s" % (name, where, "bcd %d digits" % digits if digits else "raw"))
+        return 0
 
     if args.cmd == "offsets":
         offs, asserted = parse_offsets()

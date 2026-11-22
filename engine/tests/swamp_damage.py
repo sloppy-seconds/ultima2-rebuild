@@ -34,9 +34,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import u2_gate as G
+import u2_seed                                  # noqa: E402
 
-HP_HI_OFF = 0x51 - 0x36   # PLAYER file byte of DS:51, the high BCD byte
-HP_LO_OFF = 0x52 - 0x36
+# The HP pair is named through u2_seed (state.h's hp at DS:51 and the low byte it has not
+# been able to name, unk_52 at DS:52). No offset in this file.
 
 
 def hp(dump):
@@ -48,9 +49,10 @@ def seed_case(name, tiles=None, items=None, hp_pair=None):
     work = G.seed("/var/tmp/u2-swamp-%s" % name, tiles=tiles, items=items)
     if hp_pair:
         pp = G.record(work)
-        p = bytearray(open(pp, "rb").read())
-        p[HP_HI_OFF], p[HP_LO_OFF] = hp_pair
-        open(pp, "wb").write(bytes(p))
+        p = u2_seed.PlayerRecord.load(pp)
+        p.set_raw("hp", hp_pair[0])        # DS:51 high BCD byte, DS:52 the low one
+        p.set_raw("unk_52", hp_pair[1])
+        p.write(pp)
     return work
 
 
@@ -75,10 +77,9 @@ def seed_sector(name, hi, lo, tiles=None, items=None):
     with open(os.path.join(content, "mapx%02d" % (hi * 10 + lo)), "wb") as f:
         f.write(bytes(grid))
     pp = G.record(work)
-    p = bytearray(open(pp, "rb").read())
-    p[0x49 - 0x36] = hi
-    p[0x4A - 0x36] = lo
-    open(pp, "wb").write(bytes(p))
+    p = u2_seed.PlayerRecord.load(pp)
+    p.set_at(hi, lo)
+    p.write(pp)
     return work
 
 

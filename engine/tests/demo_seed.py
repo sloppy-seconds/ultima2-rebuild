@@ -18,6 +18,12 @@ Usage: demo_seed.py DIR
 import os
 import sys
 
+# The seeders share one offset source. Every file in this directory that builds a save
+# imports u2_seed this way rather than repeating offsets, so state.h is the only place a
+# DS address is written down.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import u2_seed                                  # noqa: E402
+
 GRASS = 0x08          # measured passable on foot (docs/passability-findings.md F10)
 DOOR = 0x14           # the site tile: 0x14 >> 2 == 5, the village arm
 EDGE = 64
@@ -48,21 +54,20 @@ def main(out_dir: str) -> int:
         with open(os.path.join(content, name), "wb") as f:
             f.write(bytes(256))
 
-    p = bytearray(384)
-    p[0:6] = b"GATEDE"[:6]            # name at DS:36
-    p[0x49 - 0x36] = 7                # sector first digit
-    p[0x4A - 0x36] = 0                # sector second digit: the world map
-    p[0x51 - 0x36] = 0x99             # HP high BCD byte
-    p[0x52 - 0x36] = 0x97             # HP low  -> H.P.=9997
-    p[0x53 - 0x36] = 0x99             # food, three bytes
-    p[0x54 - 0x36] = 0x99
-    p[0x55 - 0x36] = 0x99
-    p[0x5A - 0x36] = 31               # entry x: the door cell
-    p[0x5B - 0x36] = 31               # entry y
-    p[0x4B - 0x36] = 0x40             # strength
-    p[0x4C - 0x36] = 0x80             # agility: a hit is certain
-    with open(os.path.join(save, "PLAYER", "PLAYER"), "wb") as f:
-        f.write(bytes(p))
+    # The character: a named body with enough HP and food to survive whatever the gate
+    # throws at it, standing in sector 70 with its arrival cell on the door. Every field
+    # is named here and no offset appears, because u2_seed reads the offsets from
+    # state.h at runtime — see the module's header for why that is the rule.
+    p = u2_seed.PlayerRecord()
+    p.set_name("GATEDE")
+    p.set_at(7, 0)                     # sector 70; the second digit is the site kind
+    p.set_intent("hp", 9997)
+    p.set_intent("food", 999999)
+    p.set_raw("entry_x", 31)           # the arrival cell: the door
+    p.set_raw("entry_y", 31)
+    p.set_stat("str", 0x40)
+    p.set_stat("agi", 0x80)            # a hit is certain
+    p.write(os.path.join(save, "PLAYER", "PLAYER"))
     return 0
 
 

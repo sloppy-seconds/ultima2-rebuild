@@ -12,6 +12,10 @@ Usage: cp5_fight_seed.py DIR
 import os
 import sys
 
+# The seeders share one offset source: state.h, read at runtime by u2_seed.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import u2_seed                                  # noqa: E402
+
 GRASS = 0x08          # measured passable on foot (docs/passability-findings.md F10)
 SLOT = 32             # creature slots per array; monx columns are 32 bytes apart
 
@@ -41,26 +45,26 @@ def main(out_dir: str) -> int:
         f.write(bytes(mon))
 
     # --- PLAYER: 384 bytes, file[i] == DS[0x36+i] -----------------------------
-    p = bytearray(384)
-    p[0x36 - 0x36:0x36 - 0x36 + 6] = b"GATEMAX"[:6]      # name at DS:36
-    p[0x49 - 0x36] = 0                    # sector first digit
-    p[0x4A - 0x36] = 0                    # sector second digit: the world map
-    p[0x51 - 0x36] = 0x99                 # HP high BCD byte
-    p[0x52 - 0x36] = 0x97                 # HP low  -> H.P.=9997
-    p[0x53 - 0x36] = 0x99                 # food, three bytes
-    p[0x54 - 0x36] = 0x99
-    p[0x55 - 0x36] = 0x99
-    p[0x56 - 0x36] = 0x99                 # exp  -> EXP.=9999, so a kill wraps it
-    p[0x57 - 0x36] = 0x99
-    p[0x58 - 0x36] = 0x99                 # gold -> GOLD=9999, same
-    p[0x59 - 0x36] = 0x99
-    p[0x5A - 0x36] = 2                    # entry x: the cell the player starts on
-    p[0x5B - 0x36] = 0                    # entry y
-    p[0x61 - 0x36] = 1                    # readied weapon index 1 (damage = 8*w + str)/4
-    p[0x4C - 0x36] = 0x80                 # agility byte 0x80 = 128 displayed:
-    #                                       asm/2E3D rolls (rand>>1) < agi and the
-    #                                       roll maxes at 127, so a hit is certain.
-    p[0x4B - 0x36] = 0x40                 # strength, plenty for a one-hit kill
+    # Built through u2_seed so the addresses come from state.h rather than from this file.
+    # The values are load-bearing, not decoration: exp and gold are both 9999 so a kill
+    # wraps the packed-decimal counter past its ceiling, and agility 0x80 displays as 128
+    # because asm/2E3D rolls (rand>>1) < agi and that roll maxes at 127 — so a hit is
+    # certain and the gate cannot flake on a miss.
+    p = u2_seed.PlayerRecord()
+    # Six characters, not seven: the seeder this replaced wrote b"GATEMAX"[:6], and a
+    # migration that claims to be a move keeps the bytes it claims to move. The field in
+    # state.h is 16 bytes, so "GATEMAX" would be legal — it is simply not what was there.
+    p.set_name("GATEMA")
+    p.set_at(0, 0)                       # sector 00; the second digit is the site kind
+    p.set_intent("hp", 9997)
+    p.set_intent("food", 999999)
+    p.set_intent("exp", 9999)
+    p.set_intent("gold", 9999)
+    p.set_raw("entry_x", 2)              # the cell the player starts on
+    p.set_raw("entry_y", 0)
+    p.set_intent("readied", 1)           # weapon index 1: damage = (8*w + str)/4
+    p.set_stat("agi", 0x80)
+    p.set_stat("str", 0x40)              # plenty for a one-hit kill
     # saves/<slot>/PLAYER: the record lives inside its slot directory, which is
     # also where this seed's dirty sectors will be written. engine/src/core/slot.h
     # is the authority for the shape; a seed that spelled the old flat path would
@@ -68,8 +72,7 @@ def main(out_dir: str) -> int:
     # character that is not the one it authored.
     rec = os.path.join(save, "PLAYER", "PLAYER")
     os.makedirs(os.path.dirname(rec), exist_ok=True)
-    with open(rec, "wb") as f:
-        f.write(bytes(p))
+    p.write(rec)
     return 0
 
 

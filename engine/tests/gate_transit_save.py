@@ -28,6 +28,11 @@ import os
 import re
 import shutil
 import sys
+
+# The seeders share one offset source: state.h, read at runtime by u2_seed. No DS address
+# is written down in this file.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import u2_seed                                  # noqa: E402
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -36,13 +41,9 @@ import u2_gate as G
 GRASS = 0x08
 
 # The record starts at DS:36 (the name field), so a DS offset maps to record offset
-# DS - 0x36. Same convention site_state.py uses for DS:4A / DS:5A.
-R_SECTOR_HI = 0x49 - 0x36      # sector tens digit == era on Earth
-R_SECTOR_LO = 0x4A - 0x36      # sector ones digit (0 => world map, not a site)
-R_ENTRY_X = 0x5A - 0x36        # the cell the player is placed on at load
-R_ENTRY_Y = 0x5B - 0x36
-R_GATE_INDEX = 0x6E - 0x36     # TIME-DOOR rotation index (steps by 2)
-R_GATE_CD = 0x6F - 0x36        # TIME-DOOR countdown (0 at load; first tick -> 0xff)
+# No offset table here: the fields below are named through u2_seed, which reads them from
+# state.h at runtime. The record is DS:36..DS:135, so file byte i is DS:(0x36 + i), and
+# PlayerRecord carries that base so this file never writes it.
 
 # Era 0 slot 1 gate cell is (31,56). The player starts one cell west at (30,56).
 GATE_X, GATE_Y = 31, 56
@@ -63,16 +64,15 @@ def build(work):
     open(os.path.join(content, "mapx00"), "wb").write(bytes(mp))
 
     pp = G.record(work)
-    p = bytearray(open(pp, "rb").read())
-    p[R_SECTOR_HI] = 0
-    p[R_SECTOR_LO] = 0
-    p[R_ENTRY_X] = START_X
-    p[R_ENTRY_Y] = START_Y
+    p = u2_seed.PlayerRecord.load(pp)
+    p.set_at(0, 0)                       # sector 00: era 0, world map (not a site)
+    p.set_raw("entry_x", START_X)        # the cell the player is placed on at load
+    p.set_raw("entry_y", START_Y)
     # Countdown 1 => the first turn decrements to 0, rotates the index by 2 (0 -> slot 1)
     # and stamps the door. Index 0 -> slot 1 -> era-0 cell (31,56).
-    p[R_GATE_INDEX] = 0
-    p[R_GATE_CD] = 1
-    open(pp, "wb").write(bytes(p))
+    p.set_intent("gate", 0)
+    p.set_intent("gate-countdown", 1)
+    p.write(pp)
     return {n: open(os.path.join(content, n), "rb").read()
             for n in ("mapx00", "monx00")}
 

@@ -23,6 +23,11 @@ Usage: cp6_commerce_seed.py DIR CASE
 import os
 import sys
 
+# The seeders share one offset source: state.h, read at runtime by u2_seed. No DS address
+# is written down in this file.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import u2_seed                                  # noqa: E402
+
 FLOOR = 0x70          # town paving, walkable, and what the live grid shows under a foot
 SIGN = 0xB8           # a shop-sign letter: high bit set, which is what makes asm/407F skip
 MARK = 0x68           # the merchant marker asm/409F requires
@@ -166,45 +171,39 @@ def main(out_dir: str, case: str) -> int:
     with open(os.path.join(content, f"monx{sector}"), "wb") as f:
         f.write(bytes(256))
 
-    p = bytearray(384)
-    p[0:7] = b"BUYTEST"                      # name at DS:36
-    p[0x49 - 0x36] = hi                      # sector digits: the second one IS the site kind
-    p[0x4A - 0x36] = lo
-    p[0x4E - 0x36] = 0x40                    # charisma
-    p[0x50 - 0x36] = 0x40                    # intelligence
-    p[0x51 - 0x36] = 0x99
-    p[0x52 - 0x36] = 0x99                    # HP 9999
-    p[0x53 - 0x36] = 0x50
-    p[0x54 - 0x36] = 0x00                    # food 5000, so a grocery buy is visible
-    p[0x55 - 0x36] = 0x00
-    p[0x56 - 0x36] = 0x99
-    p[0x57 - 0x36] = 0x99                    # EXP 9999
-    p[0x58 - 0x36] = 0x99
-    p[0x59 - 0x36] = 0x99                    # GOLD 9999
-    p[0x5A - 0x36] = px                      # entry cell: where the world drops you
-    p[0x5B - 0x36] = py
-    # Command-letter cases need the inventories the handlers gate on. All three are ordinary
-    # save bytes (file offset = DS - 0x36), and each one is the byte the handler actually reads:
-    p[0x4C - 0x36] = 0x40                    # agility, packed: 0x40 = 64, so digit 8 passes
-    #                                       # and digit 9 (72) does not. cmd_R's gate.
-    p[0x4B - 0x36] = 0x40                    # strength, for cmd_W next door
+    p = u2_seed.PlayerRecord()
+    p.set_name("BUYTEST")
+    p.set_at(hi, lo)                       # the second digit IS the site kind
+    p.set_stat("cha", 0x40)
+    p.set_stat("int", 0x40)
+    p.set_intent("hp", 9999)
+    p.set_intent("food", 500000)           # so a grocery buy is visible
+    p.set_intent("exp", 9999)
+    p.set_intent("gold", 9999)
+    p.set_raw("entry_x", px)               # entry cell: where the world drops you
+    p.set_raw("entry_y", py)
+    # Command-letter cases need the inventories the handlers gate on, and each of these is
+    # the byte the handler actually reads:
+    p.set_stat("agi", 0x40)                # packed: 0x40 = 64, so digit 8 passes and digit
+    #                                       # 9 (72) does not. cmd_R's gate.
+    p.set_stat("str", 0x40)                # for cmd_W next door
     for i in range(1, 10):
         if i == 7:
-            continue                         # leave one unowned so the NOT OWNED branch is
-        p[0x76 + i - 0x36] = 1               # reachable in a scripted run (7-LI)
-    p[0x97 - 0x36] = 1                       # armour_owned[CLOTH]. Enhanced mode lists only
-    #                                       # armour the character actually owns (owner's call,
-    #                                       # 2026-10-26) and prints its refusal instead of a menu
-    #                                       # when that list is empty, so with nothing owned the W
-    #                                       # prompt never appears in enhanced mode and
-    #                                       # tests/prompt_gate.py has no blocking read to order.
-    p[0xE3 - 0x36] = 1                       # items_held[13] = STRANGE COIN, which is what
-    #                                       # NEGATE TIME spends. DS:E3 is inside items_held;
-    #                                       # it is not a separate counter (see commands.c).
+            continue                       # leave one unowned so the NOT OWNED branch is
+        p.set_gear("weapons_owned", i, 1)  # reachable in a scripted run (7-LI)
+    p.set_gear("armour_owned", 0, 1)       # CLOTH. Enhanced mode lists only armour the
+    #                                       # character actually owns (owner's call,
+    #                                       # 2026-10-26) and prints its refusal instead of a
+    #                                       # menu when that list is empty, so with nothing
+    #                                       # owned the W prompt never appears in enhanced
+    #                                       # mode and tests/prompt_gate.py has no blocking
+    #                                       # read to order.
+    p.set_gear("items_held", 13, 1)        # STRANGE COIN, which is what NEGATE TIME spends.
+    #                                       # DS:E3 is inside items_held; it is not a separate
+    #                                       # counter (see commands.c).
     rec = os.path.join(save, "PLAYER", "PLAYER")   # saves/<slot>/PLAYER; core/slot.h
     os.makedirs(os.path.dirname(rec), exist_ok=True)
-    with open(rec, "wb") as f:
-        f.write(bytes(p))
+    p.write(rec)
     return 0
 
 
@@ -255,25 +254,23 @@ def main_site(out_dir: str, case: str) -> int:
         with open(gp, "wb") as f:
             f.write(bytes(grid))
 
-    p = bytearray(384)
-    p[0:7] = b"SITETST"
-    p[0x49 - 0x36] = hi
-    p[0x4A - 0x36] = lo                      # the ones digit, which IS the site kind
-    p[0x5A - 0x36] = px                      # entry cell, where a site exit drops you
-    p[0x5B - 0x36] = py
-    p[0x64 - 0x36] = torches                 # DS:64 torches, packed decimal
-    if hp is not None:                       # DS:51 high byte, DS:52 low byte
-        p[0x51 - 0x36] = hp >> 8
-        p[0x52 - 0x36] = hp & 0xFF
-    if gold is not None:                     # DS:58 high byte, DS:59 low (see state.h's wart)
-        p[0x58 - 0x36] = gold >> 8
-        p[0x59 - 0x36] = gold & 0xFF
+    p = u2_seed.PlayerRecord()
+    p.set_name("SITETST")
+    p.set_at(hi, lo)                       # the ones digit IS the site kind
+    p.set_raw("entry_x", px)               # entry cell, where a site exit drops you
+    p.set_raw("entry_y", py)
+    p.set_raw("torches", torches)          # packed decimal, written as the caller encoded it
+    if hp is not None:                     # DS:51 high byte, DS:52 low byte. Raw, not BCD:
+        p.set_raw("hp", hp >> 8)           # the caller passes the two bytes it wants, and a
+        p.set_raw("unk_52", hp & 0xFF)     # move does not change what those bytes are.
+    if gold is not None:                   # DS:58 high byte, DS:59 low (see state.h's wart)
+        p.set_raw("gold_lo", gold >> 8)
+        p.set_raw("gold_hi", gold & 0xFF)
     # No [DS:25]: it is below the saved record, so the floor always starts at whatever the
     # loader leaves there. See the SITE_CASES comment.
     rec = os.path.join(save, "PLAYER", "PLAYER")   # saves/<slot>/PLAYER; core/slot.h
     os.makedirs(os.path.dirname(rec), exist_ok=True)
-    with open(rec, "wb") as f:
-        f.write(bytes(p))
+    p.write(rec)
     return 0
 
 

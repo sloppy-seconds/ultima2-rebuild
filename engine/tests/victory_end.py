@@ -35,6 +35,11 @@ import re
 import shutil
 import subprocess
 import sys
+
+# The seeders share one offset source: state.h, read at runtime by u2_seed. No DS address
+# is written down in this file.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import u2_seed                                  # noqa: E402
 import hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -86,22 +91,21 @@ def build_site_seed(work):
 
     # PLAYER record: file[i] == DS[0x36+i]. Sector digits 0,3 (castle). Entry (2,0).
     # Certain-hit agility, readied weapon, big HP so Minax's strikes don't kill the player.
-    p = bytearray(384)
-    p[0x36 - 0x36:0x36 - 0x36 + 6] = b"GATEWIN"[:6]
-    p[0x49 - 0x36] = 0
-    p[0x4A - 0x36] = 3                 # sector second digit 3 = castle
-    p[0x51 - 0x36] = 0x99
-    p[0x52 - 0x36] = 0x97              # HP 9997
-    p[0x53 - 0x36] = 0x99; p[0x54 - 0x36] = 0x99; p[0x55 - 0x36] = 0x99
-    p[0x56 - 0x36] = 0x00; p[0x57 - 0x36] = 0x00
-    p[0x58 - 0x36] = 0x00; p[0x59 - 0x36] = 0x00
-    p[0x5A - 0x36] = 2                 # entry x
-    p[0x5B - 0x36] = 0                 # entry y
-    p[0x61 - 0x36] = 1                 # readied weapon
-    p[0x4C - 0x36] = 0x80              # agility: guaranteed hit
-    p[0x4B - 0x36] = 0x40              # strength
-    with open(os.path.join(save, "PLAYER", "PLAYER"), "wb") as f:
-        f.write(bytes(p))
+    p = u2_seed.PlayerRecord()
+    # Six name characters, because that is what this seeder wrote before and a move keeps
+    # the bytes it claims to move (state.h's field is 16 bytes, so seven would be legal).
+    p.set_name("GATEWI")
+    p.set_at(0, 3)                     # second digit 3 = castle
+    p.set_intent("hp", 9997)
+    p.set_intent("food", 999999)
+    p.set_intent("exp", 0)
+    p.set_intent("gold", 0)
+    p.set_raw("entry_x", 2)
+    p.set_raw("entry_y", 0)
+    p.set_intent("readied", 1)
+    p.set_stat("agi", 0x80)            # guaranteed hit
+    p.set_stat("str", 0x40)
+    p.write(os.path.join(save, "PLAYER", "PLAYER"))
 
 
 def run(work, keys):
