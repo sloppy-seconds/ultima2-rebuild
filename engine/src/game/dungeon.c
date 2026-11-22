@@ -746,15 +746,16 @@ void u2_dungeon_tick(u2_ctx *ctx, u2_overworld *ow)
  * up.sh passes `-e U2_DG_INSPECT=0` unconditionally, so every noVNC session booted
  * into the hall and `--inspect` was indistinguishable from not asking for it. A
  * deploy layer that always sets a switch makes presence-based truthiness always
- * true; u2_dg_dual_mode below was already reading the value. */
+ * true; u2_dg_dual_mode below was already reading the value.
+ *
+ * No cache. A `static int cached` here made the switch readable exactly once per
+ * process, so no in-process test could present unset / "" / "0" / "1" and see four
+ * answers -- which is how the presence bug stayed untested for nine days. getenv is
+ * called per turn and per boot, never per pixel, so the cache bought nothing. */
 static int dg_inspect(void)
 {
-    static int cached = -1;
-    if (cached < 0) {
-        const char *e = getenv("U2_DG_INSPECT");
-        cached = e && e[0] && e[0] != '0';
-    }
-    return cached;
+    const char *e = getenv("U2_DG_INSPECT");
+    return e && e[0] && e[0] != '0';
 }
 
 int u2_dungeon_inspect(void) { return dg_inspect(); }

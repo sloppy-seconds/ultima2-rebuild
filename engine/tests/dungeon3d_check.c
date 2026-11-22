@@ -20,8 +20,11 @@
  *   4. dispatch: enhanced routes to the 3D path, classic stays the wireframe.
  *   5. assets: deterministic across re-init, every texture carries more than
  *      one index, sprites carry both transparent and opaque pixels.
- *   6. --selftest: the predicates can go red (AGENTS.md § 3).
+ *   6. the dev switches (U2_DG_INSPECT / U2_DG_DUAL) read their value, not their
+ *      presence: unset, "" and "0" are off, "1" is on.
+ *   7. --selftest: the predicates can go red (AGENTS.md § 3).
  */
+#define _DEFAULT_SOURCE           /* setenv / unsetenv, to drive the dev switches */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -361,7 +364,51 @@ static void test_assets(void)
     CHECK(lit_white && !dark_white, "assets: far shade must remove white from the wall");
 }
 
-/* ---- 6. selftest: the predicates can go red -------------------------------- */
+/* ---- 6. the dev switches read their value, not their presence -------------- */
+/* Both dev switches are env vars, and deploy/novnc/up.sh is the caller. From
+ * 2026-11-14 to 2026-11-23 dg_inspect() tested presence while up.sh passed
+ * `-e U2_DG_INSPECT=0` unconditionally, so every noVNC session booted into the dev
+ * hall and --inspect had exactly one observable state. u2_dg_dual_mode() was
+ * already correct, which is the tell and the reason both are pinned here against
+ * the same inputs: a fix that lands on one and drifts back on the other is the bug
+ * returning. The fourth check is the control — if a presence test and a value test
+ * agree on "0", this gate cannot tell the broken reading from the fixed one. */
+static void test_dev_switches(void)
+{
+    static const struct { const char *val; int want; } cases[] = {
+        { NULL, 0 }, { "", 0 }, { "0", 0 }, { "1", 1 },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; i++) {
+        const char *label = cases[i].val ? cases[i].val : "<unset>";
+        /* Both are set to the same value: the point is that the two readers agree
+         * on identical input, so they must be fed identical input. */
+        if (cases[i].val) {
+            setenv("U2_DG_INSPECT", cases[i].val, 1);
+            setenv("U2_DG_DUAL", cases[i].val, 1);
+        } else {
+            unsetenv("U2_DG_INSPECT");
+            unsetenv("U2_DG_DUAL");
+        }
+        CHECK(u2_dungeon_inspect() == cases[i].want,
+              "dev switch: U2_DG_INSPECT=%s reads %d, want %d",
+              label, u2_dungeon_inspect(), cases[i].want);
+        CHECK(u2_dg_dual_mode() == cases[i].want,
+              "dev switch: U2_DG_DUAL=%s reads %d, want %d",
+              label, u2_dg_dual_mode(), cases[i].want);
+        if (cases[i].val && !strcmp(cases[i].val, "0")) {
+            CHECK((getenv("U2_DG_INSPECT") != NULL) != u2_dungeon_inspect(),
+                  "dev switch: a presence test and a value test agree on \"0\", "
+                  "so neither reading is proven here");
+            CHECK((getenv("U2_DG_DUAL") != NULL) != u2_dg_dual_mode(),
+                  "dev switch: a presence test and a value test agree on \"0\", "
+                  "so neither reading is proven here");
+        }
+    }
+    unsetenv("U2_DG_INSPECT");
+    unsetenv("U2_DG_DUAL");
+}
+
+/* ---- 7. selftest: the predicates can go red -------------------------------- */
 /* The CGA-on-EGA remap: the enhanced layout always draws on the 16-colour EGA
  * palette, so when the overworld art fell back to CGA its four indices must land
  * on the EGA indices of the same colour (black 0, cyan 3, magenta 5, white 15),
@@ -443,6 +490,7 @@ int main(int argc, char **argv)
     test_dispatch();
     test_assets();
     test_cga_on_ega();
+    test_dev_switches();
 
     printf("dungeon3d_check: %d checks, %d failures\n", checks, fails);
     return fails ? 1 : 0;
