@@ -91,13 +91,18 @@ typedef struct u2_overworld {
      * once per turn from the draw path and not once per frame at 60 Hz. */
     unsigned turns;
     unsigned logged_turn;
-    /* The warp's star field, mirroring the original's DS:4CD / DS:50D tables. It lives
-     * here rather than in the warp loop because asm/6DFD splits the animation across two
-     * C calls (phases A/B/C, then D/E after the PREPARE line) and the tables survive all
-     * five. asm/6D3E fills them once per space-screen entry, so `warp_seeded` is set by
-     * the warp's first call and cleared nowhere it matters within one warp. */
-    uint8_t  warp_x[64], warp_y[64];
-    int      warp_seeded;
+    /* No warp state lives here. The comment in this spot used to describe `warp_x[64]`,
+     * `warp_y[64]` and `warp_seeded` as the star field mirroring the original's
+     * DS:4CD / DS:50D tables, filled once per space-screen entry by asm/6D3E. Nothing
+     * read or wrote any of the three: the fields were dead and the comment was false, and
+     * a false comment over dead state is the worse defect, because it tells a reader the
+     * warp is stateful in the overworld when it is not. The stateful field exists in
+     * space_view (u2_space_scene_use_table, u2_space_warp_advance, u2_space_warp_seed) and
+     * is deliberately not wired to the renderer — the step rule still strands stars, so
+     * the shipped warp draws the hash field. See G89 in docs/needs-gameplay.md and the
+     * note in commands.c space_paint_mode(). When the missing piece is found, the tables
+     * belong to whoever owns the space loop (#17), not to the overworld.
+     */
     char     note[160];            /* what happened on load, for the caller */
 } u2_overworld;
 

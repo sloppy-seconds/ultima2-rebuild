@@ -1468,9 +1468,9 @@ static void space_paint_mode(u2_ctx *ctx, u2_overworld *ow, int warping,
      * as 3892 distinct dots on the original at the warp's peak. G90,
      * captures/spice86/g90-warp-table/.
      *
-     * `sc.warp_x` / `sc.warp_y` are left NULL on purpose. The stateful field they point at
-     * is seeded and stepped, but the step rule still strands stars, so drawing through it
-     * is worse than the hash field. See space_warp_frame.
+     * `sc.warp_source` stays U2_WARP_FROM_HASH on purpose. The stateful field the table
+     * mode draws is seeded and stepped, but the step rule still strands stars, so drawing
+     * through it is worse than the hash field. See space_warp_frame.
      */
     u2_space_scene_draw(&ow->frame, &sc);
 

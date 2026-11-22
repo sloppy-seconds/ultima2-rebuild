@@ -106,18 +106,31 @@ typedef struct u2_space_scene {
      * clean dot and no trail — the engine reproduces that by clearing, which is the same
      * picture arrived at differently, and the difference is recorded rather than hidden. */
     int keep_frame;
-    /* The warp field's own star positions, or NULL to fall back on the hash field.
+    /* Which star field the warp draws, and the table it draws from when the answer is
+     * the table.
+     *
      * These are the engine's version of the original's DS:4CD / DS:50D tables: 64
      * entries, advanced once per redraw by u2_space_warp_advance() and written back.
      * asm/6B3D reads a star's OLD position out of the table, derives a new one from
      * its distance from the ship, and stores it, so the field is stateful and cannot
-     * be regenerated from a seed and a frame index. When these are set, `warp_frame`
-     * is not consulted.
+     * be regenerated from a seed and a frame index. In U2_WARP_FROM_HASH the tables
+     * are not consulted at all.
      *
-     * Nothing in the shipped engine sets them. The step rule they exist for is decoded
-     * and unit-tested, but running it to completion empties the middle of the field, so
-     * the renderer stays on the hash field until the missing piece is found — see the
-     * note in commands.c space_paint_mode() and G89 in docs/needs-gameplay.md. */
+     * The mode used to be carried by the pointers: NULL meant "use the hash field".
+     * That was an in-band signal, and it bit — when these fields were added the scene
+     * builder did not initialise them, so every caller on the stack handed the draw
+     * wild pointers, the table branch ran, and the scripted launch in the space gate
+     * stopped reaching orbit with no hint of a cause. A named mode means a forgotten
+     * initialisation is a wrong picture that says which mode it used, not a dereference
+     * of garbage. Set the table with u2_space_scene_use_table; do not assign the
+     * pointers.
+     *
+     * Nothing in the shipped engine sets the table mode. The step rule the tables exist
+     * for is decoded and unit-tested, but running it to completion empties the middle of
+     * the field, so the renderer stays on the hash field until the missing piece is
+     * found — see the note in commands.c space_paint_mode() and G89 in
+     * docs/needs-gameplay.md. */
+    enum { U2_WARP_FROM_HASH = 0, U2_WARP_FROM_TABLE } warp_source;
     const uint8_t *warp_x;
     const uint8_t *warp_y;
     /* Star field seed. NOT decoded from the original -- see u2_space_scene_from(). */
@@ -184,10 +197,30 @@ typedef struct { int value; int accumulate; } u2_warp_sweep;
 u2_warp_sweep u2_space_warp_sweep(int frame);
 int u2_space_warp_sweep_frames(void);
 
-/* Build the scene from live state. Pure: reads, allocates nothing, draws nothing. */
+/* Build the scene from live state. Pure: reads, allocates nothing, draws nothing.
+ * It always returns U2_WARP_FROM_HASH and warping=0, so a gate can build a scene from
+ * state alone; a caller that is animating a warp overrides those, and a caller that has
+ * real tables says so with u2_space_scene_use_table rather than by assigning pointers. */
 void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out);
 
-/* Paint the scene into the map-window region of the frame. */
+/* Draw the warp field from the caller's own star tables instead of the hash field.
+ * `n` is not a parameter because the original's tables are 64 entries and the renderer
+ * walks exactly that many; passing a shorter array is a bug this cannot detect, so the
+ * length is stated in the type's contract instead of left to be remembered.
+ *
+ * The tables are not copied and must outlive the scene. */
+void u2_space_scene_use_table(u2_space_scene *s, const uint8_t *x, const uint8_t *y);
+
+/* Paint the scene into the map-window region of the frame.
+ *
+ * A caller MUST composite the text layer back over the frame after this and before it
+ * presents. The field clear takes the whole frame, not the view rectangle, so a scene
+ * drawn and presented as-is loses the `CMD:` prompt and the FUEL/XENO/YAKO/ZABO readout
+ * — which is a real regression this project has already shipped once (owner, 2026-11-10:
+ * "we make it to space but the cmd> etc disappears"). The requirement lives here rather
+ * than only in the one caller's comment because the API invites the two-call sequence
+ * and the second call is not visible from the signature. Folding it in for good is the
+ * space screen owning its own paint, which is #17. */
 void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s);
 
 #endif /* U2_SPACE_VIEW_H */

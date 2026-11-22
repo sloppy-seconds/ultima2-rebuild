@@ -200,6 +200,19 @@ else
     bad "space view gate failed -- the in-space screen is broken again"
 fi
 
+# Which star field the warp draws, and that naming the mode rather than leaving a pointer
+# NULL is what selects it. The table branch existed, was correct as far as anyone knew, and
+# nothing had ever drawn through it — so nothing could tell a working one from one that
+# plotted nowhere. Control, run 2026-11-22: with the `warp_source == U2_WARP_FROM_TABLE`
+# test dropped from the draw's guard, the "hash mode does not reproduce the table" check
+# goes red; with the builder's default removed, the first check goes red.
+if u2_check "$WORK/space_warp_check" tests/space_warp_check.c 2>"$WORK/swarp.build"; then
+    ok "space warp field: the table mode draws the table, and the mode is named"
+else
+    sed 's/^/        /' "$WORK/swarp.build" | tail -4
+    bad "space_warp_check failed"
+fi
+
 # --- the framebuffer ------------------------------------------------------
 # Every display backend sits behind this, so a mistake here reaches all of them.
 "$U2_CC" $U2_CCFLAGS -o "$WORK/frame_check" \

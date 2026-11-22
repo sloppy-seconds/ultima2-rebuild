@@ -94,10 +94,11 @@ void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out)
 
     out->fuel = u2_bcd_dec1(st->items_held[U2_ITEM_TRI_LITHIUM]);
     /* The builder sets every field it knows about, and callers declare the struct on the
-     * stack, so a pointer field added later MUST be initialised here or it arrives as
-     * stack garbage. That is what happened when warp_x/warp_y were added: the draw took the
+     * stack, so a field added later MUST be initialised here or it arrives as stack
+     * garbage. That is what happened when warp_x/warp_y were added: the draw took the
      * table branch with wild pointers and the scripted launch in the space gate stopped
      * reaching orbit, with no hint of the cause. */
+    out->warp_source = U2_WARP_FROM_HASH;
     out->warp_x = NULL;
     out->warp_y = NULL;
     out->warping = 0;   /* The scene builder stays stateless so a gate can build a scene from
@@ -114,6 +115,13 @@ void u2_space_scene_from(const u2_ctx *ctx, u2_space_scene *out)
     out->oy = U2_SPACE_VIEW_Y;
     out->star_seed = ((uint32_t)st->world << 16) ^
                      ((uint32_t)out->xeno << 8) ^ (uint32_t)out->yako;
+}
+
+void u2_space_scene_use_table(u2_space_scene *s, const uint8_t *x, const uint8_t *y)
+{
+    s->warp_source = U2_WARP_FROM_TABLE;
+    s->warp_x = x;
+    s->warp_y = y;
 }
 
 void u2_space_warp_seed(uint8_t *sx, uint8_t *sy, int n, uint32_t seed)
@@ -281,7 +289,7 @@ void u2_space_scene_draw(u2_frame *f, const u2_space_scene *s)
 
     uint32_t h = star_hash(s->star_seed ? s->star_seed : 1u);
 
-    if (s->warping && s->warp_x && s->warp_y) {
+    if (s->warping && s->warp_source == U2_WARP_FROM_TABLE && s->warp_x && s->warp_y) {
         /* The stateful field: positions come from the caller's tables, which it has
          * already advanced with u2_space_warp_advance(). This is the path the original
          * takes, and the picture it produces is the one the frames show -- sparse dots
