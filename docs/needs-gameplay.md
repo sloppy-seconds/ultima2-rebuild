@@ -1162,7 +1162,42 @@ now named `view_mode`.
 A CP4 test had been asserting the opposite behaviour by name and passing; it is replaced
 and the replacement says why.
 
-## G92 — what a direction key does to the star field in the orbit view `[ ]`
+## G92 — what a direction key does to the star field in the orbit view `[x]`
+
+**Resolved 2026-11-23 from the decoded asm, not from a capture.** The question was
+answerable statically and had been answered already in `asm/6999_space_status.asm`'s own
+header; the capture plan below was unnecessary and is kept only as the verification step.
+
+`asm/6999` is the orbit command loop and its arrow arms are decoded at
+`L_006cb9..L_006d3c`. Every arm: print the word, `call L_006ec4` (= `asm/6CC4`, file
++ 0x200, the ship-sprite erase at the OLD position), store a **fixed preset** into
+`DS:47B/DS:47C`, `jmp` back to the loop head.
+
+| arm | ship_x | ship_y |
+| --- | --- | --- |
+| loop head / entry (`L_006ba3`) | `0x80` | `0x40` |
+| LEFT | `0x20` | `0x40` |
+| RIGHT | `0xDF` | `0x40` |
+| CLIMB | `0x80` | `0x10` |
+| DIVE | `0x80` | `0x6F` |
+
+There is **no step and no scroll offset**. The ship is repositioned to a preset near the
+field edge, and `asm/6B3D` recomputes every star relative to the ship through the delta
+table at `cs:0x6cac`, so moving the ship up moves the computed star positions down. The
+cross is drawn at the ship (`asm/6D83` plots the vertical stroke at `x = DS:47B`,
+`y = DS:47C-3..+3`), so it moves too.
+
+Two consequences for the engine, both recorded on issue #21: the `± U2_SPACE_SHIP_STEP`
+increment in `space_fly` is the wrong shape entirely, and `space_view.c`'s claim that "the
+cross does not move" over-generalises `g90-warp-table/ship.txt`, which sampled hyperwarp
+with no key pressed and so only ever saw the entry preset.
+
+**What remains** is verification of the fix, not discovery: one before/after frame pair per
+direction in the original, confirming the presets land where the bytes say.
+
+---
+
+### Original question, kept for the record
 
 **Who can do it: agent, and it is cheap.** The original is already drivable in space
 headless; this needs keys and two screenshots, not the owner.
@@ -1203,9 +1238,9 @@ The crosshair half contradicts the 120-frame reading of `DS:47B/47C`, so it is a
 re-check in the same capture rather than to dismiss: if the field scrolls under a fixed
 cross, the scene shifts and that is easy to remember as the cross moving.
 
-**One blocker to clear first.** Today's launch spent the only tri-lithium and showed
-`FUEL=00`, so we may never have held the plain orbit state this question is about. The
-capture needs a seed with fuel to spare, and `tools/u2_edit.py` has no field name for the
-rocket's parked state, so check whether tri-lithium alone is enough before assuming a new
-field is needed.
+**One blocker to clear first** (for the verification frames, not for the answer): today's
+launch spent the only tri-lithium and showed `FUEL=00`, so we may never have held the plain
+orbit state. The frame check needs a seed with fuel to spare, and `tools/u2_edit.py` has no
+field name for the rocket's parked state, so check whether tri-lithium alone is enough
+before assuming a new field is needed.
 
