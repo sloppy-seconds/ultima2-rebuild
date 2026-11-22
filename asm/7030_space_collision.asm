@@ -68,6 +68,23 @@
 # confidence: high for the world byte, the name list 0..8, the deep-space refusal and
 #           the landing sector arithmetic; low for the world-9 name routine, which has
 #           never executed.
+#   READ END TO END 2026-11-23, and one open question closed.
+#           The lookup is three PARALLEL CS tables, nine entries each, scanned with the index
+#           counting DOWN from 9: `cs:0x7012[i]` against DS:4CA, `cs:0x701c[i]` against
+#           DS:4CB, `cs:0x7026[i]` against DS:4CC. A world matches only when all three bytes
+#           EQUAL its entry -- no tolerance, no radius, no nearest. Match: DS:6D = i and print
+#           "YOU ARE ORBITING " plus the name. No match: DS:6D = 0x0A and print
+#           "YOU ARE IN DEEP SPACE.". The 4/4/4 sun test runs first and prints "U HIT THE
+#           SUN!" but does not return -- it falls through into the scan, which matches nothing,
+#           so hitting the sun also lands you in deep space.
+#           WHY "YOU ARE ORBITING <name>." LOOKED MISSING FROM THE ENGINE: this routine is
+#           reached only from asm/6DFD's tail (the hyperwarp arm) and from the 'H' arm's
+#           no-fuel path. The rocket-launch path never calls it. So the line is an ARRIVAL
+#           message, not an orbit-entry message, and a plain launch into orbit prints no such
+#           line in the original either -- the frame that showed it (`22-right.png`) shows it
+#           because that capture had hyperwarped first. The engine's space_orbit_determine is
+#           wired the same way and was already correct; the note calling the line a divergence
+#           was comparing a post-hyperwarp frame against a launch.
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 space_collision:
 L_007230:
