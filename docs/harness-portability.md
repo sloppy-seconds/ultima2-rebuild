@@ -189,6 +189,24 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-23 -- a value that never changes across a capture is only evidence about the
+  states that capture visited, and a constant read over many frames is the most convincing
+  shape a wrong generalisation can take.** A runtime probe sampled one sprite-position pair
+  across 120 consecutive frames, found it identical every time, and the finding was written
+  into the renderer as a rule about the sprite ("the marker is pinned; the field scrolls
+  under it"), and the engine was changed to match. The probe was accurate. What made the
+  conclusion wrong is that the capture never pressed the input that rewrites the pair, so
+  the sampled constant was an initialisation value rather than an invariant, and the frames
+  were all of the one state that happens to equal the initialisation. The general shape:
+  before a per-frame read is promoted into a law, name the input that would change it and
+  show the capture exercised it. A capture that presses nothing can only evidence the idle
+  state, however many frames it holds. Two cheap guards follow. Prefer a probe that brackets
+  an input (read, act, read) over one that samples a window, since the bracketing form makes
+  "nothing pressed" visible in its own shape. And treat an owner's recollection that
+  contradicts a constant reading as a pointer at an unexercised input rather than a
+  misremembering: here the owner was right on both halves of what they described, and this
+  is the second time in one project that a correct observation lost to an over-generalised
+  measurement.
 * **2026-11-23 — a harness helper that builds a test binary is not a gate, and a wrapper that
   reports the build's exit status as the test's verdict can never go red.** This project's
   shell harness has a helper that links a check against the library and returns the compiler's
