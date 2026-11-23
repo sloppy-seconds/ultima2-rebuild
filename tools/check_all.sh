@@ -114,6 +114,13 @@ opt_run "cmd_provenance_derived" captures/spice86 -- python3 tools/cmd_handlers.
 run "demo_key_gate selftest" tools/demo_key_gate.py -- python3 tools/demo_key_gate.py --selftest
 run "demo_key_gate" asm -- python3 tools/demo_key_gate.py
 
+# The `# calls:` line is hand-editable prose duplicating a fact the body owns, and 601 files
+# carry one. Selftest first -- 8 controls, both polarities, including the wrapped continuation
+# and the lying `(+N more)` cases; the naive `call`-text rule called 212 of 601 files drift, so
+# the rule is the load-bearing part and the controls are what keep it honest.
+run "calls_gate selftest" tools/calls_gate.py -- python3 tools/calls_gate.py --selftest
+run "calls_gate" asm -- python3 tools/calls_gate.py
+
 run "cmd_marker_gate selftest" tools/cmd_marker_gate.py -- python3 tools/cmd_marker_gate.py --selftest
 run "cmd_marker_gate" engine/src docs/phase4-state.md -- python3 tools/cmd_marker_gate.py
 # Which SDL a build links is decided by this probe, and a wrong verdict is a build

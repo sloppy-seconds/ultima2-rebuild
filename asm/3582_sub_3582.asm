@@ -1,7 +1,7 @@
 # sub_3582 — mechanical clean (bulk wave); behavior not yet reviewed
 # func 3582..3595  len 0014 B  evidence: reko
 # strings: " 9,000,000 B.C."
-# calls: L_000c33
+# calls: L_000c33, L_0051df (str_out)
 # confidence: low (bytes proven by check_func.py)
 # body corrected: 2026-10-28e -- evidence: the second half of the era-table string started at
 #           asm/3577, then a jmp back to the dispatcher, then the opcode byte of the next

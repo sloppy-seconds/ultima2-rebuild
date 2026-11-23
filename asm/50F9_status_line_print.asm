@@ -12,6 +12,7 @@
 #           are all kept — only the `.byte` lines were merged — so the CP0 label invariant holds.
 #           Found by tools/forced_keep_audit.py.
 # calls: L_0051df (str_out)
+#           L_0053eb (asm/51EB str_out_at), L_0055d9 (asm/53D9)
 # provenance: live:airport (+50 other harvests), static
 #           entry executed in 51 of 60 harvests; derived by tools/provenance_from_traces.py
 #           confidence: low (bytes proven by check_func.py)

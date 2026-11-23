@@ -40,7 +40,8 @@
 # func 4050..40A5  len 0056 B  evidence: seed+call+reko
 # strings: "TRANSACT-"
 # calls: L_0051df (str_out), L_0025e6 (cursor init + slot scan seed), L_0055f4 (emit),
-#        L_0052b3 (map_tile_ptr) x2
+#        L_0052b3 (map_tile_ptr) x2, L_001790 (asm/1590 transact_shop_selector),
+#        L_002562 (asm/2362 aim_state_clear)
 # provenance: live:armour-buy, food-buy; static
 #           entry executed in 38 of 291 harvests; derived from ExecutedInstructions. This line
 #           previously carried the live citations but no executed count, and tools/cmd_handlers.py
