@@ -135,6 +135,14 @@ run "demo_key_gate" asm -- python3 tools/demo_key_gate.py
 run "calls_gate selftest" tools/calls_gate.py -- python3 tools/calls_gate.py --selftest
 run "calls_gate" asm -- python3 tools/calls_gate.py
 
+# The DS offset table, generated from state.h (docs/plan-code-index.md § 6 item 2). Required, not
+# optional: it reads only tracked inputs, and it is what makes "THIS STRUCT IS THE ONE TABLE FOR DS
+# OFFSETS" true in code rather than asserted in a comment. Selftest first -- 6 controls, including
+# the one that proves a field-shaped line the parser cannot read is a failure and not a skip.
+run "state_layout selftest" tools/state_layout.py -- python3 tools/state_layout.py --selftest
+run "state_layout verify" engine/src/core/state.h -- python3 tools/state_layout.py --verify
+run "state_layout fresh" disasm/index/state.tsv -- python3 tools/state_layout.py --check-fresh
+
 run "cmd_marker_gate selftest" tools/cmd_marker_gate.py -- python3 tools/cmd_marker_gate.py --selftest
 run "cmd_marker_gate" engine/src docs/phase4-state.md -- python3 tools/cmd_marker_gate.py
 # Which SDL a build links is decided by this probe, and a wrong verdict is a build

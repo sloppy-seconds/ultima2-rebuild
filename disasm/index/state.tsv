@@ -1,0 +1,114 @@
+ds_offset	save_offset	name	c_type	size	kind	asserted	cited_in
+0x000		sector_x	uint8_t	1	named	no	5ae1
+0x001		sector_y	uint8_t	1	named	no	5ae1
+0x002		face_dx	uint8_t	1	named	yes	
+0x003		face_dy	uint8_t	1	named	yes	
+0x004		reserved_04	uint8_t	14	reserved	no	
+0x012		view_mode	uint8_t	1	named	yes	
+0x013		player_stamp	uint8_t	1	named	yes	
+0x014		mode_a	uint8_t	1	named	yes	5b71
+0x015		mode_walk	uint8_t	1	named	yes	
+0x016		mode_b	uint8_t	1	named	yes	5b71
+0x017		mode_c	uint8_t	1	named	yes	5b71
+0x018		mode_walk_alt	uint8_t	1	named	yes	
+0x019		reserved_19	uint8_t	7	reserved	no	
+0x020		move_scratch	uint8_t	1	named	yes	
+0x021		reserved_21	uint8_t	2	reserved	no	
+0x023		player_x	uint8_t	1	named	yes	50b3
+0x024		player_y	uint8_t	1	named	yes	50b3
+0x025		site_floor	uint8_t	1	named	no	
+0x026		moved_flag	uint8_t	1	named	yes	
+0x027		reserved_27	uint8_t	2	reserved	no	
+0x029		mode_arg	uint8_t	1	named	yes	2423
+0x02a		reserved_2A	uint8_t	4	reserved	no	
+0x02e		cursor_col	uint8_t	1	named	yes	51fd
+0x02f		cursor_row	uint8_t	1	named	yes	51fd
+0x030		reserved_30	uint8_t	1	reserved	no	
+0x031		right_margin	uint8_t	1	named	yes	
+0x032		reserved_32	uint8_t	4	reserved	no	
+0x036	0x000	name	uint8_t	16	named	yes	
+0x046	0x010	sex	uint8_t	1	named	yes	
+0x047	0x011	pclass	uint8_t	1	named	yes	
+0x048	0x012	race	uint8_t	1	named	yes	
+0x049	0x013	sector_first	uint8_t	1	named	yes	2290
+0x04a	0x014	sector_second	uint8_t	1	named	yes	
+0x04b	0x015	stat_str	uint8_t	1	named	yes	
+0x04c	0x016	stat_agi	uint8_t	1	named	no	
+0x04d	0x017	stat_sta	uint8_t	1	named	no	
+0x04e	0x018	stat_cha	uint8_t	1	named	no	
+0x04f	0x019	stat_wis	uint8_t	1	named	no	
+0x050	0x01a	stat_int	uint8_t	1	named	yes	
+0x051	0x01b	hp	uint8_t	1	named	yes	
+0x052	0x01c	unk_52	uint8_t	1	named	no	
+0x053	0x01d	food	uint8_t	1	named	yes	
+0x054	0x01e	food_hi	uint8_t	1	named	no	
+0x055	0x01f	food_lo	uint8_t	1	named	no	
+0x056	0x020	exp_lo	uint8_t	1	named	yes	
+0x057	0x021	exp_hi	uint8_t	1	named	no	
+0x058	0x022	gold_lo	uint8_t	1	named	yes	
+0x059	0x023	gold_hi	uint8_t	1	named	no	
+0x05a	0x024	entry_x	uint8_t	1	named	yes	
+0x05b	0x025	entry_y	uint8_t	1	named	yes	
+0x05c	0x026	reserved_5C	uint8_t	4	reserved	no	
+0x060	0x02a	spawn_selector	uint8_t	1	named	yes	
+0x061	0x02b	readied_weapon	uint8_t	1	named	yes	
+0x062	0x02c	worn_armour	uint8_t	1	named	yes	
+0x063	0x02d	spell_pick	uint8_t	1	named	yes	
+0x064	0x02e	torches	uint8_t	1	named	yes	
+0x065	0x02f	keys	uint8_t	1	named	yes	2cd8
+0x066	0x030	tools	uint8_t	1	named	yes	2cf6
+0x067	0x031	reserved_67	uint8_t	2	reserved	no	
+0x069	0x033	rocket_parked	uint8_t	1	named	yes	
+0x06a	0x034	rocket_parked_x	uint8_t	1	named	yes	
+0x06b	0x035	rocket_parked_y	uint8_t	1	named	yes	
+0x06c	0x036	blessing	uint8_t	1	named	no	
+0x06d	0x037	world	uint8_t	1	named	yes	
+0x06e	0x038	gate_index	uint8_t	1	named	no	
+0x06f	0x039	gate_countdown	uint8_t	1	named	no	
+0x070	0x03a	reserved_70	uint8_t	4	reserved	no	
+0x074	0x03e	speed	uint16_t	2	named	yes	
+0x076	0x040	weapons_owned	uint8_t	10	named	yes	
+0x080	0x04a	reserved_80	uint8_t	8	reserved	yes	
+0x088	0x052	reserved_88	uint8_t	14	reserved	no	
+0x096	0x060	reserved_96	uint8_t	1	reserved	no	
+0x097	0x061	armour_owned	uint8_t	6	named	yes	
+0x09d	0x067	reserved_9D	uint8_t	25	reserved	no	
+0x0b6	0x080	spell_counts	uint8_t	10	named	yes	
+0x0c0	0x08a	reserved_C0	uint8_t	22	reserved	no	
+0x0d6	0x0a0	items_held	uint8_t	16	named	yes	
+0x0e6	0x0b0	reserved_E6	uint8_t	81	reserved	no	
+0x137		mon_x	uint8_t	32	named	yes	
+0x157		mon_y	uint8_t	32	named	yes	
+0x177		mon_hp	uint8_t	32	named	yes	2e3d
+0x197		mon_type	uint8_t	32	named	yes	
+0x1b7		mon_kind	uint8_t	32	named	yes	
+0x1d7		mon_role	uint8_t	32	named	yes	
+0x1f7		mon_wander_x	uint8_t	32	named	yes	
+0x217		mon_wander_y	uint8_t	32	named	yes	10bf
+0x237		reserved_237	uint8_t	2	reserved	yes	
+0x239		story_flag	uint8_t	1	named	yes	0133
+0x23a		reserved_23A	uint8_t	4	reserved	no	
+0x23e		text_attr	uint8_t	1	named	yes	
+0x23f		rng_state	uint8_t	6	named	yes	
+0x245		reserved_245	uint8_t	37	reserved	no	
+0x26a		counter_26A	uint8_t	1	named	yes	
+0x26b		paral_legs	uint8_t	1	named	yes	
+0x26c		paral_arms	uint8_t	1	named	yes	0ec2
+0x26d		paral_sleep	uint8_t	1	named	yes	0f48
+0x26e		reserved_26E	uint8_t	4	reserved	no	
+0x272		stage_a	uint8_t	256	named	yes	4abb
+0x372		stage_b	uint8_t	256	named	no	
+0x472		map_base	uint16_t	2	named	yes	50b3
+0x474		reserved_474	uint8_t	7	reserved	no	
+0x47b		space_ship_x	uint8_t	1	named	no	
+0x47c		space_ship_y	uint8_t	1	named	no	
+0x47d		reserved_47D	uint8_t	77	reserved	no	
+0x4ca		reserved_4CA	uint8_t	133	reserved	no	
+0x54f		left_margin	uint8_t	1	named	yes	
+0x550		tick_low	uint16_t	2	named	yes	06b0
+0x552		tick_high	uint16_t	2	named	yes	
+0x554		speed_baseline	uint16_t	2	named	yes	
+0x556		reserved_556	uint8_t	2	reserved	no	
+0x558		speed_mult	uint16_t	40	named	yes	
+0x580		speed_delay	uint16_t	40	named	yes	
+0x5a8		reserved_5A8	uint8_t	168	reserved	no	

@@ -359,9 +359,19 @@ the `# calls:` gate plus reading. That limitation is stated here rather than pap
 
 ## 9. Found while ruling, and not this epic's to fix
 
-Nothing parses `engine/src/core/state.h` today. `tools/u2_edit.py:95` hand-maintains `BASE = 0x36`
-and a field dict that cites `state.h` in comments, so the glossary's **Seed module** ruling —
-"offsets are generated from `state.h`, never copied from it" — is currently false in the code.
+`tools/state_layout.py` parses `engine/src/core/state.h` now (#32, 2026-11-23): 113 fields, with
+the `/* 0xNN */` comments and the `U2_OFF` asserts both checked against offsets computed from the
+declared types, `sizeof` checked against the struct's own size assert, and any field-shaped line
+the parser cannot read treated as a hard failure rather than a skip. Its output is
+`disasm/index/state.tsv`, committed, with the tool as its only writer.
+`tools/u2_edit.py:95` still hand-maintains `BASE = 0x36` and a field dict that cites `state.h` in
+comments, so the glossary's **Seed module** ruling — "offsets are generated from `state.h`, never
+copied from it" — remains false in the code.
+
+Found while building it: the header says every named field is pinned by a `_Static_assert`, and 18
+named fields are not (`sector_x`, `stat_agi`, `space_ship_x`, …). The table carries an `asserted`
+column and `--verify` ratchets the count, so the number can only fall. Adding the missing asserts
+is engine source and its own commit.
 `footprint` needs the struct read for real (names as query keys, the `save_offset` column), so
 this epic builds that parser and exposes it as an importable module.
 
