@@ -1371,7 +1371,7 @@ asm_addr	asm_file	c_file	c_line	c_symbol	cited_as
 19006	4A3E_sub_4a3e.asm	core/frame.h	9	(file)	asm/4A3E
 19006	4A3E_sub_4a3e.asm	game/title.c	21	(file)	asm/4A3E
 19006	4A3E_sub_4a3e.asm	game/title.c	293	present_poem	asm/4A3E
-19060	4A74_tile_blit_cga.asm	core/tiles.c	116	u2_tiles_extract_from_memory	asm/4A74
+19060	4A74_tile_blit_cga.asm	core/tiles.c	118	u2_tiles_extract_from_memory	asm/4A74
 19060	4A74_tile_blit_cga.asm	core/tiles.h	16	(file)	asm/4A74
 19060	4A74_tile_blit_cga.asm	core/tiles.h	19	(file)	asm/4A74
 19131	4ABB_sub_4abb.asm	core/frame.c	6	(file)	asm/4ABB

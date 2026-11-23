@@ -30,7 +30,11 @@ Output is derived from a gitignored screenshot and never writes game content.
 import argparse
 import sys
 
-from PIL import Image
+# Pillow is imported where it is used, not here. This tool's `--help` is cited in
+# docs/spice86-capture.md and doc_command_gate.py runs `--help` to prove the citation is real, so a
+# module-level `from PIL import Image` made `--help` exit 1 on any machine without Pillow -- which
+# is every CI runner. A documented command that cannot print its own usage is the defect the gate
+# exists to catch, and here the gate was right and the tool was wrong.
 
 # CGA mode-4 palette as the engine renders it (black, cyan, magenta, white).
 CGA = [(0, 0, 0), (0x55, 0xAA, 0xFF), (0xFF, 0x55, 0xFF), (0xFF, 0xFF, 0xFF)]
@@ -74,6 +78,10 @@ def find_game_area(im):
 
 
 def grid_from_screenshot(path):
+    try:
+        from PIL import Image
+    except ImportError as exc:
+        raise SystemExit("this command needs Pillow (pip install pillow); --help works without it") from exc
     im = Image.open(path).convert("RGB")
     area = find_game_area(im)
     if area is None:

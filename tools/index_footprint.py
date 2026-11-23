@@ -181,12 +181,24 @@ def roles_for(stem: str, reads: str, writes: str) -> tuple[str, str]:
 
 
 def parse_es_setup(lines: list[str]) -> str:
-    """How does this routine set ES? es=ds | es=cs | es=io(video) | es=from-reg | es=none.
+    """How does this routine load ES? es=ds | es=cs | es=io(video) | es=from-reg | es=none.
 
-    ES is not a constant across the binary, so an `es:` operand means nothing until its own routine
-    is read: asm/154E makes es=ds, asm/155D makes ES=CS, asm/310B_cmd_C makes ES=0xB800 video.
+    ES is not a constant across the binary, so an `es:` operand means nothing until the routine that
+    uses it is read. Comment lines are skipped, deliberately: a header may describe a calling
+    convention (`asm/154E`'s says `push %es ; es = ds`) that its body does not perform, and the body
+    is authoritative without exception.
+
+    WHAT ACTUALLY OCCURS IN THIS BINARY, measured over all 1212 files: `from-reg` in 10 of them
+    (`asm/4B76_pixel_plot`, `asm/4BAA_pixel_erase`, `asm/0100_sub_0100`, `asm/3139_cast_spell_flow`
+    and six more, all loading ES from AX or CL), and `none` in the other 1202. The `ds`, `cs` and
+    `io(video)` forms are recognised and unit-tested but do not appear anywhere in `asm/` — an
+    earlier version of this docstring cited asm/154E, asm/155D and asm/310B_cmd_C as examples, and
+    all three of those claims came from header prose, not from a body that sets ES. Dead branches
+    are kept because the controls prove they would work if a re-derivation ever produced such a
+    routine, but nothing in this tree exercises them, and that is stated rather than hidden.
+
     Where ES is loaded from a register whose value came from a caller (`mov %ax,%es`) the answer is
-    `from-reg` and the index says so rather than guessing -- a reported limit, not a silent one.
+    `from-reg` and the index says so rather than guessing — a reported limit, not a silent one.
     """
     found = set()
     for ln in lines:

@@ -98,14 +98,16 @@ int u2_tiles_extract_from_memory(const uint8_t *mem, size_t len, u2_tiles *t)
                   (size_t)(U2_TILE_COUNT - 1) * U2_TILE_FILE_STRIDE + U2_TILE_BYTES;
     if (len < need) return -1;
 
-    /* 1. the index table: 64 words, uniform stride of exactly 66. */
+    /* 1. the index table: 64 words, uniform stride of exactly 66. Checked in the same pass that
+     *    fills the array, because reading idx[i-1] in a second loop is what gcc's -Wanalyzer
+     *    reported as "use of uninitialized value idx[i]" — a false positive, since the first loop
+     *    writes every element, but a single pass is both true and simpler, and a suppression
+     *    comment would outlive the reason for it. */
     uint16_t idx[U2_TILE_COUNT];
     for (int i = 0; i < U2_TILE_COUNT; i++) {
         const uint8_t *p = mem + U2_TILE_INDEX_FILE_OFF + (size_t)i * 2;
         idx[i] = (uint16_t)(p[0] | (p[1] << 8));
-    }
-    for (int i = 1; i < U2_TILE_COUNT; i++) {
-        if ((int)idx[i] - (int)idx[i - 1] != U2_TILE_FILE_STRIDE) return -1;
+        if (i > 0 && (int)idx[i] - (int)idx[i - 1] != U2_TILE_FILE_STRIDE) return -1;
     }
 
     /* 2. the index values are data-image offsets; recover the base and require
