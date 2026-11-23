@@ -16,6 +16,10 @@
 #           -3..+3 like the horizontal. The engine's `U2_SPACE_SHIP_V_TO` was +2 and is now
 #           +3.
 # calls: L_004d76 (pixel_plot), 13 sites
+# provenance: live:dive-rate2 (+10 other harvests: dive-rate2-live, dive-sweep-rate,
+#           g39-rocket-flight, g60, g62h, g85, launch, w6-orbit-dive, w6-three,
+#           w6-three-live), static
+#           entry executed in 11 of 291 harvests; derived by tools/provenance_from_traces.py
 # confidence: high for the shape (both arms enumerated above, and asm/6CC4 corroborates
 #           pixel for pixel); the routine is called from asm/6B3D's head, once per pass.
 # func 6D83..6DFC  len 007A B  evidence: call+reko
