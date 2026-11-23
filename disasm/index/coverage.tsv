@@ -1,0 +1,1213 @@
+file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
+0000_data_prologue.asm	decoded					0
+0100_sub_0100.asm	segmented				low	0
+0133_sub_0133.asm	decoded	yes			high	0
+013B_sub_013b.asm	segmented				low	0
+013E_sub_013e.asm	segmented				low	0
+0142_sub_0142.asm	segmented				low	0
+014B_sub_014b.asm	segmented				low	0
+0155_sub_0155.asm	segmented				low	0
+0158_sub_0158.asm	segmented				low	0
+015E_sub_015e.asm	segmented				low	0
+0172_sub_0172.asm	segmented				low	0
+0175_sub_0175.asm	segmented				low	0
+0178_sub_0178.asm	segmented				low	0
+017D_sub_017d.asm	segmented				low	0
+0180_sub_0180.asm	segmented				low	0
+0184_sub_0184.asm	segmented				low	0
+018D_sub_018d.asm	segmented				low	0
+0198_sub_0198.asm	segmented				low	0
+019B_sub_019b.asm	segmented				low	0
+01A1_sub_01a1.asm	segmented				low	0
+01BB_sub_01bb.asm	segmented				low	0
+01BE_sub_01be.asm	segmented				low	0
+01C4_sub_01c4.asm	segmented				low	0
+01E1_sub_01e1.asm	segmented				low	0
+01E4_sub_01e4.asm	segmented				low	0
+01EA_sub_01ea.asm	segmented				low	0
+01FD_sub_01fd.asm	segmented				low	0
+01FE_sub_01fe.asm	decoded		yes		low	0
+0200_sub_0200.asm	segmented				low	0
+0203_sub_0203.asm	segmented				low	0
+0208_sub_0208.asm	segmented				low	0
+020B_sub_020b.asm	segmented				low	0
+020F_sub_020f.asm	segmented				low	0
+0222_sub_0222.asm	segmented				low	0
+0225_sub_0225.asm	segmented				low	0
+0228_sub_0228.asm	segmented				low	0
+022B_sub_022b.asm	segmented				low	0
+022E_sub_022e.asm	segmented				low	0
+0234_sub_0234.asm	segmented				low	0
+0237_sub_0237.asm	segmented				low	0
+023F_sub_023f.asm	segmented				low	0
+0242_sub_0242.asm	segmented				low	0
+0246_sub_0246.asm	segmented				low	0
+025D_sub_025d.asm	segmented				low	0
+025E_sub_025e.asm	decoded		yes		low	0
+0272_sub_0272.asm	segmented				low	0
+0273_sub_0273.asm	decoded		yes		low	0
+0287_sub_0287.asm	segmented				low	0
+0288_sub_0288.asm	decoded		yes		low	0
+02A0_sub_02a0.asm	segmented				low	0
+02A3_sub_02a3.asm	decoded		yes		low	0
+02CB_sub_02cb.asm	segmented				low	0
+02CC_sub_02cc.asm	decoded		yes		low	0
+02E3_sub_02e3.asm	segmented				low	0
+02E6_sub_02e6.asm	decoded		yes		low	0
+02F7_sub_02f7.asm	segmented				low	0
+02F8_sub_02f8.asm	decoded		yes		low	0
+031E_sub_031e.asm	segmented				low	0
+031F_sub_031f.asm	decoded		yes		low	0
+034A_sub_034a.asm	segmented				low	0
+034B_sub_034b.asm	decoded		yes		low	0
+0374_sub_0374.asm	segmented				low	0
+0375_sub_0375.asm	decoded		yes		low	0
+0389_sub_0389.asm	segmented				low	0
+038C_sub_038c.asm	segmented				low	0
+038F_sub_038f.asm	segmented				low	0
+0394_sub_0394.asm	segmented				low	0
+0397_sub_0397.asm	segmented				low	0
+039B_sub_039b.asm	segmented				low	0
+039E_sub_039e.asm	segmented				low	0
+03A2_sub_03a2.asm	segmented				low	0
+03A6_sub_03a6.asm	segmented				low	0
+03A9_sub_03a9.asm	segmented				low	0
+03AC_sub_03ac.asm	segmented				low	0
+0688_sub_0688.asm	segmented				low	0
+068E_sub_068e.asm	segmented				low	0
+0696_sub_0696.asm	segmented				low	0
+069C_sub_069c.asm	segmented				low	0
+069F_sub_069f.asm	segmented				low	0
+06A4_sub_06a4.asm	segmented				low	0
+06A8_sub_06a8.asm	segmented				low	0
+06AB_sub_06ab.asm	segmented				low	0
+06AC_clock_tick_wait.asm	decoded	yes			high	0
+06B0_sub_06b0.asm	segmented				low	0
+06BE_sub_06be.asm	segmented				low	0
+06C2_sub_06c2.asm	segmented				low	0
+06C6_sub_06c6.asm	segmented				low	0
+06CC_sub_06cc.asm	segmented				low	0
+06D0_sub_06d0.asm	segmented				low	0
+06D4_sub_06d4.asm	segmented				low	0
+06D7_sub_06d7.asm	segmented				low	0
+06DA_sub_06da.asm	segmented				low	0
+06EC_sub_06ec.asm	segmented				low	0
+06ED_speed_rescale.asm	decoded	yes			high	0
+0711_speed_delay_lookup.asm	decoded	yes			high	0
+0715_sub_0715.asm	segmented				low	0
+0718_sub_0718.asm	segmented				low	0
+071B_sub_071b.asm	segmented				low	0
+071E_sub_071e.asm	segmented				low	0
+0720_data_mixed.asm	decoded	yes	yes		high	0
+0764_sub_0764.asm	segmented				low	0
+0767_sub_0767.asm	segmented				low	0
+0776_sub_0776.asm	segmented				low	0
+0796_sub_0796.asm	segmented				low	0
+07AA_sub_07aa.asm	segmented				low	0
+07B1_sub_07b1.asm	segmented				low	0
+07B4_sub_07b4.asm	segmented				low	0
+07C3_load_no_character.asm	observed	yes		yes	low	0
+07DB_sub_07db.asm	segmented				low	0
+07DC_sub_07dc.asm	decoded		yes		low	0
+07DE_sub_07de.asm	segmented				low	0
+07E3_sub_07e3.asm	segmented				low	0
+07E6_sub_07e6.asm	segmented				low	0
+07ED_sub_07ed.asm	segmented				low	0
+07F0_sub_07f0.asm	segmented				low	0
+07F3_dos_block_read.asm	decoded	yes			low	0
+0807_sub_0807.asm	segmented				low	0
+080A_sub_080a.asm	segmented				low	0
+080D_sub_080d.asm	segmented				low	0
+0839_restage_parked_rocket.asm	decoded	yes			low	0
+0850_sub_0850.asm	segmented				low	0
+0859_sub_0859.asm	segmented				low	0
+0864_sub_0864.asm	segmented				low	0
+0867_sub_0867.asm	segmented				low	0
+086F_sub_086f.asm	segmented				low	0
+087A_sub_087a.asm	segmented				low	0
+087D_cmd_prompt.asm	observed	yes		yes	low	0
+0887_sub_0887.asm	segmented				low	0
+088A_sub_088a.asm	segmented				low	0
+088D_sub_088d.asm	segmented				low	0
+0890_sub_0890.asm	segmented				low	0
+0893_sub_0893.asm	segmented				low	0
+0896_sub_0896.asm	segmented				low	0
+08A7_sub_08a7.asm	segmented				low	0
+08C8_sub_08c8.asm	segmented				low	0
+08CE_sub_08ce.asm	segmented				low	0
+08D1_sub_08d1.asm	segmented				low	0
+08D6_sub_08d6.asm	segmented				low	0
+08DC_sub_08dc.asm	segmented				low	0
+08E3_sub_08e3.asm	segmented				low	0
+08E6_sub_08e6.asm	segmented				low	0
+08EA_sub_08ea.asm	segmented				low	0
+08ED_sub_08ed.asm	segmented				low	0
+08F0_sub_08f0.asm	segmented				low	0
+08F3_sub_08f3.asm	segmented				low	0
+08F6_sub_08f6.asm	segmented				low	0
+08F9_sub_08f9.asm	segmented				low	0
+08FF_sub_08ff.asm	segmented				low	0
+090C_sub_090c.asm	segmented				low	0
+090D_sub_090d.asm	segmented				low	0
+0930_sub_0930.asm	segmented				low	0
+0933_sub_0933.asm	segmented				low	0
+0936_walk_loop.asm	observed	yes		yes	high	0
+0940_sub_0940.asm	segmented				low	0
+094D_sub_094d.asm	segmented				low	0
+094E_sub_094e.asm	segmented				low	0
+094F_sub_094f.asm	segmented				low	0
+0951_sub_0951.asm	decoded		yes		low	0
+0955_sub_0955.asm	segmented				low	0
+0962_sub_0962.asm	segmented				low	0
+0965_sub_0965.asm	segmented				low	0
+0968_sub_0968.asm	segmented				low	0
+096C_sub_096c.asm	segmented				low	0
+0973_sub_0973.asm	segmented				low	0
+0976_sub_0976.asm	segmented				low	0
+097C_sub_097c.asm	segmented				low	0
+0989_sub_0989.asm	segmented				low	0
+098C_sub_098c.asm	segmented				low	0
+098F_sub_098f.asm	segmented				low	0
+0993_sub_0993.asm	segmented				low	0
+099A_sub_099a.asm	segmented				low	0
+099D_sub_099d.asm	segmented				low	0
+09A3_sub_09a3.asm	segmented				low	0
+09AF_sub_09af.asm	segmented				low	0
+09B2_sub_09b2.asm	segmented				low	0
+09B5_sub_09b5.asm	segmented				low	0
+09B9_sub_09b9.asm	segmented				low	0
+09C0_sub_09c0.asm	segmented				low	0
+09C3_sub_09c3.asm	segmented				low	0
+09C9_sub_09c9.asm	segmented				low	0
+09D5_sub_09d5.asm	segmented				low	0
+09D8_sub_09d8.asm	segmented				low	0
+09DB_sub_09db.asm	segmented				low	0
+09DF_sub_09df.asm	segmented				low	0
+09E6_sub_09e6.asm	segmented				low	0
+09E9_sub_09e9.asm	segmented				low	0
+09F4_sub_09f4.asm	segmented				low	0
+09FB_sub_09fb.asm	segmented				low	0
+09FF_sub_09ff.asm	segmented				low	0
+0A02_invalid_move_msg.asm	observed	yes		yes	low	0
+0A15_invalid_move_to_cmd_done.asm	decoded	yes			high	0
+0A18_sub_0a18.asm	segmented				low	0
+0A1C_sub_0a1c.asm	segmented				low	0
+0A1F_cmd_dispatch.asm	observed	yes		yes	high	0
+0A30_sub_0a30.asm	segmented				low	0
+0A33_cmd_done.asm	observed	yes		yes	low	0
+0A38_post_command_tail.asm	decoded	yes			high	0
+0A4A_sub_0a4a.asm	segmented				low	0
+0A4E_sub_0a4e.asm	segmented				low	0
+0A51_sub_0a51.asm	segmented				low	0
+0A55_sub_0a55.asm	segmented				low	0
+0A58_sub_0a58.asm	segmented				low	0
+0A5C_sub_0a5c.asm	segmented				low	0
+0A5F_sub_0a5f.asm	segmented				low	0
+0A6D_monster_sweep_head.asm	decoded	yes			high	0
+0A74_monster_sweep_slot_test.asm	decoded	yes			high	0
+0A7C_sub_0a7c.asm	segmented				low	0
+0A83_sub_0a83.asm	segmented				low	0
+0AA1_monster_sweep_next.asm	decoded	yes			high	0
+0AA4_monster_spawn_entry.asm	decoded	yes			high	0
+0AA7_sub_0aa7.asm	segmented				low	0
+0AAA_combat_special_attack_gate.asm	observed	yes		yes	medium	0
+0AB6_sub_0ab6.asm	segmented				low	0
+0ABA_sub_0aba.asm	segmented				low	0
+0AC0_sub_0ac0.asm	segmented				low	0
+0AC4_sub_0ac4.asm	segmented				low	0
+0AC7_sub_0ac7.asm	segmented				low	0
+0AD3_combat_special_attack_dispatch.asm	observed	yes		yes	high	0
+0ADB_sub_0adb.asm	segmented				low	0
+0AE1_sub_0ae1.asm	segmented				low	0
+0AE5_sub_0ae5.asm	segmented				low	0
+0AEB_sub_0aeb.asm	segmented				low	0
+0AEF_sub_0aef.asm	segmented				low	0
+0AF5_sub_0af5.asm	segmented				low	0
+0AF9_sub_0af9.asm	segmented				low	0
+0AFC_sub_0afc.asm	segmented				low	0
+0B07_sub_0b07.asm	segmented				low	0
+0B0F_sub_0b0f.asm	segmented				low	0
+0B25_sub_0b25.asm	segmented				low	0
+0B36_sub_0b36.asm	segmented				low	0
+0B39_sub_0b39.asm	segmented				low	0
+0B4A_sub_0b4a.asm	segmented				low	0
+0B4D_sub_0b4d.asm	segmented				low	0
+0B5F_sub_0b5f.asm	segmented				low	0
+0B62_melee_hit_roll.asm	decoded	yes			high	0
+0B65_sub_0b65.asm	segmented				low	0
+0B71_sub_0b71.asm	segmented				low	0
+0B79_melee_damage_pool.asm	decoded	yes			high	0
+0B9B_sub_0b9b.asm	segmented				low	0
+0B9D_sub_0b9d.asm	segmented				low	0
+0BA0_sub_0ba0.asm	segmented				low	0
+0BA8_sub_0ba8.asm	segmented				low	0
+0BAB_sub_0bab.asm	segmented				low	0
+0BAF_monster_hp_epilogue.asm	decoded	yes			low	0
+0BB2_sub_0bb2.asm	segmented				low	0
+0BB9_sub_0bb9.asm	segmented				low	0
+0BBC_sub_0bbc.asm	segmented				low	0
+0BC6_sub_0bc6.asm	segmented				low	0
+0BC9_sub_0bc9.asm	segmented				low	0
+0BCC_sub_0bcc.asm	segmented				low	0
+0BCF_sub_0bcf.asm	segmented				low	0
+0BD1_sub_0bd1.asm	segmented				low	0
+0BD8_sub_0bd8.asm	segmented				low	0
+0BDB_apply_hp_damage.asm	decoded	yes			high	0
+0C02_sub_0c02.asm	segmented				low	0
+0C09_sub_0c09.asm	segmented				low	0
+0C1C_sub_0c1c.asm	segmented				low	0
+0C1F_status_tick_branch.asm	decoded	yes			high	0
+0C2B_sub_0c2b.asm	segmented				low	0
+0C33_sub_0c33.asm	segmented				low	0
+0C3A_sub_0c3a.asm	segmented				low	0
+0C3E_sub_0c3e.asm	segmented				low	0
+0C45_sub_0c45.asm	segmented				low	0
+0C49_sub_0c49.asm	segmented				low	0
+0C50_sub_0c50.asm	segmented				low	0
+0C54_sub_0c54.asm	segmented				low	0
+0C5B_sub_0c5b.asm	segmented				low	0
+0C5F_sub_0c5f.asm	segmented				low	0
+0C62_death.asm	decoded	yes			high	0
+0C82_sub_0c82.asm	segmented				low	0
+0C89_sub_0c89.asm	segmented				low	0
+0C8C_character_dead_msg.asm	decoded	yes			high	0
+0C9A_sub_0c9a.asm	segmented				low	0
+0C9B_sub_0c9b.asm	segmented				low	0
+0C9C_sub_0c9c.asm	segmented				high	0
+0CA2_sub_0ca2.asm	segmented				low	0
+0CAA_sub_0caa.asm	segmented				low	0
+0CAD_sub_0cad.asm	segmented				low	0
+0CB0_sub_0cb0.asm	segmented				high	0
+0CB9_sub_0cb9.asm	segmented				low	0
+0CBD_sub_0cbd.asm	segmented				low	0
+0CC0_sub_0cc0.asm	segmented				high	0
+0CD2_sub_0cd2.asm	segmented				low	0
+0CD4_sub_0cd4.asm	segmented				low	0
+0CD9_sub_0cd9.asm	segmented				low	0
+0CDC_sub_0cdc.asm	segmented				high	0
+0CEE_spawn_tile_store.asm	decoded				high	0
+0D06_sub_0d06.asm	segmented				low	0
+0D09_sub_0d09.asm	segmented				low	0
+0D0E_sub_0d0e.asm	segmented				low	0
+0D11_sub_0d11.asm	segmented				low	0
+0D16_sub_0d16.asm	segmented				low	0
+0D19_sub_0d19.asm	segmented				low	0
+0D1E_sub_0d1e.asm	segmented				low	0
+0D21_sub_0d21.asm	segmented				low	0
+0D44_sub_0d44.asm	segmented				low	0
+0D4C_sub_0d4c.asm	segmented				low	0
+0D4F_monster_hp_orc.asm	decoded	yes			high	0
+0D64_sub_0d64.asm	segmented				low	0
+0D6C_sub_0d6c.asm	segmented				low	0
+0D6F_monster_hp_thief_daemon.asm	decoded	yes			high	0
+0DA4_sub_0da4.asm	segmented				low	0
+0DAC_sub_0dac.asm	segmented				low	0
+0DAF_monster_hp_sea_serpent.asm	decoded	yes			high	0
+0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	decoded	yes			high	0
+0E70_combat_paralyzed_legs.asm	observed	yes		yes	high	0
+0EC2_combat_paralyzed_arms.asm	observed	yes		yes	high	0
+0F12_combat_magic_missile.asm	observed	yes		yes	medium	0
+0F48_combat_sleep_spell.asm	observed	yes		yes	high	0
+0F8E_combat_minax_attack.asm	decoded	yes			low	0
+0FCD_combat_thief_steal.asm	observed	yes		yes	high	0
+1013_sub_1013.asm	segmented				low	0
+1014_sub_1014.asm	segmented				low	0
+1015_sub_1015.asm	segmented				low	0
+101C_sub_101c.asm	segmented				low	0
+102B_sub_102b.asm	segmented				low	0
+1033_sub_1033.asm	segmented				low	0
+1035_sub_1035.asm	segmented				low	0
+1039_sub_1039.asm	segmented				low	0
+103D_sub_103d.asm	segmented				low	0
+1040_minax_proximity_check.asm	decoded	yes			medium	0
+1048_minax_reach_test.asm	decoded	yes			high	0
+106D_sub_106d.asm	segmented				low	0
+1078_sub_1078.asm	segmented				low	0
+107B_sub_107b.asm	segmented				low	0
+107F_sub_107f.asm	segmented				low	0
+1082_sub_1082.asm	segmented				low	0
+1086_creature_wander_step.asm	observed	yes		yes	high	0
+10A0_sub_10a0.asm	segmented				low	0
+10A4_sub_10a4.asm	segmented				low	0
+10A7_sub_10a7.asm	segmented				low	0
+10AA_sub_10aa.asm	segmented				low	0
+10BC_sub_10bc.asm	segmented				low	0
+10BF_sub_10bf.asm	segmented				low	0
+10CE_sub_10ce.asm	segmented				low	0
+10E9_sub_10e9.asm	segmented				low	0
+10EC_sub_10ec.asm	segmented				low	0
+10F0_sub_10f0.asm	segmented				low	0
+10F3_sub_10f3.asm	segmented				low	0
+10F9_sub_10f9.asm	segmented				low	0
+10FC_sub_10fc.asm	segmented				low	0
+110E_sub_110e.asm	segmented				low	0
+1111_sub_1111.asm	segmented				low	0
+1115_sub_1115.asm	segmented				low	0
+1118_sub_1118.asm	segmented				low	0
+111E_sub_111e.asm	segmented				low	0
+1121_sub_1121.asm	segmented				low	0
+1124_sub_1124.asm	segmented				low	0
+1128_sub_1128.asm	segmented				low	0
+112C_sub_112c.asm	segmented				low	0
+112F_sub_112f.asm	segmented				low	0
+113A_sub_113a.asm	segmented				low	0
+1141_sub_1141.asm	segmented				low	0
+1142_sub_1142.asm	segmented				low	0
+114A_sub_114a.asm	segmented				low	0
+1151_dungeon_turn.asm	observed	yes		yes	high	0
+12DB_dungeon_events.asm	observed	yes		yes	low	0
+143C_dungeon_cell_gate.asm	decoded	yes			low	0
+144C_dungeon_cell_gate_tail.asm	decoded	yes			low	0
+1451_site_cell_open_on_floor.asm	observed	yes		yes	high	0
+147F_dungeon_monster_spawn.asm	decoded	yes			high	0
+152E_dungeon_step_vector.asm	decoded				low	0
+154E_tlkx_record_printer.asm	observed	yes		yes	high	0
+155D_chatter_table_selector.asm	decoded	yes			high	0
+1564_sub_1564.asm	segmented				low	0
+156B_sub_156b.asm	segmented				low	0
+156E_sub_156e.asm	segmented				low	0
+1571_sub_1571.asm	segmented				low	0
+1573_sub_1573.asm	segmented				low	0
+157B_sub_157b.asm	segmented				low	0
+157E_sub_157e.asm	segmented				low	0
+1580_sub_1580.asm	segmented				low	0
+1590_transact_shop_selector.asm	observed	yes		yes	high	0
+1598_sub_1598.asm	segmented				low	0
+159F_sub_159f.asm	segmented				low	0
+15A2_sub_15a2.asm	segmented				low	0
+15A9_sub_15a9.asm	segmented				low	0
+15AC_sub_15ac.asm	segmented				low	0
+15B4_sub_15b4.asm	segmented				low	0
+15B7_sub_15b7.asm	segmented				low	0
+15BA_sub_15ba.asm	segmented				low	0
+15C8_sub_15c8.asm	segmented				low	0
+15D0_sub_15d0.asm	segmented				low	0
+15D3_sub_15d3.asm	segmented				low	0
+15D6_sub_15d6.asm	segmented				low	0
+15DE_sub_15de.asm	segmented				low	0
+15E1_tavern_menu.asm	decoded	yes	yes		low	0
+16BD_barkeep_chatter_hints.asm	decoded	yes	yes		high	0
+1799_tavern_food_price.asm	decoded	yes			low	0
+17B2_sub_17b2.asm	segmented				low	0
+17B7_sub_17b7.asm	segmented				low	0
+17C5_sub_17c5.asm	segmented				low	0
+17DD_sub_17dd.asm	segmented				low	0
+17E0_sub_17e0.asm	segmented				low	0
+17E5_sub_17e5.asm	segmented				low	0
+17E9_sub_17e9.asm	segmented				low	0
+17EF_sub_17ef.asm	segmented				low	0
+17F0_sub_17f0.asm	decoded		yes		low	0
+17F2_sub_17f2.asm	segmented				low	0
+17F5_sub_17f5.asm	segmented				low	0
+1817_sub_1817.asm	segmented				low	0
+1818_sub_1818.asm	decoded		yes		low	0
+181A_tavern_thanks.asm	decoded	yes			low	0
+183E_sub_183e.asm	segmented				low	0
+1841_cleric_class_gate.asm	decoded	yes			high	0
+1849_sub_1849.asm	segmented				low	0
+184C_not_a_cleric_msg.asm	decoded	yes			low	0
+1866_sub_1866.asm	segmented				low	0
+1869_cleric_shrine.asm	decoded	yes			low	0
+19AF_wizard_class_gate.asm	decoded	yes			high	0
+19B3_sub_19b3.asm	segmented				low	0
+19BA_not_a_wizard_msg.asm	decoded	yes			low	0
+19D4_sub_19d4.asm	segmented				low	0
+19D7_magic_shop_menu.asm	decoded	yes	yes		low	0
+1B6B_clue_pool.asm	decoded	yes	yes		high	0
+1D1D_shop_menus.asm	decoded	yes	yes		low	0
+2028_read_decimal_digit.asm	decoded	yes			high	0
+2052_gold_spend_price.asm	decoded	yes			high	0
+20AB_bcd_price_from_stats.asm	decoded	yes			high	0
+2122_sub_2122.asm	segmented				low	0
+212A_sub_212a.asm	segmented				low	0
+212E_sub_212e.asm	segmented				low	0
+214D_sub_214d.asm	segmented				low	0
+2150_sub_2150.asm	segmented				low	0
+2152_sub_2152.asm	segmented				low	0
+2155_sub_2155.asm	segmented				low	0
+215C_sub_215c.asm	segmented				low	0
+2166_sub_2166.asm	segmented				low	0
+2169_sub_2169.asm	segmented				low	0
+216B_sub_216b.asm	segmented				low	0
+216E_sub_216e.asm	segmented				low	0
+2186_sub_2186.asm	segmented				low	0
+2189_sub_2189.asm	segmented				low	0
+218B_sub_218b.asm	segmented				low	0
+2192_sub_2192.asm	segmented				low	0
+2195_sub_2195.asm	segmented				low	0
+2199_creature_step_gate.asm	decoded	yes			high	0
+21FC_sub_21fc.asm	segmented				low	0
+2201_sub_2201.asm	segmented				low	0
+220A_sub_220a.asm	segmented				low	0
+2213_sub_2213.asm	segmented				low	0
+2216_sub_2216.asm	segmented				low	0
+2233_sub_2233.asm	segmented				low	0
+225A_sub_225a.asm	segmented				low	0
+226F_sub_226f.asm	segmented				low	0
+2272_sub_2272.asm	segmented				low	0
+2275_illegal_command_msg.asm	observed	yes		yes	low	0
+228A_sub_228a.asm	segmented				low	0
+228D_sub_228d.asm	segmented				low	0
+2290_sub_2290.asm	segmented				low	0
+22BF_sub_22bf.asm	segmented				low	0
+22D1_sub_22d1.asm	segmented				low	0
+22D4_sub_22d4.asm	segmented				low	0
+22D5_sub_22d5.asm	segmented				low	0
+22FC_sub_22fc.asm	segmented				low	0
+22FD_sector_store_gate.asm	decoded	yes			high	0
+2304_sub_2304.asm	segmented				low	0
+2305_sector_store.asm	decoded	yes			high	0
+2362_aim_state_clear.asm	decoded	yes			high	0
+2370_sub_2370.asm	segmented				low	0
+2373_sub_2373.asm	segmented				low	0
+2378_sub_2378.asm	segmented				low	0
+2383_sub_2383.asm	segmented				low	0
+2389_sub_2389.asm	segmented				low	0
+2392_sub_2392.asm	segmented				low	0
+2393_sub_2393.asm	decoded		yes		low	0
+2395_sub_2395.asm	decoded		yes		low	0
+2396_sub_2396.asm	segmented				low	0
+239C_sub_239c.asm	segmented				low	0
+23A2_sub_23a2.asm	segmented				low	0
+23A8_sub_23a8.asm	segmented				low	0
+23AE_sub_23ae.asm	segmented				low	0
+23B0_sub_23b0.asm	segmented				low	0
+23B9_sub_23b9.asm	segmented				low	0
+23BE_sub_23be.asm	segmented				low	0
+23C7_sub_23c7.asm	segmented				low	0
+23CC_sub_23cc.asm	segmented				low	0
+23D4_sub_23d4.asm	segmented				low	0
+23D9_sub_23d9.asm	segmented				low	0
+23E1_sub_23e1.asm	segmented				low	0
+23E6_find_creature_at_cursor.asm	decoded	yes			high	0
+2423_passability.asm	observed	yes		yes	low	0
+242D_sub_242d.asm	segmented				low	0
+2434_sub_2434.asm	segmented				low	0
+243B_sub_243b.asm	segmented				low	0
+243E_sub_243e.asm	segmented				low	0
+2453_sub_2453.asm	segmented				low	0
+245A_restage_parked_rocket.asm	observed	yes		yes	low	0
+2474_sub_2474.asm	segmented				low	0
+2488_sub_2488.asm	segmented				low	0
+248B_swamp_damage_gate.asm	decoded	yes			medium	0
+2495_swamp_damage.asm	decoded	yes			medium	0
+24B1_force_field_gate.asm	decoded	yes			medium	0
+24B5_force_field_event.asm	observed	yes		yes	high	0
+2520_paralysis_gate.asm	decoded	yes			high	0
+2527_sub_2527.asm	segmented				low	0
+253B_food_mode_dispatch.asm	observed	yes		yes	high	0
+2542_mode_arm_rocket.asm	decoded				low	0
+2545_sub_2545.asm	segmented				low	0
+2549_sub_2549.asm	segmented				low	0
+254C_sub_254c.asm	segmented				low	0
+2550_sub_2550.asm	segmented				low	0
+2553_sub_2553.asm	segmented				low	0
+2557_mode_arm_horse.asm	observed			yes	low	0
+2575_sub_2575.asm	segmented				low	0
+2578_sub_2578.asm	segmented				low	0
+257E_sub_257e.asm	segmented				low	0
+2584_sub_2584.asm	segmented				low	0
+2587_sub_2587.asm	segmented				low	0
+258D_sub_258d.asm	segmented				low	0
+2590_sub_2590.asm	segmented				low	0
+2593_sub_2593.asm	segmented				low	0
+2599_food_drain_walk.asm	observed	yes		yes	high	0
+25BD_sub_25bd.asm	segmented				low	0
+25C0_sub_25c0.asm	segmented				low	0
+25C9_sub_25c9.asm	segmented				low	0
+25CC_sub_25cc.asm	segmented				low	0
+25D0_sub_25d0.asm	segmented				low	0
+25D4_sub_25d4.asm	segmented				low	0
+25D8_sub_25d8.asm	segmented				low	0
+25DC_sub_25dc.asm	segmented				low	0
+25E0_sub_25e0.asm	segmented				low	0
+25E4_sub_25e4.asm	segmented				low	0
+25E8_sub_25e8.asm	segmented				low	0
+25EC_sub_25ec.asm	segmented				low	0
+25F0_sub_25f0.asm	segmented				low	0
+25F4_sub_25f4.asm	segmented				low	0
+25F8_ladder_default_accept.asm	decoded				low	0
+25FF_sub_25ff.asm	segmented				low	0
+2604_mode_arm_plane.asm	observed			yes	low	0
+2619_mode_arm_ship.asm	observed			yes	low	0
+2620_sub_2620.asm	segmented				low	0
+2626_food_drain_mounted.asm	observed	yes		yes	high	0
+2664_sub_2664.asm	segmented				low	0
+2677_sub_2677.asm	segmented				low	0
+268C_sub_268c.asm	segmented				low	0
+269F_sub_269f.asm	segmented				low	0
+26A8_sub_26a8.asm	segmented				low	0
+26B7_time_door_target_era.asm	decoded	yes			high	0
+26C3_time_door_target_era_up.asm	decoded	yes			high	0
+26C6_time_door_set_era.asm	decoded	yes			high	0
+26CC_time_door_place_player.asm	decoded	yes			medium	0
+26F2_sub_26f2.asm	segmented				low	0
+26F5_sub_26f5.asm	segmented				low	0
+26F9_sub_26f9.asm	segmented				low	0
+2700_sub_2700.asm	segmented				low	0
+2701_sub_2701.asm	segmented				low	0
+2707_sub_2707.asm	segmented				low	0
+2708_sub_2708.asm	segmented				low	0
+2731_sub_2731.asm	segmented				low	0
+2735_sub_2735.asm	segmented				low	0
+2744_sub_2744.asm	segmented				low	0
+2776_sub_2776.asm	segmented				low	0
+277A_sub_277a.asm	segmented				low	0
+277B_dungeon_move_commands.asm	decoded	yes			low	0
+29D2_sub_29d2.asm	segmented				low	0
+2B65_sub_2b65.asm	segmented				low	0
+2B8F_cmd_A.asm	observed			yes	medium	0
+2B9B_sub_2b9b.asm	segmented				low	0
+2BA2_sub_2ba2.asm	segmented				low	0
+2BA5_attack_arms_gate.asm	decoded	yes			medium	0
+2BAD_attack_arms_refusal_to_cmd_done.asm	decoded	yes			high	0
+2BBE_sub_2bbe.asm	segmented				low	0
+2BC1_sub_2bc1.asm	segmented				low	0
+2BC4_sub_2bc4.asm	segmented				low	0
+2BC7_sub_2bc7.asm	segmented				low	0
+2BD4_sub_2bd4.asm	segmented				low	0
+2BD7_sub_2bd7.asm	segmented				low	0
+2BDA_sub_2bda.asm	segmented				low	0
+2BE3_sub_2be3.asm	segmented				low	0
+2BE6_sub_2be6.asm	segmented				low	0
+2BE9_sub_2be9.asm	segmented				low	0
+2BEC_combat_hit_msg.asm	observed	yes		yes	low	0
+2BF8_sub_2bf8.asm	segmented				low	0
+2BFB_sub_2bfb.asm	segmented				low	0
+2C19_monster_hp_subtract.asm	decoded	yes			low	0
+2C26_monster_hp_set.asm	decoded	yes			low	0
+2C2D_minax_hit_teleport_gate.asm	decoded	yes			high	0
+2C35_sub_2c35.asm	segmented				low	0
+2C38_minax_teleport_swap.asm	decoded	yes			high	0
+2CA4_combat_kill_cell_ptr.asm	observed	yes		yes	medium	0
+2CB5_combat_kill_cell_restore.asm	decoded	yes			medium	0
+2CCD_victory_call.asm	decoded	yes			medium	0
+2CD3_combat_kill_drop_dispatch.asm	observed	yes		yes	low	0
+2D22_combat_type_drop_table.asm	observed			yes	low	0
+2D8C_combat_kill_reward.asm	observed	yes		yes	low	0
+2DB4_sub_2db4.asm	segmented				low	0
+2DB7_sub_2db7.asm	segmented				low	0
+2DC1_combat_gold_gain.asm	observed	yes		yes	medium	0
+2DE1_sub_2de1.asm	segmented				low	0
+2DE4_sub_2de4.asm	segmented				low	0
+2DEE_combat_exp_gain.asm	observed	yes		yes	medium	0
+2E06_sub_2e06.asm	segmented				low	0
+2E09_combat_miss_msg.asm	observed	yes		yes	low	0
+2E13_sub_2e13.asm	segmented				low	0
+2E3A_sub_2e3a.asm	segmented				low	0
+2E3D_combat_attack_flow.asm	observed	yes		yes	low	0
+2F6F_cmd_B.asm	observed			yes	high	0
+2F78_sub_2f78.asm	segmented				low	0
+2F7B_sub_2f7b.asm	segmented				low	0
+2F7F_sub_2f7f.asm	segmented				low	0
+2F96_sub_2f96.asm	segmented				low	0
+2F9E_sub_2f9e.asm	segmented				low	0
+2FAD_vehicle_board_dispatch.asm	observed	yes		yes	medium	0
+2FB4_sub_2fb4.asm	segmented				low	0
+2FB8_offer_what_msg.asm	observed	yes		yes	low	0
+2FCD_sub_2fcd.asm	segmented				low	0
+2FD6_vehicle_horse.asm	observed	yes		yes	low	0
+2FF6_vehicle_ship_gate.asm	observed			yes	low	0
+2FFE_vehicle_ship.asm	decoded	yes			low	0
+3035_sub_3035.asm	segmented				low	0
+3038_vehicle_frigate.asm	decoded	yes			low	0
+3045_sub_3045.asm	segmented				low	0
+3048_vehicle_plane.asm	decoded	yes			low	0
+310B_cmd_C.asm	observed			yes	high	0
+3139_cast_spell_flow.asm	decoded	yes			high	0
+330C_cast_target_finder.asm	observed	yes		yes	high	0
+334D_cmd_D.asm	observed			yes	high	0
+3381_site_floor_up.asm	decoded	yes			high	0
+3389_cmd_E.asm	observed			yes	high	0
+3392_sub_3392.asm	segmented				low	0
+3395_sub_3395.asm	segmented				low	0
+3399_sub_3399.asm	segmented				low	0
+33A6_sub_33a6.asm	segmented				low	0
+33AE_move_only_on_foot.asm	decoded	yes			low	0
+33C3_sub_33c3.asm	segmented				low	0
+33D1_sub_33d1.asm	segmented				low	0
+33D4_sub_33d4.asm	segmented				low	0
+33DA_sub_33da.asm	segmented				low	0
+33DD_sub_33dd.asm	segmented				low	0
+33E3_sub_33e3.asm	segmented				low	0
+33E6_sub_33e6.asm	segmented				low	0
+33EC_sub_33ec.asm	segmented				low	0
+33EF_sub_33ef.asm	segmented				low	0
+33F5_sub_33f5.asm	segmented				low	0
+33F8_sub_33f8.asm	segmented				low	0
+33FE_sub_33fe.asm	segmented				low	0
+3401_sub_3401.asm	segmented				low	0
+340F_sub_340f.asm	segmented				low	0
+341B_sub_341b.asm	segmented				low	0
+341E_sub_341e.asm	segmented				low	0
+342A_sub_342a.asm	segmented				low	0
+343C_sub_343c.asm	segmented				low	0
+343F_sub_343f.asm	segmented				low	0
+34B5_sub_34b5.asm	segmented				low	0
+34C0_sub_34c0.asm	segmented				low	0
+34C3_sub_34c3.asm	segmented				low	0
+34CF_sub_34cf.asm	segmented				low	0
+34E1_sub_34e1.asm	segmented				low	0
+34E4_site_enter_dungeon.asm	decoded	yes			high	0
+3525_sub_3525.asm	segmented				low	0
+353A_sub_353a.asm	segmented				high	0
+353D_sub_353d.asm	decoded		yes		high	0
+3546_time_index_message.asm	decoded	yes			high	0
+3565_sub_3565.asm	segmented				low	0
+3566_sub_3566.asm	decoded		yes		low	0
+3577_sub_3577.asm	decoded		yes		low	0
+3582_sub_3582.asm	decoded		yes		low	0
+3596_show_year_1990.asm	decoded	yes	yes		low	0
+35C1_cmd_F.asm	observed	yes		yes	high	0
+35C9_sub_35c9.asm	segmented				low	0
+35CC_sub_35cc.asm	segmented				low	0
+35D0_sub_35d0.asm	segmented				low	0
+35DB_sub_35db.asm	segmented				low	0
+35DD_sub_35dd.asm	decoded		yes		low	0
+35DE_sub_35de.asm	segmented				low	0
+35EA_sub_35ea.asm	segmented				low	0
+35EB_sub_35eb.asm	decoded		yes		low	0
+35ED_sub_35ed.asm	segmented				low	0
+35F0_sub_35f0.asm	segmented				low	0
+35F3_sub_35f3.asm	segmented				low	0
+3600_sub_3600.asm	segmented				low	0
+3603_sub_3603.asm	segmented				low	0
+3606_sub_3606.asm	segmented				low	0
+360E_sub_360e.asm	segmented				low	0
+3611_monster_damage_apply.asm	decoded	yes			medium	0
+363B_cmd_G.asm	observed			yes	medium	0
+3782_cmd_H.asm	observed			yes	high	0
+3794_cmd_I.asm	observed	yes		yes	high	0
+3795_ignite_torch_gate.asm	decoded	yes	yes		high	0
+37A4_sub_37a4.asm	segmented				low	0
+37A7_sub_37a7.asm	segmented				low	0
+37AB_sub_37ab.asm	segmented				low	0
+37AE_ignite_torch_burn.asm	decoded	yes			high	0
+37DC_cmd_J.asm	observed			yes	high	0
+37F1_cmd_K.asm	observed	yes		yes	high	0
+37F2_klimb_msg.asm	decoded	yes	yes		high	0
+380B_klimb_what_msg.asm	decoded	yes	yes		high	0
+3812_klimb_gate.asm	decoded	yes			high	0
+3823_site_floor_down.asm	decoded	yes			high	0
+38B0_cmd_L.asm	observed			yes	medium	0
+3B92_cmd_M.asm	observed			yes	high	0
+3BCE_cmd_N.asm	observed	yes		yes	high	0
+3BDD_sub_3bdd.asm	segmented				low	0
+3BE0_sub_3be0.asm	segmented				low	0
+3BE4_sub_3be4.asm	segmented				low	0
+3C01_sub_3c01.asm	segmented				low	0
+3C02_sub_3c02.asm	decoded		yes		low	0
+3C04_coin_rub.asm	decoded	yes			low	0
+3C2E_cmd_O.asm	observed			yes	medium	0
+3DBC_cmd_P.asm	observed			yes	high	0
+3DC4_sub_3dc4.asm	segmented				low	0
+3DC5_sub_3dc5.asm	decoded		yes		low	0
+3DC7_cmd_Q.asm	observed	yes		yes	high	0
+3DDD_sub_3ddd.asm	segmented				low	0
+3DE0_sub_3de0.asm	segmented				low	0
+3DE4_offer_only_outdoors.asm	decoded	yes			low	0
+3DF7_sub_3df7.asm	segmented				low	0
+3DFA_offer_only_outdoors_earth.asm	observed	yes		yes	high	0
+3E50_cmd_R.asm	observed			yes	medium	0
+3E9F_sub_3e9f.asm	segmented				low	0
+3EA2_sub_3ea2.asm	segmented				low	0
+3EAB_sub_3eab.asm	segmented				low	0
+3EBB_sub_3ebb.asm	segmented				low	0
+3EC2_sub_3ec2.asm	segmented				low	0
+3ED1_sub_3ed1.asm	segmented				low	0
+3ED4_ready_weapon_agility_gate.asm	decoded				medium	0
+3F25_cmd_S.asm	observed	yes		yes	high	0
+3F36_sub_3f36.asm	segmented				low	0
+3F37_sub_3f37.asm	decoded		yes		low	0
+3F59_sub_3f59.asm	segmented				low	0
+3F5D_steal_attempt.asm	decoded	yes			low	0
+4050_cmd_T.asm	observed	yes		yes	high	0
+40A6_yell_no_response.asm	observed	yes		yes	low	0
+40BD_sub_40bd.asm	segmented				low	0
+40C0_sub_40c0.asm	segmented				medium	0
+40C8_sub_40c8.asm	segmented				low	0
+40CB_transact_type_chain.asm	observed	yes		yes	high	0
+40D4_to_tribute.asm	observed	yes		yes	high	0
+40D7_sub_40d7.asm	segmented				low	0
+40E0_street_guard.asm	decoded	yes			low	0
+4101_sub_4101.asm	segmented				low	0
+4104_sub_4104.asm	segmented				low	0
+4108_street_jester.asm	decoded	yes			low	0
+4125_sub_4125.asm	segmented				low	0
+4128_sub_4128.asm	segmented				low	0
+412C_street_merchant.asm	decoded	yes			low	0
+415B_sub_415b.asm	segmented				low	0
+415F_street_fighter.asm	decoded	yes			low	0
+4181_sub_4181.asm	segmented				low	0
+4184_sub_4184.asm	segmented				low	0
+4188_street_cleric.asm	decoded	yes			low	0
+41A3_sub_41a3.asm	segmented				low	0
+41A6_sub_41a6.asm	segmented				low	0
+41AA_street_wizard.asm	observed	yes		yes	low	0
+41D2_sub_41d2.asm	segmented				low	0
+41D5_sub_41d5.asm	segmented				low	0
+41D9_street_thief.asm	decoded	yes			low	0
+4206_sub_4206.asm	segmented				low	0
+4207_sub_4207.asm	decoded		yes		low	0
+4209_talk_scripted_npc.asm	observed	yes		yes	high	0
+4211_sub_4211.asm	segmented				low	0
+4214_sub_4214.asm	segmented				low	0
+4217_sub_4217.asm	segmented				low	0
+421A_sub_421a.asm	segmented				low	0
+4220_sub_4220.asm	segmented				low	0
+4223_sub_4223.asm	segmented				low	0
+4232_sub_4232.asm	segmented				low	0
+4246_sub_4246.asm	segmented				low	0
+4249_tribute_welcome.asm	observed	yes		yes	high	0
+425F_sub_425f.asm	segmented				low	0
+4262_tribute_charge.asm	observed	yes		yes	high	0
+4281_sub_4281.asm	segmented				low	0
+4282_sub_4282.asm	decoded		yes		low	0
+428E_tribute_raise.asm	observed	yes		yes	high	0
+42AA_raise_ladder_300.asm	observed	yes		yes	high	0
+42B7_raise_ladder_200.asm	observed	yes		yes	high	0
+42C1_raise_ladder_100.asm	observed	yes		yes	high	0
+42CB_raise_ladder_0.asm	observed	yes		yes	high	0
+42D1_raise_amount_store.asm	observed	yes		yes	high	0
+42E2_hp_raise_add.asm	observed	yes		yes	high	0
+42F1_cmd_U.asm	observed			yes	high	0
+4306_sub_4306.asm	segmented				low	0
+4307_sub_4307.asm	decoded		yes		low	0
+4309_unlock_aim_gate.asm	decoded	yes			high	0
+4310_open_no_door.asm	decoded	yes			low	0
+4326_unlock_target.asm	decoded	yes			high	0
+433A_sub_433a.asm	segmented				low	0
+433E_sub_433e.asm	segmented				low	0
+4345_open_no_key_fit.asm	decoded	yes			low	0
+435B_sub_435b.asm	segmented				low	0
+435E_open_write_tile.asm	decoded	yes			high	0
+437E_cmd_V.asm	observed			yes	medium	0
+43F3_cmd_W.asm	observed			yes	medium	0
+44D4_cmd_X.asm	observed			yes	medium	0
+4542_cmd_Y.asm	observed			yes	high	0
+4551_cmd_Y_poll_key.asm	decoded				high	0
+4554_cmd_Y_spin_until_key.asm	decoded				high	0
+4559_cmd_Y_enter_test.asm	decoded				high	0
+455D_cmd_Y_echo_char.asm	decoded				high	0
+4560_cmd_Y_loop_back.asm	decoded				high	0
+4562_cmd_Y_print_cr.asm	decoded				high	0
+4565_cmd_Y_to_cmd_done.asm	decoded				high	0
+4568_cmd_Z.asm	observed			yes	high	0
+456B_sub_456b.asm	segmented				low	0
+457D_sub_457d.asm	segmented				low	0
+4580_level_gain_msg.asm	observed	yes		yes	low	0
+458D_sub_458d.asm	segmented				low	0
+4593_sub_4593.asm	segmented				low	0
+4598_sub_4598.asm	segmented				low	0
+459E_sub_459e.asm	segmented				low	0
+45A3_sub_45a3.asm	segmented				low	0
+45AC_sub_45ac.asm	segmented				low	0
+45B1_sub_45b1.asm	segmented				low	0
+45BA_sub_45ba.asm	segmented				low	0
+45BF_sub_45bf.asm	segmented				low	0
+45C4_status_weapon.asm	observed	yes		yes	low	0
+45D1_sub_45d1.asm	segmented				low	0
+45D2_sub_45d2.asm	decoded		yes		low	0
+45DA_sub_45da.asm	segmented				low	0
+45E9_status_torches.asm	observed	yes		yes	low	0
+45F5_sub_45f5.asm	segmented				low	0
+45F6_sub_45f6.asm	decoded		yes		low	0
+45FB_sub_45fb.asm	segmented				low	0
+45FC_sub_45fc.asm	decoded		yes		low	0
+460A_status_armour.asm	observed	yes		yes	low	0
+4617_sub_4617.asm	segmented				low	0
+4618_sub_4618.asm	decoded		yes		low	0
+4620_sub_4620.asm	segmented				low	0
+462F_status_keys.asm	observed	yes		yes	low	0
+4638_sub_4638.asm	segmented				low	0
+4639_sub_4639.asm	decoded		yes		low	0
+463E_sub_463e.asm	segmented				low	0
+464B_sub_464b.asm	decoded		yes		low	0
+464D_sub_464d.asm	segmented				low	0
+464E_sub_464e.asm	decoded		yes		low	0
+4657_sub_4657.asm	segmented				low	0
+4658_sub_4658.asm	decoded		yes		low	0
+4660_sub_4660.asm	segmented				low	0
+466F_status_tools.asm	observed	yes		yes	low	0
+4679_sub_4679.asm	segmented				low	0
+467A_sub_467a.asm	decoded		yes		low	0
+467F_sub_467f.asm	segmented				low	0
+4681_sub_4681.asm	segmented				low	0
+468E_sub_468e.asm	segmented				low	0
+4693_sub_4693.asm	segmented				low	0
+4698_sub_4698.asm	segmented				low	0
+469E_sub_469e.asm	segmented				low	0
+46AD_sub_46ad.asm	segmented				low	0
+46B2_sub_46b2.asm	segmented				low	0
+46B7_sub_46b7.asm	segmented				low	0
+46BD_sub_46bd.asm	segmented				low	0
+46CC_sub_46cc.asm	segmented				low	0
+46D1_sub_46d1.asm	segmented				low	0
+46D6_sub_46d6.asm	segmented				low	0
+46DC_sub_46dc.asm	segmented				low	0
+46EB_sub_46eb.asm	segmented				low	0
+46F0_sub_46f0.asm	segmented				low	0
+46F5_sub_46f5.asm	segmented				low	0
+46FB_sub_46fb.asm	segmented				low	0
+470A_sub_470a.asm	segmented				low	0
+470F_sub_470f.asm	segmented				low	0
+4714_sub_4714.asm	segmented				low	0
+471A_sub_471a.asm	segmented				low	0
+4729_sub_4729.asm	segmented				low	0
+472E_sub_472e.asm	segmented				low	0
+4733_sub_4733.asm	segmented				low	0
+4739_sub_4739.asm	segmented				low	0
+4748_list_header_weapons.asm	observed	yes		yes	low	0
+4755_sub_4755.asm	segmented				low	0
+4758_sub_4758.asm	segmented				low	0
+475B_sub_475b.asm	segmented				low	0
+475C_sub_475c.asm	decoded		yes		low	0
+4763_sub_4763.asm	segmented				low	0
+4771_sub_4771.asm	segmented				low	0
+4777_sub_4777.asm	segmented				low	0
+4778_sub_4778.asm	decoded		yes		low	0
+4786_sub_4786.asm	segmented				low	0
+478B_sub_478b.asm	segmented				low	0
+4793_sub_4793.asm	segmented				low	0
+47A2_list_header_armour.asm	observed	yes		yes	low	0
+47AE_sub_47ae.asm	segmented				low	0
+47B1_sub_47b1.asm	segmented				low	0
+47B4_sub_47b4.asm	segmented				low	0
+47B5_sub_47b5.asm	decoded		yes		low	0
+47BC_sub_47bc.asm	segmented				low	0
+47BD_data_mixed.asm	decoded				high	0
+47CA_sub_47ca.asm	segmented				low	0
+47CF_sub_47cf.asm	segmented				low	0
+47D0_sub_47d0.asm	decoded		yes		low	0
+47DE_sub_47de.asm	segmented				low	0
+47E1_sub_47e1.asm	decoded		yes		low	0
+47E3_sub_47e3.asm	segmented				low	0
+47EB_sub_47eb.asm	segmented				low	0
+47FA_list_header_spells.asm	observed	yes		yes	low	0
+4806_sub_4806.asm	segmented				low	0
+4809_sub_4809.asm	segmented				low	0
+480C_sub_480c.asm	segmented				low	0
+480D_sub_480d.asm	decoded		yes		low	0
+4814_sub_4814.asm	segmented				low	0
+4815_data_mixed.asm	decoded				high	0
+4822_sub_4822.asm	segmented				low	0
+4828_sub_4828.asm	segmented				low	0
+4829_sub_4829.asm	decoded		yes		low	0
+4837_sub_4837.asm	segmented				low	0
+483C_sub_483c.asm	segmented				low	0
+4842_sub_4842.asm	segmented				low	0
+4844_sub_4844.asm	segmented				low	0
+4853_list_header_items.asm	observed	yes		yes	low	0
+485E_sub_485e.asm	segmented				low	0
+4861_sub_4861.asm	segmented				low	0
+4864_sub_4864.asm	segmented				low	0
+4865_sub_4865.asm	decoded		yes		low	0
+486C_sub_486c.asm	segmented				low	0
+486D_data_mixed.asm	decoded				high	0
+487A_sub_487a.asm	segmented				low	0
+4881_sub_4881.asm	segmented				low	0
+4886_sub_4886.asm	segmented				low	0
+4887_sub_4887.asm	decoded		yes		low	0
+488B_sub_488b.asm	segmented				low	0
+488C_sub_488c.asm	decoded		yes		low	0
+489A_sub_489a.asm	segmented				low	0
+489F_sub_489f.asm	segmented				low	0
+48A7_sub_48a7.asm	segmented				low	0
+48BC_sub_48bc.asm	segmented				low	0
+48BF_sub_48bf.asm	segmented				low	0
+48C4_sub_48c4.asm	segmented				low	0
+48C7_sub_48c7.asm	segmented				low	0
+48CA_sub_48ca.asm	segmented				low	0
+4A1C_screen_clear_mode1.asm	observed	yes		yes	low	0
+4A22_sub_4a22.asm	segmented				low	0
+4A2F_sub_4a2f.asm	segmented				low	0
+4A3C_sub_4a3c.asm	segmented				low	0
+4A3E_sub_4a3e.asm	segmented				low	0
+4A46_sub_4a46.asm	segmented				low	0
+4A4E_sub_4a4e.asm	segmented				low	0
+4A56_sub_4a56.asm	segmented				low	0
+4A5E_sub_4a5e.asm	segmented				low	0
+4A64_sub_4a64.asm	segmented				low	0
+4A71_sub_4a71.asm	segmented				low	0
+4A74_tile_blit_cga.asm	observed	yes		yes	high	0
+4A89_sub_4a89.asm	segmented				low	0
+4AA6_sub_4aa6.asm	segmented				low	0
+4AAD_flush_staged_cells.asm	observed	yes		yes	high	0
+4AB8_sub_4ab8.asm	segmented				low	0
+4ABB_sub_4abb.asm	segmented				low	0
+4AC3_sub_4ac3.asm	segmented				low	0
+4ACE_sub_4ace.asm	segmented				low	0
+4AD7_sub_4ad7.asm	segmented				low	0
+4AE0_sub_4ae0.asm	segmented				low	0
+4AE6_sub_4ae6.asm	segmented				low	0
+4AEF_sub_4aef.asm	segmented				low	0
+4AF1_sub_4af1.asm	segmented				low	0
+4AFA_sub_4afa.asm	segmented				low	0
+4AFC_sub_4afc.asm	segmented				low	0
+4B08_sub_4b08.asm	segmented				low	0
+4B1B_sub_4b1b.asm	segmented				low	0
+4B26_sub_4b26.asm	segmented				low	0
+4B35_sub_4b35.asm	segmented				low	0
+4B4E_sub_4b4e.asm	segmented				low	0
+4B5D_sub_4b5d.asm	segmented				low	0
+4B76_pixel_plot.asm	decoded	yes			low	0
+4BAA_pixel_erase.asm	decoded	yes			low	0
+4BE0_pixel_block.asm	decoded	yes			medium	0
+4C1E_video_xor_patch.asm	decoded	yes			high	0
+4C31_sub_4c31.asm	segmented				low	0
+4C50_sub_4c31_epilogue.asm	observed	yes	yes	yes	high	0
+4C55_name_pool.asm	decoded	yes	yes		high	0
+4F09_arrow_scancode_table.asm	decoded	yes	yes		high	0
+4F11_monster_step_vector.asm	decoded	yes			high	0
+4F20_sub_4f20.asm	segmented				low	0
+4F32_sub_4f32.asm	segmented				low	0
+4F36_monster_pursuit_vector.asm	observed	yes		yes	high	0
+4F4D_key_poll.asm	observed	yes		yes	low	0
+4F52_sub_4f52.asm	segmented				low	0
+4F56_sub_4f56.asm	segmented				low	0
+4F58_sub_4f58.asm	segmented				low	0
+4F5C_sub_4f5c.asm	segmented				low	0
+4F60_sub_4f60.asm	segmented				low	0
+4F64_sub_4f64.asm	segmented				low	0
+4F69_sub_4f69.asm	segmented				low	0
+4F6A_sub_4f6a.asm	segmented				low	0
+4F6E_sub_4f6e.asm	segmented				low	0
+4F70_sub_4f70.asm	segmented				low	0
+4F74_sub_4f74.asm	segmented				low	0
+4F76_sub_4f76.asm	segmented				low	0
+4F7B_sub_4f7b.asm	segmented				low	0
+4F85_sub_4f85.asm	segmented				low	0
+4F89_sub_4f89.asm	segmented				low	0
+4F8E_speed_slower_f8.asm	decoded	yes			high	0
+4FA0_sub_4fa0.asm	segmented				low	0
+4FA5_speed_faster_f7.asm	decoded	yes			high	0
+4FB3_speed_rescale_call.asm	decoded	yes			high	0
+4FB6_sub_4fb6.asm	segmented				low	0
+4FBB_sub_4fbb.asm	segmented				low	0
+4FBE_sub_4fbe.asm	segmented				low	0
+4FC5_sub_4fc5.asm	segmented				low	0
+4FCA_sub_4fca.asm	segmented				low	0
+4FCC_sub_4fcc.asm	segmented				low	0
+4FD1_sub_4fd1.asm	segmented				low	0
+4FD3_sub_4fd3.asm	segmented				low	0
+4FD7_sub_4fd7.asm	segmented				low	0
+4FDB_sub_4fdb.asm	segmented				low	0
+4FDD_sub_4fdd.asm	segmented				low	0
+4FDF_str_out.asm	observed			yes	high	0
+4FE2_sub_4fe2.asm	segmented				low	0
+4FEC_sub_4fec.asm	segmented				low	0
+4FF0_sub_4ff0.asm	segmented				low	0
+4FFB_sub_4ffb.asm	segmented				low	0
+4FFE_sub_4ffe.asm	segmented				low	0
+5000_sub_5000.asm	segmented				low	0
+5003_char_print.asm	observed	yes		yes	low	0
+500D_sub_500d.asm	segmented				low	0
+5016_sub_5016.asm	segmented				low	0
+501A_sub_501a.asm	segmented				low	0
+5025_sub_5025.asm	segmented				low	0
+5036_sub_5036.asm	segmented				low	0
+503D_sub_503d.asm	segmented				low	0
+504A_sub_504a.asm	segmented				medium	0
+5057_sub_5057.asm	segmented				low	0
+505A_sub_505a.asm	segmented				low	0
+505F_sub_505f.asm	segmented				low	0
+5066_print_sex_male.asm	observed	yes		yes	low	0
+506E_sub_506e.asm	segmented				low	0
+506F_print_sex_female.asm	decoded	yes			low	0
+507A_print_player_name.asm	decoded	yes			high	0
+507D_sub_507d.asm	segmented				low	0
+5085_sub_5085.asm	segmented				low	0
+5088_sub_5088.asm	segmented				low	0
+508B_sub_508b.asm	segmented				low	0
+508C_sub_508c.asm	segmented				low	0
+5093_sub_5093.asm	segmented				low	0
+509B_sub_509b.asm	segmented				low	0
+509E_sub_509e.asm	segmented				low	0
+50A1_sub_50a1.asm	segmented				low	0
+50A3_sub_50a3.asm	segmented				low	0
+50AD_sub_50ad.asm	segmented				low	0
+50B0_sub_50b0.asm	segmented				low	0
+50B2_sub_50b2.asm	segmented				low	0
+50B3_map_tile_ptr.asm	observed	yes		yes	low	0
+50D8_sign_of_al.asm	decoded	yes			high	0
+50DC_sub_50dc.asm	segmented				low	0
+50DE_sub_50de.asm	segmented				low	0
+50E1_sub_50e1.asm	segmented				low	0
+50E3_sub_50e3.asm	segmented				low	0
+50EF_abs_signed_byte.asm	decoded	yes			high	0
+50F3_sub_50f3.asm	segmented				low	0
+50F9_status_line_print.asm	observed	yes	yes	yes	low	0
+51A5_print_bcd4_al_di.asm	decoded	yes			high	0
+51B0_sub_51b0.asm	segmented				low	0
+51EB_str_out_at.asm	observed	yes		yes	low	0
+51FB_sub_51fb.asm	segmented				low	0
+51FD_str_out_core.asm	observed	yes		yes	low	0
+5212_sub_5212.asm	segmented				low	0
+5217_rand_byte.asm	observed	yes		yes	low	0
+522B_rand_byte_shift.asm	decoded	yes			low	0
+5236_rand_byte_tail.asm	decoded	yes			low	0
+523E_sub_523e.asm	segmented				low	0
+5246_sub_5246.asm	segmented				low	0
+524A_sub_524a.asm	segmented				low	0
+5251_sub_5251.asm	segmented				low	0
+5255_wound_video_flash.asm	decoded	yes			high	0
+525E_video_flash_variant.asm	decoded	yes			high	0
+5267_video_flash_variant.asm	decoded	yes			high	0
+5270_video_flash_variant.asm	decoded	yes			high	0
+5279_sub_5279.asm	segmented				low	0
+527F_sub_527f.asm	segmented				low	0
+5287_data_mixed.asm	decoded	yes	yes		high	0
+52CA_dos_call_wrapper.asm	decoded	yes			low	0
+52E7_sub_52e7.asm	segmented				low	0
+52EF_sub_52ef.asm	segmented				low	0
+52F6_sub_52f6.asm	segmented				low	0
+5300_sub_5300.asm	segmented				low	0
+530F_sub_530f.asm	segmented				low	0
+5317_sub_5317.asm	segmented				low	0
+531B_msg_wrong_disk.asm	decoded	yes			low	0
+5343_sub_5343.asm	segmented				low	0
+5351_sub_5351.asm	decoded	yes			high	0
+5356_sub_5356.asm	segmented				low	0
+535A_sub_535a.asm	decoded	yes			high	0
+5371_sub_5371.asm	segmented				low	0
+5379_sub_5379.asm	segmented				low	0
+538F_sub_538f.asm	segmented				low	0
+53A0_sub_53a0.asm	segmented				low	0
+53B5_print_byte_bcd.asm	decoded	yes			high	0
+53D0_sub_53d0.asm	segmented				low	0
+53D9_sub_53d9.asm	segmented				low	0
+53DF_sub_53df.asm	segmented				low	0
+53E6_sub_53e6.asm	segmented				low	0
+53EE_sub_53ee.asm	segmented				low	0
+53F3_sub_53f3.asm	segmented				low	0
+53F4_char_print_wrap.asm	observed	yes		yes	low	0
+53F7_sub_53f7.asm	segmented				low	0
+5400_sub_5400.asm	segmented				low	0
+5A66_sub_5a66.asm	segmented				low	0
+5AB1_map_render.asm	decoded	yes			high	0
+5AB8_sub_5ab8.asm	segmented				low	0
+5ABB_sub_5abb.asm	decoded	yes			high	0
+5AE1_stage_visible_cells.asm	observed	yes		yes	high	0
+5AED_sub_5aed.asm	segmented				low	0
+5AF9_sub_5af9.asm	segmented				low	0
+5AFF_sub_5aff.asm	segmented				low	0
+5B33_sub_5b33.asm	segmented				low	0
+5B39_sub_5b39.asm	segmented				low	0
+5B3D_sub_5b3d.asm	segmented				low	0
+5B44_sub_5b44.asm	segmented				low	0
+5B47_sub_5b47.asm	segmented				low	0
+5B4B_sub_5b4b.asm	segmented				low	0
+5B4D_sub_5b4d.asm	segmented				low	0
+5B5D_sub_5b5d.asm	segmented				low	0
+5B6E_sub_5b6e.asm	segmented				low	0
+5B71_mode_table_copy.asm	decoded	yes			low	0
+5B98_sub_5b98.asm	decoded	yes			high	0
+5BC2_sub_5bc2.asm	segmented				low	0
+5C11_sub_5c11.asm	segmented				low	0
+5C15_sub_5c15.asm	segmented				low	0
+5C1C_sub_5c1c.asm	segmented				low	0
+5C1F_sub_5c1f.asm	segmented				low	0
+5C23_sub_5c23.asm	segmented				low	0
+5C25_sub_5c25.asm	segmented				low	0
+5C35_sub_5c35.asm	segmented				low	0
+5C46_sub_5c46.asm	segmented				low	0
+5C49_sub_5c49.asm	segmented				low	0
+5C6D_underlay_copy.asm	observed	yes		yes	high	0
+5C70_sub_5c70.asm	segmented				low	0
+5C76_sub_5c76.asm	segmented				low	0
+5C88_sub_5c88.asm	segmented				low	0
+5C95_beep_short.asm	decoded	yes			medium	0
+5C9C_sub_5c9c.asm	segmented				low	0
+5CA5_sub_5ca5.asm	segmented				low	0
+5CAB_sub_5cab.asm	segmented				low	0
+5CAE_sub_5cae.asm	segmented				low	0
+5CB1_sub_5cb1.asm	segmented				low	0
+5CB2_speaker_start.asm	decoded	yes			medium	0
+5CCC_sub_5ccc.asm	segmented				low	0
+5CD0_sub_5cd0.asm	segmented				low	0
+5CD2_speaker_freq.asm	observed	yes		yes	low	0
+5CDA_sub_5cda.asm	segmented				low	0
+5CDD_sub_5cdd.asm	segmented				low	0
+5CE0_sub_5ce0.asm	segmented				low	0
+5CE3_sub_5ce3.asm	segmented				low	0
+5CE4_speaker_stop.asm	decoded	yes			medium	0
+5CED_sub_5ced.asm	segmented				low	0
+5D09_speaker_seq_player.asm	decoded	yes			medium	0
+5D14_sub_5d14.asm	segmented				low	0
+5D22_sub_5d22.asm	segmented				low	0
+5D2D_sub_5d2d.asm	segmented				low	0
+5D37_sub_5d37.asm	segmented				low	0
+5D3A_sub_5d3a.asm	segmented				low	0
+5D3D_sub_5d3d.asm	segmented				low	0
+5D50_sub_5d50.asm	segmented				low	0
+5D55_sub_5d55.asm	segmented				low	0
+5D58_sub_5d58.asm	segmented				low	0
+5DA9_tone_player.asm	decoded	yes			medium	0
+5DB0_sub_5db0.asm	segmented				low	0
+5DB3_sub_5db3.asm	segmented				low	0
+5DCD_sub_5dcd.asm	segmented				low	0
+5DD7_sub_5dd7.asm	segmented				low	0
+5DDE_sub_5dde.asm	segmented				low	0
+5DE6_sub_5de6.asm	segmented				low	0
+5DF0_sub_5df0.asm	segmented				low	0
+5DF3_sub_5df3.asm	segmented				low	0
+5E07_sub_5e07.asm	segmented				low	0
+5E0F_sub_5e0f.asm	segmented				low	0
+5E19_sub_5e19.asm	segmented				low	0
+5E1C_sub_5e1c.asm	segmented				low	0
+5E30_sub_5e30.asm	segmented				low	0
+5E32_sub_5e32.asm	segmented				low	0
+5E35_sub_5e35.asm	segmented				low	0
+5E3A_sub_5e3a.asm	segmented				low	0
+5E83_sub_5e83.asm	segmented				low	0
+5EAC_sub_5eac.asm	segmented				low	0
+5EC2_sub_5ec2.asm	segmented				low	0
+5EC7_play_seq0.asm	decoded	yes			medium	0
+5ECE_sub_5ece.asm	segmented				low	0
+5ED5_sub_5ed5.asm	segmented				low	0
+5ED6_sub_5ed6.asm	segmented				low	0
+5ED7_sub_5ed7.asm	segmented				low	0
+5EED_sub_5eed.asm	segmented				low	0
+5EF2_sub_5ef2.asm	segmented				low	0
+5F08_sub_5f08.asm	segmented				low	0
+5FA6_sub_5fa6.asm	segmented				low	0
+5FBD_sub_5fbd.asm	segmented				low	0
+5FC3_sub_5fc3.asm	segmented				low	0
+5FE0_sub_5fe0.asm	segmented				low	0
+5FF7_sub_5ff7.asm	segmented				low	0
+6000_dungeon_render.asm	decoded	yes			low	0
+6078_dungeon_depth_scan.asm	decoded	yes			low	0
+6144_dungeon_shape_dispatch.asm	segmented	yes	yes		low	4
+6291_sub_6291.asm	segmented				low	0
+6304_sub_6304.asm	segmented				low	0
+6377_sub_6377.asm	segmented				low	0
+63CE_sub_63ce.asm	segmented				low	0
+6425_sub_6425.asm	decoded	yes			low	0
+648D_sub_648d.asm	segmented				low	0
+64E2_sub_64e2.asm	segmented				low	0
+653F_sub_653f.asm	segmented				low	0
+6594_sub_6594.asm	segmented				low	0
+660C_sub_660c.asm	segmented				low	0
+6684_sub_6684.asm	segmented				low	0
+66CB_sub_66cb.asm	segmented				low	0
+67B3_line.asm	decoded	yes			low	0
+68A3_sprite_stroke.asm	decoded	yes			low	0
+68C0_dungeon_grid_byte.asm	decoded	yes			medium	0
+68ED_dungeon_sprite_pass.asm	decoded	yes			low	0
+6999_space_status.asm	decoded	yes			high	0
+6B3D_space_field_draw.asm	decoded	yes			medium	0
+6CC4_space_ship_erase.asm	observed	yes	yes	yes	medium	0
+6D3E_sub_6d3e.asm	segmented				low	0
+6D5B_sub_6d5b.asm	segmented				low	0
+6D68_sub_6d68.asm	segmented				low	0
+6D83_space_ship_draw.asm	observed	yes		yes	high	0
+6DFD_hyperwarp_flow.asm	decoded				high	0
+6FA3_space_status_values.asm	decoded	yes			high	0
+7030_space_collision.asm	decoded	yes			high	0
+7242_sub_7242.asm	segmented				low	0
+7276_sub_7276.asm	segmented				low	0
+7289_sub_7289.asm	segmented				low	0
+72A0_sub_72a0.asm	segmented				low	0
+8387_sub_8387.asm	segmented				low	0
+8CD0_sub_8cd0.asm	segmented				low	0
+8DCD_sub_8dcd.asm	segmented				low	0

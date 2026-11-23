@@ -143,6 +143,14 @@ run "state_layout selftest" tools/state_layout.py -- python3 tools/state_layout.
 run "state_layout verify" engine/src/core/state.h -- python3 tools/state_layout.py --verify
 run "state_layout fresh" disasm/index/state.tsv -- python3 tools/state_layout.py --check-fresh
 
+# The coverage grade, derived from markers rather than the bulk-assigned `confidence:` stamp, plus
+# the unnamed-offset queue. Required: reads only asm/ and state.h. Selftest first -- 7 controls
+# over the grade derivation, including the one proving a commented forced-keep does NOT cap a
+# grade; the naive reading of D3 would have capped 146 files for the wrong reason.
+run "index_coverage selftest" tools/index_coverage.py -- python3 tools/index_coverage.py --selftest
+run "index_coverage verify" asm disasm/index/state.tsv -- python3 tools/index_coverage.py --verify
+run "index_coverage fresh" disasm/index/coverage.tsv disasm/index/unnamed-offsets.tsv -- python3 tools/index_coverage.py --check-fresh
+
 run "cmd_marker_gate selftest" tools/cmd_marker_gate.py -- python3 tools/cmd_marker_gate.py --selftest
 run "cmd_marker_gate" engine/src docs/phase4-state.md -- python3 tools/cmd_marker_gate.py
 # Which SDL a build links is decided by this probe, and a wrong verdict is a build

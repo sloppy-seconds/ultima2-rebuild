@@ -212,6 +212,23 @@ What makes it actionable:
   the code touches that has no name, ordered by touch count. That is how the mirror grows: the
   index proposes, the mirror decides.
 
+**Shipped 2026-11-23 as `tools/index_coverage.py` (#23).** The headline the marker rule produces
+is **26.8% decoded, 9.4% observed** over 1212 files — roughly double what the `confidence:` stamp
+implied — and the report prints the three predicates beside the counts so the figure cannot be
+quoted away from the rule that made it. Two things came out of building it:
+
+* **D3, corrected.** "A file with undecoded bytes in range cannot hold a `decoded` grade", read
+  literally as "has a `.byte` line", caps 146 files, and caps them wrongly: a forced-keep is a
+  decoded instruction that gas cannot emit identically, not an unknown byte. The test is whether
+  the line says anything at all — **a `.byte` with no comment is undecoded** — and that bites on
+  exactly one file today (`asm/6144_dungeon_shape_dispatch.asm`). The rule still has teeth; it
+  goes red the day somebody deletes a comment.
+* **The queue ships from `state.h`, not from `footprint`.** It is the 25 reserved bytes with a
+  count of how many `asm/` files mention the literal, which is a mention and not an access. The
+  access column and true touch ordering arrive with #24, as do `cited_by_engine` and the
+  per-module rollup that wait on `engine-map` (#26). Deferrals are printed in the report rather
+  than shipped as empty columns.
+
 ### 3.4 `xref` — cut, and what ships in its place
 
 The draft's fourth index merged the static call graph with the runtime CFG corpus, because the
