@@ -265,9 +265,12 @@ opt_run "forced_keep_audit selftest" original/ultimaii.exe asm -- python3 tools/
 # says no look identical until you test one of each.
 opt_run "recut_bytes selftest" original/ultimaii.exe -- python3 tools/recut_bytes.py --selftest
 
-echo "== Apple II 6502 side (needs gitignored inputs) =="
-opt_run "apple2_seeds selftest" references/apple decompiled/apple2 -- python3 tools/apple2_seeds.py --selftest
-opt_run "apple2_anchor_map" original/ultimaii.exe decompiled/apple2 -- python3 tools/apple2_anchor_map.py --selftest
+# The Apple II 6502 side is deliberately NOT gated (owner ruling 2026-11-23).
+# references/apple/ and the Ghidra decompilation of it are a reference corpus -- kept in case the
+# lineage claim needs re-checking, not a surface this project has to keep green. Gating it bought
+# nothing and produced noise: its inputs are gitignored by design, so the gates skipped in CI by
+# accident and false-alarred STALE in a clean tree. The tools stay and still run by hand; see
+# docs/apple2-reference.md for the ruling and what was derived with them.
 
 # The place index needs the player's content to decode, so it is an opt leg like the other
 # content-dependent gates. --verify is a control with four ways to fail: the letter table, the
@@ -290,7 +293,6 @@ opt_run "generated fresh" tools/census.py tools/place_index.py original/ultimaii
 opt_run "npc_index" original/tlkx32 -- python3 tools/npc_index.py --verify
 opt_run "planet_index" original/ultimaii.exe -- python3 tools/planet_index.py --verify
 opt_run "gate_graph" original/ultimaii.exe -- python3 tools/gate_graph.py --verify
-opt_run "apple2 index fresh" /var/tmp/u2-apple2-6502/u2_6502.tsv -- python3 tools/apple2_index.py --check
 
 echo
 echo "== FM Towns crosswalk (needs gitignored media) =="

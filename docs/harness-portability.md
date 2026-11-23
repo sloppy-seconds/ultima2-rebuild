@@ -189,6 +189,16 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-23 -- a reference-only corpus must not be gated, and a precondition that names a
+  directory rather than the file the tool opens lies in both directions.** The gates over the
+  second-platform reference import were removed: their inputs are optional by design, so they
+  skipped in CI by accident (declared against a host scratch path that only existed on one
+  machine) and reported a stale committed table in a clean tree where the real input was absent
+  but the declared one was present. Two rules fall out. Declare the precondition as the file the
+  tool actually opens, with a glob where it is one of many, because an empty directory passes
+  `-e`. And keep optional-by-design corpora out of the gate suite: a check that can only run on
+  one person's machine is not a check, it is a rumour.
+  → Tier 1, gate design: preconditions name opened files, and reference-only inputs are not gated.
 * **2026-11-23 -- a confidence stamp assigned in bulk is not a measure of understanding, and a
   coverage metric built on it inherits the lie.** This project's headline ("87% of the binary is
   not understood") turned out to be a count of a field a bulk reassembly pass had written as a

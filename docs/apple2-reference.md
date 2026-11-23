@@ -9,6 +9,15 @@ That section asserted the DOS port is a translation of Garriott's 6502. Until no
 was an assumption carried in prose. It is now something we can test byte by byte, which
 changes Step 3 of gameplay-logic work from "guess at 6502 idioms" to "read the 6502".
 
+## 0. Status: reference only, not gated
+
+Owner ruling, 2026-11-23: nothing in `tools/check_all.sh` gates the Apple II side. The disks and
+their Ghidra decompilation are here so the lineage claim can be re-checked if it is ever doubted,
+not so a gate has to stay green between doubts. Gating them bought noise: the inputs are gitignored
+by design, so the three gates skipped in CI by accident and false-alarred `STALE` in a clean tree.
+The tools remain and are run by hand when the reference is consulted, and the § 8 crosswalk is a
+recorded finding rather than a checked invariant.
+
 ## 1. What the images actually are
 
 Three 140 KB unadorned images. `cp2` identifies disk 1 as:
