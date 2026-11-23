@@ -46,9 +46,16 @@ def main():
     # path: a gate that only runs on one laptop is a gate that is not running.
     seed_src = os.path.join(REPO, "original", "player")
     if not os.path.exists(seed_src):
-        print("  FAIL  no original/player to seed from, so this gate cannot run. A skip "
-              "here would hide the defect it exists to catch, so it is a failure.")
-        return 1
+        # Exit 77, not 1: "I could not run" is a different verdict from "the code is wrong", and
+        # collapsing the two is what made CI red for the wrong reason. original/ is gitignored, so
+        # no CI runner can ever have this seed -- a hard failure there is a gate asserting on an
+        # input that cannot exist, and it read for two days as a CP4 ghost-stamp defect. The CALLER
+        # rules on 77: locally it stays a failure, because here the content is expected and its
+        # absence is a real problem. A skip that can hide a failure is not a skip; this one cannot,
+        # because the input is gitignored by design.
+        print("  SKIP  no original/player to seed from, so this gate cannot run (exit 77). "
+              "Locally that is a failure, not a skip: the content is expected here.")
+        return 77
     shutil.copy(seed_src, work + "/save/PLAYER/PLAYER")
     for args in (["maxout", work + "/save/PLAYER/PLAYER"],
                  ["set", work + "/save/PLAYER/PLAYER", "sector", "0"]):
