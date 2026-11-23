@@ -13,7 +13,7 @@
 # Provides:
 #   U2_ROOT                 the engine directory; this file cds there
 #   U2_CC, U2_CCFLAGS       the engine's own compiler and flag set
-#   u2_lib                  ensure build/libu2.a exists and is current
+#   u2_lib                  ensure the current build dir's libu2.a exists and is current
 #   u2_check OUT SRC...     compile SRC... and link them against libu2.a
 #   u2_check_raw OUT SRC... compile SRC... with an explicit list and NO library
 #
@@ -34,11 +34,21 @@ U2_CC="${U2_CC:-cc}"
 # engine/Makefile is the only home for the flag set. A check held to a weaker bar
 # than the code it checks is a check that passes for the wrong reason.
 U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
-U2_LIBDIR="$U2_ROOT/build"
+# Where the archive lives. This MUST come from U2_OBJDIR, which the Makefile exports as $(BUILD):
+# `test-asan` re-invokes make with BUILD=build/asan, so the archive that job builds is
+# build/asan/libu2.a. Hardcoding `build` meant the sanitizer job linked whatever plain archive a
+# dirty tree happened to leave behind -- locally that made an ASan run PASS while checking nothing
+# under sanitizers -- and on CI's clean tree it failed as `cannot find -lu2`. Same root, two
+# verdicts, neither one earned.
+U2_LIBDIR="${U2_LIBDIR:-$U2_ROOT/${U2_OBJDIR:-build}}"
 U2_LIB="$U2_LIBDIR/libu2.a"
 
 u2_lib() {
-    make -s lib
+    make -s lib || return 1
+    # Fail here rather than at the linker. `ld: cannot find -lu2` inside a check program reads as a
+    # defect in the code under test; the truth is that the build directory and the link path
+    # disagreed, and that is a harness misconfiguration.
+    [ -f "$U2_LIB" ] || { echo "harness: no libu2.a in $U2_LIBDIR (U2_OBJDIR=${U2_OBJDIR:-unset}); refusing to link a stale or foreign archive" >&2; return 1; }
 }
 
 # u2_check OUT SRC... — build SRC... against the engine library.
