@@ -1,7 +1,11 @@
 # Epic: the bible — a generated, graded, self-correcting reference to the game
 
-**Status: proposal, not built. Not a live queue.** Depends on
-`docs/plan-code-index.md`; see § 9 for the ordering argument.
+**Status: ruled, not built. Not a live queue.** Depends on `docs/plan-code-index.md`; § 9
+carries the interleaved order, and § 11 is the record of rulings from the decision review on
+2026-11-23 — nothing in this document is open. Terms live in `GLOSSARY.md` (**the bible**,
+**negative fact**, **evidence grade** against **coverage grade**); the two decisions that need
+to stand on their own are ADR 0003 (no model runs in CI) and ADR 0004 (prose is a generated
+view).
 
 The model is the Gamer Corner Ultima II guide
 (`guides.gamercorner.net/ultimaii/`), which is excellent and which this project has already
@@ -40,6 +44,20 @@ being something we must be careful about and becomes something that cannot survi
   used as a source. See § 7.
 * **Not the internals doc.** Engine mapping (asm ↔ C, classic vs enhanced) is a second skin
   over the same index for contributors, not content in the player-facing book.
+* **No tile-art page in v1.** A bible page about tile art becomes a trace document, and a
+  public page is exactly the hand-off vector the cleanroom wall exists to close. The art story
+  keeps its own documents; the exclusion is named here rather than left to be discovered.
+* **No enhanced mode in v1.** The index epic ruled enhanced out of `engine-map` because the
+  divergence notes do not exist, and a `diverges:` field nobody has filled reads as finished.
+  Same defect one layer up, same answer: excluded, and writing the notes is its own item rather
+  than a dependency smuggled in through a rendering rule.
+* **A fact's evidence is never a `docs/*.md` file.** Evidence is an `asm/` file or a tool.
+  The 100 files in `docs/` are working notes, and a fact citing prose about prose inherits
+  every drift in it.
+* **The reader is an agent first.** The fact store and its queries are the product; the rendered
+  page is proof that the facts render. That is why the renderer is last and optional, and it is
+  the reason this epic exists: returning agents re-decode things and cite prose that has gone
+  stale.
 
 ---
 
@@ -69,10 +87,37 @@ Fields that matter and why:
 * **`name_source`** — `ours | wiki`, because we ruled that bytes decide identity and the wiki
   decides names. The game spells `TOMMERSVILLE` and `PIRATES COVE` itself where their guide
   says Tommersville and Pirates Harbour. Every row says where its name came from.
+* **`kind`** — a closed enum, not free text: `rule | arithmetic | condition | relation |
+  identity`. A closed set is what makes "does this fact support that sentence" decidable. An
+  unknown `kind` fails `--verify`.
+* **`scope`** — required on a **negative fact** (glossary), naming the method that established
+  the absence and its blind spots. A negative fact may not be graded above `inferred` until the
+  method is exhaustive.
+* **`disputed`** — propagated by the extractor from a header carrying `NAME DISPUTED:` or
+  `body corrected:`. A disputed fact renders inline as disputed and may not be graded above
+  `inferred` until the header settles. Dropping it would hide the most interesting rows.
+
+Entities are ids owned by the census (`sector/21`, `creature/…`, `place/…`), and the census is
+**entity authority, not a fact source**: facts reference entity ids and never duplicate census
+columns, so there is no cycle between the two. A fact citing an unknown entity id fails
+`--verify`.
 
 Behavioural rules that cannot be mechanically derived are authored **in `asm/` headers**, where
 the evidence lives and where corrections land, and extracted into the fact store. Not authored
 in the fact store. That is the difference between a generated view and a second copy.
+
+The authoring surface is a strict header line, because 236 headers carry `name-evidence:` *prose*
+and prose extraction is itself a model task — which would put a model between the bytes and the
+fact store, and that is where folklore enters:
+
+```
+# fact: <id> | <kind> | <grade> | <entities> | <statement>
+```
+
+One line per fact, pipe-delimited, fixed field order, statement capped at one sentence, no
+continuation lines, and a malformed line is a hard failure rather than a skipped one. Adding
+these lines is legal under CP0: the body guard md5s only non-`#` lines and the assembler ignores
+comments. Headers are retrofitted only for pages being drafted, starting with statistics.
 
 ---
 
@@ -95,6 +140,12 @@ Output is structured, not free prose:
 A sentence with no `facts` is a compile error. A sentence citing a fact that does not support
 it is a judge failure.
 
+The writer also carries a committed style block, because style rules here are grade rules in
+disguise: present tense, no hedges on `observed` or `measured` facts, a hedge required for an
+`inferred` one, and no third-party folklore vocabulary. An unversioned prompt is a second
+hand-maintained copy of the judge's standard, so the block lives in `tools/prompts/` and is
+covered by the prompt hash in § 5.
+
 ---
 
 ## 5. The judge: three mechanical questions
@@ -109,40 +160,70 @@ plausibility is what it is tuned to reward. Per sentence:
 3. **Did the grade survive?** An `inferred` fact rendered as flat assertion fails. Prose
    naturally smooths uncertainty away, so this must be checked, not hoped for.
 
-Plus a fourth, because true-and-empty compiles: **vacuity.** A sentence that cites facts and
-says nothing about them is rejected.
+Plus a fourth, because true-and-empty compiles: **vacuity**, and it is made mechanical or it is
+the vibes test this section refuses. A deterministic pre-check runs before the judge: a sentence
+must name at least one entity from its cited facts and must contain a token drawn from the
+fact's `statement`, or it is rejected as vacuous. The judge then carries the same four questions
+as a second pass and must give a non-empty reason for any failure. The two checks together are
+what make "supported" testable: the pre-check catches the empty sentence, question 2 catches the
+sentence that names the right entity and asserts something no fact states.
 
-Prefer a different model family for the judge where available. The judge's output is per
-sentence with a reason, never a page-level verdict.
+The judge's output is per sentence with a reason, never a page-level verdict, and it is a
+committed artefact. One row per sentence: the sentence id, the four questions as separate
+pass/fail fields, a reason per failure, the judge model id, the prompt hash, and the hash of the
+prose it judged. CI asserts the artefact without running a model — every sentence has a verdict,
+every verdict passes or the sentence is absent from the page and present in the drop list, and
+the recorded prose hash matches the store. A consequence worth naming now: **changing the judge
+model or prompt invalidates every verdict**, which means re-judging all pages. That is cheap,
+because re-judging never touches the writer.
 
-**The judge must be seen red before it is trusted**, per this repo's standing rule about
-gates. Three controls ship with it and run in CI: a deliberately false sentence, a
-grade-laundered one, and an unsourced-but-true one. All three must fail. A judge that cannot
-fail is worse than no judge.
+**The judge must be seen red before it is trusted**, per this repo's standing rule about gates.
+Three controls ship with it: a deliberately false sentence, a grade-laundered one, and an
+unsourced-but-true one. All three must fail. A judge that cannot fail is worse than no judge.
+
+**Controls do not run in CI, because no model runs in CI** (ADR 0003). They run as part of the
+generation step, and their output is committed alongside a hash of the writer/judge pair in use;
+CI asserts the control file exists, matches the current pair hash, and shows all three controls
+failing. "The judge was seen red" is therefore a checkable artefact, not a claim in prose. The
+writer and judge must be different model families, both ids recorded per page, and the pair is
+chosen by whoever runs the build rather than fixed here — naming a pair now would be a decision
+made without the evidence the controls produce.
 
 ---
 
 ## 6. Rendering
 
-Static site, generated, no server, regeneratable in CI with a freshness gate. Two skins over
-one fact store:
+Generated, no server, and **rendering is last and optional**: the generator writes HTML into a
+gitignored `site/`, viewable locally the way `map_viewer.py --serve` already works, and the
+freshness gate operates on the fact and prose stores rather than on HTML. Hosting is a
+publication question and publication is deferred (§ 7), so no hosting decision is made here.
+Two skins over one fact store:
 
 * **`bible/`** — the game. Game systems, places, planets, creatures, items, spells, time and
-  gates. Grades visible inline; clicking a sentence shows its evidence files.
-* **`internals/`** — our build. asm ↔ C, classic vs enhanced, coverage numbers, what is still
-  inferred. Contributor-facing, and kept out of the player's book so our caveats do not
-  pollute prose someone reads to learn the game.
+  gates. Evidence grades visible inline; clicking a sentence shows its evidence files.
+* **`internals/`** — **tables only, no drafted prose.** The coverage table, the engine-map table,
+  the disagreement rows, and links out to the owning doc. Its content is exactly what the index
+  epic's three tables already generate, and `docs/phase4-state.md` already owns intent prose, so
+  a second prose surface there would drift from the docs inside a week. The two skins are honest
+  in different ways: the player's book is judged prose, the internals skin is tables.
 
-Enhanced mode can only ever be rendered as `derived from X, diverges at Y`. An unqualified
-enhanced row would claim evidence that does not exist.
+**Page granularity.** Staleness, cost and the drop list are all per page, so the unit has to be
+named: one page per system (`statistics`, `time`, `gates`, `hyperjump`) plus one page per
+lookup-shaped entity (each place, each creature), because a reader asking about sector 21 should
+get one page, and the census already has the row to build it from. Behavioural rules live on the
+system pages. A corrected charisma byte then dirties `statistics`, not the whole book.
 
-**The most valuable page is free: "where we disagree with the guide."** We already vendor their
-table with a fetch date, so diffing our derived facts against theirs in both directions is a
-join, and it turns a reference into a control.
+**The most valuable output is free, and it is not prose: "where we disagree with the guide," as
+per-claim rows.** Measured: their vendored table is 28 rows with four columns
+(`Name,Type,World,Treasure`), `disasm/census/place.tsv` already joins it with `grade` and
+`source`, and `disasm/source-third-party-spells.tsv` already carries `verdict` and `grade` per
+spell claim. So the content is half-built and it is two joins, not a page. Render it as their
+claim, our verdict, our evidence grade and the direction of the disagreement — prose would only
+soften the one artefact that is genuinely a control.
 
 ---
 
-## 7. The text and licence line, which needs ruling
+## 7. The text and licence line, ruled for v1
 
 `AGENTS.md` already rules that game text is committed because `asm/` cannot exist without it,
 and that art is never committed and is substituted under the cleanroom. A public website is a
@@ -157,7 +238,11 @@ Three things this epic must not do:
 * **Do not publish substitute-art-adjacent evidence.** The cleanroom wall says
   `docs/tile-art-spec.md` may carry intent and never a trace. A bible page about tile art must
   not become a trace document, or it hands the wall's forbidden content to whoever draws next.
-* **Decide what game text the public site may contain.** See D6.
+* **No verbatim game string in any public skin until the owner rules otherwise.** Ruled
+  2026-11-23: v1 is internal-only, and the public skin — if it is ever built — renders no
+  verbatim game string, paraphrase only, with `name_source` visible in the rendered page and
+  third-party table rows quoted as data with attribution in the footer. The existing
+  committed-text ruling was about reconstruction files, and a website is a different exposure.
 
 ---
 
@@ -174,34 +259,44 @@ work this is.
 | stat increases come in steps of 4 | not established here; needs the increase site read |
 | discount is `charisma + intelligence`, wrapping at 255 | partial — `asm/20AB_bcd_price_from_stats` exists; G23 records the static half "did not come out clean" |
 | three price tiers, middle at internal 64, cheapest at 128 | not decoded |
-| **"charisma doesn't have any other effect"** | **not establishable without the code index** |
+| **"charisma doesn't have any other effect"** | **answerable now, with a scope** — charisma is `DS:4E` (proven 2026-10-29) and `grep -rn 0x4e asm/` returns 9 files, 6 non-comment hits |
 
-That last row is the argument for the ordering. "Charisma has no other effect" is a *negative*
-claim, and observation can never establish it — no amount of playing proves absence. A
-data-flow index answers it in one query: every routine that reads the charisma byte. Their
-guide's most actionable advice ("keep charisma below 66") rests entirely on a claim their
-method cannot verify and ours can. That is the pitch for both epics in one line.
+That last row is still the pitch and it is **no longer a blocker**. "Charisma has no other
+effect" is a *negative* fact (glossary), and observation can never establish it — no amount of
+playing proves absence. But the fast path already answers it: read the nine files that mention
+`0x4e`, and grade the claim `measured (grep; indexed bases unresolved)`, which is the honest
+scope rather than a caveat. `footprint` does not create the claim, it upgrades the scope from
+"grep, indexed bases unresolved" to "every site that can reach the byte". Their guide's most
+actionable advice ("keep charisma below 66") rests on a claim their method cannot verify and
+ours can, and that is still the argument for both epics — it just does not gate this one.
 
 The spike is: generate that one page end to end — facts, closed-book draft, judged, rendered —
 with every sentence anchored, and let it be wrong in public on one page rather than right in
-principle on none.
+principle on none. Three of the seven claims above are things we have not decoded, and the page
+must show that: see the `open` section in § 12.
 
 ---
 
 ## 9. Ordering across both epics
 
-The index epic is a prerequisite, but only two of its five indexes gate the bible:
+Re-ruled 2026-11-23 against `docs/plan-code-index.md` § 6 and § 7, which moved after this section
+was written: `dataflow` is now `footprint`, `xref` is cut to its own epic, the census is **not**
+folded under `lookup`, and `coverage` ships *before* `footprint`. The interleaved order:
 
 | step | what | why here |
 | --- | --- | --- |
-| A | `dataflow` + `engine-map` + `tools/lookup` | the substrate, and the spike needs exactly this |
-| B | fact schema + extraction + **Statistics spike** | proves the whole loop for one page |
-| C | `coverage`, `xref`, census folded into `lookup` | finishes the index epic |
-| D | full bible pages, `internals/` skin, disagreement page | volume work, only after B proves it |
+| 1 | the `# calls:` gate (index #22) | an hour, independent, can go red the day it lands |
+| 2 | `coverage` (index #23) | nearly free, gives the headline number, proves the gate pattern |
+| 3 | fact schema + extractor + **Statistics spike** (bible) | de-risks the schema, the writer and the judge for one page, and needs no index deliverable at all |
+| 4 | `footprint` + `lookup` (index #24) | the big one, arriving with the spike's requirements already known |
+| 5 | bible volume, `engine-map`, disagreement rows, internals skin | volume work, only after 3 proves the loop |
 
-The argument against finishing the index first: the spike will tell us what the index is
-missing, and it costs a page rather than a quarter. The Statistics page needs a charisma
-data-flow query, so step A is genuinely upstream — but nothing in B needs `xref`.
+The index is a *producer* of cheap truth and should not wait; the bible's risky part was never
+the facts, it is the schema, the closed-book writer and a judge nobody has seen red, and none of
+that needs the index now that the spike is unblocked. Two things would change this order: wanting
+the charisma claim proven rather than scoped moves `footprint` ahead of the spike, and a bad
+spike — a schema that cannot express a negative claim, a judge that waves everything through — is
+a cheap failure worth having at step 3 rather than after an epic.
 
 ---
 
@@ -216,45 +311,79 @@ data-flow query, so step A is genuinely upstream — but nothing in B needs `xre
 | facts drift from `asm/` | hand-maintained copies | facts generated or extracted only; `--check-fresh` gate |
 | the site becomes the authority | people cite the rendering | every page names its generator and commit; the site is explicitly a view |
 | stale prose after a correction | prose authored, not derived | anchors make staleness detectable; unanchored prose is rejected |
+| the freshness gate cannot byte-compare prose | LLM output is non-deterministic, so the census precedent does not transfer | staleness and input-equality instead of `cmp` (§ 12) |
+| a claim is in scope but has no fact | silence reads as completeness | the `open` section is generated, and a claim row with no fact and no `open` entry fails `--verify` |
+| a fact vanishes and the page quietly shrinks | deletion is not correction | `void` state: the page is not rendered at all until re-drafted (§ 12) |
 
 ---
 
-## 11. Decisions to settle
+## 11. Rulings
 
-**D1 — Where do facts live?** Recommend: generated `disasm/facts/` (YAML, committed), with
-behavioural rules authored in `asm/` headers and extracted. Alternative: a database file,
-which is less reviewable and diffs worse.
+Reviewed 2026-11-23. The draft's D-numbers are kept so nothing is lost; reversals say so.
 
-**D2 — Anchor syntax.** Recommend the two-field YAML above (`text` + `facts[]`), one entry per
-sentence. Alternatives: inline markers in markdown (nicer to read, easier to write unanchored
-prose by accident).
+| # | decision | ruling |
+| --- | --- | --- |
+| D1 | where facts live | generated `disasm/facts/`, committed, YAML. Behavioural rules are authored as `# fact:` lines in `asm/` headers and extracted; the extractor is the sole writer. |
+| D2 | anchor syntax | the two-field YAML (`text` + `facts[]`), one entry per sentence. An unanchored sentence is a compile error. |
+| D3 | writer and judge families | different families, mandatory, both ids recorded per page; the pair is chosen by whoever runs the build and the controls must have been run against the pair in use. |
+| D4 | a sentence that fails | dropped, and listed on the page under "could not be supported". A page that silently dropped three sentences looks more certain than the truth. |
+| D5 | publish at all | internal-only v1. The public skin is deferred behind an owner ruling, and renders no verbatim game string when it comes. |
+| D6 | verbatim game strings | none in any public skin until the owner rules otherwise (§ 7). |
+| D7 | third-party names | `name_source` is visible in the rendered page, not just the data, so attribution survives into what a reader sees. |
+| D8 | page order | Statistics spike, then the disagreement rows, then planets and places (the census already holds 781 rows), then creatures, then items and spells, then time and gates. |
+| D9 | capture citations | yes, and a claim about visible behaviour names its capture directory; frames stay gitignored. |
+| D10 | regeneration cost | incremental, and the gate is staleness rather than a rebuild — because byte-comparing LLM prose is impossible (§ 12). |
+| new | does the spike need the index | **reverses § 9 as drafted.** No. Charisma is `DS:4E`, nine files mention it; the spike runs grep-first now with a scoped grade and `footprint` upgrades the scope later. |
+| new | where models run | never in CI (ADR 0003). Generation is a human-triggered agent step that commits prose plus per-sentence verdicts; CI gates the artefacts. This makes the draft's "controls run in CI" false. |
+| new | how a fact leaves a prose header | a strict one-line `# fact:` field, retrofit only for drafted pages, malformed line is a hard failure. An LLM extracting facts from headers is refused: it puts a model between the bytes and the fact store. |
+| new | who owns the prose store | the generator (ADR 0004). A human who wants different wording changes the fact or the prompt, never the prose. |
+| new | facts against `docs/` | a fact's evidence is an `asm/` file or a tool, never a `docs/*.md`. Docs stay working notes; retiring the generated index docs is deferred. |
+| new | grade vocabulary | facts carry an **evidence grade**; the index's is always **coverage grade**; "grade" unqualified is banned. `recalled` renders in the internal skin and is excluded from any public page. |
+| new | tile art | excluded from v1 (§ 2). |
+| new | enhanced mode | excluded from v1 (§ 2), for the same reason the index epic cut it from `engine-map`. |
+| new | vacuity | a deterministic pre-check (name an entity from the cited facts, contain a token from the `statement`) plus the judge's second pass with a mandatory reason. |
+| new | census vs facts | census is entity authority, not a fact source. Facts reference entity ids and never copy census columns; unknown entity id or unknown `kind` fails `--verify`. |
+| new | negative facts | a named kind carrying `scope`; may not be graded above `inferred` until the method is exhaustive. |
+| new | disputed headers | `NAME DISPUTED:` and `body corrected:` propagate to a `disputed` flag, rendered inline, capped at `inferred`. |
+| new | page granularity | one page per system plus one per lookup-shaped entity. |
+| new | `internals/` skin | tables only, no drafted prose, no judge. |
+| new | rendering and hosting | generator writes to a gitignored `site/`; no hosting decision until publication is ruled. |
+| new | the disagreement output | per-claim rows, not a prose page. |
+| new | who reads it | an agent first; the fact store is the product and the renderer is last and optional. |
+| new | "the bible" | kept as the name, defined in `GLOSSARY.md` against the docs and the index. |
+| new | the `open` section | a report, not a queue. Work gets added to `docs/outstanding.md` or `docs/needs-gameplay.md` by hand, in the commit that exposed it. |
 
-**D3 — Same model for writer and judge?** Recommend: different families where available, and
-the controls in § 5 run against whichever pair is chosen so the choice is evidenced rather than
-assumed.
+---
 
-**D4 — What happens to a sentence that fails the judge?** Recommend: it is dropped and the
-failure is listed on the page under "could not be supported". Hiding judge failures would make
-the site look more certain than it is.
+## 12. Layout, build order, and page states
 
-**D5 — Do we publish at all, and if so what game text?** Recommend: build the generator first,
-decide publication later, and default to no verbatim game strings in the public skin until
-ruled. The internal site is as useful for our purposes and has no exposure.
+**Layout.** `disasm/facts/` generated fact rows; `bible/prose/` the anchored prose store;
+`bible/verdicts/` per-sentence judge verdicts; `site/` gitignored rendered HTML;
+`tools/prompts/bible_writer.md` and `tools/prompts/bible_judge.md` committed and hashed, because
+an unversioned prompt is a second hand-maintained copy of the judge's standard. Tools follow the
+index epic's naming: `tools/index_facts.py`, `tools/bible_draft.py`, `tools/bible_judge.py`,
+`tools/bible_render.py`.
 
-**D6 — Does the public skin quote game strings?** Open, needs the owner. Interacts with the
-existing committed-text ruling, which was about reconstruction files, not a website.
+**Build order.** (1) schema, extractor and `--verify`, with controls that go red on a malformed
+fact line and on a missing evidence file — committed with **zero facts in it**, because the thing
+that can fail comes before the thing that fills it; (2) retrofit `# fact:` lines in the
+statistics headers and generate the first rows; (3) the writer, anchors enforced as a hard error;
+(4) the judge, its four questions, the vacuity pre-check and the three controls; (5) the renderer,
+last, because nothing else depends on it.
 
-**D7 — Third-party names in a public site.** Recommend: keep `name_source` visible in the
-rendered output, not just the data, so attribution survives into what a reader sees.
+**Staleness, since a byte-compare is impossible.** Two deterministic checks. *Input equality:*
+the artefact records the fact-set hash, the prompt hashes and the model ids, and the gate asserts
+those still match the tree, so a changed input makes every dependent page stale without
+regenerating anything. *Evidence movement:* each fact records a hash of its evidence files, and a
+page citing a fact whose evidence moved is stale. Together they are what "a corrected decode
+invalidates the prose" means mechanically.
 
-**D8 — How many pages, and which first?** Recommend: Statistics (spike), then planets and
-places (census already covers them), then creatures, then items and spells, then time and
-gates. Ordered by how much of the fact base already exists.
+**Page states.** `fresh`; `stale`, where evidence moved and sentences will be re-drafted; and
+`void`, where a cited fact no longer exists — a deletion, not a correction, and the page is not
+rendered at all until re-drafted, because a quietly shorter page is worse than a visible absence.
 
-**D9 — Does the bible cite captures?** Recommend: yes, and a claim about visible behaviour
-must name its frame, per the existing "a behavioural claim needs a frame" rule. Frames are
-gitignored, so the citation names the capture directory rather than embedding the image.
-
-**D10 — Regeneration cost.** A full rebuild drafts every page through two models. Recommend
-incremental: only pages whose facts changed get re-drafted, and the freshness gate checks
-staleness rather than rebuilding everything on every commit.
+**The `open` section.** Every page carries a generated list of the claims in scope that have no
+supporting fact, and a claim row with no fact and no `open` entry fails `--verify`. Silence is
+not an option, which is the bible's version of the index epic's unknown-span rule. It is a report
+on the page, not a queue: work goes to `docs/outstanding.md` or `docs/needs-gameplay.md` by hand,
+in the commit that exposed it.

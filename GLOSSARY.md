@@ -83,7 +83,23 @@ How far a given `asm/` region has been read, derived from its own header rather 
 `confidence:` stamp, which a bulk wave assigned. **segmented** — boundaries proven, bytes exact,
 body unread. **decoded** — someone has read the body and recorded what it does. **observed** —
 its behaviour has been seen running in a named capture.
-_Avoid_: "understood"; "confidence" used as a synonym for grade.
+_Avoid_: "understood"; "confidence" used as a synonym for grade; "grade" used unqualified.
+
+## Negative fact
+
+A claim that something does *not* happen or is nowhere done — "charisma has no other effect".
+It carries a `scope` naming the method that established the absence and that method's blind
+spots, because absences are only as strong as the search. A negative fact may not be graded
+above `inferred` until the method is exhaustive.
+_Avoid_: treating "nobody saw it" as an absence proof; a negative fact without a scope.
+
+## Evidence grade
+
+How a claim was established: `observed`, `measured`, `inferred`, `recalled`, per the AGENTS.md
+evidence discipline. It attaches to a claim; a coverage grade attaches to a region of the binary.
+The two scales share the word `observed` and mean different things by it, so neither is ever
+rendered as bare "grade".
+_Avoid_: confidence, certainty, "grade" unqualified.
 
 ## Behavioural core
 
@@ -92,6 +108,14 @@ here. It is the code that owes an `asm/` citation, and the exemption is the poin
 platform, debug and generated-header code citing nothing is correct, not a gap. The boundary is
 owned by the generator's exemption list, not by prose.
 _Avoid_: "uncited code", "code with no evidence".
+
+## The bible
+
+The graded, generated reference to *the game*: a view over facts, where every claim carries how it
+was established and dies when the decode behind it is corrected. It is distinct from the docs,
+which are working notes about our reconstruction, and from the index, which maps bytes to
+behaviour for contributors. It describes the game, not the build.
+_Avoid_: wiki, guide (that word belongs to the third-party one), handbook.
 
 ## Art precedence
 
