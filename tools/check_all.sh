@@ -42,11 +42,25 @@ OPT=0
 
 # run <label> <required-path...> -- <command...>
 # opt_run ... : same, but a missing input is expected in CI and is not fatal.
+#
+# A declared path must be the thing the gate actually reads, not a directory that merely
+# contains it. `captures/spice86` exists in CI and is empty, so a gate declared against the
+# directory passed its precondition and then failed inside the tool -- which is how gate-suite
+# went red for two weeks with six gates that could not have run anywhere else. Globs are
+# allowed, and a glob that matches nothing counts as missing.
+has_input() {
+    local pat="$1" f
+    for f in $pat; do
+        [ -e "$f" ] && return 0
+    done
+    return 1
+}
+
 run() {
     local label="$1"; shift
     local optional="$OPT"; OPT=0
     while [ "$1" != "--" ]; do
-        if [ ! -e "$1" ]; then
+        if ! has_input "$1"; then
             if [ "$CI_MODE" = 1 ] && [ "$optional" = 0 ]; then
                 printf '  FAIL  %-26s REQUIRED gate cannot run: missing %s\n' "$label" "$1"
                 fails=$((fails + 1))
@@ -103,7 +117,7 @@ run "cmd_handlers" asm disasm/jump-table.txt -- python3 tools/cmd_handlers.py --
 # The derived half. captures/spice86/ is gitignored, so this is optional by declaration and
 # SKIPs in CI rather than pretending to have checked. It is the gate that makes `exec` generated
 # rather than hand-kept: the numbers in each handler header must equal what the captures say.
-opt_run "cmd_provenance_derived" captures/spice86 -- python3 tools/cmd_handlers.py --verify-provenance
+opt_run "cmd_provenance_derived" captures/spice86/*/spice86dumpExecutionFlow.json -- python3 tools/cmd_handlers.py --verify-provenance
 # The owner's command-loop ruling (AGENTS.md § 3) needs teeth: the twelve handlers no capture
 # has seen run must carry an UNPROVEN marker, and nothing may be called code-complete while one
 # stands. Selftest first -- 9 controls, both polarities, including the one that proves the gate
@@ -144,9 +158,9 @@ run "s86_ports selftest" tools/s86_ports.py -- python3 tools/s86_ports.py --self
 # The two-target bot adapter: one DS decoder (the engine's), two executables, and an
 # undeliverable key that refuses instead of pretending the game ignored it. Needs no
 # emulator, which is what makes it gateable — the live proof is bot/play_original.py.
-run "bot target adapter" bot/target_check.py -- python3 bot/target_check.py
+opt_run "bot target adapter" engine/u2 bot/target_check.py -- python3 bot/target_check.py
 run "bot policy rule" bot/policy.py -- python3 bot/policy.py
-run "bot passmap (engine answers passability)" bot/passmap_check.py -- python3 bot/passmap_check.py
+opt_run "bot passmap (engine answers passability)" engine/u2 bot/passmap_check.py -- python3 bot/passmap_check.py
 run "bot nav (search only, no rules)" bot/nav.py -- python3 bot/nav.py
 run "bot census loader" bot/census.py -- python3 bot/census.py
 # The mode discriminator against the corpus, not just against itself. mode_check.c (CP0)
@@ -154,7 +168,7 @@ run "bot census loader" bot/census.py -- python3 bot/census.py
 # bug it caught — a dungeon's staging pair is also all-0xFF, so eighteen dungeon frames read
 # as space — was invisible to the synthetic test, which is the whole reason both exist.
 run "mode vs capture corpus" bot/mode_probe.py -- python3 bot/mode_probe.py
-run "mode vs orbit capture" bot/mode_orbit_check.py -- python3 bot/mode_orbit_check.py
+opt_run "mode vs orbit capture" captures/spice86/w6-orbit-dive/PAD.txt -- python3 bot/mode_orbit_check.py
 # Whether a container image still matches its Containerfile. The old test was "does
 # an image exist", so an edited recipe was silently ignored — which cost a full
 # SDL3 container cycle to a message blaming the Makefile. Runs against a podman
@@ -267,12 +281,12 @@ opt_run "place_index" original/mapx22 -- python3 tools/place_index.py --verify
 # place-index.tsv sat stale with five wiki names unjoined and --verify could not see it:
 # --verify re-derives in memory and never compares against the committed artefact, so it was
 # checking the generator and not the file everyone reads.
-run "census verify" disasm/place-index.tsv disasm/source-gamercorner-locations.csv original/ultimaii.exe -- python3 tools/census.py --verify
+opt_run "census verify" disasm/place-index.tsv disasm/source-gamercorner-locations.csv original/ultimaii.exe -- python3 tools/census.py --verify
 # One gate covers every committed generated table, including the census: regenerate each to a
 # temp dir and byte-compare. This caught a second stale file the moment it was written --
 # planet-index.tsv joins settlement names out of place-index, so it went stale when the wiki
 # names landed there, and nothing noticed.
-run "generated fresh" tools/census.py tools/place_index.py -- bash tools/generated_fresh.sh
+opt_run "generated fresh" tools/census.py tools/place_index.py original/ultimaii.exe -- bash tools/generated_fresh.sh
 opt_run "npc_index" original/tlkx32 -- python3 tools/npc_index.py --verify
 opt_run "planet_index" original/ultimaii.exe -- python3 tools/planet_index.py --verify
 opt_run "gate_graph" original/ultimaii.exe -- python3 tools/gate_graph.py --verify
