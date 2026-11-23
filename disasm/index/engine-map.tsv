@@ -512,6 +512,8 @@ asm_addr	asm_file	c_file	c_line	c_symbol	cited_as
 8274	2052_gold_spend_price.asm	game/commerce.h	231	u2_offer_result	asm/2052
 8274	2052_gold_spend_price.asm	game/commerce.h	232	u2_offer_result	asm/2070
 8363	20AB_bcd_price_from_stats.asm	core/state.h	220	u2_state	asm/20AB
+8363	20AB_bcd_price_from_stats.asm	core/state.h	739	u2_bcd2_str	asm/20AB
+8363	20AB_bcd_price_from_stats.asm	core/state.h	746	u2_bcd2_str	asm/20AB
 8363	20AB_bcd_price_from_stats.asm	game/commerce.c	34	(file)	asm/20AB
 8363	20AB_bcd_price_from_stats.asm	game/commerce.c	37	(file)	asm/20AB
 8363	20AB_bcd_price_from_stats.asm	game/commerce.c	40	(file)	asm/20AB
@@ -909,13 +911,13 @@ asm_addr	asm_file	c_file	c_line	c_symbol	cited_as
 11713	2DC1_combat_gold_gain.asm	core/state.c	177	u2_bcd_inc_sat	asm/2DC1
 11713	2DC1_combat_gold_gain.asm	core/state.c	206	daa_add	asm/2DC1
 11713	2DC1_combat_gold_gain.asm	core/state.h	253	u2_state	asm/2DC1
-11713	2DC1_combat_gold_gain.asm	core/state.h	755	u2_bcd2_str	asm/2DC1
+11713	2DC1_combat_gold_gain.asm	core/state.h	779	u2_bcd2_str	asm/2DC1
 11713	2DC1_combat_gold_gain.asm	game/combat.c	202	u2_combat_force_field	asm/2DC1
 11713	2DC1_combat_gold_gain.asm	game/combat.c	330	u2_combat_force_field	asm/2DC1
 11713	2DC1_combat_gold_gain.asm	game/dungeon.c	249	u2_dungeon_get	asm/2DC1
 11758	2DEE_combat_exp_gain.asm	core/state.c	206	daa_add	asm/2DEE
 11758	2DEE_combat_exp_gain.asm	core/state.h	244	u2_state	asm/2DEE
-11758	2DEE_combat_exp_gain.asm	core/state.h	755	u2_bcd2_str	asm/2DEE
+11758	2DEE_combat_exp_gain.asm	core/state.h	779	u2_bcd2_str	asm/2DEE
 11785	2E09_combat_miss_msg.asm	game/combat.c	455	u2_combat_cast_kill	asm/2E09
 11785	2E09_combat_miss_msg.asm	game/combat.c	512	u2_combat_cannon	asm/2E09
 11785	2E09_combat_miss_msg.asm	game/combat.h	72	u2_attack	asm/2E09
@@ -1085,7 +1087,7 @@ asm_addr	asm_file	c_file	c_line	c_symbol	cited_as
 13883	363B_cmd_G.asm	core/state.c	207	daa_add	asm/363B
 13883	363B_cmd_G.asm	core/state.h	384	u2_state	asm/363B
 13883	363B_cmd_G.asm	core/state.h	419	u2_state	asm/363B
-13883	363B_cmd_G.asm	core/state.h	755	u2_bcd2_str	asm/363B
+13883	363B_cmd_G.asm	core/state.h	779	u2_bcd2_str	asm/363B
 13883	363B_cmd_G.asm	core/world.h	275	u2_world_dungeon_put	asm/363B
 13883	363B_cmd_G.asm	debug/dump_state.c	133	emit_raw	asm/363B
 13883	363B_cmd_G.asm	game/combat.c	202	u2_combat_force_field	asm/363B
@@ -1347,7 +1349,7 @@ asm_addr	asm_file	c_file	c_line	c_symbol	cited_as
 17768	4568_cmd_Z.asm	game/status.c	218	u2_status_draw_full	asm/4568
 17768	4568_cmd_Z.asm	game/status.c	228	u2_status_draw_full	asm/4568
 17768	4568_cmd_Z.asm	game/status.c	238	u2_status_draw_full	asm/4568
-17841	45B1_sub_45b1.asm	core/state.h	740	u2_bcd2_str	asm/45B8
+17841	45B1_sub_45b1.asm	core/state.h	764	u2_bcd2_str	asm/45B8
 17841	45B1_sub_45b1.asm	game/commands.c	69	(file)	asm/45B8
 17841	45B1_sub_45b1.asm	game/commands.c	516	cmd_N	asm/45B8
 17882	45DA_sub_45da.asm	game/status.c	258	u2_status_draw_full	asm/45DA

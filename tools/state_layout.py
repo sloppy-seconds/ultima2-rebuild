@@ -23,7 +23,7 @@ WHAT IT PROVES, and every one of these caught something on the first run:
 WHAT IT REPORTS AND DOES NOT YET FAIL. The header claims every named field is pinned by a
 `_Static_assert`; 18 named fields are not (`sector_x`, `stat_agi`, `space_ship_x`, ...). The
 `asserted` column says so per row, and `--verify` ratchets: it fails if the count rises above
-`--max-unasserted`, so the number can only go down. Adding the missing asserts is engine source
+`--max-unasserted`, which is now 0 — every named field is pinned, and it can only stay that way.
 and its own commit, not this tool's.
 
 USAGE
@@ -64,7 +64,11 @@ FIELD_RE = re.compile(
 # Anything that looks like a declaration but is not one FIELD_RE accepts. Deliberately loose:
 # a false positive here is a loud failure we want, a false negative is the silent kind.
 FIELDISH_RE = re.compile(r"^\s*(?:/\*[^*]*\*/\s*)?uint(8|16)_t\s+[A-Za-z0-9_]+")
-ASSERT_RE = re.compile(r"_Static_assert\(U2_OFF\(([A-Za-z0-9_]+)\)\s*==\s*(0x[0-9A-Fa-f]+)")
+# Not anchored to `_Static_assert(` on purpose: the compound form
+# `_Static_assert(U2_OFF(a) == 0x272 && U2_OFF(b) == 0x372, ...)` pins two fields on one line, and
+# an anchored pattern counted only the first — which reported stage_b as unasserted while the header
+# asserted it. A parser that silently under-counts is the defect this tool exists to prevent.
+ASSERT_RE = re.compile(r"U2_OFF\(([A-Za-z0-9_]+)\)\s*==\s*(0x[0-9A-Fa-f]+)")
 SIZEOF_RE = re.compile(r"_Static_assert\(sizeof\(u2_state\)\s*==\s*(0x[0-9A-Fa-f]+)")
 ASM_CITE_RE = re.compile(r"asm/([0-9A-Fa-f]{4})")
 
@@ -255,7 +259,7 @@ def main() -> int:
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--check-fresh", action="store_true")
     ap.add_argument("--selftest", action="store_true", help="run the controls and exit")
-    ap.add_argument("--max-unasserted", type=int, default=18,
+    ap.add_argument("--max-unasserted", type=int, default=0,
                     help="ratchet: fail above this many named fields without a U2_OFF assert")
     args = ap.parse_args()
 

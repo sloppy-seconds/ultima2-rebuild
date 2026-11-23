@@ -732,6 +732,30 @@ _Static_assert(U2_OFF(stage_b) + sizeof(((u2_state *)0)->stage_b) == 0x472,
                "stage_b must end where map_base begins");
 _Static_assert(U2_OFF(left_margin)== 0x54F, "left_margin moved");
 
+/* The remaining named fields the mirror's own ratchet reported unasserted (#33). Every one of
+ * these offsets is derived from this struct, so each line is a tautology today — that is the
+ * point. They exist so a future reorder, a inserted field, or a padding change fails the build
+ * instead of silently shifting what the engine writes into a save record. `stat_cha` is the one
+ * with independent evidence: DS:4E is proven from asm/20AB, so if this line ever fires, the
+ * mirror and the binary have parted company. */
+_Static_assert(U2_OFF(sector_x)       == 0x000, "sector_x moved");
+_Static_assert(U2_OFF(sector_y)       == 0x001, "sector_y moved");
+_Static_assert(U2_OFF(site_floor)     == 0x025, "site_floor moved");
+_Static_assert(U2_OFF(stat_agi)       == 0x04C, "stat_agi moved");
+_Static_assert(U2_OFF(stat_sta)       == 0x04D, "stat_sta moved");
+_Static_assert(U2_OFF(stat_cha)       == 0x04E, "stat_cha moved; DS:4E is proven from asm/20AB");
+_Static_assert(U2_OFF(stat_wis)       == 0x04F, "stat_wis moved");
+_Static_assert(U2_OFF(unk_52)         == 0x052, "unk_52 moved");
+_Static_assert(U2_OFF(food_hi)        == 0x054, "food_hi moved");
+_Static_assert(U2_OFF(food_lo)        == 0x055, "food_lo moved");
+_Static_assert(U2_OFF(exp_hi)         == 0x057, "exp_hi moved");
+_Static_assert(U2_OFF(gold_hi)        == 0x059, "gold_hi moved");
+_Static_assert(U2_OFF(blessing)       == 0x06C, "blessing moved");
+_Static_assert(U2_OFF(gate_index)     == 0x06E, "gate_index moved");
+_Static_assert(U2_OFF(gate_countdown) == 0x06F, "gate_countdown moved");
+_Static_assert(U2_OFF(space_ship_x)   == 0x47B, "space_ship_x moved");
+_Static_assert(U2_OFF(space_ship_y)   == 0x47C, "space_ship_y moved");
+
 /* Packed-decimal decode: a BCD pair is stored hundreds byte first
  * (0x99 0x97 == 9997), per captures/README.md and the display sites.
  * There is no encoder on purpose — see the note in core/state.c. */
