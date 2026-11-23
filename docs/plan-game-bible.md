@@ -396,6 +396,22 @@ per-file properties, and that is the only way both can hold when three generator
 directory. A second extractor that re-emitted another tool's output was rejected: it is a copy
 with extra steps, and it drops the grade the originating tool already carries.
 
+**Spike status, 2026-11-23 (#28, deterministic half).** The first three facts live in
+`asm/20AB_bcd_price_from_stats.asm` and extract to `disasm/facts/asm.tsv`: charisma's offset
+(observed), what the horse price scales on (inferred), and how the stat bytes are used at that
+site (inferred). Writing them settled two things.
+
+* **No `daa`/`das` site touches a stat byte.** `tools/bcd_census.py` finds 72 decimal-adjust sites
+  and none of them is a stat, so "stats are packed decimal" is a save-format and display
+  convention, not something the engine computes with — `asm/20AB` adds `DS:50` and `DS:4E` with a
+  plain `adc` and takes the bit length of the sum. That is why `bcd_census.py --facts` is not
+  built: for this page it would emit nothing, and machinery without a fact behind it is the thing
+  this plan keeps refusing. It stays deferred until a page about gold, food or exp needs it.
+* **The one-line rule bit immediately.** The first draft wrapped the fact lines across lines and
+  `--verify` went red on all three — a wrapped line is a truncated statement and a wrong field
+  count. That was the gate catching a real mistake on real input, two commits after it shipped
+  with zero facts and twelve controls.
+
 **Build order.** (1) schema, extractor and `--verify`, with controls that go red on a malformed
 fact line and on a missing evidence file — committed with **zero facts in it**, because the thing
 that can fail comes before the thing that fills it; (2) retrofit `# fact:` lines in the

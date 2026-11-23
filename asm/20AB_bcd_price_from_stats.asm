@@ -203,6 +203,10 @@
 #     assembler re-encodes those movs differently, so the listing stores the original
 #     machine words and the mnemonics are our reading. check_func.py proves the bytes
 #     round-trip, not the disassembly.
+# fact: stat.charisma.at-ds-4e | identity | observed | state:stat_cha,asm:20ab | Charisma is the byte at DS:4E: this routine adds it to intelligence to scale a quoted price, and a character whose DS:4E held 0x20 printed CHARISMA-20.
+# fact: price.scales-on-int-plus-cha | relation | inferred | asm:20ab,state:stat_int,state:stat_cha | The price derived here scales on the bit length of intelligence plus charisma, so it moves with the two together rather than with either alone.
+# fact: stats-used-as-binary-here | arithmetic | inferred | state:stat_int,state:stat_cha,asm:20ab | This routine adds the two stat bytes with a plain `adc` and takes the bit length of the sum, so at this site the stat bytes are read as binary integers.
+# bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 # bulk wave: L_<addr> labels kept as cross-reference anchors (CP3)
 sub_20ab:
 L_0022ab:
