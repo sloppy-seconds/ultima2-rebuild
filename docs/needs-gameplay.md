@@ -601,6 +601,32 @@ creatures from their drawn outline.
 **Blocks:** any dungeon bestiary, T9, the dungeon renderer.
 
 
+## G95 — the fifteen routines no capture has ever reached `[ ]`
+
+**Question:** a body says control can reach these fifteen routines and no harvest in the corpus
+has ever been there. What do they do, and does the engine implement them correctly?
+
+**Where this came from:** `tools/index_xref.py --reconcile` split the 884 edges a body claims but
+no harvest proved. 857 of them point at a callee that *is* proven, just from another caller, which
+is breadth rather than a gap. Fifteen point at a callee nobody ever reached. The list is generated
+(`awk -F'\t' '$3=="callee-never-reached"' disasm/index/xref-gaps.tsv`), so it is not maintained by
+hand and will shrink on its own as captures land.
+
+The three worth naming, because they are one story each: `1B6B_clue_pool` is targeted by three
+different callers and no capture ever reached it, which reads as nobody buying a clue; `3F5D_steal_attempt`
+reaches `4188_street_cleric`, so stealing from a cleric has never been tried; `3C2E_cmd_O` reaches
+two subroutines that no `O` press has ever touched.
+
+**Action:** seed a character with gold and stand at a clue seller, then a cleric, then press `O`
+in the state its menu needs. `tools/u2_edit.py setpos` plus `tools/spice86_type.py` is the whole
+rig; `docs/needs-gameplay.md` standing hazards still apply.
+**Why the agent can do it:** every one of the fifteen is reachable by seeding state, none needs a
+human hand on a keyboard.
+**Needs owner:** no.
+**Blocks:** any claim that the engine implements these correctly — they are `inferred` until a
+frame exists, and `cmd_handlers.py` already shows all 26 command letters exercised, so this is not
+the same queue as the UNPROVEN handler markers.
+
 ## Session planning — group by setup, not by question
 
 One launch can close several items. Cheapest order:
