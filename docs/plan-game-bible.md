@@ -412,6 +412,26 @@ site (inferred). Writing them settled two things.
   count. That was the gate catching a real mistake on real input, two commits after it shipped
   with zero facts and twelve controls.
 
+**Pair status, 2026-11-23 (#29, #30).** The writer and the critic are committed
+project-scoped subagents (`.pi/agents/bible-writer.md`, `.pi/agents/bible-critic.md`) running
+`local/qwen3.8-flash-next` and `local/deepseek-flash` — different families, as ruled — and both
+definitions carry **no tools, no project context, no skills**, so closed-book is the config rather
+than a request. `tools/bible.py` is everything that is not a model: page selection, the exact task
+message each model sees, the vacuity pre-check, the verdict schema, the hashes, and `--verify`.
+Three things came out of building it:
+
+* **The style block is injected, not copied into the agent definition.** Two hand-maintained copies
+  of the judge's standard is the exact defect this plan keeps naming, so `tools/prompts/` is the
+  single source and the orchestrator pastes it into the task message.
+* **The hashes are load-bearing, not bookkeeping.** `pair.json` records both model ids and both
+  prompt hashes; every verdict row carries the prose hash and the critic prompt hash; `--verify`
+  goes red when prose moves under a verdict or a prompt changes under a verdict. Editing a prompt
+  invalidates every page loudly, which is what turns "the judge was seen red" into an artefact.
+* **The controls ran on the first attempt and all three failed on their intended question** — the
+  false sentence on `supported`, the grade-laundered one on `grade_survived`, the true-but-
+  unsourced one on `supported`. The critic also caught a real grade-laundering defect in the
+  writer's first draft, which is the only proof that matters at this size.
+
 **Build order.** (1) schema, extractor and `--verify`, with controls that go red on a malformed
 fact line and on a missing evidence file — committed with **zero facts in it**, because the thing
 that can fail comes before the thing that fills it; (2) retrofit `# fact:` lines in the
