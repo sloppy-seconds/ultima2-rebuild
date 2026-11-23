@@ -57,12 +57,41 @@ by hand in about eleven places.
 
 **Ruled 2026-11-21.** Offsets are generated from `state.h`, never copied from it. A test names
 intent — "the player is in sector 32 with the ankh" — and does not write `p[0x49 - 0x36]`.
+**Not yet true in the code, as of 2026-11-23:** nothing parses `state.h`, and
+`tools/u2_edit.py` hand-copies the base and the
+field table from it. The parser this ruling assumes is a deliverable of
+`docs/plan-code-index.md` § 9; until it lands, do not cite this line as settled.
 
 ## DS mirror
 
 `engine/src/core/state.h`: the C struct that *is* the original's DS segment, every named field
 pinned by `_Static_assert` so a layout drift is a build failure. It is also the save format.
 It is the one offset table, and the authority any other offset source must derive from.
+**Ruled 2026-11-23:** the mirror is authority for what a byte is *called*; the asm tree is
+authority for what *touches* it. A generated footprint index may read the mirror's names and
+must never invent one.
+
+## Footprint
+
+The set of memory bytes an `asm/` routine touches, with the site that touches each. A static map
+of ownership, not of values: it answers *who writes this byte*, never *what value is in it*.
+_Avoid_: dataflow (it promises a value-flow analysis this is not), xref, cross-reference.
+
+## Coverage grade
+
+How far a given `asm/` region has been read, derived from its own header rather than from the
+`confidence:` stamp, which a bulk wave assigned. **segmented** — boundaries proven, bytes exact,
+body unread. **decoded** — someone has read the body and recorded what it does. **observed** —
+its behaviour has been seen running in a named capture.
+_Avoid_: "understood"; "confidence" used as a synonym for grade.
+
+## Behavioural core
+
+The engine code that models what the original does, as opposed to code that only makes it run
+here. It is the code that owes an `asm/` citation, and the exemption is the point: renderer,
+platform, debug and generated-header code citing nothing is correct, not a gap. The boundary is
+owned by the generator's exemption list, not by prose.
+_Avoid_: "uncited code", "code with no evidence".
 
 ## Art precedence
 

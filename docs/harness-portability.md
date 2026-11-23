@@ -189,6 +189,28 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **2026-11-23 -- a confidence stamp assigned in bulk is not a measure of understanding, and a
+  coverage metric built on it inherits the lie.** This project's headline ("87% of the binary is
+  not understood") turned out to be a count of a field a bulk reassembly pass had written as a
+  default, not a finding anyone had made. The number was reproducible and meaningless. A harness
+  that reports decode progress must derive it from fields that only change when somebody reads a
+  body -- a recorded evidence line, a correction marker, a named entry -- and must print the
+  predicates beside the counts so a figure cannot be quoted away from the rule that produced it.
+  The stamp stays useful as an input column; it is only forbidden as the headline.
+  → Tier 1, evidence discipline: a progress metric is a claim, so it is derived from evidence-
+  bearing fields and shipped with its own predicates.
+* **2026-11-23 -- a byte-ownership index must resolve segment registers per routine, and must
+  never assume the data segment.** A footprint map built only over the default data segment
+  answers "who writes this byte" and silently implies nothing reads the tables addressed through
+  the code segment, which is the same plausible-wrong-answer shape as a mis-parsed operand. The
+  hazard is that the extra segment is not constant across a real-mode binary: it can hold the
+  data segment in one routine, the code segment in another, and video memory in a third, so a
+  write through it means something different in each place and one of those is a hardware seam
+  rather than data. Resolve it per routine from that routine's own setup, keep an unresolved site
+  as a loud candidate rather than a silent omission, and treat a write through the code segment as
+  its own class with an asserted count, because in a hand-written binary a new one is news.
+  → Tier 2, static analysis: segment resolution is a precondition of any data-ownership index, and
+  an index that assumes a segment must say which one it assumed.
 * **2026-11-23 -- a capture-hungry agent builds an observation-shaped reconstruction, not a
   code-shaped one, and the harness should refuse the substitution by default.** Across one
   session this project was asked for a capture or an owner observation four times and answered
