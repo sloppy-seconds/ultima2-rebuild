@@ -26,6 +26,24 @@ printf 'engine play API test\n'
 DATA=""
 [ -d ../original ] && DATA="--data-dir ../original"
 
+# Some legs assert on what the world does, and there is no world without the gitignored content
+# files. Before this, `DATA` was set conditionally and the world legs then failed in CI with
+# symptoms that read as engine defects -- AP9 "no CMD: prompt", AP10 "dead=False", AP12 "rolls 0
+# cd 0" -- for three days while the code they named was never wrong. The precondition is the data
+# dir itself, not CI: gate on the thing that is actually missing, and the same rule holds locally,
+# where content is expected and its absence is a real problem worth a loud failure elsewhere.
+HAVE_CONTENT=0
+[ -n "$DATA" ] && HAVE_CONTENT=1
+
+skip() { printf '  SKIP  %s\n' "$1"; }
+
+# need_content LABEL -> 0 if the world can run, else prints a SKIP and returns 1.
+need_content() {
+    [ "$HAVE_CONTENT" = 1 ] && return 0
+    skip "$1: needs world content (original/ is gitignored), so this leg cannot run here"
+    return 1
+}
+
 # One session, raw stdout captured, so a leg can assert on the bytes and not only on
 # what the client chose to raise on.
 session() { # session NAME <<< commands-on-stdin
@@ -297,6 +315,7 @@ esac
 # keys. `CMD:` is only ever emitted by the overworld, so it is the thing that actually proves
 # the handoff happened. (Measured while writing this leg: the sector check passed with the
 # handoff disabled, which is why it is not the assertion.)
+if need_content "AP9"; then
 if grep -q 'CMD:' "$WORK/ap8.out"; then
     ok "AP9: create hands off into the world -- the overworld's CMD: prompt was emitted"
 else
@@ -310,11 +329,13 @@ printf '{"cmd":"quit"}\n' | session ap9b
 M0=$(field "$WORK/ap9b.out" ready mode)
 [ "$M0" = "title" ] && ok "AP9 control: with no character the mode is title, so the field can go red" \
                     || bad "AP9 control: mode with no character is '$M0', want title"
+fi
 
 # --- AP10: the death signal, in both directions ----------------------------------
 # asm/0C62_death.asm zeroes DS:51..59 and prints "<name> IS DEAD!"; the capture named in that
 # header shows all four ledger fields at 0000. So the signature is the whole ledger, not HP
 # alone, and a predicate that watched only HP would call a wounded character a corpse.
+if need_content "AP10"; then
 python3 -c '
 import sys
 b = bytearray(0x280)
@@ -334,6 +355,7 @@ fi
 grep -q '"dead":false' "$WORK/ap8.out" \
     && ok "AP10 control: a living character reads dead=false, so the predicate is not always true" \
     || bad "AP10 control: a fresh character was reported dead"
+fi
 
 # --- AP11: every win-condition predicate in docs/goal-spec.md § 1 is readable ------
 # § 7.3 item 1 existed because not one dependency-graph predicate could be read through
@@ -378,6 +400,7 @@ esac
 # RNG counter, and only a completed world turn advances it. The countdown is the second
 # half -- it proves the turn body reached the gate tick, and its value also pins the
 # cold-load wrap (256 turns to the first door, so five turns reads 251, not 3).
+if need_content "AP12"; then
 printf '{"cmd":"create","name":"T","sex":"M","race":1,"class":1,"stats":[20,20,10,10,10,20]}\n' > "$WORK/ap12.keys"
 for i in $(seq 1 12); do printf '{"cmd":"key","key":"0xf1"}\n' >> "$WORK/ap12.keys"; done
 printf '{"cmd":"quit"}\n' >> "$WORK/ap12.keys"
@@ -414,6 +437,7 @@ for l in open(sys.argv[1]):
 ' "$WORK/ap12b.out" \
   && ok "AP12 control: with no keys nothing turned, so the rolls test can go red" \
   || bad "AP12 control: a keyless session advanced the rng"
+fi
 
 # And the door itself must be readable, not just implied. At load the original stamps
 # nothing, so `present` is false here and that is the correct answer, not a gap.
