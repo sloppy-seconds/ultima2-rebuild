@@ -159,6 +159,13 @@ run "index_facts selftest" tools/index_facts.py -- python3 tools/index_facts.py 
 run "index_facts verify" asm disasm/census -- python3 tools/index_facts.py --verify
 run "index_facts fresh" disasm/facts/asm.tsv -- python3 tools/index_facts.py --check-fresh
 
+# The bible loop (docs/plan-game-bible.md § 4-5). No model runs in CI (ADR 0003), so these assert
+# the committed artefacts instead: every sentence has a verdict, no prose moved under a verdict,
+# the recorded pair still matches the prompt files, and the three judge controls are still red. A
+# prompt or model-id edit therefore turns this red until every page is re-judged -- on purpose.
+run "bible selftest" tools/bible.py -- python3 tools/bible.py --selftest
+run "bible verify" disasm/bible -- python3 tools/bible.py --verify
+
 run "cmd_marker_gate selftest" tools/cmd_marker_gate.py -- python3 tools/cmd_marker_gate.py --selftest
 run "cmd_marker_gate" engine/src docs/phase4-state.md -- python3 tools/cmd_marker_gate.py
 # Which SDL a build links is decided by this probe, and a wrong verdict is a build
