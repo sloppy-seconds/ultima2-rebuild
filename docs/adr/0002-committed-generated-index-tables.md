@@ -1,10 +1,20 @@
-# Generated index tables are committed, and the generator is their only writer
+# Generated index tables are committed, and each file has exactly one writer
 
 The code index writes generated tables under `disasm/index/`. We ruled they are **committed**,
-mirroring `disasm/census/`, and that **the generator is the only writer**, enforced by the
-existing freshness gate rather than by convention. Committed so a change to derived facts shows up
-as a reviewable diff; sole-writer because the moment a human can type a conclusion into a
-generated table it becomes a second hand-maintained copy and stops being a view.
+mirroring `disasm/census/`, and that **each file has exactly one writer** — the generator that
+produced it, enforced by the existing freshness gate rather than by convention. Committed so a
+change to derived facts shows up as a reviewable diff; sole-writer because the moment a human can
+type a conclusion into a generated table it becomes a second hand-maintained copy and stops being
+a view.
+
+**Amended 2026-11-23, the same day, for scope.** The original wording read "the generator is the
+only writer" of a directory, which the game bible's fact store immediately broke: behavioural
+rules come out of `asm/` headers, stat-encoding facts come out of `tools/bcd_census.py`, and
+place facts come out of `tools/census.py`, and all three belong in `disasm/facts/`. The rule is
+therefore per file, not per directory — `asm.tsv` has one writer, `bcd.tsv` has one writer, and
+so on — because sole-writer and freshness are only meaningful as per-file properties. The
+alternative, one extractor re-emitting another tool's output so a directory has a single author,
+is a copy with extra steps that also drops the grade the originating tool already carried.
 
 ## Considered Options
 

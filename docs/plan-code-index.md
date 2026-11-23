@@ -112,6 +112,21 @@ One row per `(segment, offset, asm_file, access)` where access is
 directly jumpable. Queries: `lookup footprint 0x4c7`, `lookup footprint DS:4C7` and
 `lookup footprint sweep_counter` all answer "who touches the sweep byte" in one command.
 
+The `access` column comes from a **closed table of about 25 mnemonic rows**, hand-curated inside
+the generator with a citation per row, exactly like the span allowlist: it is evidence, not
+generated data. Ruled 2026-11-23. `mov`/`movb`/`movw` write the destination and read the source;
+`cmp`/`cmpb`/`cmpw` and `test` read both and write neither; `add`, `sub`, `adc`, `sbb`, `and`,
+`or`, `xor` and their `b`/`w` variants are read-modify-write on the destination; `inc`/`dec` and
+their width variants are read-modify-write; `lea` reads; `xchg` is read-modify-write on both;
+`jmp` and `call` targets are control transfers and not data accesses, so they are excluded; and
+`.byte` is forced-keep opacity. AT&T puts the destination last. **An unrecognised mnemonic with a
+memory operand is a hard failure, not a skip**, because a silent skip is how an index starts
+quietly lying about what it covers. The operand splitter is imported from
+`tools/dialect_masm.py`'s `split_operands()`, which already handles quotes and paren depth; its
+`att_operand()` returns `None` rather than guessing, which is the failure shape this index wants
+as well. One splitter in the repo, and the dependency direction is harmless: the index importing
+a parser does not make the assembler's correctness depend on the index.
+
 Five hard cases, and they are the design, not the footnotes:
 
 1. **Dynamic offsets.** `asm/6B3D` touches the star tables as `0x4cd(%si)`, so the literal
@@ -272,17 +287,24 @@ counted, so:
 
 ## 6. Sequencing inside this epic
 
-1. The `# calls:` gate (§ 3.4) — its own commit, and it can go red today.
-2. `coverage` — nearly free, delivers the headline number, and proves the gate pattern before
-   anything hard is attempted.
-3. `footprint` + `lookup` — highest value, carries the hard cases, and builds the first real
-   `state.h` parser (§ 9).
-4. `engine-map` — cheap once the citation gate has a `--c` mode.
-5. `xref` — its own epic, not this one's item 4.
+1. The `# calls:` gate (§ 3.4) — **shipped 2026-11-23** as `tools/calls_gate.py`.
+2. **The `state.h` parser, as its own deliverable, landing before `coverage`.** Ruled 2026-11-23:
+   `coverage`'s most actionable output is the unnamed-offset queue, and that queue is the
+   parser's offset list minus the named ones. Shipping `coverage` without it would ship the boring
+   half first and advertise a queue that cannot exist yet. The parser is small, `footprint` needs
+   it anyway, and it is the only thing that makes `tools/u2_edit.py`'s hand-copied offsets
+   fixable (`docs/outstanding.md`). Filed as its own issue for the same reason.
+3. `coverage` — nearly free once the parser exists, delivers the headline number, and proves the
+   gate pattern before anything hard is attempted. **Its rollup column defers to `engine-map`**
+   and says so in the table header rather than shipping a stub column.
+4. `footprint` + `lookup` — highest value, carries the hard cases, and consumes the parser that
+   item 2 built rather than growing its own.
+5. `engine-map` — cheap once the citation gate has a `--c` mode.
+6. `xref` — its own epic, not this one's item 4.
 
 This file stays a plan and `docs/outstanding.md` stays the only queue. One GitHub issue per
-deliverable (footprint, coverage, engine-map, the `# calls:` gate, the deferred `xref` epic),
-each linking here and never restating it.
+deliverable (footprint, coverage, the `state.h` parser, engine-map, the `# calls:` gate, the
+deferred `xref` epic), each linking here and never restating it.
 
 ---
 

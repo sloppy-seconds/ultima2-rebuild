@@ -119,6 +119,14 @@ continuation lines, and a malformed line is a hard failure rather than a skipped
 these lines is legal under CP0: the body guard md5s only non-`#` lines and the assembler ignores
 comments. Headers are retrofitted only for pages being drafted, starting with statistics.
 
+**Evidence is implicit, and that is the point.** Ruled 2026-11-23. A `# fact:` line's evidence
+*is* the header it sits in, so the line never repeats its own filename, and staleness hashes the
+containing file. A fact whose evidence is a tool rather than the routine it describes — the stat
+encoding comes from `tools/bcd_census.py`, the place names from `tools/census.py` — carries an
+optional sixth field naming the tool, and staleness hashes the tool as well. Making the field
+mandatory would have every line in the tree restate where it lives, and a required field that is
+always derivable is a field that drifts.
+
 ---
 
 ## 4. The writer: closed-book
@@ -323,7 +331,7 @@ Reviewed 2026-11-23. The draft's D-numbers are kept so nothing is lost; reversal
 
 | # | decision | ruling |
 | --- | --- | --- |
-| D1 | where facts live | generated `disasm/facts/`, committed, YAML. Behavioural rules are authored as `# fact:` lines in `asm/` headers and extracted; the extractor is the sole writer. |
+| D1 | where facts live | generated `disasm/facts/`, committed, YAML. Behavioural rules are authored as `# fact:` lines in `asm/` headers and extracted; **one writer per file**, so the extractor owns `asm.tsv` and each tool that generates facts owns its own file (§ 12). |
 | D2 | anchor syntax | the two-field YAML (`text` + `facts[]`), one entry per sentence. An unanchored sentence is a compile error. |
 | D3 | writer and judge families | different families, mandatory, both ids recorded per page; the pair is chosen by whoever runs the build and the controls must have been run against the pair in use. |
 | D4 | a sentence that fails | dropped, and listed on the page under "could not be supported". A page that silently dropped three sentences looks more certain than the truth. |
@@ -363,6 +371,14 @@ Reviewed 2026-11-23. The draft's D-numbers are kept so nothing is lost; reversal
 an unversioned prompt is a second hand-maintained copy of the judge's standard. Tools follow the
 index epic's naming: `tools/index_facts.py`, `tools/bible_draft.py`, `tools/bible_judge.py`,
 `tools/bible_render.py`.
+
+**One writer per file, not one writer per directory.** Ruled 2026-11-23, and ADR 0002 carries it.
+The header extractor writes `disasm/facts/asm.tsv`. A tool-derived fact is written by the tool
+that knows its own evidence, so `tools/bcd_census.py` and `tools/census.py` each grow a `--facts`
+mode writing `disasm/facts/bcd.tsv` and `disasm/facts/census.tsv`. Sole-writer and freshness are
+per-file properties, and that is the only way both can hold when three generators feed one
+directory. A second extractor that re-emitted another tool's output was rejected: it is a copy
+with extra steps, and it drops the grade the originating tool already carries.
 
 **Build order.** (1) schema, extractor and `--verify`, with controls that go red on a malformed
 fact line and on a missing evidence file — committed with **zero facts in it**, because the thing
