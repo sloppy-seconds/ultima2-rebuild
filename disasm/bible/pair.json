@@ -1,0 +1,6 @@
+{
+  "critic_model": "local/deepseek-flash",
+  "critic_prompt_sha": "109df50d5790",
+  "writer_model": "local/qwen3.8-flash-next",
+  "writer_prompt_sha": "18402f4b1839"
+}

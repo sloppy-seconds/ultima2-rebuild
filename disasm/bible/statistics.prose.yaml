@@ -1,0 +1,6 @@
+- text: "Charisma is the byte at DS:4E."
+  facts: [stat.charisma.at-ds-4e]
+- text: "At this site, the stat bytes are read as binary integers."
+  facts: [stats-used-as-binary-here]
+- text: "The price derived here appears to scale on the bit length of intelligence plus charisma."
+  facts: [price.scales-on-int-plus-cha]

@@ -1,0 +1,4 @@
+sentence_id	resolves	supported	grade_survived	non_vacuous	reason	judge_model	prompt_sha	prose_sha
+s1	pass	pass	pass	pass		local/deepseek-flash	109df50d5790	152c3aba6af3
+s2	pass	pass	fail	pass	The fact stats-used-as-binary-here is graded inferred, but the sentence asserts flatly "the stat bytes are read as binary integers" with no hedge such as "appears" or "on the evidence"; the fact itself only states that at this site the bytes are read as binary integers on inference.	local/deepseek-flash	109df50d5790	152c3aba6af3
+s3	pass	pass	pass	pass		local/deepseek-flash	109df50d5790	152c3aba6af3
