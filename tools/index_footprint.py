@@ -21,10 +21,10 @@ filled only from the allowlist below, one citation per entry. Everything else is
 and a query that could land inside an unknown span returns that base as a loud candidate. A silent
 empty answer is the failure this file is built to avoid.
 
-SEGMENTS ARE NOT ONE THING. ES is set by whoever uses it: `asm/154E` makes es=ds, `asm/155D` makes
-ES=CS, `asm/310B_cmd_C` makes ES=0xB800/0xBA00, video memory. Each `es:` site is resolved from its
-own routine's setup; video goes to the seams column, not the data rows; a routine using `es:` with
-no resolvable setup fails --verify. A `cs:` *write* is a selfmod class with an asserted count,
+SEGMENTS ARE NOT ONE THING. ES is resolved per routine from that routine's own setup, and where no
+routine in the graph sets it at all the index records a documented calling convention rather than
+failing: see ES_CONVENTION below, which carries a reason per entry. Video-resident ES goes to the
+seams column, not the data rows. A `cs:` *write* is a selfmod class with an asserted count,
 because a new one in this binary would be news.
 
 THE PARSER ACCOUNTS FOR ITSELF. Every non-comment line is parsed, or counted as data, or counted as
@@ -333,6 +333,25 @@ def table(rows: list[dict]) -> str:
                                              int(r["line"])))) + "\n"
 
 
+# ES AS A CALLING CONVENTION, ruled 2026-11-23. `--es-sources` measured 61 files that use `es:` with
+# no in-file setup, then asked the graph who sets it for them: not one of their callers sets ES
+# either. No amount of traversal can resolve a value established above the entry point, so the index
+# records it as a convention instead of failing forever. The reason is part of the data, not a comment
+# beside it: an exemption list without reasons is how a gate quietly stops meaning anything, and
+# --verify fails if an entry here stops matching a real unresolved site.
+ES_CONVENTION: dict[str, str] = {
+    "1564_sub_1564.asm": "reads a byte through ES:DI (`mov %es:(%di),%al`); no in-file setup and no "
+                         "caller sets ES, so ES arrives set from above the entry point",
+    "1573_sub_1573.asm": "reads a byte through ES:DI (`mov %es:(%di),%al`); same shape as 1564, "
+                         "reached from the same dispatch",
+    "6144_dungeon_shape_dispatch.asm": "port input into ES:DI (`insb (%dx),%es:(%di)`); the string "
+                                       "operand's segment is set by the caller's caller, not by any "
+                                       "routine in the graph",
+    "7030_space_collision.asm": "scans ES (`scas %es:(%di),%ax`); same convention, and the only es: "
+                                "string operand outside the two 15xx readers",
+}
+
+
 def verify() -> int:
     rows, errors, tot = build()
     for e in errors:
@@ -340,14 +359,25 @@ def verify() -> int:
     if tot["unparsed"]:
         print(f"  FAIL  {tot['unparsed']} instruction-shaped line(s) went unparsed -- the parser "
               "must account for every line")
-    if tot["es_unresolved"]:
-        print(f"  FAIL  {len(tot['es_unresolved'])} file(s) use es: with no resolvable setup: "
-              f"{', '.join(tot['es_unresolved'][:6])}")
+    unexempt = [f for f in tot["es_unresolved"] if f not in ES_CONVENTION]
+    stale = [f for f in ES_CONVENTION if f not in tot["es_unresolved"]]
+    if unexempt:
+        print(f"  FAIL  {len(unexempt)} file(s) use es: with no resolvable setup and no recorded "
+              f"convention: {', '.join(unexempt[:6])}")
+    if stale:
+        # An exemption that no longer exempts anything is a lie with a reason attached, and the
+        # reason is exactly what makes people trust it. Name it and fail.
+        print(f"  FAIL  {len(stale)} ES_CONVENTION entr(ies) no longer match an unresolved site: "
+              f"{', '.join(stale[:6])} -- delete the entry, do not leave it standing")
+    for f in tot["es_unresolved"]:
+        if f in ES_CONVENTION:
+            print(f"  NOTE  {f}: es: with no in-file setup, ruled a calling convention -- "
+                  f"{ES_CONVENTION[f]}")
     print(f"index_footprint: {len(rows)} rows from {tot['files']} files; "
           f"parsed {tot['parsed']}, data {tot['data']}, labels {tot['labels']}, "
           f"forced-keep {tot['forced_keep_lines']}, unparsed {tot['unparsed']}")
     print(f"index_footprint: cs writes (selfmod) = {len(tot['selfmod'])}")
-    ok = not errors and not tot["unparsed"] and not tot["es_unresolved"]
+    ok = not errors and not tot["unparsed"] and not unexempt and not stale
     print("index_footprint: " + ("ok" if ok else "FAIL"))
     return 0 if ok else 1
 
@@ -391,6 +421,8 @@ def lookup(query: str) -> int:
 
 
 def _selftest() -> int:
+    global ASM  # the controls below retarget the module-level ASM dir; without this, assigning it
+                 # anywhere in this function makes every read of it local.
     ok = True
     tmp = pathlib.Path("/var/tmp/u2footprint-selftest")
     tmp.mkdir(parents=True, exist_ok=True)
@@ -433,6 +465,38 @@ def _selftest() -> int:
          False, lambda r: not r)
     case("es: with no setup is a failure", "# s\nsub_0001:\n        mov    %al,%es:0x6c\n        ret\n",
          True)
+
+    # The mirror control, because an exemption tested only in the failing direction is a permission
+    # nobody can trust: a file named in ES_CONVENTION must let verify() pass, and an entry that stops
+    # matching must make it fail. Both halves are checked here rather than asserted in a comment.
+    for f in tmp.glob("*.asm"):
+        f.unlink()
+    # Every file named in ES_CONVENTION has to be present, or the stale rule fires -- correctly -- on
+    # the three that are missing, and the control would be testing the wrong thing while passing.
+    for name in ES_CONVENTION:
+        (tmp / name).write_text("# s\nsub_x:\n        mov    %es:(%di),%al\n        ret\n",
+                                encoding="utf-8")
+    keep = ASM
+    try:
+        ASM = tmp
+        rc = verify()
+        if rc != 0:
+            ok = False
+            print("FAIL  control a recorded ES convention passes verify: rc=" + str(rc))
+        else:
+            print("ok    control a recorded ES convention passes verify")
+        # And the stale-entry half: leave the file with no `es:` at all, so the ONLY reason verify can
+        # go red is that the convention entry now matches nothing. Renaming it instead would have made
+        # it fail for the unexempted-site reason and proved nothing about the stale rule.
+        (tmp / "1564_sub_1564.asm").write_text(
+            "# s\nsub_x:\n        mov    %al,0x4e\n        ret\n", encoding="utf-8")
+        if verify() == 0:
+            ok = False
+            print("FAIL  control a stale ES convention entry was tolerated")
+        else:
+            print("ok    control a stale ES convention entry goes red")
+    finally:
+        ASM = keep
     case("es set to ds resolves", "# s\nsub_0001:\n        mov    %ds,%es\n        mov    %al,%es:0x6c\n"
          "        ret\n", False, lambda r: any(x["segment"] == "es" for x in r))
     case("video es goes to its own segment",

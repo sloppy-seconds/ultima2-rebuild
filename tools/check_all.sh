@@ -164,6 +164,12 @@ run "index_facts fresh" disasm/facts/asm.tsv -- python3 tools/index_facts.py --c
 # whose ES is set by a caller, and all eight need a ruling before they can be closed. A gate that
 # is red on day one trains everyone to ignore it, so it goes in when it can be true.
 run "index_footprint selftest" tools/index_footprint.py -- python3 tools/index_footprint.py --selftest
+# Wired 2026-11-23, once the four `es:` sites were ruled rather than merely known. It had been left
+# unwired while red on day one, which trains everyone to ignore the gate; the ruling (ES is a calling
+# convention established above the entry point, recorded per file with its reason in ES_CONVENTION)
+# is what made it safe to turn on. The controls prove it can still go red: an unexempted `es:` site
+# fails, and so does a convention entry that no longer matches anything.
+run "index_footprint verify" tools/index_footprint.py -- python3 tools/index_footprint.py --verify
 run "index_footprint fresh" disasm/index/footprint.tsv -- python3 tools/index_footprint.py --check-fresh
 
 # The engine map (docs/plan-code-index.md § 3.2): which C implements which asm. The citation check
