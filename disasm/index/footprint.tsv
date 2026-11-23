@@ -357,8 +357,8 @@ ds	0	unknown	read-modify-write	7289_sub_7289.asm	20	yes
 ds	0	unknown	read	8CD0_sub_8cd0.asm	31	yes		
 ds	0	unknown	write	8CD0_sub_8cd0.asm	35	yes		
 ds	0	unknown	write	8CD0_sub_8cd0.asm	200	yes		
-ds	0	unknown	read-modify-write	8DCD_sub_8dcd.asm	24	yes		
-ds	0	unknown	read-modify-write	8DCD_sub_8dcd.asm	26	yes		
+ds	0	unknown	read-modify-write	8DCD_clock_tick_read.asm	28	yes		
+ds	0	unknown	read-modify-write	8DCD_clock_tick_read.asm	30	yes		
 ds	1		write	080D_sub_080d.asm	61	no		absolute operand, no base register
 ds	1		read-modify-write	0955_sub_0955.asm	9	no		absolute operand, no base register
 ds	1		read-modify-write	096C_sub_096c.asm	8	no		absolute operand, no base register
@@ -691,7 +691,7 @@ ds	31		write	3C2E_cmd_O.asm	75	no		absolute operand, no base register
 ds	31		read	3C2E_cmd_O.asm	107	no		absolute operand, no base register
 ds	31		read	3C2E_cmd_O.asm	142	no		absolute operand, no base register
 ds	31		write	3EA2_sub_3ea2.asm	8	no		absolute operand, no base register
-ds	31		read	3EAB_sub_3eab.asm	9	no		absolute operand, no base register
+ds	31		read	3EAB_ds76_index_test.asm	16	no		absolute operand, no base register
 ds	31		read	3EBB_sub_3ebb.asm	7	no		absolute operand, no base register
 ds	31		read	3ED4_ready_weapon_agility_gate.asm	48	no		absolute operand, no base register
 ds	31		read	3ED4_ready_weapon_agility_gate.asm	68	no		absolute operand, no base register
@@ -737,7 +737,7 @@ ds	32		read	3139_cast_spell_flow.asm	523	no		absolute operand, no base register
 ds	32		write	35F3_sub_35f3.asm	9	no		absolute operand, no base register
 ds	32		read	3611_monster_damage_apply.asm	29	no		absolute operand, no base register
 ds	32		write	4050_cmd_T.asm	135	no		absolute operand, no base register
-ds	32		read	4223_sub_4223.asm	9	no		absolute operand, no base register
+ds	32		read	4223_world_eq9_gate.asm	17	no		absolute operand, no base register
 ds	32		read-modify-write	72A0_sub_72a0.asm	139	no		absolute operand, no base register
 ds	33		write	0896_sub_0896.asm	9	no		absolute operand, no base register
 ds	33		read-modify-write	08D6_sub_08d6.asm	7	no		absolute operand, no base register
@@ -1083,7 +1083,7 @@ ds	74		read	113A_sub_113a.asm	7	no		absolute operand, no base register
 ds	74		read	15AC_sub_15ac.asm	9	no		absolute operand, no base register
 ds	74		read	15BA_sub_15ba.asm	10	no		absolute operand, no base register
 ds	74		read	15C8_sub_15c8.asm	9	no		absolute operand, no base register
-ds	74		read	15D6_sub_15d6.asm	9	no		absolute operand, no base register
+ds	74		read	15D6_ds4a_eq2_gate.asm	15	no		absolute operand, no base register
 ds	74		read	218B_sub_218b.asm	9	no		absolute operand, no base register
 ds	74		read	2199_creature_step_gate.asm	161	no		absolute operand, no base register
 ds	74		read	225A_sub_225a.asm	25	no		absolute operand, no base register
@@ -1298,7 +1298,7 @@ ds	109		read	3823_site_floor_down.asm	89	no		absolute operand, no base register
 ds	109		read	38B0_cmd_L.asm	203	no		absolute operand, no base register
 ds	109		read	38B0_cmd_L.asm	310	no		absolute operand, no base register
 ds	109		read	3DFA_offer_only_outdoors_earth.asm	45	no		absolute operand, no base register
-ds	109		read	4223_sub_4223.asm	13	no		absolute operand, no base register
+ds	109		read	4223_world_eq9_gate.asm	21	no		absolute operand, no base register
 ds	109		read	6999_space_status.asm	146	no		absolute operand, no base register
 ds	109		write	7030_space_collision.asm	163	no		absolute operand, no base register
 ds	109		write	7030_space_collision.asm	169	no		absolute operand, no base register

@@ -216,8 +216,8 @@ from_asm	to_asm	class	note
 1151_dungeon_turn.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 1151_dungeon_turn.asm	52F6_sub_52f6.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 1151_dungeon_turn.asm	5E83_sub_5e83.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
-12DB_dungeon_events.asm	15A9_sub_15a9.asm	callee-never-reached	no harvest ever reached the callee
-12DB_dungeon_events.asm	15D6_sub_15d6.asm	callee-never-reached	no harvest ever reached the callee
+12DB_dungeon_events.asm	15A9_stub_to_15d6.asm	callee-never-reached	no harvest ever reached the callee
+12DB_dungeon_events.asm	15D6_ds4a_eq2_gate.asm	callee-never-reached	no harvest ever reached the callee
 12DB_dungeon_events.asm	4C55_name_pool.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 12DB_dungeon_events.asm	5400_sub_5400.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 12DB_dungeon_events.asm	5E83_sub_5e83.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
@@ -231,14 +231,14 @@ from_asm	to_asm	class	note
 157B_sub_157b.asm	5400_sub_5400.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 157E_sub_157e.asm	16BD_barkeep_chatter_hints.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 159F_sub_159f.asm	17C5_sub_17c5.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
-15A9_sub_15a9.asm	17C5_sub_17c5.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
+15A9_stub_to_15d6.asm	17C5_sub_17c5.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 15B4_sub_15b4.asm	1D1D_shop_menus.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 15B7_sub_15b7.asm	1869_cleric_shrine.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 15BA_sub_15ba.asm	1B6B_clue_pool.asm	callee-never-reached	no harvest ever reached the callee
 15BA_sub_15ba.asm	2028_read_decimal_digit.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 15D0_sub_15d0.asm	216E_sub_216e.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 15D3_sub_15d3.asm	19D7_magic_shop_menu.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
-15DE_sub_15de.asm	17E0_sub_17e0.asm	callee-never-reached	no harvest ever reached the callee
+15DE_sub_15de.asm	17E0_ah_ff_sentinel_check.asm	callee-never-reached	no harvest ever reached the callee
 15E1_tavern_menu.asm	0C33_sub_0c33.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 15E1_tavern_menu.asm	1869_cleric_shrine.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 15E1_tavern_menu.asm	1B6B_clue_pool.asm	callee-never-reached	no harvest ever reached the callee
@@ -556,8 +556,8 @@ from_asm	to_asm	class	note
 3C2E_cmd_O.asm	2233_sub_2233.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3C2E_cmd_O.asm	2557_mode_arm_horse.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3C2E_cmd_O.asm	25E4_sub_25e4.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
-3C2E_cmd_O.asm	3EAB_sub_3eab.asm	callee-never-reached	no harvest ever reached the callee
-3C2E_cmd_O.asm	3ED1_sub_3ed1.asm	callee-never-reached	no harvest ever reached the callee
+3C2E_cmd_O.asm	3EAB_ds76_index_test.asm	callee-never-reached	no harvest ever reached the callee
+3C2E_cmd_O.asm	3ED1_stub_to_c30.asm	callee-never-reached	no harvest ever reached the callee
 3C2E_cmd_O.asm	3F5D_steal_attempt.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3C2E_cmd_O.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3C2E_cmd_O.asm	5400_sub_5400.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
@@ -573,7 +573,7 @@ from_asm	to_asm	class	note
 3E9F_sub_3e9f.asm	2216_sub_2216.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3EA2_sub_3ea2.asm	5287_data_mixed.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3EC2_sub_3ec2.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
-3ED1_sub_3ed1.asm	0C2B_sub_0c2b.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
+3ED1_stub_to_c30.asm	0C2B_sub_0c2b.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3ED4_ready_weapon_agility_gate.asm	0C33_sub_0c33.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3ED4_ready_weapon_agility_gate.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3F25_cmd_S.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
@@ -581,7 +581,7 @@ from_asm	to_asm	class	note
 3F37_sub_3f37.asm	5287_data_mixed.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3F37_sub_3f37.asm	5400_sub_5400.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3F5D_steal_attempt.asm	4188_street_cleric.asm	callee-never-reached	no harvest ever reached the callee
-3F5D_steal_attempt.asm	4223_sub_4223.asm	callee-never-reached	no harvest ever reached the callee
+3F5D_steal_attempt.asm	4223_world_eq9_gate.asm	callee-never-reached	no harvest ever reached the callee
 3F5D_steal_attempt.asm	5287_data_mixed.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 4050_cmd_T.asm	16BD_barkeep_chatter_hints.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 4050_cmd_T.asm	2557_mode_arm_horse.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
@@ -722,7 +722,7 @@ from_asm	to_asm	class	note
 48C4_sub_48c4.asm	4C31_sub_4c31.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 48C7_sub_48c7.asm	52F6_sub_52f6.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 48CA_sub_48ca.asm	0C33_sub_0c33.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
-48CA_sub_48ca.asm	4B4E_sub_4b4e.asm	callee-never-reached	no harvest ever reached the callee
+48CA_sub_48ca.asm	4B4E_dual_text_video_helper.asm	callee-never-reached	no harvest ever reached the callee
 4A22_sub_4a22.asm	53F7_sub_53f7.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 4A2F_sub_4a2f.asm	5400_sub_5400.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 4A56_sub_4a56.asm	5400_sub_5400.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
@@ -730,7 +730,7 @@ from_asm	to_asm	class	note
 4AE6_sub_4ae6.asm	4C55_name_pool.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 4AF1_sub_4af1.asm	4C55_name_pool.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 4B26_sub_4b26.asm	4C55_name_pool.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
-4B4E_sub_4b4e.asm	4C55_name_pool.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
+4B4E_dual_text_video_helper.asm	4C55_name_pool.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 4F11_monster_step_vector.asm	52CA_dos_call_wrapper.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 4F20_sub_4f20.asm	52CA_dos_call_wrapper.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 4F64_sub_4f64.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
@@ -815,7 +815,7 @@ from_asm	to_asm	class	note
 5ED7_sub_5ed7.asm	5FA6_sub_5fa6.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 5EF2_sub_5ef2.asm	5FA6_sub_5fa6.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 5F08_sub_5f08.asm	090D_sub_090d.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
-5F08_sub_5f08.asm	5EED_sub_5eed.asm	callee-never-reached	no harvest ever reached the callee
+5F08_sub_5f08.asm	5EED_restore_regs_ret.asm	callee-never-reached	no harvest ever reached the callee
 5F08_sub_5f08.asm	6144_dungeon_shape_dispatch.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 5FC3_sub_5fc3.asm	5FA6_sub_5fa6.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 5FE0_sub_5fe0.asm	5FA6_sub_5fa6.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
@@ -882,4 +882,4 @@ from_asm	to_asm	class	note
 72A0_sub_72a0.asm	5CB1_sub_5cb1.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 72A0_sub_72a0.asm	6078_dungeon_depth_scan.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 72A0_sub_72a0.asm	6144_dungeon_shape_dispatch.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
-8CD0_sub_8cd0.asm	8DCD_sub_8dcd.asm	callee-never-reached	no harvest ever reached the callee
+8CD0_sub_8cd0.asm	8DCD_clock_tick_read.asm	callee-never-reached	no harvest ever reached the callee

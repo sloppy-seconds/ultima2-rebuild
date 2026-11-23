@@ -260,7 +260,7 @@ PY
 
 Fourteen files come back, and they are three different things. **Correctly raw**: the menu
 string blobs (`15E1_tavern_menu`, `19D7_magic_shop_menu`, `5400_sub_5400`) — those are text, and
-`db` is the right rendering. **Already documented**: `8DCD_sub_8dcd`, whose header says its row
+`db` is the right rendering. **Already documented**: `8DCD_clock_tick_read`, whose header says its row
 claims a mostly-zero tail. **The actual defect**: `72A0`, `8387`, `6144`, `48CA`, `277B`,
 `437E_cmd_V`, `3048_vehicle_plane`, `68ED` — spans where the clean wave could not tell code from
 data and rendered everything as bytes, of which `72A0` and `8387` are an order of magnitude

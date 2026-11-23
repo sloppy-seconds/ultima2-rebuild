@@ -1049,8 +1049,8 @@ from_asm	to_asm	evidence	kinds	harvests
 12DB_dungeon_events.asm	152E_dungeon_step_vector.asm	observed	jmp	2
 12DB_dungeon_events.asm	154E_tlkx_record_printer.asm	observed	jcc	1
 12DB_dungeon_events.asm	1564_sub_1564.asm	observed	jmp	1
-12DB_dungeon_events.asm	15A9_sub_15a9.asm	static		0
-12DB_dungeon_events.asm	15D6_sub_15d6.asm	static		0
+12DB_dungeon_events.asm	15A9_stub_to_15d6.asm	static		0
+12DB_dungeon_events.asm	15D6_ds4a_eq2_gate.asm	static		0
 12DB_dungeon_events.asm	15E1_tavern_menu.asm	both	call|jcc|jmp	24
 12DB_dungeon_events.asm	16BD_barkeep_chatter_hints.asm	observed	call	24
 12DB_dungeon_events.asm	2305_sector_store.asm	observed	jmp	1
@@ -1150,14 +1150,14 @@ from_asm	to_asm	evidence	kinds	harvests
 15A2_sub_15a2.asm	29D2_sub_29d2.asm	observed	jmp	2
 15A2_sub_15a2.asm	3389_cmd_E.asm	observed	jmp	1
 15A2_sub_15a2.asm	33F8_sub_33f8.asm	observed	jmp	1
-15A9_sub_15a9.asm	17C5_sub_17c5.asm	static		0
+15A9_stub_to_15d6.asm	17C5_sub_17c5.asm	static		0
 15B4_sub_15b4.asm	1D1D_shop_menus.asm	static		0
 15B7_sub_15b7.asm	1869_cleric_shrine.asm	static		0
 15BA_sub_15ba.asm	1B6B_clue_pool.asm	static		0
 15BA_sub_15ba.asm	2028_read_decimal_digit.asm	static		0
 15D0_sub_15d0.asm	216E_sub_216e.asm	static		0
 15D3_sub_15d3.asm	19D7_magic_shop_menu.asm	static		0
-15DE_sub_15de.asm	17E0_sub_17e0.asm	static		0
+15DE_sub_15de.asm	17E0_ah_ff_sentinel_check.asm	static		0
 15E1_tavern_menu.asm	0C33_sub_0c33.asm	static		0
 15E1_tavern_menu.asm	12DB_dungeon_events.asm	observed	fallthrough	24
 15E1_tavern_menu.asm	16BD_barkeep_chatter_hints.asm	both	fallthrough|jcc	24
@@ -2265,8 +2265,8 @@ from_asm	to_asm	evidence	kinds	harvests
 3C2E_cmd_O.asm	25E4_sub_25e4.asm	static		0
 3C2E_cmd_O.asm	2626_food_drain_mounted.asm	observed	jmp	5
 3C2E_cmd_O.asm	3DBC_cmd_P.asm	observed	unknown	8
-3C2E_cmd_O.asm	3EAB_sub_3eab.asm	static		0
-3C2E_cmd_O.asm	3ED1_sub_3ed1.asm	static		0
+3C2E_cmd_O.asm	3EAB_ds76_index_test.asm	static		0
+3C2E_cmd_O.asm	3ED1_stub_to_c30.asm	static		0
 3C2E_cmd_O.asm	3F5D_steal_attempt.asm	static		0
 3C2E_cmd_O.asm	51B0_sub_51b0.asm	static		0
 3C2E_cmd_O.asm	5400_sub_5400.asm	static		0
@@ -2298,7 +2298,7 @@ from_asm	to_asm	evidence	kinds	harvests
 3E9F_sub_3e9f.asm	2216_sub_2216.asm	static		0
 3EA2_sub_3ea2.asm	5287_data_mixed.asm	static		0
 3EC2_sub_3ec2.asm	51B0_sub_51b0.asm	static		0
-3ED1_sub_3ed1.asm	0C2B_sub_0c2b.asm	static		0
+3ED1_stub_to_c30.asm	0C2B_sub_0c2b.asm	static		0
 3ED4_ready_weapon_agility_gate.asm	0C33_sub_0c33.asm	static		0
 3ED4_ready_weapon_agility_gate.asm	51B0_sub_51b0.asm	static		0
 3F25_cmd_S.asm	51B0_sub_51b0.asm	static		0
@@ -2321,7 +2321,7 @@ from_asm	to_asm	evidence	kinds	harvests
 3F5D_steal_attempt.asm	277B_dungeon_move_commands.asm	observed	jmp|unknown	5
 3F5D_steal_attempt.asm	3823_site_floor_down.asm	observed	unknown	2
 3F5D_steal_attempt.asm	4188_street_cleric.asm	static		0
-3F5D_steal_attempt.asm	4223_sub_4223.asm	static		0
+3F5D_steal_attempt.asm	4223_world_eq9_gate.asm	static		0
 3F5D_steal_attempt.asm	51B0_sub_51b0.asm	both	unknown	1
 3F5D_steal_attempt.asm	5287_data_mixed.asm	static		0
 3F5D_steal_attempt.asm	52EF_sub_52ef.asm	observed	jmp|unknown	3
@@ -2645,7 +2645,7 @@ from_asm	to_asm	evidence	kinds	harvests
 48CA_sub_48ca.asm	2D8C_combat_kill_reward.asm	observed	unknown	1
 48CA_sub_48ca.asm	4A1C_screen_clear_mode1.asm	observed	unknown	1
 48CA_sub_48ca.asm	4A3C_sub_4a3c.asm	observed	jcc	18
-48CA_sub_48ca.asm	4B4E_sub_4b4e.asm	static		0
+48CA_sub_48ca.asm	4B4E_dual_text_video_helper.asm	static		0
 4A1C_screen_clear_mode1.asm	4A22_sub_4a22.asm	observed	unknown	1
 4A22_sub_4a22.asm	4A2F_sub_4a2f.asm	observed	unknown	1
 4A22_sub_4a22.asm	53F7_sub_53f7.asm	static		0
@@ -2681,7 +2681,7 @@ from_asm	to_asm	evidence	kinds	harvests
 4AE6_sub_4ae6.asm	4C55_name_pool.asm	static		0
 4AF1_sub_4af1.asm	4C55_name_pool.asm	static		0
 4B26_sub_4b26.asm	4C55_name_pool.asm	static		0
-4B4E_sub_4b4e.asm	4C55_name_pool.asm	static		0
+4B4E_dual_text_video_helper.asm	4C55_name_pool.asm	static		0
 4BE0_pixel_block.asm	4C1E_video_xor_patch.asm	observed	fallthrough	292
 4C1E_video_xor_patch.asm	4C31_sub_4c31.asm	observed	fallthrough	292
 4C1E_video_xor_patch.asm	53F7_sub_53f7.asm	observed	call	292
@@ -3151,7 +3151,7 @@ from_asm	to_asm	evidence	kinds	harvests
 5F08_sub_5f08.asm	5EAC_sub_5eac.asm	observed	call	122
 5F08_sub_5f08.asm	5ECE_sub_5ece.asm	observed	call	122
 5F08_sub_5f08.asm	5ED7_sub_5ed7.asm	observed	call	122
-5F08_sub_5f08.asm	5EED_sub_5eed.asm	static		0
+5F08_sub_5f08.asm	5EED_restore_regs_ret.asm	static		0
 5F08_sub_5f08.asm	6078_dungeon_depth_scan.asm	observed	fallthrough	138
 5F08_sub_5f08.asm	6144_dungeon_shape_dispatch.asm	static		0
 5FA6_sub_5fa6.asm	5FBD_sub_5fbd.asm	observed	fallthrough	90
@@ -3377,4 +3377,4 @@ from_asm	to_asm	evidence	kinds	harvests
 72A0_sub_72a0.asm	6144_dungeon_shape_dispatch.asm	static		0
 72A0_sub_72a0.asm	6DFD_hyperwarp_flow.asm	observed	call	7
 72A0_sub_72a0.asm	7030_space_collision.asm	observed	fallthrough|jmp	11
-8CD0_sub_8cd0.asm	8DCD_sub_8dcd.asm	static		0
+8CD0_sub_8cd0.asm	8DCD_clock_tick_read.asm	static		0

@@ -603,8 +603,27 @@ creatures from their drawn outline.
 
 ## G95 — the fifteen routines no capture has ever reached `[ ]`
 
-**Question:** a body says control can reach these fifteen routines and no harvest in the corpus
-has ever been there. What do they do, and does the engine implement them correctly?
+**Question:** a body says control can reach these fifteen edges and no harvest in the corpus has
+ever been there. What does the player see, and does the engine render it correctly?
+
+**Decode-first, applied 2026-11-23.** The bytes were asked before a capture was asked of anyone, and
+they answered: thirteen routines, every one between 3 and 20 non-comment lines, nine of them
+unnamed only because nobody had read them. They are now named and headered —
+`15A9_stub_to_15d6`, `15D6_ds4a_eq2_gate`, `17E0_ah_ff_sentinel_check`, `3EAB_ds76_index_test`,
+`3ED1_stub_to_c30`, `4223_world_eq9_gate`, `4B4E_dual_text_video_helper`, `5EED_restore_regs_ret`,
+`8DCD_clock_tick_read`. Two are pure `jmp` stubs, one is a shared register-restore epilogue, one is
+the fourth INT 1Ah clock site, one runs a helper over both text-mode frame buffers, two are gates
+on DS bytes. `1B6B_clue_pool`, `2BAD_attack_arms_refusal_to_cmd_done` and `4188_street_cleric` were
+already named from their own strings.
+
+**What is left, and it is small.** (1) Frames, for visual claims only: decoding `1B6B_clue_pool`
+says which strings it prints and what it tests, it does not license "the clue menu renders like
+this". (2) Which world is 9 — `4223_world_eq9_gate` compares DS:6D against 9 and DS:6D is the world
+byte by asm/7030, but the world table answers which one and this file cannot. (3) Whether asm/5F08's
+pushes match asm/5EED's four pops; if they do not, `5EED` is a second entry point, not an epilogue.
+Static, five minutes, nobody has done it. (4) `02F8_sub_02f8` is still unnamed — its string is
+`'D' - FOR A DEMONSTRATION`, so it is some kind of help menu, and that is an inference from one
+string, not a decode.
 
 **Where this came from:** `tools/index_xref.py --reconcile` split the 884 edges a body claims but
 no harvest proved. 857 of them point at a callee that *is* proven, just from another caller, which
@@ -617,15 +636,15 @@ different callers and no capture ever reached it, which reads as nobody buying a
 reaches `4188_street_cleric`, so stealing from a cleric has never been tried; `3C2E_cmd_O` reaches
 two subroutines that no `O` press has ever touched.
 
-**Action:** seed a character with gold and stand at a clue seller, then a cleric, then press `O`
-in the state its menu needs. `tools/u2_edit.py setpos` plus `tools/spice86_type.py` is the whole
-rig; `docs/needs-gameplay.md` standing hazards still apply.
-**Why the agent can do it:** every one of the fifteen is reachable by seeding state, none needs a
-human hand on a keyboard.
+**Action for the frame:** seed a character with gold and stand at a clue seller, then a cleric, then
+press `O` in the state its menu needs. `tools/u2_edit.py setpos` plus `tools/spice86_type.py` is
+the whole rig; the standing hazards above still apply.
+**Why the agent can do it:** items 2 and 3 are static reads; item 1 is seeded state, no human hand
+on a keyboard.
 **Needs owner:** no.
-**Blocks:** any claim that the engine implements these correctly — they are `inferred` until a
-frame exists, and `cmd_handlers.py` already shows all 26 command letters exercised, so this is not
-the same queue as the UNPROVEN handler markers.
+**Blocks:** any claim that the engine *renders* these correctly. Behaviour is decoded; presentation
+is `inferred` until a frame exists. `cmd_handlers.py` already shows all 26 command letters
+exercised, so this is not the same queue as the UNPROVEN handler markers.
 
 ## Session planning — group by setup, not by question
 

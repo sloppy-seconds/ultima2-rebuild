@@ -375,7 +375,7 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 1598_sub_1598.asm	segmented				low	0
 159F_sub_159f.asm	segmented				low	0
 15A2_sub_15a2.asm	segmented				low	0
-15A9_sub_15a9.asm	segmented				low	0
+15A9_stub_to_15d6.asm	decoded	yes			high	0
 15AC_sub_15ac.asm	segmented				low	0
 15B4_sub_15b4.asm	segmented				low	0
 15B7_sub_15b7.asm	segmented				low	0
@@ -383,7 +383,7 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 15C8_sub_15c8.asm	segmented				low	0
 15D0_sub_15d0.asm	segmented				low	0
 15D3_sub_15d3.asm	segmented				low	0
-15D6_sub_15d6.asm	segmented				low	0
+15D6_ds4a_eq2_gate.asm	decoded	yes			high	0
 15DE_sub_15de.asm	segmented				low	0
 15E1_tavern_menu.asm	decoded	yes	yes		low	0
 16BD_barkeep_chatter_hints.asm	decoded	yes	yes		high	0
@@ -392,7 +392,7 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 17B7_sub_17b7.asm	segmented				low	0
 17C5_sub_17c5.asm	segmented				low	0
 17DD_sub_17dd.asm	segmented				low	0
-17E0_sub_17e0.asm	segmented				low	0
+17E0_ah_ff_sentinel_check.asm	decoded	yes			low	0
 17E5_sub_17e5.asm	segmented				low	0
 17E9_sub_17e9.asm	segmented				low	0
 17EF_sub_17ef.asm	segmented				low	0
@@ -711,10 +711,10 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 3E50_cmd_R.asm	observed			yes	medium	0
 3E9F_sub_3e9f.asm	segmented				low	0
 3EA2_sub_3ea2.asm	segmented				low	0
-3EAB_sub_3eab.asm	segmented				low	0
+3EAB_ds76_index_test.asm	decoded	yes			high	0
 3EBB_sub_3ebb.asm	segmented				low	0
 3EC2_sub_3ec2.asm	segmented				low	0
-3ED1_sub_3ed1.asm	segmented				low	0
+3ED1_stub_to_c30.asm	decoded	yes			high	0
 3ED4_ready_weapon_agility_gate.asm	decoded				medium	0
 3F25_cmd_S.asm	observed	yes		yes	high	0
 3F36_sub_3f36.asm	segmented				low	0
@@ -755,7 +755,7 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 4217_sub_4217.asm	segmented				low	0
 421A_sub_421a.asm	segmented				low	0
 4220_sub_4220.asm	segmented				low	0
-4223_sub_4223.asm	segmented				low	0
+4223_world_eq9_gate.asm	decoded	yes			high	0
 4232_sub_4232.asm	segmented				low	0
 4246_sub_4246.asm	segmented				low	0
 4249_tribute_welcome.asm	observed	yes		yes	high	0
@@ -948,7 +948,7 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 4B1B_sub_4b1b.asm	segmented				low	0
 4B26_sub_4b26.asm	segmented				low	0
 4B35_sub_4b35.asm	segmented				low	0
-4B4E_sub_4b4e.asm	segmented				low	0
+4B4E_dual_text_video_helper.asm	decoded	yes			high	0
 4B5D_sub_4b5d.asm	segmented				low	0
 4B76_pixel_plot.asm	decoded	yes			low	0
 4BAA_pixel_erase.asm	decoded	yes			low	0
@@ -1167,7 +1167,7 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 5ED5_sub_5ed5.asm	segmented				low	0
 5ED6_sub_5ed6.asm	segmented				low	0
 5ED7_sub_5ed7.asm	segmented				low	0
-5EED_sub_5eed.asm	segmented				low	0
+5EED_restore_regs_ret.asm	decoded	yes			high	0
 5EF2_sub_5ef2.asm	segmented				low	0
 5F08_sub_5f08.asm	segmented				low	0
 5FA6_sub_5fa6.asm	segmented				low	0
@@ -1210,4 +1210,4 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 72A0_sub_72a0.asm	segmented				low	0
 8387_sub_8387.asm	segmented				low	0
 8CD0_sub_8cd0.asm	segmented				low	0
-8DCD_sub_8dcd.asm	segmented				low	0
+8DCD_clock_tick_read.asm	decoded	yes			low	0
