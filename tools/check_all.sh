@@ -151,6 +151,14 @@ run "index_coverage selftest" tools/index_coverage.py -- python3 tools/index_cov
 run "index_coverage verify" asm disasm/index/state.tsv -- python3 tools/index_coverage.py --verify
 run "index_coverage fresh" disasm/index/coverage.tsv disasm/index/unnamed-offsets.tsv -- python3 tools/index_coverage.py --check-fresh
 
+# The `# fact:` schema and extractor (docs/plan-game-bible.md § 3). It ships with ZERO facts on
+# purpose -- the thing that can fail comes before the thing that fills it -- so the 13 controls are
+# the gate today, and they include the end-to-end duplicate-id case and the malformed-line case
+# that must never become a silent skip.
+run "index_facts selftest" tools/index_facts.py -- python3 tools/index_facts.py --selftest
+run "index_facts verify" asm disasm/census -- python3 tools/index_facts.py --verify
+run "index_facts fresh" disasm/facts/asm.tsv -- python3 tools/index_facts.py --check-fresh
+
 run "cmd_marker_gate selftest" tools/cmd_marker_gate.py -- python3 tools/cmd_marker_gate.py --selftest
 run "cmd_marker_gate" engine/src docs/phase4-state.md -- python3 tools/cmd_marker_gate.py
 # Which SDL a build links is decided by this probe, and a wrong verdict is a build

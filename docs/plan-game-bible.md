@@ -127,6 +127,22 @@ optional sixth field naming the tool, and staleness hashes the tool as well. Mak
 mandatory would have every line in the tree restate where it lives, and a required field that is
 always derivable is a field that drifts.
 
+**Shipped 2026-11-23 as `tools/index_facts.py` (#27), with zero facts in the tree**, which is the
+ruling rather than an oversight: the thing that can fail comes before the thing that fills it.
+Thirteen controls, including the end-to-end duplicate-id case. Two details settled while building
+it:
+
+* **The store is TSV, not YAML.** D1 said YAML. Every other generated table in this repo is TSV
+  (`disasm/census/`, `disasm/index/`), the freshness gate is a line diff, and a tab inside a
+  statement is now a hard failure, which is the only hazard the format has.
+* **Entity references are namespaced, because census has no id column.** The ruling said facts
+  reference census entity ids; census tables have `guide_name`, `name`, `layer`, `art`, `what`
+  and `era_index` instead. So a reference is `ns:value` — `place:`, `creature:`, `sector:`,
+  `npc:`, `vehicle:`, `gate:`, `tile:`, `world:`, `site:`, `vendor:`, plus `state:` for a
+  `state.h` field and `asm:` for a routine — and `--verify` resolves every one against the column
+  that names it. An unresolvable entity is a hard failure, which is the point: a fact about a
+  place that got renamed should stop resolving, loudly.
+
 ---
 
 ## 4. The writer: closed-book
