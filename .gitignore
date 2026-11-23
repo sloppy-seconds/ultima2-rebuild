@@ -164,3 +164,9 @@ engine/build-sdlstatic/
 # playthrough of copyrighted content exactly as a save file does, so it is user data
 # and never a repo artefact. The gate records its own fixture instead.
 demos/
+
+# Rendered bible skins (docs/plan-game-bible.md § 6). Generated, no server, and
+# deliberately not gated on freshness: the gates operate on the fact and prose
+# stores, because HTML that is stale says nothing wrong about the tree. Regenerate
+# with tools/bible_render.py.
+site/

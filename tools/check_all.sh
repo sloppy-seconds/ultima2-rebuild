@@ -166,6 +166,12 @@ run "index_facts fresh" disasm/facts/asm.tsv -- python3 tools/index_facts.py --c
 run "bible selftest" tools/bible.py -- python3 tools/bible.py --selftest
 run "bible verify" disasm/bible -- python3 tools/bible.py --verify
 
+# The renderer runs no model, so this is a smoke test and not a freshness gate: it proves the joins
+# behind the internals tables still resolve and that at least one page renders. The HTML itself is
+# deliberately not freshness-gated (docs/plan-game-bible.md § 6) -- the gates operate on the fact
+# and prose stores, because stale HTML says nothing wrong about the tree.
+run "bible_render smoke" disasm/bible disasm/census -- python3 tools/bible_render.py --out /var/tmp/u2bible-render-check
+
 run "cmd_marker_gate selftest" tools/cmd_marker_gate.py -- python3 tools/cmd_marker_gate.py --selftest
 run "cmd_marker_gate" engine/src docs/phase4-state.md -- python3 tools/cmd_marker_gate.py
 # Which SDL a build links is decided by this probe, and a wrong verdict is a build

@@ -432,6 +432,23 @@ Three things came out of building it:
   unsourced one on `supported`. The critic also caught a real grade-laundering defect in the
   writer's first draft, which is the only proof that matters at this size.
 
+**Renderer status, 2026-11-23 (#31).** `tools/bible_render.py` writes two skins into a gitignored
+`site/` and runs no model, so it is deterministic and a smoke gate can cover it. `bible/` renders
+only sentences whose verdict passes all four questions, each with its evidence grade inline and a
+fold naming the `asm/` file behind it; a dropped sentence is not rendered and the page says how many
+were dropped. `internals/` is tables only, as ruled — coverage, the unnamed-offset queue, and the
+table against the third-party sources. Page state is derived, never asserted: `fresh`, `stale` when
+prose moved under a verdict, `void` when a cited fact left the store. Three things came out of it:
+
+* **The disagreement artefact is mostly agreement, and saying so is the point.** Nine third-party
+  spell claims are judged: seven agree, two are partial. The heading reports both numbers rather
+  than calling the whole table a list of disagreements, which is what the plan's phrasing invited.
+* **`--public` refuses.** v1 is internal-only and the fact store quotes game text today, so a public
+  skin would break the § 7 ruling by construction. The refusal names the ruling rather than
+  silently rendering something that looks published.
+* **HTML is not freshness-gated, on purpose.** The gates operate on the stores; stale HTML says
+  nothing wrong about the tree. The gate that exists proves the joins still resolve.
+
 **Build order.** (1) schema, extractor and `--verify`, with controls that go red on a malformed
 fact line and on a missing evidence file — committed with **zero facts in it**, because the thing
 that can fail comes before the thing that fills it; (2) retrofit `# fact:` lines in the
