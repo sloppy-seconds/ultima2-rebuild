@@ -326,7 +326,13 @@ int main(void)
      * pull 8 -- which lands on 0x86, past the bound. Without the reseed it stays there.
      * This case exists because running the control (disabling the bound) left every other
      * check green, which is how the aggregate check above was caught being vacuous. */
-    uint8_t ex[1] = { 0x10 }, ey[1] = { 0x7e };
+    /* Sized at U2_SPACE_ORBIT_STARS, not 1. u2_space_orbit_pull walks every star in the field
+     * (for i < U2_SPACE_ORBIT_STARS) and writes each one back, so a one-byte buffer is a
+     * 63-byte stack overflow that only a sanitizer can see -- gcc compiled and ran it, the value
+     * at ey[0] happened to survive, and the check passed by corrupting its caller. ASan caught it
+     * as stack-buffer-overflow READ of size 1 in u2_space_orbit_pull; the engine is correct here
+     * and the test was lying about its own contract. */
+    uint8_t ex[U2_SPACE_ORBIT_STARS] = { 0x10 }, ey[U2_SPACE_ORBIT_STARS] = { 0x7e };
     uint32_t erng = 0x9a7u;
     u2_space_orbit_pull(ex, ey, 0x10, 0x7f, &erng);
     CHECK(ey[0] <= 0x7f,
