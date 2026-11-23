@@ -206,11 +206,24 @@ static half partly exists already as generated `# calls:` lines in 601 headers, 
 half has to decide which of 292 `ExecutionFlow.json` harvests count as evidence, under the rule
 that CFG *blocks* are a seed list and `ExecutedInstructions` is the proof. It gets its own epic.
 
-What ships here instead is the gate the cut exposes. A `# calls:` line is hand-editable prose
-duplicating a fact that lives in the body, so it can drift silently; today the two agree. The gate
-reports disagreement, **the body is authoritative without exception**, and it is report-only — no
-`--fix`, because auto-editing an `asm/` header touches the CP0-frozen surface and deserves a
-human. It lands as its own commit, ahead of the index work.
+What ships here instead is the gate the cut exposes: `tools/calls_gate.py`. A `# calls:` line is
+hand-editable prose duplicating a fact that lives in the body, so it can drift silently; this
+section claimed the two agree, and the gate found five transfers across three files that did not
+claim them. The gate reports disagreement, **the body is authoritative without exception**, and it
+is report-only — no `--fix`, because auto-editing an `asm/` header touches the CP0-frozen surface
+and deserves a human.
+
+The rule is the load-bearing part, and two versions of it were wrong before one was right. A
+transfer is `call` *and* `jmp` — `asm/017D` is a three-byte stub whose whole body is
+`jmp L_000442` — plus forced-keep `.byte 0xe8` lines whose comment names the swallowed call, plus
+the fall-through chain of a fragment split, since only the last fragment holds the `ret` and
+`asm/507A`'s claim is satisfied two fragments later in `asm/5085`. A header's list wraps onto
+indented continuation lines, and a long list is elided with `(+N more)`, which is a checkable
+assertion and not a shrug: the gate fails when the body has a different number of unlisted
+transfers than the line claims. `call`-text-only called 212 of 601 files drift; ignoring
+continuations and elisions called 17. Either would have made the gate noise on the day it landed,
+so the eight controls in `--selftest` are what keep the rule honest, and the gate runs in
+`tools/check_all.sh` behind its own selftest.
 
 ---
 
