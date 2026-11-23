@@ -89,10 +89,58 @@ def resolve(funcs: list[dict], addr: int):
     return None
 
 
+CITE_C_RE = re.compile(r"asm/([0-9A-Fa-f]{4})\b|\bL_([0-9a-fA-F]{6})\b")
+
+
+def check_c(funcs: list[dict]) -> tuple[int, list[tuple[str, str]]]:
+    """The `--c` mode: does the C tree's asm citations resolve?
+
+    This lives here and not in engine-map on purpose (docs/plan-code-index.md § 3.2): two gates that
+    both resolve `asm/XXXX` drift, and the rename hazard AGENTS.md names is exactly the failure they
+    would catch inconsistently. engine-map reports a dangling citation as an input error.
+    """
+    by_addr = {f["start"]: f for f in funcs}  # noqa: F841  (kept: resolve() walks funcs)
+    labels: set[str] = set()
+    for path in ASM.glob("*.asm"):
+        for line in path.read_text(errors="replace").splitlines():
+            for lm in re.finditer(r"^(L_[0-9a-fA-F]{6}):", line):
+                labels.add(lm.group(1).lower())
+    dangling: list[tuple[str, str]] = []
+    mentions = 0
+    for path in sorted((ROOT / "engine" / "src").rglob("*")):
+        if path.suffix not in (".c", ".h"):
+            continue
+        for i, line in enumerate(path.read_text(errors="replace").splitlines(), start=1):
+            for m in CITE_C_RE.finditer(line):
+                mentions += 1
+                if m.group(1):
+                    if resolve(funcs, int(m.group(1), 16)) is None:
+                        dangling.append((f"{path.name}:{i}", m.group(0)))
+                elif m.group(2):
+                    # `L_004c1c` names the instruction at offset 0x4c1c, not necessarily a label
+                    # that asm/ actually prints -- most of these are call targets inside another
+                    # routine's range. Resolve it as an address first; a defined label also counts.
+                    addr = int(m.group(2), 16)
+                    if resolve(funcs, addr) is None and m.group(2).lower() not in labels:
+                        dangling.append((f"{path.name}:{i}", m.group(0)))
+    return mentions, dangling
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--strict", action="store_true")
+    ap.add_argument("--c", dest="c_mode", action="store_true",
+                    help="check the C tree's asm/ and L_ citations instead of docs/")
     args = ap.parse_args()
+
+    funcs = load_functions()
+    if args.c_mode:
+        mentions, dangling = check_c(funcs)
+        print(f"xref --c: {mentions} citation(s) from engine/src resolve against asm/")
+        for where, cite in sorted(set(dangling)):
+            print(f"  FAIL  {where}: {cite} resolves to no function range or label")
+        print(f"xref --c: {'FAIL' if dangling else 'ok'}")
+        return 1 if dangling else 0
 
     funcs = load_functions()
     by_addr = {f["start"]: f for f in funcs}

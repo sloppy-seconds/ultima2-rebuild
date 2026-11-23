@@ -166,6 +166,14 @@ run "index_facts fresh" disasm/facts/asm.tsv -- python3 tools/index_facts.py --c
 run "index_footprint selftest" tools/index_footprint.py -- python3 tools/index_footprint.py --selftest
 run "index_footprint fresh" disasm/index/footprint.tsv -- python3 tools/index_footprint.py --check-fresh
 
+# The engine map (docs/plan-code-index.md § 3.2): which C implements which asm. The citation check
+# lives in xref_provenance --c rather than here on purpose -- two gates that both resolve asm/XXXX
+# drift, and the rename hazard AGENTS.md names is what they would catch inconsistently.
+run "xref --c" engine/src asm -- python3 tools/xref_provenance.py --c
+run "index_engine_map selftest" engine/src asm -- python3 tools/index_engine_map.py --selftest
+run "index_engine_map verify" engine/src asm -- python3 tools/index_engine_map.py --verify
+run "index_engine_map fresh" disasm/index/engine-map.tsv -- python3 tools/index_engine_map.py --check-fresh
+
 # The bible loop (docs/plan-game-bible.md § 4-5). No model runs in CI (ADR 0003), so these assert
 # the committed artefacts instead: every sentence has a verdict, no prose moved under a verdict,
 # the recorded pair still matches the prompt files, and the three judge controls are still red. A
