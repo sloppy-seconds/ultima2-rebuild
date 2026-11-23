@@ -179,6 +179,11 @@ run "index_engine_map fresh" disasm/index/engine-map.tsv -- python3 tools/index_
 # lands, and a gate that makes every commit wait teaches people to stop running the gate.
 run "index_xref selftest" asm captures -- python3 tools/index_xref.py --selftest
 
+# The filename-is-runtime / label-is-file convention. It exists because mixing the two produced a
+# confident wrong header about a three-line routine on 2026-11-23; see docs/needs-gameplay.md G95.
+run "label_offset_gate" asm -- python3 tools/label_offset_gate.py --verify
+run "label_offset_gate selftest" asm -- python3 tools/label_offset_gate.py --selftest
+
 # The bible loop (docs/plan-game-bible.md § 4-5). No model runs in CI (ADR 0003), so these assert
 # the committed artefacts instead: every sentence has a verdict, no prose moved under a verdict,
 # the recorded pair still matches the prompt files, and the three judge controls are still red. A

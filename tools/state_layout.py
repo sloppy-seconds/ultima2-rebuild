@@ -239,6 +239,15 @@ FIELDS, _UNPARSED = parse(STATE_H.read_text(encoding="utf-8"))
 annotate(FIELDS, asserts(STATE_H.read_text(encoding="utf-8"))[0])
 
 
+def fields() -> list[Field]:
+    """The parsed struct, offsets computed and `asserted`/`save_offset` annotated.
+
+    The importable entry point: `coverage` and `footprint` both read the DS layout through this
+    rather than re-parsing state.h, which is the whole reason the parser exists.
+    """
+    return FIELDS
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--json", action="store_true")

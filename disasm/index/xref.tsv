@@ -488,7 +488,7 @@ from_asm	to_asm	evidence	kinds	harvests
 0BDB_apply_hp_damage.asm	50F9_status_line_print.asm	observed	jmp	8
 0BDB_apply_hp_damage.asm	52EF_sub_52ef.asm	observed	jmp	3
 0BDB_apply_hp_damage.asm	5400_sub_5400.asm	observed	jmp	1
-0BDB_apply_hp_damage.asm	5CED_sub_5ced.asm	observed	jmp	4
+0BDB_apply_hp_damage.asm	5CED_speaker_tone_loop.asm	observed	jmp	4
 0BDB_apply_hp_damage.asm	5D3D_sub_5d3d.asm	observed	jmp	2
 0C02_sub_0c02.asm	0C09_sub_0c09.asm	observed	call	94
 0C09_sub_0c09.asm	0B79_melee_damage_pool.asm	observed	jmp	1
@@ -595,7 +595,7 @@ from_asm	to_asm	evidence	kinds	harvests
 0CC0_sub_0cc0.asm	52CA_dos_call_wrapper.asm	observed	jcc	8
 0CC0_sub_0cc0.asm	52EF_sub_52ef.asm	observed	jcc	1
 0CC0_sub_0cc0.asm	5400_sub_5400.asm	both	call	23
-0CC0_sub_0cc0.asm	5CED_sub_5ced.asm	observed	jcc	2
+0CC0_sub_0cc0.asm	5CED_speaker_tone_loop.asm	observed	jcc	2
 0CC0_sub_0cc0.asm	5D37_sub_5d37.asm	observed	jcc	4
 0CD2_sub_0cd2.asm	0CD4_sub_0cd4.asm	observed	fallthrough	68
 0CD4_sub_0cd4.asm	0CD9_sub_0cd9.asm	observed	fallthrough	68
@@ -766,7 +766,7 @@ from_asm	to_asm	evidence	kinds	harvests
 0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	51B0_sub_51b0.asm	observed	jcc|jmp	13
 0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	52CA_dos_call_wrapper.asm	observed	jcc	3
 0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	5400_sub_5400.asm	observed	call	62
-0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	5CED_sub_5ced.asm	observed	jmp	2
+0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	5CED_speaker_tone_loop.asm	observed	jmp	2
 0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	5D37_sub_5d37.asm	observed	jmp	84
 0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	5D3D_sub_5d3d.asm	observed	jmp	2
 0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	6078_dungeon_depth_scan.asm	observed	call	62
@@ -1084,7 +1084,7 @@ from_asm	to_asm	evidence	kinds	harvests
 12DB_dungeon_events.asm	5287_data_mixed.asm	observed	call	51
 12DB_dungeon_events.asm	52CA_dos_call_wrapper.asm	observed	jcc|jmp	22
 12DB_dungeon_events.asm	5400_sub_5400.asm	static		0
-12DB_dungeon_events.asm	5CED_sub_5ced.asm	observed	jmp	3
+12DB_dungeon_events.asm	5CED_speaker_tone_loop.asm	observed	jmp	3
 12DB_dungeon_events.asm	5D37_sub_5d37.asm	observed	jmp	1
 12DB_dungeon_events.asm	5E83_sub_5e83.asm	static		0
 12DB_dungeon_events.asm	6078_dungeon_depth_scan.asm	static		0
@@ -1223,7 +1223,7 @@ from_asm	to_asm	evidence	kinds	harvests
 19D7_magic_shop_menu.asm	5287_data_mixed.asm	static		0
 19D7_magic_shop_menu.asm	5343_sub_5343.asm	observed	jmp	5
 19D7_magic_shop_menu.asm	53A0_sub_53a0.asm	static		0
-19D7_magic_shop_menu.asm	5CED_sub_5ced.asm	observed	unknown	1
+19D7_magic_shop_menu.asm	5CED_speaker_tone_loop.asm	observed	unknown	1
 1D1D_shop_menus.asm	0C33_sub_0c33.asm	static		0
 1D1D_shop_menus.asm	2028_read_decimal_digit.asm	observed	call|jcc	3
 1D1D_shop_menus.asm	20AB_bcd_price_from_stats.asm	static		0
@@ -2270,7 +2270,7 @@ from_asm	to_asm	evidence	kinds	harvests
 3C2E_cmd_O.asm	3F5D_steal_attempt.asm	static		0
 3C2E_cmd_O.asm	51B0_sub_51b0.asm	static		0
 3C2E_cmd_O.asm	5400_sub_5400.asm	static		0
-3C2E_cmd_O.asm	5CED_sub_5ced.asm	observed	jmp	2
+3C2E_cmd_O.asm	5CED_speaker_tone_loop.asm	observed	jmp	2
 3C2E_cmd_O.asm	5E1C_sub_5e1c.asm	observed	call	3
 3DBC_cmd_P.asm	3DC5_sub_3dc5.asm	observed	unknown	8
 3DBC_cmd_P.asm	51B0_sub_51b0.asm	static		0
@@ -2984,22 +2984,22 @@ from_asm	to_asm	evidence	kinds	harvests
 5CDA_sub_5cda.asm	5CDD_sub_5cdd.asm	observed	unknown	262
 5CDD_sub_5cdd.asm	5CE0_sub_5ce0.asm	observed	unknown	262
 5CE0_sub_5ce0.asm	5CE4_speaker_stop.asm	observed	fallthrough	262
-5CE4_speaker_stop.asm	5CED_sub_5ced.asm	observed	jcc	262
-5CED_sub_5ced.asm	0B4D_sub_0b4d.asm	observed	jmp	1
-5CED_sub_5ced.asm	0B71_sub_0b71.asm	observed	jmp	4
-5CED_sub_5ced.asm	0D21_sub_0d21.asm	observed	jmp	1
-5CED_sub_5ced.asm	0DAF_monster_hp_sea_serpent.asm	observed	jmp	3
-5CED_sub_5ced.asm	12DB_dungeon_events.asm	observed	jmp	4
-5CED_sub_5ced.asm	2389_sub_2389.asm	observed	jmp	1
-5CED_sub_5ced.asm	2392_sub_2392.asm	observed	jmp	1
-5CED_sub_5ced.asm	3596_show_year_1990.asm	observed	jmp	1
-5CED_sub_5ced.asm	3C2E_cmd_O.asm	observed	jmp	2
-5CED_sub_5ced.asm	4281_sub_4281.asm	observed	jmp	1
-5CED_sub_5ced.asm	5D09_speaker_seq_player.asm	observed	fallthrough	262
-5CED_sub_5ced.asm	5D2D_sub_5d2d.asm	observed	jmp	32
-5CED_sub_5ced.asm	5D37_sub_5d37.asm	observed	jmp	3
-5CED_sub_5ced.asm	5D3D_sub_5d3d.asm	observed	jmp	3
-5CED_sub_5ced.asm	5D58_sub_5d58.asm	observed	jcc|jmp	12
+5CE4_speaker_stop.asm	5CED_speaker_tone_loop.asm	observed	jcc	262
+5CED_speaker_tone_loop.asm	0B4D_sub_0b4d.asm	observed	jmp	1
+5CED_speaker_tone_loop.asm	0B71_sub_0b71.asm	observed	jmp	4
+5CED_speaker_tone_loop.asm	0D21_sub_0d21.asm	observed	jmp	1
+5CED_speaker_tone_loop.asm	0DAF_monster_hp_sea_serpent.asm	observed	jmp	3
+5CED_speaker_tone_loop.asm	12DB_dungeon_events.asm	observed	jmp	4
+5CED_speaker_tone_loop.asm	2389_sub_2389.asm	observed	jmp	1
+5CED_speaker_tone_loop.asm	2392_sub_2392.asm	observed	jmp	1
+5CED_speaker_tone_loop.asm	3596_show_year_1990.asm	observed	jmp	1
+5CED_speaker_tone_loop.asm	3C2E_cmd_O.asm	observed	jmp	2
+5CED_speaker_tone_loop.asm	4281_sub_4281.asm	observed	jmp	1
+5CED_speaker_tone_loop.asm	5D09_speaker_seq_player.asm	observed	fallthrough	262
+5CED_speaker_tone_loop.asm	5D2D_sub_5d2d.asm	observed	jmp	32
+5CED_speaker_tone_loop.asm	5D37_sub_5d37.asm	observed	jmp	3
+5CED_speaker_tone_loop.asm	5D3D_sub_5d3d.asm	observed	jmp	3
+5CED_speaker_tone_loop.asm	5D58_sub_5d58.asm	observed	jcc|jmp	12
 5D09_speaker_seq_player.asm	5D14_sub_5d14.asm	observed	fallthrough	262
 5D14_sub_5d14.asm	5D22_sub_5d22.asm	observed	fallthrough	262
 5D14_sub_5d14.asm	5EAC_sub_5eac.asm	static		0
@@ -3027,7 +3027,7 @@ from_asm	to_asm	evidence	kinds	harvests
 5D3D_sub_5d3d.asm	38B0_cmd_L.asm	observed	fallthrough	3
 5D3D_sub_5d3d.asm	50F9_status_line_print.asm	observed	jcc	3
 5D3D_sub_5d3d.asm	51B0_sub_51b0.asm	observed	fallthrough|jcc	12
-5D3D_sub_5d3d.asm	5CED_sub_5ced.asm	observed	fallthrough|jcc	13
+5D3D_sub_5d3d.asm	5CED_speaker_tone_loop.asm	observed	fallthrough|jcc	13
 5D3D_sub_5d3d.asm	5D50_sub_5d50.asm	observed	fallthrough	262
 5D3D_sub_5d3d.asm	5EAC_sub_5eac.asm	static		0
 5D3D_sub_5d3d.asm	5ED7_sub_5ed7.asm	static		0
@@ -3035,7 +3035,7 @@ from_asm	to_asm	evidence	kinds	harvests
 5D50_sub_5d50.asm	5F08_sub_5f08.asm	static		0
 5D55_sub_5d55.asm	5D58_sub_5d58.asm	observed	fallthrough	262
 5D55_sub_5d55.asm	5ED7_sub_5ed7.asm	static		0
-5D58_sub_5d58.asm	5CED_sub_5ced.asm	observed	jcc|jmp	39
+5D58_sub_5d58.asm	5CED_speaker_tone_loop.asm	observed	jcc|jmp	39
 5D58_sub_5d58.asm	5DA9_tone_player.asm	observed	fallthrough	258
 5D58_sub_5d58.asm	5E3A_sub_5e3a.asm	observed	jmp	262
 5DA9_tone_player.asm	5DB0_sub_5db0.asm	observed	fallthrough	258

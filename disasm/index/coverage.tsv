@@ -1131,7 +1131,7 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 5CE0_sub_5ce0.asm	segmented				low	0
 5CE3_sub_5ce3.asm	segmented				low	0
 5CE4_speaker_stop.asm	decoded	yes			medium	0
-5CED_sub_5ced.asm	segmented				low	0
+5CED_speaker_tone_loop.asm	decoded	yes			high	0
 5D09_speaker_seq_player.asm	decoded	yes			medium	0
 5D14_sub_5d14.asm	segmented				low	0
 5D22_sub_5d22.asm	segmented				low	0

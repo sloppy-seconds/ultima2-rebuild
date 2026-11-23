@@ -624,12 +624,14 @@ gives 0 EARTH, 1 MERCURY ... 8 PLUTO, **9 PLANET X** — names at exe `0x072b9`,
 a player would use. `asm/4223_planet_x_gate` is therefore a Planet X gate and is renamed.
 
 **What is left, and it is small.** (3) ~~asm/5F08's pushes vs asm/5EED's four pops~~ **checked
-2026-11-23, and the answer was not the guess:** there are two byte-identical copies of the pop-quad,
-at 0x5EED and at 0x6108. 0x6108 has executed in the corpus, 0x5EED has not, and the code after
-0x6108 inside asm/5F08 has never executed either — so the pop-quad is a shared exit that other
-routines return through, and asm/5F08's nominal entry is a boundary artefact. The two
-`call L_005eed` sites load DX/CX/BX from registers instead of pushing four words and have never
-executed, so they are recorded as a gap rather than explained. (4) ~~`02F8_sub_02f8` unnamed~~
+2026-11-23, and the first answer was wrong in a way worth keeping.** There are two byte-identical
+copies of the pop-quad, at file `0x60ED` (runtime `0x5EED`, this file) and file `0x6108` (runtime
+`0x5F08`, the entry region of asm/5F08). **Both have executed.** The first version of this note said
+one copy was dead, because it tested `0x5EED` against a set of file offsets — and file `0x5EED` is
+asm/5CED's speaker routine, not the epilogue. Mixing the two address spaces produced a confident
+wrong answer about a routine three lines long. The two `call L_005eed` sites load DX/CX/BX from
+registers instead of pushing four words and have never executed, so they stay a gap rather than an
+explanation. `tools/label_offset_gate.py` now asserts the convention so the mistake has a fence. (4) ~~`02F8_sub_02f8` unnamed~~
 **named `02F8_demo_help_line_print`:** it writes DS:2F and DS:2E and prints
 `'D' - FOR A DEMONSTRATION` through str_out, and 0x04FC has executed, so the print is observed even
 though the edge into it never was.
