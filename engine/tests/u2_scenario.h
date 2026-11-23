@@ -137,7 +137,11 @@ static inline int u2_sc_grid_has(u2_ctx *ctx, const char *needle)
 static inline const char *u2_sc_row(u2_ctx *ctx, int row, char *buf, int c0, int c1)
 {
     int n = 0;
-    for (int c = c0; c <= c1 && n < U2_COLS; c++) buf[n++] = (char)ctx->vram.cell[row][c].ch;
+    /* c is clamped to the row, not just n to the buffer. Callers legitimately pass an end column
+     * past the right edge (30, 79 on a 40-column screen means "to the end of the row"), and the
+     * old guard bounded only the output length, so with c0 > 0 the read walked off the end of
+     * vram.cell[row]. UBSan named it: index 40 out of bounds for type 'u2_cell [40]'. */
+    for (int c = c0; c <= c1 && c < U2_COLS && n < U2_COLS; c++) buf[n++] = (char)ctx->vram.cell[row][c].ch;
     while (n > 0 && buf[n - 1] == ' ') n--;
     buf[n] = '\0';
     char *p = buf;
