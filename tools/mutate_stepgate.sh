@@ -9,6 +9,14 @@ set -uo pipefail
 cd "$(dirname "$0")/../engine"
 
 SRCS=$(ls src/core/*.c src/game/*.c src/debug/*.c | grep -v 'game/ai.c')
+# Compiled with the engine's own compiler and flag set, exactly as engine/tests/mutate_speed.sh
+# does. This script used to hardcode `cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent`, a weaker
+# and narrower bar than the code under test is held to, and on CI that difference was the whole
+# failure: the speed harness (which uses U2_CC/U2_CCFLAGS) caught 9/9 while this one reported every
+# mutant as "would not compile". A check program held to a different bar than its subject is the
+# defect this project names everywhere except, until now, here.
+U2_CCFLAGS="${U2_CCFLAGS:-$(make -s ccflags)}"
+U2_CC="${U2_CC:-cc}"
 pass=0; fail=0
 
 mutate() {
@@ -24,8 +32,8 @@ if old not in s:
 open(p,'w').write(s.replace(old,new,1))
 PY
     [ $? -ne 0 ] && { echo "  SKIP  $name (pattern not found)"; fail=$((fail+1)); return; }
-    if ! cc -std=c11 -Wall -Wextra -Werror -Isrc -Icontent -o /var/tmp/ai_mut \
-            tests/ai_check.c /var/tmp/ai_mutant.c $SRCS 2>/dev/null; then
+    if ! "$U2_CC" $U2_CCFLAGS -o /var/tmp/ai_mut \
+            tests/ai_check.c /var/tmp/ai_mutant.c $SRCS >/var/tmp/ai_mut.build 2>&1; then
         # A mutant that will not compile tested nothing, and a mutation that tests nothing is
         # a miss, not a skip. The first version returned here without counting it, so a
         # missing content/gen_content.h — which a checkout that lost a tracked file would
@@ -34,6 +42,11 @@ PY
         # every mutation "skip", the totals came out `caught 0, MISSED 0`, and the harness
         # printed PASS while checking nothing at all.
         echo "  MISSED  $name (mutant would not compile — is engine/build built?)"
+        # The compiler's stderr went to /dev/null, so CI said "would not compile" nine times and
+        # never said why while the same script passed locally. A gate that cannot name its reason
+        # gets rerun until it goes green by accident; the first four lines of the build log are now
+        # part of the verdict.
+        sed 's/^/          /' /var/tmp/ai_mut.build | head -4
         fail=$((fail+1)); return
     fi
     if /var/tmp/ai_mut >/var/tmp/ai_mut.out 2>&1; then

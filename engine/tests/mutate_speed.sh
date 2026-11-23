@@ -28,10 +28,16 @@ open(p,'w').write(s.replace(old,new,1))
 PY
     if [ $? -ne 0 ]; then echo "  MISSED  $name (pattern not found)"; fail=$((fail+1)); return; fi
     if ! "$U2_CC" $U2_CCFLAGS -o /var/tmp/speed_mut \
-            tests/speed_check.c /var/tmp/speed_mut.c $SRCS 2>/dev/null; then
+            tests/speed_check.c /var/tmp/speed_mut.c $SRCS >/var/tmp/speed_mut.build 2>&1; then
         # Not a skip: a mutant that will not compile checked nothing. Usual cause is an
         # unbuilt engine — the committed header is content/gen_content.h.
+        #
+        # The compiler's stderr used to go to /dev/null, so CI reported nine missed mutants with no
+        # reason at all while the same script caught 9/9 locally. A gate that cannot say why it is
+        # red is a gate that gets rerun until it goes green by accident; the first four lines of the
+        # build log are now printed, which is what turns "MISSED" into a diagnosis.
         echo "  MISSED  $name (mutant would not compile — is engine/build built?)"
+        sed 's/^/          /' /var/tmp/speed_mut.build | head -4
         fail=$((fail+1)); return
     fi
     if /var/tmp/speed_mut >/var/tmp/speed_mut.out 2>&1; then
