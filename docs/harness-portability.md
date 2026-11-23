@@ -2667,3 +2667,15 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   not red when the operation is legal.
   → Tier 1, deploy discipline: env switches are read by value and left unset when false, and a
   mode that changes the boot target says so where a log or a dump will show it.
+- 2026-11-23 — **a round-trip test cannot detect a wrong base offset, because the reader and the
+  writer share it.** A save editor was refactored so its field offsets came from a generated table
+  instead of hand-copied numbers. The first run read the base from the wrong column of that table,
+  so every write landed at the wrong distance from the start of the record. `show` printed the
+  values that had just been set, and a write-then-read assertion passed, because both directions
+  subtracted the same wrong base. The defect was invisible to anything that only asks the tool
+  questions in its own vocabulary, and was caught only by running the previous version and the new
+  one over identical input and comparing the resulting bytes.
+  → Tier 1, refactor discipline: when a change is meant to preserve behaviour, the control is a
+  byte-for-byte comparison against the previous version on identical input, not a round-trip
+  through the tool under test. A shared constant that is wrong in both directions is the one error
+  a round-trip is structurally incapable of reporting.
