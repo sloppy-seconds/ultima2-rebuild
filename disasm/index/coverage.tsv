@@ -1195,7 +1195,7 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 68C0_dungeon_grid_byte.asm	decoded	yes			medium	0
 68ED_dungeon_sprite_pass.asm	decoded	yes			low	0
 6999_space_status.asm	decoded	yes			high	0
-6B3D_space_field_draw.asm	decoded	yes			medium	0
+6B3D_space_field_draw.asm	decoded	yes	yes		medium	0
 6CC4_space_ship_erase.asm	observed	yes	yes	yes	medium	0
 6D3E_sub_6d3e.asm	segmented				low	0
 6D5B_sub_6d5b.asm	segmented				low	0
@@ -1203,7 +1203,7 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 6D83_space_ship_draw.asm	observed	yes		yes	high	0
 6DFD_hyperwarp_flow.asm	decoded				high	0
 6FA3_space_status_values.asm	decoded	yes			high	0
-7030_space_collision.asm	decoded	yes			high	0
+7030_space_collision.asm	decoded	yes	yes		high	0
 7242_sub_7242.asm	segmented				low	0
 7276_sub_7276.asm	segmented				low	0
 7289_sub_7289.asm	segmented				low	0

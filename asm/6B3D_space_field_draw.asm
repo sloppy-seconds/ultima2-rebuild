@@ -156,6 +156,11 @@
 #           `CS:0x6b3d` contains the routine's own bytes (`8a 84 cd 04` is `mov ah,[si+0x4cd]`).
 #           On a fresh title screen both CS words read zero, which is what an unseeded
 #           accumulator should do.
+# body corrected: 2026-11-23 -- evidence: L_006eba decoded as `movups`, an SSE instruction an
+#           8086 cannot execute. The bytes are 0f 10 01 followed by an ascending run 02..08; no
+#           jump or call targets the label; it is absent from all 292 captured execution-flow dumps
+#           while this routine appears in them. Replaced with the raw bytes, which assemble_clean
+#           proves byte-identical. It is data, not an instruction.
 # confidence: medium-high for the mode byte and the tables; **measured-static for the >= 2
 #           branch** (it is a divider into the speaker, not art); low for the audible result
 # provenance: static — the mode byte, the two tables and the erase-before-plot were read out of
@@ -541,7 +546,10 @@ L_006eb7:
 L_006eb9:
         push   %cs
 L_006eba:
-        movups (%bx,%di),%xmm0
+        .byte 0x0f,0x10,0x01  # not code: unreachable data. Nothing jumps here, it never appears
+                              # in any of 292 execution-flow dumps while this routine does, and the
+                              # bytes after it run 02 03 04 05 06 07 08 -- an ascending table. The
+                              # disassembler read 0F 10 01 as SSE, which this CPU cannot execute.
 L_006ebd:
         add    (%bp,%di),%al
 L_006ebf:

@@ -3,7 +3,7 @@ cs	0	unknown	read	4C31_sub_4c31.asm	11	yes
 cs	0	unknown	read	4FF0_sub_4ff0.asm	9	yes		
 cs	0	unknown	read	52F6_sub_52f6.asm	9	yes		
 cs	0	unknown	read	5D22_sub_5d22.asm	9	yes		
-cs	0	unknown	read	7030_space_collision.asm	283	yes		
+cs	0	unknown	read	7030_space_collision.asm	289	yes		
 cs	1	unknown	read	5D14_sub_5d14.asm	12	yes		
 cs	1	unknown	read	5D2D_sub_5d2d.asm	7	yes		
 cs	2	unknown	read	4C31_sub_4c31.asm	15	yes		
@@ -175,13 +175,13 @@ cs	25225	unknown	read	66CB_sub_66cb.asm	14	yes
 cs	25225	unknown	read	66CB_sub_66cb.asm	56	yes		
 cs	25225	unknown	read	66CB_sub_66cb.asm	96	yes		
 cs	25225	unknown	read	66CB_sub_66cb.asm	128	yes		
-cs	27024		read	6B3D_space_field_draw.asm	442	no		absolute operand, no base register
-cs	27024		write	6B3D_space_field_draw.asm	446	no		absolute operand, no base register
+cs	27024		read	6B3D_space_field_draw.asm	447	no		absolute operand, no base register
+cs	27024		write	6B3D_space_field_draw.asm	451	no		absolute operand, no base register
 cs	27024		write	6DFD_hyperwarp_flow.asm	118	no		absolute operand, no base register
-cs	27026		read	6B3D_space_field_draw.asm	444	no		absolute operand, no base register
+cs	27026		read	6B3D_space_field_draw.asm	449	no		absolute operand, no base register
 cs	27026		write	6DFD_hyperwarp_flow.asm	120	no		absolute operand, no base register
 cs	27026		write	6DFD_hyperwarp_flow.asm	146	no		absolute operand, no base register
-cs	27028		read-modify-write	6B3D_space_field_draw.asm	456	no		absolute operand, no base register
+cs	27028		read-modify-write	6B3D_space_field_draw.asm	461	no		absolute operand, no base register
 cs	27028		write	6DFD_hyperwarp_flow.asm	160	no		absolute operand, no base register
 cs	27028		write	7242_sub_7242.asm	16	no		absolute operand, no base register
 cs	27028		write	7242_sub_7242.asm	38	no		absolute operand, no base register
@@ -198,16 +198,16 @@ cs	27032		read	7276_sub_7276.asm	10	no		absolute operand, no base register
 cs	27032		write	7276_sub_7276.asm	16	no		absolute operand, no base register
 cs	27032		read	7289_sub_7289.asm	10	no		absolute operand, no base register
 cs	27032		write	7289_sub_7289.asm	16	no		absolute operand, no base register
-cs	27820	unknown	read	6B3D_space_field_draw.asm	268	yes		
-cs	27820	unknown	read	6B3D_space_field_draw.asm	306	yes		
-cs	27836	unknown	read	6B3D_space_field_draw.asm	356	yes		
-cs	27836	unknown	read	6B3D_space_field_draw.asm	390	yes		
+cs	27820	unknown	read	6B3D_space_field_draw.asm	273	yes		
+cs	27820	unknown	read	6B3D_space_field_draw.asm	311	yes		
+cs	27836	unknown	read	6B3D_space_field_draw.asm	361	yes		
+cs	27836	unknown	read	6B3D_space_field_draw.asm	395	yes		
 cs	28690	unknown	read	6999_space_status.asm	150	yes		
-cs	28690	unknown	read	7030_space_collision.asm	131	yes		
+cs	28690	unknown	read	7030_space_collision.asm	137	yes		
 cs	28700	unknown	read	6999_space_status.asm	154	yes		
-cs	28700	unknown	read	7030_space_collision.asm	137	yes		
+cs	28700	unknown	read	7030_space_collision.asm	143	yes		
 cs	28710	unknown	read	6999_space_status.asm	158	yes		
-cs	28710	unknown	read	7030_space_collision.asm	143	yes		
+cs	28710	unknown	read	7030_space_collision.asm	149	yes		
 cs	31168		read	4AE6_sub_4ae6.asm	10	no		absolute operand, no base register
 cs	31214		read	4AF1_sub_4af1.asm	10	no		absolute operand, no base register
 ds	0	unknown	read-modify-write	020F_sub_020f.asm	28	yes		
@@ -341,11 +341,11 @@ ds	0	unknown	read-modify-write	6144_dungeon_shape_dispatch.asm	317	yes
 ds	0	unknown	read	6144_dungeon_shape_dispatch.asm	319	yes		
 ds	0	unknown	read	6144_dungeon_shape_dispatch.asm	353	yes		
 ds	0	unknown	read	68C0_dungeon_grid_byte.asm	55	yes		
-ds	0	unknown	read-modify-write	6B3D_space_field_draw.asm	530	yes		
-ds	0	unknown	read	6B3D_space_field_draw.asm	532	yes		
-ds	0	unknown	read-modify-write	6B3D_space_field_draw.asm	536	yes		
-ds	0	unknown	read	6B3D_space_field_draw.asm	538	yes		
-ds	0	unknown	read	6B3D_space_field_draw.asm	546	yes		
+ds	0	unknown	read-modify-write	6B3D_space_field_draw.asm	535	yes		
+ds	0	unknown	read	6B3D_space_field_draw.asm	537	yes		
+ds	0	unknown	read-modify-write	6B3D_space_field_draw.asm	541	yes		
+ds	0	unknown	read	6B3D_space_field_draw.asm	543	yes		
+ds	0	unknown	read	6B3D_space_field_draw.asm	554	yes		
 ds	0	unknown	read-modify-write	6FA3_space_status_values.asm	138	yes		
 ds	0	unknown	read-modify-write	6FA3_space_status_values.asm	140	yes		
 ds	0	unknown	read-modify-write	6FA3_space_status_values.asm	142	yes		
@@ -1072,8 +1072,8 @@ ds	73		write	26C6_time_door_set_era.asm	19	no		absolute operand, no base registe
 ds	73		read	26CC_time_door_place_player.asm	17	no		absolute operand, no base register
 ds	73		read	2708_sub_2708.asm	31	no		absolute operand, no base register
 ds	73		read	3C2E_cmd_O.asm	123	no		absolute operand, no base register
-ds	73		write	7030_space_collision.asm	358	no		absolute operand, no base register
-ds	73		write	7030_space_collision.asm	393	no		absolute operand, no base register
+ds	73		write	7030_space_collision.asm	369	no		absolute operand, no base register
+ds	73		write	7030_space_collision.asm	405	no		absolute operand, no base register
 ds	74		read	086F_sub_086f.asm	11	no		absolute operand, no base register
 ds	74		read	0A38_post_command_tail.asm	45	no		absolute operand, no base register
 ds	74		read	0BA0_sub_0ba0.asm	9	no		absolute operand, no base register
@@ -1117,8 +1117,8 @@ ds	74		read	3DDD_sub_3ddd.asm	7	no		absolute operand, no base register
 ds	74		read	3F5D_steal_attempt.asm	126	no		absolute operand, no base register
 ds	74		read	4050_cmd_T.asm	142	no		absolute operand, no base register
 ds	74		read	4232_sub_4232.asm	7	no		absolute operand, no base register
-ds	74		write	7030_space_collision.asm	354	no		absolute operand, no base register
-ds	74		write	7030_space_collision.asm	389	no		absolute operand, no base register
+ds	74		write	7030_space_collision.asm	365	no		absolute operand, no base register
+ds	74		write	7030_space_collision.asm	401	no		absolute operand, no base register
 ds	75		read	2BFB_sub_2bfb.asm	15	no		absolute operand, no base register
 ds	75		read	43F3_cmd_W.asm	77	no		absolute operand, no base register
 ds	75		read	4698_sub_4698.asm	8	no		absolute operand, no base register
@@ -1300,11 +1300,11 @@ ds	109		read	38B0_cmd_L.asm	310	no		absolute operand, no base register
 ds	109		read	3DFA_offer_only_outdoors_earth.asm	45	no		absolute operand, no base register
 ds	109		read	4223_sub_4223.asm	13	no		absolute operand, no base register
 ds	109		read	6999_space_status.asm	146	no		absolute operand, no base register
-ds	109		write	7030_space_collision.asm	157	no		absolute operand, no base register
 ds	109		write	7030_space_collision.asm	163	no		absolute operand, no base register
-ds	109		read	7030_space_collision.asm	169	no		absolute operand, no base register
-ds	109		read	7030_space_collision.asm	307	no		absolute operand, no base register
-ds	109		read	7030_space_collision.asm	391	no		absolute operand, no base register
+ds	109		write	7030_space_collision.asm	169	no		absolute operand, no base register
+ds	109		read	7030_space_collision.asm	175	no		absolute operand, no base register
+ds	109		read	7030_space_collision.asm	313	no		absolute operand, no base register
+ds	109		read	7030_space_collision.asm	403	no		absolute operand, no base register
 ds	110		read	26B7_time_door_target_era.asm	20	no		absolute operand, no base register
 ds	110		read	26CC_time_door_place_player.asm	25	no		absolute operand, no base register
 ds	110		read	2708_sub_2708.asm	41	no		absolute operand, no base register
@@ -1640,8 +1640,8 @@ ds	1145		read	67B3_line.asm	160	no		absolute operand, no base register
 ds	1145		write	67B3_line.asm	164	no		absolute operand, no base register
 ds	1145		read	67B3_line.asm	206	no		absolute operand, no base register
 ds	1145		write	67B3_line.asm	210	no		absolute operand, no base register
-ds	1145		write	6B3D_space_field_draw.asm	410	no		absolute operand, no base register
-ds	1145		write	6B3D_space_field_draw.asm	426	no		absolute operand, no base register
+ds	1145		write	6B3D_space_field_draw.asm	415	no		absolute operand, no base register
+ds	1145		write	6B3D_space_field_draw.asm	431	no		absolute operand, no base register
 ds	1145		write	6CC4_space_ship_erase.asm	36	no		absolute operand, no base register
 ds	1145		write	6CC4_space_ship_erase.asm	86	no		absolute operand, no base register
 ds	1145		read-modify-write	6CC4_space_ship_erase.asm	94	no		absolute operand, no base register
@@ -1690,8 +1690,8 @@ ds	1146		read	67B3_line.asm	152	no		absolute operand, no base register
 ds	1146		write	67B3_line.asm	156	no		absolute operand, no base register
 ds	1146		read	67B3_line.asm	214	no		absolute operand, no base register
 ds	1146		write	67B3_line.asm	218	no		absolute operand, no base register
-ds	1146		write	6B3D_space_field_draw.asm	414	no		absolute operand, no base register
-ds	1146		write	6B3D_space_field_draw.asm	432	no		absolute operand, no base register
+ds	1146		write	6B3D_space_field_draw.asm	419	no		absolute operand, no base register
+ds	1146		write	6B3D_space_field_draw.asm	437	no		absolute operand, no base register
 ds	1146		write	6CC4_space_ship_erase.asm	48	no		absolute operand, no base register
 ds	1146		read-modify-write	6CC4_space_ship_erase.asm	52	no		absolute operand, no base register
 ds	1146		read-modify-write	6CC4_space_ship_erase.asm	56	no		absolute operand, no base register
@@ -1753,12 +1753,12 @@ ds	1147		write	6999_space_status.asm	353	no		absolute operand, no base register
 ds	1147		write	6999_space_status.asm	368	no		absolute operand, no base register
 ds	1147		write	6999_space_status.asm	387	no		absolute operand, no base register
 ds	1147		write	6999_space_status.asm	402	no		absolute operand, no base register
-ds	1147		read	6B3D_space_field_draw.asm	234	no		absolute operand, no base register
+ds	1147		read	6B3D_space_field_draw.asm	239	no		absolute operand, no base register
 ds	1147		read	6CC4_space_ship_erase.asm	76	no		absolute operand, no base register
 ds	1147		read	6D83_space_ship_draw.asm	29	no		absolute operand, no base register
 ds	1147		read	6D83_space_ship_draw.asm	71	no		absolute operand, no base register
 ds	1147		write	6DFD_hyperwarp_flow.asm	242	no		absolute operand, no base register
-ds	1147		write	7030_space_collision.asm	295	no		absolute operand, no base register
+ds	1147		write	7030_space_collision.asm	301	no		absolute operand, no base register
 ds	1148		write	6078_dungeon_depth_scan.asm	40	no		absolute operand, no base register
 ds	1148		read	6078_dungeon_depth_scan.asm	118	no		absolute operand, no base register
 ds	1148		write	6078_dungeon_depth_scan.asm	128	no		absolute operand, no base register
@@ -1804,13 +1804,13 @@ ds	1148		write	6999_space_status.asm	357	no		absolute operand, no base register
 ds	1148		write	6999_space_status.asm	372	no		absolute operand, no base register
 ds	1148		write	6999_space_status.asm	383	no		absolute operand, no base register
 ds	1148		write	6999_space_status.asm	398	no		absolute operand, no base register
-ds	1148		read	6B3D_space_field_draw.asm	322	no		absolute operand, no base register
+ds	1148		read	6B3D_space_field_draw.asm	327	no		absolute operand, no base register
 ds	1148		read	6CC4_space_ship_erase.asm	38	no		absolute operand, no base register
 ds	1148		read	6CC4_space_ship_erase.asm	88	no		absolute operand, no base register
 ds	1148		read	6D83_space_ship_draw.asm	33	no		absolute operand, no base register
 ds	1148		read	6D83_space_ship_draw.asm	83	no		absolute operand, no base register
 ds	1148		write	6DFD_hyperwarp_flow.asm	246	no		absolute operand, no base register
-ds	1148		write	7030_space_collision.asm	299	no		absolute operand, no base register
+ds	1148		write	7030_space_collision.asm	305	no		absolute operand, no base register
 ds	1149		write	6078_dungeon_depth_scan.asm	60	no		absolute operand, no base register
 ds	1149		read	6078_dungeon_depth_scan.asm	142	no		absolute operand, no base register
 ds	1149		write	6078_dungeon_depth_scan.asm	152	no		absolute operand, no base register
@@ -1958,26 +1958,26 @@ ds	1215		read	4BE0_pixel_block.asm	49	no		absolute operand, no base register
 ds	1217		read	4B76_pixel_plot.asm	46	no		absolute operand, no base register
 ds	1217		read	4BAA_pixel_erase.asm	26	no		absolute operand, no base register
 ds	1217		read	4BE0_pixel_block.asm	59	no		absolute operand, no base register
-ds	1219		write	6B3D_space_field_draw.asm	228	no		absolute operand, no base register
-ds	1219		read	6B3D_space_field_draw.asm	262	no		absolute operand, no base register
-ds	1219		read	6B3D_space_field_draw.asm	302	no		absolute operand, no base register
-ds	1219		write	6B3D_space_field_draw.asm	512	no		absolute operand, no base register
-ds	1220		write	6B3D_space_field_draw.asm	316	no		absolute operand, no base register
-ds	1220		read	6B3D_space_field_draw.asm	350	no		absolute operand, no base register
-ds	1220		read	6B3D_space_field_draw.asm	386	no		absolute operand, no base register
-ds	1220		write	6B3D_space_field_draw.asm	516	no		absolute operand, no base register
-ds	1221		write	6B3D_space_field_draw.asm	276	no		absolute operand, no base register
-ds	1221		write	6B3D_space_field_draw.asm	308	no		absolute operand, no base register
-ds	1221		read	6B3D_space_field_draw.asm	424	no		absolute operand, no base register
-ds	1221		write	6B3D_space_field_draw.asm	520	no		absolute operand, no base register
-ds	1222		write	6B3D_space_field_draw.asm	360	no		absolute operand, no base register
-ds	1222		write	6B3D_space_field_draw.asm	396	no		absolute operand, no base register
-ds	1222		read	6B3D_space_field_draw.asm	430	no		absolute operand, no base register
-ds	1222		write	6B3D_space_field_draw.asm	526	no		absolute operand, no base register
-ds	1223		read	6B3D_space_field_draw.asm	402	no		absolute operand, no base register
-ds	1223		read	6B3D_space_field_draw.asm	438	no		absolute operand, no base register
-ds	1223		read	6B3D_space_field_draw.asm	476	no		absolute operand, no base register
-ds	1223		read	6B3D_space_field_draw.asm	486	no		absolute operand, no base register
+ds	1219		write	6B3D_space_field_draw.asm	233	no		absolute operand, no base register
+ds	1219		read	6B3D_space_field_draw.asm	267	no		absolute operand, no base register
+ds	1219		read	6B3D_space_field_draw.asm	307	no		absolute operand, no base register
+ds	1219		write	6B3D_space_field_draw.asm	517	no		absolute operand, no base register
+ds	1220		write	6B3D_space_field_draw.asm	321	no		absolute operand, no base register
+ds	1220		read	6B3D_space_field_draw.asm	355	no		absolute operand, no base register
+ds	1220		read	6B3D_space_field_draw.asm	391	no		absolute operand, no base register
+ds	1220		write	6B3D_space_field_draw.asm	521	no		absolute operand, no base register
+ds	1221		write	6B3D_space_field_draw.asm	281	no		absolute operand, no base register
+ds	1221		write	6B3D_space_field_draw.asm	313	no		absolute operand, no base register
+ds	1221		read	6B3D_space_field_draw.asm	429	no		absolute operand, no base register
+ds	1221		write	6B3D_space_field_draw.asm	525	no		absolute operand, no base register
+ds	1222		write	6B3D_space_field_draw.asm	365	no		absolute operand, no base register
+ds	1222		write	6B3D_space_field_draw.asm	401	no		absolute operand, no base register
+ds	1222		read	6B3D_space_field_draw.asm	435	no		absolute operand, no base register
+ds	1222		write	6B3D_space_field_draw.asm	531	no		absolute operand, no base register
+ds	1223		read	6B3D_space_field_draw.asm	407	no		absolute operand, no base register
+ds	1223		read	6B3D_space_field_draw.asm	443	no		absolute operand, no base register
+ds	1223		read	6B3D_space_field_draw.asm	481	no		absolute operand, no base register
+ds	1223		read	6B3D_space_field_draw.asm	491	no		absolute operand, no base register
 ds	1223		write	6DFD_hyperwarp_flow.asm	112	no		absolute operand, no base register
 ds	1223		write	6DFD_hyperwarp_flow.asm	140	no		absolute operand, no base register
 ds	1223		read-modify-write	6DFD_hyperwarp_flow.asm	158	no		absolute operand, no base register
@@ -1991,36 +1991,36 @@ ds	1224		write	6DFD_hyperwarp_flow.asm	136	no		absolute operand, no base registe
 ds	1224		read-modify-write	6DFD_hyperwarp_flow.asm	154	no		absolute operand, no base register
 ds	1224		write	6DFD_hyperwarp_flow.asm	290	no		absolute operand, no base register
 ds	1224		read-modify-write	6DFD_hyperwarp_flow.asm	300	no		absolute operand, no base register
-ds	1225		write	6B3D_space_field_draw.asm	400	no		absolute operand, no base register
-ds	1225		read	6B3D_space_field_draw.asm	420	no		absolute operand, no base register
-ds	1225		read	6B3D_space_field_draw.asm	464	no		absolute operand, no base register
+ds	1225		write	6B3D_space_field_draw.asm	405	no		absolute operand, no base register
+ds	1225		read	6B3D_space_field_draw.asm	425	no		absolute operand, no base register
+ds	1225		read	6B3D_space_field_draw.asm	469	no		absolute operand, no base register
 ds	1226		write	6999_space_status.asm	152	no		absolute operand, no base register
 ds	1226		write	6DFD_hyperwarp_flow.asm	195	no		absolute operand, no base register
 ds	1226		write	6DFD_hyperwarp_flow.asm	253	no		absolute operand, no base register
 ds	1226		read	6FA3_space_status_values.asm	74	no		absolute operand, no base register
-ds	1226		read	7030_space_collision.asm	93	no		absolute operand, no base register
-ds	1226		read	7030_space_collision.asm	133	no		absolute operand, no base register
+ds	1226		read	7030_space_collision.asm	99	no		absolute operand, no base register
+ds	1226		read	7030_space_collision.asm	139	no		absolute operand, no base register
 ds	1227		write	6999_space_status.asm	156	no		absolute operand, no base register
 ds	1227		write	6DFD_hyperwarp_flow.asm	201	no		absolute operand, no base register
 ds	1227		write	6DFD_hyperwarp_flow.asm	260	no		absolute operand, no base register
 ds	1227		read	6FA3_space_status_values.asm	92	no		absolute operand, no base register
-ds	1227		read	7030_space_collision.asm	99	no		absolute operand, no base register
-ds	1227		read	7030_space_collision.asm	139	no		absolute operand, no base register
+ds	1227		read	7030_space_collision.asm	105	no		absolute operand, no base register
+ds	1227		read	7030_space_collision.asm	145	no		absolute operand, no base register
 ds	1228		write	6999_space_status.asm	160	no		absolute operand, no base register
 ds	1228		write	6DFD_hyperwarp_flow.asm	207	no		absolute operand, no base register
 ds	1228		write	6DFD_hyperwarp_flow.asm	267	no		absolute operand, no base register
 ds	1228		read	6FA3_space_status_values.asm	110	no		absolute operand, no base register
-ds	1228		read	7030_space_collision.asm	105	no		absolute operand, no base register
-ds	1228		read	7030_space_collision.asm	145	no		absolute operand, no base register
-ds	1229	0x04cd+64	read	6B3D_space_field_draw.asm	226	yes		asm/6B3D_space_field_draw.asm walks the star table as 0x4cd(%si); 64 entries
-ds	1229	0x04cd+64	read	6B3D_space_field_draw.asm	408	yes		asm/6B3D_space_field_draw.asm walks the star table as 0x4cd(%si); 64 entries
-ds	1229	0x04cd+64	write	6B3D_space_field_draw.asm	428	yes		asm/6B3D_space_field_draw.asm walks the star table as 0x4cd(%si); 64 entries
-ds	1229	0x04cd+64	read	6B3D_space_field_draw.asm	510	yes		asm/6B3D_space_field_draw.asm walks the star table as 0x4cd(%si); 64 entries
+ds	1228		read	7030_space_collision.asm	111	no		absolute operand, no base register
+ds	1228		read	7030_space_collision.asm	151	no		absolute operand, no base register
+ds	1229	0x04cd+64	read	6B3D_space_field_draw.asm	231	yes		asm/6B3D_space_field_draw.asm walks the star table as 0x4cd(%si); 64 entries
+ds	1229	0x04cd+64	read	6B3D_space_field_draw.asm	413	yes		asm/6B3D_space_field_draw.asm walks the star table as 0x4cd(%si); 64 entries
+ds	1229	0x04cd+64	write	6B3D_space_field_draw.asm	433	yes		asm/6B3D_space_field_draw.asm walks the star table as 0x4cd(%si); 64 entries
+ds	1229	0x04cd+64	read	6B3D_space_field_draw.asm	515	yes		asm/6B3D_space_field_draw.asm walks the star table as 0x4cd(%si); 64 entries
 ds	1229	0x04cd+64	write	6D3E_sub_6d3e.asm	18	yes		asm/6B3D_space_field_draw.asm walks the star table as 0x4cd(%si); 64 entries
-ds	1293	unknown	read	6B3D_space_field_draw.asm	314	yes		
-ds	1293	unknown	read	6B3D_space_field_draw.asm	412	yes		
-ds	1293	unknown	write	6B3D_space_field_draw.asm	434	yes		
-ds	1293	unknown	read	6B3D_space_field_draw.asm	514	yes		
+ds	1293	unknown	read	6B3D_space_field_draw.asm	319	yes		
+ds	1293	unknown	read	6B3D_space_field_draw.asm	417	yes		
+ds	1293	unknown	write	6B3D_space_field_draw.asm	439	yes		
+ds	1293	unknown	read	6B3D_space_field_draw.asm	519	yes		
 ds	1293	unknown	write	6D3E_sub_6d3e.asm	24	yes		
 ds	1357		read-modify-write	4F7B_sub_4f7b.asm	8	no		absolute operand, no base register
 ds	1357		read	5C95_beep_short.asm	17	no		absolute operand, no base register
@@ -2053,7 +2053,7 @@ ds	1420		read	5D3D_sub_5d3d.asm	10	no		absolute operand, no base register
 ds	1456	unknown	read	4AC3_sub_4ac3.asm	12	yes		
 ds	3721		read-modify-write	8CD0_sub_8cd0.asm	152	no		absolute operand, no base register
 ds	8192	unknown	read-modify-write	6144_dungeon_shape_dispatch.asm	219	yes		
-ds	20313	unknown	read	7030_space_collision.asm	113	yes		
+ds	20313	unknown	read	7030_space_collision.asm	119	yes		
 ds	21022	unknown	read-modify-write	50F9_status_line_print.asm	52	yes		
 ds	21534	unknown	read-modify-write	50F9_status_line_print.asm	92	yes		
 es	0	unknown	read	1564_sub_1564.asm	7	yes	none	
@@ -2068,7 +2068,7 @@ es	0	unknown	write	4BE0_pixel_block.asm	67	yes	from-reg
 es	0	unknown	write	4BE0_pixel_block.asm	75	yes	from-reg	
 es	0	unknown	read-modify-write	4C31_sub_4c31.asm	13	yes	from-reg	
 es	0	unknown	write	6144_dungeon_shape_dispatch.asm	251	yes	none	
-es	0	unknown	read	7030_space_collision.asm	317	yes	none	
+es	0	unknown	read	7030_space_collision.asm	323	yes	none	
 es	2	unknown	write	4A89_sub_4a89.asm	17	yes	from-reg	
 es	2	unknown	read-modify-write	4C31_sub_4c31.asm	17	yes	from-reg	
 es	6		read	8CD0_sub_8cd0.asm	172	no	from-reg	absolute operand, no base register

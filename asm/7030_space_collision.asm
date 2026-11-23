@@ -65,6 +65,12 @@
 #           not. The landing sector arithmetic and the 'REQUEST DENIED!' test are graded
 #           observed from live DS readback (DS:49 = 0x09, sector 90) plus frames, not
 #           from ExecutedInstructions. Do not cite this trace for the landing path.
+# body corrected: 2026-11-23 -- evidence: three sites here decoded as x87 (`fisubrs`, two
+#           `fnstsw`), which needs an 8087 this CPU does not have. Each is skipped by a jump two
+#           bytes before it, none is targeted by any jump or call, none appears in 292 captured
+#           execution-flow dumps while this routine does, and the bytes after 0x73d1 are the
+#           literal string "INSERT PLAYER DISK)". Replaced with raw bytes; assemble_clean proves
+#           the byte match. They are data, not instructions.
 # confidence: high for the world byte, the name list 0..8, the deep-space refusal and
 #           the landing sector arithmetic; low for the world-9 name routine, which has
 #           never executed.
@@ -326,7 +332,10 @@ L_0073cd:
 L_0073cf:
         .byte 0xeb,0x17  # forced-kept: jmp    0x73e8
 L_0073d1:
-        fisubrs (%bx,%si)
+        .byte 0xde,0x28  # not code: the two bytes in front of the message "INSERT PLAYER DISK)".
+                         # The jmp two bytes above skips over them, nothing targets this label,
+                         # and they appear in none of 292 execution-flow dumps. The disassembler
+                         # read the escape byte DE as x87, which needs an 8087 this CPU lacks.
 L_0073d3:
         db "INSERT PLAYER DISK)",0x8d,0x00        # string
 L_0073e8:
@@ -343,7 +352,9 @@ L_0073ee:
 L_0073f1:
         .byte 0xeb,0x06  # forced-kept: jmp    0x73f9
 L_0073f3:
-        fnstsw (%di)
+        .byte 0xdd,0x3d  # not code: skipped by the jmp above (which lands at 0x73f9), never
+                         # executed in 292 captures, and the real instruction resumes at the
+                         # forced-keep sbb on the next line. DD is an x87 escape, not an opcode.
 L_0073f5:
         .byte 0x1b,0xff  # forced-kept: sbb    %di,%di
 L_0073f7:
@@ -378,7 +389,8 @@ L_007428:
 L_00742b:
         .byte 0xeb,0x06  # forced-kept: jmp    0x7433
 L_00742d:
-        fnstsw (%di)
+        .byte 0xdd,0x3d  # not code: same shape as 0x73f3 -- skipped by the jmp above, never
+                         # executed, real code resumes at the forced-keep sbb after it.
 L_00742f:
         .byte 0x1b,0xff  # forced-kept: sbb    %di,%di
 L_007431:
