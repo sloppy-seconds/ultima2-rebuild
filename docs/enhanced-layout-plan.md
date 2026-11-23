@@ -238,6 +238,11 @@ are the invasive ones and should not start until they are ruled.
 *(numbered 7a because it is a slice request that sits on top of the slice table above;
 § 8 and § 9 keep their numbers, since other documents point at them.)*
 
+**Status: specified in full, not built.** The design now lives in
+`docs/helm-automap-spec.md`, which carries the owner's rulings of 2026-11-23 (the trigger,
+the persistence split, and the reveal rule), the format sketch, the gate list, and the
+remaining open questions. This section keeps its number because other documents cite it.
+
 **Status: the trigger is ruled, 2026-11-23 — the automap appears whenever the player holds
 one or more helms.** Not ruled, and they are the two that actually cost something: the dungeon
 persistence question and the reveal rule, both listed at the end of this section. Not started.
