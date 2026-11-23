@@ -238,11 +238,16 @@ are the invasive ones and should not start until they are ruled.
 *(numbered 7a because it is a slice request that sits on top of the slice table above;
 § 8 and § 9 keep their numbers, since other documents point at them.)*
 
-**Status: requested, not ruled, not started.** Recorded here rather than built, and it
-is an *enhancement*, so it lives behind `--enhanced` and must not change what a
-classic-mode player sees. Classic keeps what the original does: press `V`, spend one
-HELM, see the sector drawn, press a key, back to the game (`CP5 H1`,
-`captures/spice86/vhelm-sector-map-live`).
+**Status: the trigger is ruled, 2026-11-23 — the automap appears whenever the player holds
+one or more helms.** Not ruled, and they are the two that actually cost something: the dungeon
+persistence question and the reveal rule, both listed at the end of this section. Not started.
+It is an *enhancement*, so it lives behind `--enhanced` and must not change what a classic-mode
+player sees. Classic keeps what the original does: press `V`, spend one HELM, see the sector
+drawn, press a key, back to the game (`CP5 H1`, `captures/spice86/vhelm-sector-map-live`).
+The ruling settles the possession question and, with the "no charge per look" line below it,
+means the panel automap is passive: holding a helm shows it, and showing it spends nothing.
+The original's `V` still costs one HELM in both modes, because that is the original's behaviour
+and this enhancement does not replace it.
 
 The request, as the owner put it: in enhanced mode, **while the player holds one or
 more helms**, the current sector map is drawn persistently in the side panel — no key
@@ -252,10 +257,12 @@ automap is earned by moving rather than by holding the item.
 
 Why it is cheap to want and not free to build:
 
-- **The panel does not exist yet.** This whole document is the panel, and S1–S4 are
-  unstarted. The automap is a box in that panel, so it is downstream of S1 and S2 at
-  minimum, and of whatever the § 4 font ruling picks, because the box's pixel width is
-  what sets how much of a 64x64 sector can be shown.
+- ~~**The panel does not exist yet.** This whole document is the panel, and S1–S4 are
+  unstarted.~~ **No longer true, 2026-11-23:** the panel exists (`core/panel.c`, drawn from
+  `game/overworld.c`), so the automap is a box in a panel that is already on screen. What that
+  bullet was really asking for still stands in weaker form: the box's pixel width is what sets
+  how much of a 64x64 sector can be shown, and nothing yet asserts the panel's box extents, so
+  the first task is to give the box a measured, asserted rectangle rather than to build a panel.
 - **The sector half is nearly free.** `helm_map_draw` in `game/commands.c` already
   renders a whole sector from `u2_world_tile_at` at 4x2 px per cell with a density
   ladder measured from the frames. A panel box is the same draw at a different scale
@@ -277,7 +284,10 @@ Why it is cheap to want and not free to build:
 
 What it would need before anyone writes code, in order:
 
-1. S1 and S2 landed, so there is a panel with a box of known pixel extent.
+1. ~~S1 and S2 landed, so there is a panel with a box of known pixel extent.~~ **Done** —
+   `core/layout.h` and `core/panel.c` are in the tree, so the prerequisite this item named is
+   met. What is still missing is the § 7 gate for those slices: a box of *known* extent is only
+   known if something asserts it.
 2. A ruling on **persistence**: is the explored dungeon map saved, or session-only?
    Saved means it belongs in the save overlay and needs a format decision; session-only
    means it resets on reload and should say so in the UI.
