@@ -159,6 +159,13 @@ run "index_facts selftest" tools/index_facts.py -- python3 tools/index_facts.py 
 run "index_facts verify" asm disasm/census -- python3 tools/index_facts.py --verify
 run "index_facts fresh" disasm/facts/asm.tsv -- python3 tools/index_facts.py --check-fresh
 
+# The footprint index (docs/plan-code-index.md § 3.1). --verify is deliberately NOT wired yet: it
+# is red on four misdecode candidates (SSE and x87 mnemonics an 8086 cannot execute) and four files
+# whose ES is set by a caller, and all eight need a ruling before they can be closed. A gate that
+# is red on day one trains everyone to ignore it, so it goes in when it can be true.
+run "index_footprint selftest" tools/index_footprint.py -- python3 tools/index_footprint.py --selftest
+run "index_footprint fresh" disasm/index/footprint.tsv -- python3 tools/index_footprint.py --check-fresh
+
 # The bible loop (docs/plan-game-bible.md § 4-5). No model runs in CI (ADR 0003), so these assert
 # the committed artefacts instead: every sentence has a verdict, no prose moved under a verdict,
 # the recorded pair still matches the prompt files, and the three judge controls are still red. A
