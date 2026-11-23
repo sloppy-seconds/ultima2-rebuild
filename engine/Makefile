@@ -22,7 +22,14 @@ WARN     := -Wall -Wextra -Werror -Wshadow -Wstrict-prototypes -Wmissing-prototy
 # that names an address. -g0 would strip the backtraces the sanitizer target relies on.
 OPT      ?= -O2 -g1
 CPPFLAGS += -Isrc -Icontent
-CFLAGS   += $(STD) $(WARN) $(OPT)
+# -fPIE is not optional on a PIE-default toolchain. Ubuntu's clang builds executables as PIE, and
+# objects compiled without -fPIE carry absolute relocations (R_X86_64_32 against .rodata, .bss)
+# that cannot be linked into one, so every check program that links libu2.a died at link time with
+# "relocation ... can not be used when making a PIE object". The engine binary itself linked, which
+# is why this looked like a CP4 logic failure for two days: the harness never built, and the script
+# reported the assertion it had been about to check. Fedora's gcc defaults to PIE too but was never
+# asked to link the archive, so the host never showed it.
+CFLAGS   += $(STD) $(WARN) $(OPT) -fPIE
 # The flag set every C translation unit in this project is compiled with, exported to
 # the test scripts so a check program is never held to a weaker bar than the engine it
 # checks. Before this, the ad-hoc `cc -std=c11 -Wall -Wextra -Werror` lines in
@@ -30,7 +37,7 @@ CFLAGS   += $(STD) $(WARN) $(OPT)
 # and -pedantic, and 25 real defects were hiding in the check programs behind that.
 # Scripts run by hand rather than through make fall back to `make -s ccflags`, so the
 # list has exactly one home.
-U2_CCFLAGS  = $(STD) $(WARN) $(CPPFLAGS)
+U2_CCFLAGS  = $(STD) $(WARN) $(CPPFLAGS) -fPIE
 export U2_CCFLAGS
 # The compiler the check programs are built with, so `make CC=clang test` compiles the
 # tests with clang too and not only the engine. A script run by hand falls back to cc.

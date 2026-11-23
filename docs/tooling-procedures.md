@@ -565,3 +565,30 @@ has the original load a record the engine wrote, reading both back out of live m
 whenever save handling changes — `engine/src/core/save.c`, the write-back in `engine/src/core/world.c`,
 the DS layout in `engine/src/core/state.h`, or the harness itself. `docs/save-format.md` § 9 has the
 recipe and § 8 the reason a whole-window byte comparison is not achievable.
+
+## Reproducing a compiler-specific CI failure
+
+The `clang` and `asan` jobs fail on runners this host is not: CI is Ubuntu with clang and the
+sanitizer runtimes, the host is Fedora with gcc and neither library. When one of those jobs goes red
+and the local suite is green, the difference is the toolchain, not the code, and it is reproducible
+here in a container — `localhost/u2-clang` (Ubuntu, clang 18) exists for exactly this.
+
+```bash
+cp -a . /var/tmp/u2clang/            # build off a copy: the host tree holds gcc objects
+cd /var/tmp/u2clang
+podman run --rm --userns=keep-id --user 1000:1000 \
+       -v /var/tmp/u2clang:/src:z -w /src localhost/u2-clang \
+       bash -lc 'make -C engine CC=clang && make -C engine CC=clang test'
+```
+
+**`--userns=keep-id --user 1000:1000` is not decoration, and the two failure modes without it are
+worth recognising because both masquerade as engine bugs.** As root, `chmod`-based protections do not
+apply, so the read-only-save-slot assertion fails and reports a defect that does not exist. As a bare
+`--user 1000:1000` without `keep-id`, the mapped uid cannot write the mount, and 22 config checks fail
+with `cannot write cfgw.ini`. Only the uid-mapped form reproduces what a GitHub runner does.
+
+This is how the CP4 red of 2026-11-23 was settled: the ghost-stamp assertion was never the fault. The
+harness had not linked — non-`-fPIE` objects in `libu2.a` cannot link into a PIE-default executable —
+and the script reported the assertion it was about to run. A check program that fails to build must
+not be able to look like a failed assertion, and that is the argument for making `run_cp*.sh` treat a
+harness build failure as its own verdict rather than falling through.
