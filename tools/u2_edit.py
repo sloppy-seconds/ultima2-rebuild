@@ -85,6 +85,9 @@ Usage:
     python3 tools/u2_edit.py set player armour 6
     python3 tools/u2_edit.py set player keys 20
     python3 tools/u2_edit.py set player str 40 -o /var/tmp/tp/player
+
+The DS offsets are generated from engine/src/core/state.h via disasm/index/state.tsv; run
+`selftest` to prove they resolve and that the resolver refuses a table that moved a field.
 """
 import argparse
 import os
@@ -92,56 +95,137 @@ import shutil
 import sys
 
 SIZE = 384
-BASE = 0x36          # save_offset = DS_offset - BASE
 
-# name -> (DS offset, width, max, kind)
-FIELDS = {
-    'name':   (0x36, 16, None, 'text'),
-    'sex':    (0x46, 1, None, 'char'),
-    'class':  (0x47, 1, 3, 'int'),
-    'race':   (0x48, 1, 3, 'int'),
-    'sector': (0x49, 2, 99, 'sector'),
+# The DS offsets here are GENERATED, not copied. The Seed module ruling in GLOSSARY.md says a
+# seed tool takes its offsets from engine/src/core/state.h, and this tool hand-copied the base
+# and every field offset instead, which made that ruling false in the code: move a field in
+# state.h and this file kept writing the old address and reported success. The offsets now come
+# from disasm/index/state.tsv, the committed table whose sole writer is tools/state_layout.py,
+# which parses state.h and refuses when a field is unnamed or unasserted. What stays hand-written
+# is the part only this tool knows: which state.h field each command name means, how wide it is on
+# disk, its maximum, and its encoding.
+STATE_TABLE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           os.pardir, 'disasm', 'index', 'state.tsv')
+
+
+def load_state_table(path=STATE_TABLE):
+    """Read the generated DS table: name -> (ds_offset, size, save_offset)."""
+    try:
+        rows = open(path, encoding='utf-8').read().splitlines()
+    except OSError as exc:
+        raise ValueError('cannot read %s (%s); regenerate it with '
+                         '"python3 tools/state_layout.py --write"' % (path, exc))
+    if not rows or rows[0].split('\t')[:3] != ['ds_offset', 'save_offset', 'name']:
+        raise ValueError('%s: unexpected header, expected ds_offset/save_offset/name' % path)
+    table = {}
+    for line in rows[1:]:
+        c = line.split('\t')
+        if len(c) < 5:
+            raise ValueError('%s: short row %r' % (path, line))
+        table[c[2]] = (int(c[0], 16), int(c[4]), int(c[1], 16) if c[1] else None)
+    if not table:
+        raise ValueError('%s: header but no rows' % path)
+    return table
+
+
+# name -> (DS offset, width, max, kind). _off and _span are bound to the loaded table by
+# resolve_fields; calling them before that is a bug in this file, not a bad save.
+def _off(key):
+    raise ValueError('_off called before the table was bound')
+
+
+def _span(first, rest):
+    raise ValueError('_span called before the table was bound')
+
+
+def resolve_fields(table):
+    """Build name -> (DS offset, width, max, kind) from the generated table.
+
+    Every failure is hard and names its reason. A silently missing field is how a seed tool
+    ends up writing the wrong byte and printing "wrote" afterwards.
+    """
+    def off(key):
+        if key not in table:
+            raise ValueError('%r is not a field in the generated DS table. The layout is '
+                             'generated from engine/src/core/state.h -- fix the name there or '
+                             'here, then regenerate with tools/state_layout.py --write.' % key)
+        return table[key][0]
+
+    def span(first, rest):
+        """A multi-byte field spans several state.h fields; prove they are contiguous."""
+        start = off(first)
+        want = start + table[first][1]
+        for key in rest:
+            if key not in table:
+                raise ValueError('%r, part of the %r field, is missing from the DS table' % (key, first))
+            if table[key][0] != want:
+                raise ValueError('%r should sit at 0x%X to complete the %r field; the table says 0x%X'
+                                 % (key, want, first, table[key][0]))
+            want += table[key][1]
+        return start
+
+    global _off, _span
+    _off, _span = off, span
+    return {
+    'name':   (_off('name'), 16, None, 'text'),
+    'sex':    (_off('sex'), 1, None, 'char'),
+    'class':  (_off('pclass'), 1, 3, 'int'),
+    'race':   (_off('race'), 1, 3, 'int'),
+    'sector': (_span('sector_first', ('sector_second',)), 2, 99, 'sector'),
     # Stats are BCD, one byte each: byte 0x40 means 40, not 64. Writing a raw
     # integer displays the wrong number (40 -> 0x28 -> "28").
-    'str':    (0x4B, 1, 99, 'bcd'),
-    'agi':    (0x4C, 1, 99, 'bcd'),
-    'sta':    (0x4D, 1, 99, 'bcd'),
+    'str':    (_off('stat_str'), 1, 99, 'bcd'),
+    'agi':    (_off('stat_agi'), 1, 99, 'bcd'),
+    'sta':    (_off('stat_sta'), 1, 99, 'bcd'),
     # 0x4E/0x4F were the DISPUTED pair until 2026-10-29: state.h said cha/wis, the
     # live findings table said wis/cha, and every maxout character had them equal so
     # nothing could tell. Settled by captures/spice86/d13-cha-vs-wis — a character
     # with 0x4E=20 and 0x4F=40 printed CHARISMA-20 / WISDOM-40 and priced a horse off
     # 0x4E. state.h was right; the findings table is corrected.
-    'cha':    (0x4E, 1, 99, 'bcd'),
-    'wis':    (0x4F, 1, 99, 'bcd'),
-    'int':    (0x50, 1, 99, 'bcd'),
-    'hp':     (0x51, 2, 9999, 'bcd'),    # 4-digit BCD across 0x51,0x52:
+    'cha':    (_off('stat_cha'), 1, 99, 'bcd'),
+    'wis':    (_off('stat_wis'), 1, 99, 'bcd'),
+    'int':    (_off('stat_int'), 1, 99, 'bcd'),
+    'hp':     (_span('hp', ('unk_52',)), 2, 9999, 'bcd'),    # 4-digit BCD across 0x51,0x52:
                                           # hp=4 with 0x52=0 displays as
                                           # H.P.=0400. A raw byte write of 255
                                           # gives 0xFF, whose nibbles are not
                                           # decimal digits, and the game prints
                                           # "??" for those.
-    'food':   (0x53, 3, 999999, 'bcd'),   # 6-digit counter; the status band
+    'food':   (_span('food', ('food_hi', 'food_lo')), 3, 999999, 'bcd'),   # 6-digit counter; the status band
                                           # prints only the top 4 digits, so
                                           # 40000 displays as FOOD=0400
-    'exp':    (0x56, 2, 9999, 'bcd'),
-    'gold':   (0x58, 2, 9999, 'bcd'),
-    'entry_x': (0x5A, 1, 63, 'int'),
-    'entry_y': (0x5B, 1, 63, 'int'),
-    'spell':  (0x63, 1, 255, 'int'),
+    'exp':    (_span('exp_lo', ('exp_hi',)), 2, 9999, 'bcd'),
+    'gold':   (_span('gold_lo', ('gold_hi',)), 2, 9999, 'bcd'),
+    'entry_x': (_off('entry_x'), 1, 63, 'int'),
+    'entry_y': (_off('entry_y'), 1, 63, 'int'),
+    'spell':  (_off('spell_pick'), 1, 255, 'int'),
     # Equipment and consumables. Proven in docs/spice86-live-findings.md s11 by
     # live read/write-back, with the name tables cited to file offsets.
-    'weapon': (0x61, 1, 9, 'int'),       # readied weapon index; 0 = HANDS
-    'armour': (0x62, 1, 7, 'int'),       # worn armour index; 0 = SKIN
-    'torches': (0x64, 1, 99, 'bcd'),
-    'keys':   (0x65, 1, 99, 'bcd'),
-    'tools':  (0x66, 1, 99, 'bcd'),
-    'world':  (0x6D, 1, 10, 'int'),      # 0 Earth, 1..9 planets, 0x0A deep space
+    'weapon': (_off('readied_weapon'), 1, 9, 'int'),       # readied weapon index; 0 = HANDS
+    'armour': (_off('worn_armour'), 1, 7, 'int'),       # worn armour index; 0 = SKIN
+    'torches': (_off('torches'), 1, 99, 'bcd'),
+    'keys':   (_off('keys'), 1, 99, 'bcd'),
+    'tools':  (_off('tools'), 1, 99, 'bcd'),
+    'world':  (_off('world'), 1, 10, 'int'),      # 0 Earth, 1..9 planets, 0x0A deep space
     # The Father Antos blessing flag. Written in the original by asm/4209:422B (world 9,
     # castle sector, role 0x81) and read by asm/3C2E cmd_O, which grants the force field
     # ring in sector 32 only when it is non-zero. Seeding it is how a gate tests the ring
     # arm without flying to Planet X first.
-    'blessing': (0x6C, 1, 1, 'int'),
-}
+    'blessing': (_off('blessing'), 1, 1, 'int'),
+    }
+
+
+STATE = load_state_table()
+try:
+    FIELDS = resolve_fields(STATE)
+except ValueError as exc:
+    sys.exit('u2_edit: %s' % exc)
+BASE = STATE['name'][0]      # the saved span starts where `name` sits, at DS:36
+if STATE['name'][2] != 0:
+    sys.exit("u2_edit: the generated table does not put the `name` field at save_offset 0, so "
+             "this tool's assumption about the base of the saved span is wrong. Check "
+             "tools/state_layout.py --verify before trusting any write.")
+
 
 WEAPONS = ['HANDS', 'DAGGER', 'MACE', 'AXE', 'BOW', 'SWORD',
            'GREAT SWORD', 'LIGHT SWORD', 'PHASER', 'QUICK SWORD']
@@ -174,15 +258,15 @@ SPELL_NAMES = ['NONE', 'LIGHT', 'DOWN LADDER', 'UP LADDER', 'PASSWALL', 'SURFACE
 # the game will happily walk past into 00 if you keep grinding it.
 MAXOUT = {'str': 99, 'agi': 99, 'sta': 99, 'cha': 99, 'wis': 99, 'int': 99,
           'hp': 9999, 'food': 999999, 'gold': 9999, 'exp': 9999}
-ARMOUR_BASE = 0x76      # weapons owned, DS:76+i  (the name is wrong; the comment is right)
-ITEM_BASE = 0xD6        # items held, DS:D6+i
+ARMOUR_BASE = STATE['weapons_owned'][0]   # DS:76+i, one count byte per weapon owned
+ITEM_BASE = STATE['items_held'][0]        # items held, DS:D6+i
 # Spell stock, DS:B6+i, ten slots, indexed by the readied-spell number DS:63. The index base is
 # the SPELLS group of the name pool (asm/4C55_name_pool.asm pool[36..45]): 0 NONE, 1 LIGHT,
 # 2 DOWN LADDER, 3 UP LADDER, 4 PASSWALL, 5 SURFACE, 6 PRAYER, 7 MAGIC MISSILE, 8 BLINK, 9 KILL.
 # asm/3139_cast_spell_flow reads DS:B6[DS:63] and answers NO SPELL! when it is zero, then
 # decrements it in packed decimal — so these are BCD counts and spells are CONSUMABLES, not
 # memorised slots. Slot 0 is NONE and is left alone.
-SPELL_BASE = 0xB6
+SPELL_BASE = STATE['spell_counts'][0]
 SPELL_SLOTS = 10
 
 
@@ -280,14 +364,89 @@ def show(d):
     print('items   %s' % (', '.join('%s x%d' % hc for hc in held) or '(none)'))
 
 
+def selftest():
+    """Prove the generated offsets resolve, and that the resolver can refuse.
+
+    This is a gate, so it has controls that are expected to go red. A resolver that cannot
+    fail is worse than hand-copied offsets, because it looks like it is checking something.
+    """
+    fails = []
+
+    def check(label, ok):
+        print('%-62s %s' % (label, 'ok' if ok else 'FAIL'))
+        if not ok:
+            fails.append(label)
+
+    check('every command field resolved an offset', len(FIELDS) >= 25)
+    check('BASE is where the name field sits', BASE == STATE['name'][0])
+    check('every resolved offset lands inside the 384-byte record',
+          all(BASE <= off <= BASE + SIZE for off, _, _, _ in FIELDS.values()))
+    check('the generated save_offset column agrees with BASE for every saved field',
+          all(ds - BASE == save for ds, _sz, save in STATE.values() if save is not None)
+          and any(save is not None for _ds, _sz, save in STATE.values()))
+    check('the composite fields are the widths the record actually has',
+          FIELDS['hp'][1] == 2 and FIELDS['food'][1] == 3
+          and FIELDS['sector'][1] == 2 and FIELDS['gold'][1] == 2)
+
+    def refuses(label, mutate):
+        table = dict(STATE)
+        mutate(table)
+        try:
+            resolve_fields(table)
+        except ValueError:
+            check(label, True)
+            return
+        check(label, False)
+
+    def drop(t):
+        del t['stat_cha']
+
+    def move(t):
+        t['unk_52'] = (0x9f, 1, 0x69)
+
+    def wipe(t):
+        t.clear()
+
+    refuses('control: a field missing from the table is a hard failure', drop)
+    refuses('control: a field moved out of a composite span is a hard failure', move)
+    refuses('control: an empty table is a hard failure', wipe)
+
+    # Behaviour, not just arithmetic: the refactor must not have changed what a write does.
+    d = bytearray(SIZE)
+    for name, want in (('str', 40), ('agi', 7), ('hp', 1234), ('gold', 7),
+                       ('food', 40000), ('sector', 71), ('class', 2), ('world', 9)):
+        put(d, name, want)
+        check('round-trip %s = %d' % (name, want), get(d, name) == want)
+    put(d, 'name', 'PAUL')
+    check('round-trip name', get(d, 'name') == 'PAUL')
+    put(d, 'sex', 'f')
+    check('round-trip sex', get(d, 'sex') == 'F')
+
+    d2 = bytearray(SIZE)
+    put(d2, 'str', 40)
+    check('control: str 40 is stored as BCD 0x40, not binary 0x28',
+          d2[FIELDS['str'][0] - BASE] == 0x40)
+    put(d2, 'sector', 71)
+    check('control: sector 71 is stored as the two digits 7 then 1, not 0x47',
+          d2[FIELDS['sector'][0] - BASE] == 7 and d2[FIELDS['sector'][0] - BASE + 1] == 1)
+
+    print('%d check(s) failed' % len(fails))
+    return 1 if fails else 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('cmd', choices=['show', 'set', 'setpos', 'maxout'])
-    ap.add_argument('file')
+    ap.add_argument('cmd', choices=['show', 'set', 'setpos', 'maxout', 'selftest'])
+    ap.add_argument('file', nargs='?')
     ap.add_argument('args', nargs='*')
     ap.add_argument('-o', '--out')
     a = ap.parse_args()
+
+    if a.cmd == 'selftest':
+        return selftest()
+    if not a.file:
+        ap.error('%s needs a save file' % a.cmd)
 
     low = a.file.lower()
     if '/references/' in low or ('/original/' in low and not a.out):
@@ -401,4 +560,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

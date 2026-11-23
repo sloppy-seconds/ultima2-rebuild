@@ -143,6 +143,14 @@ run "state_layout selftest" tools/state_layout.py -- python3 tools/state_layout.
 run "state_layout verify" engine/src/core/state.h -- python3 tools/state_layout.py --verify
 run "state_layout fresh" disasm/index/state.tsv -- python3 tools/state_layout.py --check-fresh
 
+# The save editor takes its DS offsets from the generated table now, not from hand-copied
+# numbers. Its selftest is the gate: it proves every command field resolves, that the generated
+# save_offset column agrees with the base this tool assumes, and -- the part that makes it a gate
+# rather than a report -- that the resolver refuses a table with a field missing, a field moved
+# out of a composite span, or no rows at all. A wrong base is the dangerous failure here, because
+# get() and put() share it, so a round-trip still looks fine; the base check is what catches it.
+run "u2_edit selftest" disasm/index/state.tsv -- python3 tools/u2_edit.py selftest
+
 # The coverage grade, derived from markers rather than the bulk-assigned `confidence:` stamp, plus
 # the unnamed-offset queue. Required: reads only asm/ and state.h. Selftest first -- 7 controls
 # over the grade derivation, including the one proving a commented forced-keep does NOT cap a
