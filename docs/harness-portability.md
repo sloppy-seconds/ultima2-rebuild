@@ -2612,5 +2612,58 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   shape: a flag whose two states are indistinguishable to every observer is a flag with one state, so
   a dev affordance that changes what the program boots into must announce itself on stderr or in the
   state dump, and must have a control proving the off state is reachable.
+* **2026-11-23 — a static archive built without `-fPIE` cannot link into a PIE-default
+  executable, and the failure arrives wearing the costume of an assertion.** The engine binary
+  links from objects directly and succeeded, so the build step went green; only the check programs,
+  which link the archive, died at link time with an absolute-relocation complaint. The harness then
+  reported the assertion it had been about to run, and two days were spent on a named behavioural
+  defect in code that was never executed. The general shape: a toolchain default that differs between
+  the developer's platform and the runner is a defect the build must be immune to, not a platform to
+  learn; and a harness must never be able to report a test result for a binary it failed to produce.
+  → Tier 1, build discipline: compile the archive with the same position-independence the executables
+  get, and make "could not build" a distinct verdict from "the test failed".
+* **2026-11-23 — a harness that discards the compiler's stderr cannot say why it is red, and two
+  harnesses in one repository differed only in how strictly they were compiled.** A mutation harness
+  reported every mutant as "would not compile" with the compiler output sent to `/dev/null`, while a
+  second mutation harness in the same job caught every mutant. The difference was that one hardcoded
+  a narrower flag set than the project's exported one and the other used the export; on the runner the
+  narrower set failed to build the mutant, and nothing in the verdict said so. The same rule this
+  project already applies to check programs -- never hold a test to a weaker bar than its subject --
+  had simply not been applied to the harnesses that prove the tests can fail. The general shape: any
+  harness that shells out to a compiler must capture its output and print the first lines on failure,
+  and every harness must compile with the project's exported flag set rather than a remembered copy.
+  → Tier 1, gate design: a gate that cannot name its reason gets rerun until it goes green by accident.
+* **2026-11-23 — "could not run" is a verdict, and collapsing it into "failed" makes a gate assert on
+  an input that cannot exist.** Several gates needed a file the repository gitignores by policy. Each
+  had reasoned correctly for the local case -- a silent skip would hide the defect the gate exists to
+  catch -- and then returned a plain failure, which meant the continuous-integration runner could never
+  go green and produced symptoms that read as product defects for days. The fix is a distinct
+  cannot-run exit code decided by the caller: locally the missing input is a real problem and stays a
+  failure; where the input is gitignored by design, the gate prints a visible skip naming what is
+  missing and where the property is still covered. The distinction is the precondition itself, not the
+  environment variable, so the same rule holds in both places. A skip that can hide a failure is not a
+  skip; one whose input cannot exist in that environment cannot.
+  → Tier 1, gate design: preconditions name the file the tool opens, and cannot-run is its own verdict.
+* **2026-11-23 — a sanitizer job that hardcodes the build directory links the wrong library and
+  reports PASS while sanitizing nothing.** The harness resolved the archive path from a fixed
+  directory while the sanitizer target built its own, so on a dirty developer tree the sanitizer run
+  linked an ordinary archive left there hours earlier and printed a pass; on a clean tree the same
+  mismatch surfaced as a link error. One root cause, two unearned verdicts, and only the loud one was
+  noticed. The general shape: any secondary build configuration (sanitizer, coverage, alternate
+  compiler) must publish the directory it built into, and every consumer must read that value rather
+  than reconstruct it -- a reconstructed path is a second hand-maintained copy of a build fact.
+  → Tier 1, build discipline: one exported build directory, read by everything that links against it.
+* **2026-11-23 — an authorship guard that compares per-file bodies must distinguish a rename from an
+  edit, or every legitimate rename gets marked and the marker stops meaning anything.** The guard
+  permits a changed body only when the file carries a correction marker. Renaming a file -- which the
+  project's own naming rules *require* whenever a session learns what a routine does -- presents to the
+  guard as a removal plus an addition, so ten correctly renamed files with byte-identical bodies were
+  reported as unmarked edits and the branch went red for obeying the rules. The fix separates the two
+  shapes on evidence: same address and identical body is a rename and owes nothing; a rename that also
+  changes a body still needs the marker. The general shape: a permission gate must be tested against
+  the legitimate operations it will meet, not only against the violation it was written to catch, and
+  a control proving the legal case passes is as necessary as one proving the illegal case fails.
+  → Tier 1, gate design: write the control that makes a gate red, and the control that proves it is
+  not red when the operation is legal.
   → Tier 1, deploy discipline: env switches are read by value and left unset when false, and a
   mode that changes the boot target says so where a log or a dump will show it.
