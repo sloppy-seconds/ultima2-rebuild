@@ -85,7 +85,7 @@ def harvests():
     return sorted(CAPTURES.rglob("*ExecutionFlow.json"))
 
 
-def edges(routines, bodies):
+def edges(routines, mn_by_addr):
     """(from, to, kind) -> (harvest set, total count)."""
     seen = {}
     for path in harvests():
@@ -100,7 +100,7 @@ def edges(routines, bodies):
         for a, b in zip(addrs, addrs[1:]):
             if a == b:
                 continue
-            kind = classify(bodies, a)
+            kind = classify(mn_by_addr, a)
             k = (a, b, kind)
             ent = seen.setdefault(k, [set(), 0])
             ent[0].add(path.parent.name)
@@ -108,25 +108,26 @@ def edges(routines, bodies):
     return seen
 
 
-def classify(bodies, addr):
+def classify(mn_by_addr, addr):
     """The kind of transfer the source instruction performs, read off the body line."""
-    routines_ = None  # noqa: F841  (kept for readability of the lookup below)
-    for name, table in bodies.items():
-        for off, mn in table.items():
-            if off == addr:
-                if mn == "call":
-                    return "call"
-                if mn == "jmp":
-                    return "jmp"
-                if mn.startswith("j"):
-                    return "jcc"
-                return "fallthrough"
-    return "unknown"
+    mn = mn_by_addr.get(addr)
+    if mn is None:
+        return "unknown"
+    if mn == "call":
+        return "call"
+    if mn == "jmp":
+        return "jmp"
+    if mn.startswith("j"):
+        return "jcc"
+    return "fallthrough"
 
 
 def build(routines):
-    bodies = {p.name: body_lines(p) for p in ROOT.glob("asm/*.asm")}
-    ed = edges(routines, bodies)
+    mn_by_addr = {}
+    for p in ROOT.glob("asm/*.asm"):
+        for off, mn in body_lines(p).items():
+            mn_by_addr.setdefault(off, mn)
+    ed = edges(routines, mn_by_addr)
     rows = []
     for (a, b, kind), (hs, n) in sorted(ed.items()):
         rows.append([f"{a:04X}", resolve(routines, a) or "?", f"{b:04X}",
@@ -211,10 +212,10 @@ def selftest() -> int:
          resolve(r, r[r.index((0x7030, "7030_space_collision.asm")) + 1][0] + 2)
          != "7030_space_collision.asm"),
         ("a source address with no body line is unknown, not guessed",
-         classify({"x.asm": {0x1234: "mov"}}, 0x9999) == "unknown"),
+         classify({0x1234: "mov"}, 0x9999) == "unknown"),
         ("a call is a call and a fall-through is not a transfer",
-         classify({"x.asm": {0x100: "call"}}, 0x100) == "call"
-         and classify({"x.asm": {0x101: "mov"}}, 0x101) == "fallthrough"),
+         classify({0x100: "call"}, 0x100) == "call"
+         and classify({0x101: "mov"}, 0x101) == "fallthrough"),
         ("CFG blocks are named only as a seed list",
          "seed list" in pathlib.Path(__file__).read_text()),
     ]
@@ -224,6 +225,133 @@ def selftest() -> int:
     return 0 if all(c[1] for c in checks) else 1
 
 
+def static_edges(routines):
+    """Routine-level transfers the bodies claim, via calls_gate's rule (call, jmp, forced-keep,
+    fragment fall-through). The header is not consulted: the body is authoritative, and
+    calls_gate already proves the header agrees."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    from calls_gate import parse  # same transfer rule, one implementation
+    out = {}
+    for p in sorted(ROOT.glob("asm/*.asm")):
+        _, _, transfers, _ = parse(p.read_text(errors="replace"))
+        for tok in transfers:
+            try:
+                tgt = int(tok.replace("L_", ""), 16)
+            except ValueError:
+                continue
+            to = resolve(routines, tgt)
+            if to and to != p.name:
+                out.setdefault((p.name, to), set()).add("static")
+    return out
+
+
+def classify_star(mn_by_addr, star_by_addr, addr):
+    """As classify, but a transfer through a register or memory operand -- `jmp *%bx`, the command
+    jump table -- is its own kind. That distinction is the whole reason the runtime half exists:
+    an indirect target has no static target at all, so it can only ever be observed."""
+    if star_by_addr.get(addr):
+        return "indirect"
+    return classify(mn_by_addr, addr)
+
+
+def star_lines(path):
+    """addr -> True for body lines that transfer through a register or memory operand."""
+    out = {}
+    addr = None
+    for raw in path.read_text(errors="replace").splitlines():
+        m = LINE_RE.match(raw)
+        if m:
+            addr = int(m.group(1), 16)
+            continue
+        if addr is not None and re.match(r"^\s+(jmp|call)\s+\*", raw):
+            out[addr] = True
+            addr = None
+    return out
+
+
+def observed_edges(routines):
+    """Routine-level edges proven by execution, keyed the same way as static_edges."""
+    mn_by_addr, star_by_addr = {}, {}
+    for p in ROOT.glob("asm/*.asm"):
+        for off, mn in body_lines(p).items():
+            mn_by_addr.setdefault(off, mn)
+        star_by_addr.update(star_lines(p))
+    out = {}
+    for path in harvests():
+        try:
+            data = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        flow = data if isinstance(data, list) else data.get("ExecutedInstructions", [])
+        addrs = [e["Offset"] + BIAS for e in flow
+                 if isinstance(e, dict) and e.get("Segment") == GAME_SEGMENT
+                 and isinstance(e.get("Offset"), int)]
+        for x, y in zip(addrs, addrs[1:]):
+            if x == y:
+                continue
+            a, b = resolve(routines, x), resolve(routines, y)
+            if a and b and a != b:
+                ent = out.setdefault((a, b), {"harvests": set(), "kinds": set()})
+                ent["harvests"].add(path.parent.name)
+                ent["kinds"].add(classify_star(mn_by_addr, star_by_addr, x))
+    return out
+
+
+def merge() -> int:
+    """The two halves side by side. The interesting column is the disagreement."""
+    r = routines()
+    st, ob = static_edges(r), observed_edges(r)
+    rows = []
+    for key in sorted(set(st) | set(ob)):
+        in_st, in_ob = key in st, key in ob
+        ev = "both" if in_st and in_ob else ("static" if in_st else "observed")
+        o = ob.get(key, {"harvests": set(), "kinds": set()})
+        rows.append([key[0], key[1], ev, "|".join(sorted(o["kinds"])),
+                     str(len(o["harvests"]))])
+    p = ROOT / "disasm" / "index" / "xref.tsv"
+    p.write_text("from_asm\tto_asm\tevidence\tkinds\tharvests\n"
+                 + "".join("\t".join(x) + "\n" for x in rows))
+    n = {k: sum(1 for x in rows if x[2] == k) for k in ("both", "static", "observed")}
+    print(f"wrote {p.relative_to(ROOT)} ({len(rows)} routine-level edges: "
+          f"both {n['both']}, static-only {n['static']}, observed-only {n['observed']})")
+    print("  observed-only means proven-but-unclaimed: headers exist on 601 of 1212 files and")
+    print("  elide long lists, so most of this class is a transfer no header bothers to claim.")
+    print("  The indirect kind inside it is the interesting subset -- a jmp through a jump table")
+    print("  has no static target at all and can only ever be observed.")
+    return 0
+
+
+def es_sources() -> int:
+    """For a file that reads es: with no in-file setup, who could have set ES before the transfer?
+
+    footprint refuses to guess this per-file, and it was right: ES arrives from a caller, so the
+    answer is in the graph. This reads the graph and says, per caller, what ES that caller sets."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    from index_footprint import parse_es_setup
+    r = routines()
+    starts = {n: s for s, n in r}
+    ob = observed_edges(r)
+    st = static_edges(r)
+    for name in sorted({k[1] for k in st} | {k[1] for k in ob}):
+        p = ROOT / "asm" / name
+        if not p.exists():
+            continue
+        lines = p.read_text(errors="replace").splitlines()
+        if "es:" not in "".join(lines).lower() or parse_es_setup(lines) != "none":
+            continue
+        callers = sorted({k[0] for k in st if k[1] == name} | {k[0] for k in ob if k[1] == name})
+        print(f"{name}: es: used with no in-file setup; {len(callers)} caller(s)")
+        for c in callers:
+            cp = ROOT / "asm" / c
+            setup = parse_es_setup(cp.read_text(errors="replace").splitlines()) if cp.exists() else "?"
+            how = "observed" if (c, name) in ob else "static only"
+            print(f"    {c:34} sets ES = {setup or 'nothing in file'}  ({how})")
+        if not callers:
+            print("    no caller in either half -- ES is set by something that never transfers")
+            print("    here in this corpus, which is an honest gap, not a resolved fact.")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--write", action="store_true")
@@ -231,11 +359,19 @@ def main() -> int:
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--seed-list", action="store_true")
     ap.add_argument("--reached", metavar="ADDR")
+    ap.add_argument("--merge", action="store_true",
+                    help="write the static+observed merge and print the disagreement counts")
+    ap.add_argument("--es-sources", action="store_true",
+                    help="for files whose es: setup arrives from a caller, name the callers")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
     if a.seed_list:
         return seed_list()
+    if a.merge:
+        return merge()
+    if a.es_sources:
+        return es_sources()
     if a.reached:
         return reached(a.reached)
     if a.verify:
