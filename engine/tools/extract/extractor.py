@@ -82,7 +82,7 @@ MANIFEST = [
     ("U2_S_TITLE_COPYRIGHT",   "02A3_sub_02a3.asm", ("run", 0x04AD)),
     ("U2_S_TITLE_AND_ORIGIN",  "02CC_sub_02cc.asm", 0),
     ("U2_S_TITLE_TYPE",        "02E6_sub_02e6.asm", ("run", 0x04F0)),
-    ("U2_S_MENU_DEMO",         "02F8_sub_02f8.asm", 0),
+    ("U2_S_MENU_DEMO",         "02F8_demo_help_line_print.asm", 0),
     ("U2_S_MENU_PLAY",         "031F_sub_031f.asm", 0),
     ("U2_S_MENU_CREATE",       "034B_sub_034b.asm", 0),
     ("U2_S_MENU_CHOICE",       "0375_sub_0375.asm", 0),

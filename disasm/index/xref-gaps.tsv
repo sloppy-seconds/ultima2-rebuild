@@ -35,7 +35,7 @@ from_asm	to_asm	class	note
 02A3_sub_02a3.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 02CC_sub_02cc.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 02E6_sub_02e6.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
-02F8_sub_02f8.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
+02F8_demo_help_line_print.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 031F_sub_031f.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 0375_sub_0375.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 038C_sub_038c.asm	50F9_status_line_print.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
@@ -773,7 +773,7 @@ from_asm	to_asm	class	note
 53B5_print_byte_bcd.asm	51FD_str_out_core.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 53D0_sub_53d0.asm	50F9_status_line_print.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 53F4_char_print_wrap.asm	51FD_str_out_core.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
-5400_sub_5400.asm	02F8_sub_02f8.asm	callee-never-reached	no harvest ever reached the callee
+5400_sub_5400.asm	02F8_demo_help_line_print.asm	callee-never-reached	no harvest ever reached the callee
 5400_sub_5400.asm	4BE0_pixel_block.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 5400_sub_5400.asm	50F9_status_line_print.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 5400_sub_5400.asm	51B0_sub_51b0.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not

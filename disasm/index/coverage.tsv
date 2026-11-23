@@ -55,7 +55,7 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 02E3_sub_02e3.asm	segmented				low	0
 02E6_sub_02e6.asm	decoded		yes		low	0
 02F7_sub_02f7.asm	segmented				low	0
-02F8_sub_02f8.asm	decoded		yes		low	0
+02F8_demo_help_line_print.asm	decoded	yes	yes		high	0
 031E_sub_031e.asm	segmented				low	0
 031F_sub_031f.asm	decoded		yes		low	0
 034A_sub_034a.asm	segmented				low	0

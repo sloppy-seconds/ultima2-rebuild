@@ -988,7 +988,7 @@ ds	46		write	025E_sub_025e.asm	17	no		absolute operand, no base register
 ds	46		write	0273_sub_0273.asm	16	no		absolute operand, no base register
 ds	46		write	0288_sub_0288.asm	15	no		absolute operand, no base register
 ds	46		write	02CC_sub_02cc.asm	15	no		absolute operand, no base register
-ds	46		write	02F8_sub_02f8.asm	15	no		absolute operand, no base register
+ds	46		write	02F8_demo_help_line_print.asm	25	no		absolute operand, no base register
 ds	46		write	031F_sub_031f.asm	15	no		absolute operand, no base register
 ds	46		write	034B_sub_034b.asm	15	no		absolute operand, no base register
 ds	46		write	0375_sub_0375.asm	15	no		absolute operand, no base register

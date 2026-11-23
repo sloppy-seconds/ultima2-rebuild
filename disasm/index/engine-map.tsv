@@ -31,7 +31,7 @@ asm_addr	asm_file	c_file	c_line	c_symbol	cited_as
 675	02A3_sub_02a3.asm	game/title.c	79	txt	asm/02A3
 716	02CC_sub_02cc.asm	game/title.c	80	txt	asm/02CC
 742	02E6_sub_02e6.asm	game/title.c	81	txt	asm/02E6
-760	02F8_sub_02f8.asm	game/title.c	82	txt	asm/02F8
+760	02F8_demo_help_line_print.asm	game/title.c	82	txt	asm/02F8
 799	031F_sub_031f.asm	game/title.c	83	txt	asm/031F
 843	034B_sub_034b.asm	game/title.c	84	txt	asm/034B
 885	0375_sub_0375.asm	game/title.c	85	txt	asm/0375

@@ -35,8 +35,8 @@ from_asm	to_asm	evidence	kinds	harvests
 02A3_sub_02a3.asm	51B0_sub_51b0.asm	static		0
 02CC_sub_02cc.asm	51B0_sub_51b0.asm	static		0
 02E6_sub_02e6.asm	51B0_sub_51b0.asm	static		0
-02F8_sub_02f8.asm	031F_sub_031f.asm	observed	fallthrough	292
-02F8_sub_02f8.asm	51B0_sub_51b0.asm	static		0
+02F8_demo_help_line_print.asm	031F_sub_031f.asm	observed	fallthrough	292
+02F8_demo_help_line_print.asm	51B0_sub_51b0.asm	static		0
 031F_sub_031f.asm	08A7_sub_08a7.asm	observed	unknown	292
 031F_sub_031f.asm	08ED_sub_08ed.asm	observed	call	292
 031F_sub_031f.asm	4BE0_pixel_block.asm	observed	call	292
@@ -2902,7 +2902,7 @@ from_asm	to_asm	evidence	kinds	harvests
 53F4_char_print_wrap.asm	53F7_sub_53f7.asm	observed	fallthrough	292
 53F7_sub_53f7.asm	034B_sub_034b.asm	observed	fallthrough	292
 53F7_sub_53f7.asm	5400_sub_5400.asm	observed	fallthrough	292
-5400_sub_5400.asm	02F8_sub_02f8.asm	static		0
+5400_sub_5400.asm	02F8_demo_help_line_print.asm	static		0
 5400_sub_5400.asm	03AC_sub_03ac.asm	observed	fallthrough	57
 5400_sub_5400.asm	09A3_sub_09a3.asm	observed	fallthrough	233
 5400_sub_5400.asm	0B79_melee_damage_pool.asm	observed	jmp	3
