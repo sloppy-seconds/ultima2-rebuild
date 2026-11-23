@@ -755,7 +755,7 @@ file	grade	name_evidence	body_corrected	live	confidence	undecoded_byte_lines
 4217_sub_4217.asm	segmented				low	0
 421A_sub_421a.asm	segmented				low	0
 4220_sub_4220.asm	segmented				low	0
-4223_world_eq9_gate.asm	decoded	yes			high	0
+4223_planet_x_gate.asm	decoded	yes			high	0
 4232_sub_4232.asm	segmented				low	0
 4246_sub_4246.asm	segmented				low	0
 4249_tribute_welcome.asm	observed	yes		yes	high	0

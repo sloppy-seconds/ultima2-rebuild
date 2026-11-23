@@ -581,7 +581,7 @@ from_asm	to_asm	class	note
 3F37_sub_3f37.asm	5287_data_mixed.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3F37_sub_3f37.asm	5400_sub_5400.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 3F5D_steal_attempt.asm	4188_street_cleric.asm	callee-never-reached	no harvest ever reached the callee
-3F5D_steal_attempt.asm	4223_world_eq9_gate.asm	callee-never-reached	no harvest ever reached the callee
+3F5D_steal_attempt.asm	4223_planet_x_gate.asm	callee-never-reached	no harvest ever reached the callee
 3F5D_steal_attempt.asm	5287_data_mixed.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 4050_cmd_T.asm	16BD_barkeep_chatter_hints.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not
 4050_cmd_T.asm	2557_mode_arm_horse.asm	callee-reached-elsewhere	callee is proven; this caller's edge is not

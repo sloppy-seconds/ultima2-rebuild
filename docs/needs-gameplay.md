@@ -610,7 +610,7 @@ ever been there. What does the player see, and does the engine render it correct
 they answered: thirteen routines, every one between 3 and 20 non-comment lines, nine of them
 unnamed only because nobody had read them. They are now named and headered —
 `15A9_stub_to_15d6`, `15D6_ds4a_eq2_gate`, `17E0_ah_ff_sentinel_check`, `3EAB_ds76_index_test`,
-`3ED1_stub_to_c30`, `4223_world_eq9_gate`, `4B4E_dual_text_video_helper`, `5EED_restore_regs_ret`,
+`3ED1_stub_to_c30`, `4223_planet_x_gate`, `4B4E_dual_text_video_helper`, `5EED_restore_regs_ret`,
 `8DCD_clock_tick_read`. Two are pure `jmp` stubs, one is a shared register-restore epilogue, one is
 the fourth INT 1Ah clock site, one runs a helper over both text-mode frame buffers, two are gates
 on DS bytes. `1B6B_clue_pool`, `2BAD_attack_arms_refusal_to_cmd_done` and `4188_street_cleric` were
@@ -618,8 +618,10 @@ already named from their own strings.
 
 **What is left, and it is small.** (1) Frames, for visual claims only: decoding `1B6B_clue_pool`
 says which strings it prints and what it tests, it does not license "the clue menu renders like
-this". (2) Which world is 9 — `4223_world_eq9_gate` compares DS:6D against 9 and DS:6D is the world
-byte by asm/7030, but the world table answers which one and this file cannot. (3) Whether asm/5F08's
+this". (2) ~~Which world is 9~~ **closed by lookup 2026-11-23:** `tools/census.py --what world`
+gives 0 EARTH, 1 MERCURY ... 8 PLUTO, **9 PLANET X** — names at exe `0x072b9`, hyperjump table at
+`0x07212`, grade measured. Earth occupies index 0, so the planets sit one below the counting order
+a player would use. `asm/4223_planet_x_gate` is therefore a Planet X gate and is renamed. (3) Whether asm/5F08's
 pushes match asm/5EED's four pops; if they do not, `5EED` is a second entry point, not an epilogue.
 Static, five minutes, nobody has done it. (4) `02F8_sub_02f8` is still unnamed — its string is
 `'D' - FOR A DEMONSTRATION`, so it is some kind of help menu, and that is an inference from one

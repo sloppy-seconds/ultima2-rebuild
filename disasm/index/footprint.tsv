@@ -737,7 +737,7 @@ ds	32		read	3139_cast_spell_flow.asm	523	no		absolute operand, no base register
 ds	32		write	35F3_sub_35f3.asm	9	no		absolute operand, no base register
 ds	32		read	3611_monster_damage_apply.asm	29	no		absolute operand, no base register
 ds	32		write	4050_cmd_T.asm	135	no		absolute operand, no base register
-ds	32		read	4223_world_eq9_gate.asm	17	no		absolute operand, no base register
+ds	32		read	4223_planet_x_gate.asm	19	no		absolute operand, no base register
 ds	32		read-modify-write	72A0_sub_72a0.asm	139	no		absolute operand, no base register
 ds	33		write	0896_sub_0896.asm	9	no		absolute operand, no base register
 ds	33		read-modify-write	08D6_sub_08d6.asm	7	no		absolute operand, no base register
@@ -1298,7 +1298,7 @@ ds	109		read	3823_site_floor_down.asm	89	no		absolute operand, no base register
 ds	109		read	38B0_cmd_L.asm	203	no		absolute operand, no base register
 ds	109		read	38B0_cmd_L.asm	310	no		absolute operand, no base register
 ds	109		read	3DFA_offer_only_outdoors_earth.asm	45	no		absolute operand, no base register
-ds	109		read	4223_world_eq9_gate.asm	21	no		absolute operand, no base register
+ds	109		read	4223_planet_x_gate.asm	23	no		absolute operand, no base register
 ds	109		read	6999_space_status.asm	146	no		absolute operand, no base register
 ds	109		write	7030_space_collision.asm	163	no		absolute operand, no base register
 ds	109		write	7030_space_collision.asm	169	no		absolute operand, no base register

@@ -2321,7 +2321,7 @@ from_asm	to_asm	evidence	kinds	harvests
 3F5D_steal_attempt.asm	277B_dungeon_move_commands.asm	observed	jmp|unknown	5
 3F5D_steal_attempt.asm	3823_site_floor_down.asm	observed	unknown	2
 3F5D_steal_attempt.asm	4188_street_cleric.asm	static		0
-3F5D_steal_attempt.asm	4223_world_eq9_gate.asm	static		0
+3F5D_steal_attempt.asm	4223_planet_x_gate.asm	static		0
 3F5D_steal_attempt.asm	51B0_sub_51b0.asm	both	unknown	1
 3F5D_steal_attempt.asm	5287_data_mixed.asm	static		0
 3F5D_steal_attempt.asm	52EF_sub_52ef.asm	observed	jmp|unknown	3
