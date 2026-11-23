@@ -23,38 +23,60 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DELTA = 0x200
 LABEL_RE = re.compile(r"^L_([0-9A-Fa-f]{6}):", re.MULTILINE)
 
-# Files off the convention, each with the reason. An exception list without reasons is how a gate
-# quietly stops meaning anything, and this one only ever shrinks.
-EXCEPTIONS = {
-    "4050_cmd_T.asm": "first label is name+0x20d, not name+0x200; the clean wave cut this fragment "
-                      "at a boundary 13 bytes off. Recorded, not fixed: moving a label is a body "
-                      "change and CP0 freezes the body.",
-}
+# Files off the convention that a named entry label does not explain. An exception list without
+# reasons is how a gate quietly stops meaning anything, and this one only ever shrinks. It is empty
+# on purpose: the one apparent outlier, 4050_cmd_T.asm at +0x20d, turned out to be the gate's
+# mistake, not the corpus's — its entry is labelled `cmd_T:` and the clean wave only stamped L_
+# labels from the fourth instruction on. See NAMED_ENTRY below.
+EXCEPTIONS: dict[str, str] = {}
+
+# A file whose first address-bearing label is later than name+0x200 is legitimate when the entry is
+# labelled by name instead — `cmd_T:`, `sub_405d:` and so on. The address is still the filename's;
+# it is simply not spelled out on the entry line.
+ENTRY_LABEL_RE = re.compile(r"^([A-Za-z_][\w]*):\s*$")
 
 
 def scan():
-    ok, bad, nolabel = [], [], []
+    ok, bad, nolabel, named_entry = [], [], [], []
     for p in sorted((ROOT / "asm").glob("*.asm")):
         try:
             name = int(p.name[:4], 16)
         except ValueError:
             continue
-        labels = LABEL_RE.findall(p.read_text(errors="replace"))
+        text = p.read_text(errors="replace")
+        labels = LABEL_RE.findall(text)
         if not labels:
             nolabel.append(p.name)
             continue
-        if int(labels[0], 16) - name == DELTA:
+        delta = int(labels[0], 16) - name
+        if delta == DELTA:
             ok.append(p.name)
+            continue
+        # Explain the gap before calling it a failure: is the entry labelled by name?
+        first_l = f"L_{labels[0]}:"
+        entry_named = False
+        for line in text.splitlines():
+            if line.startswith("#") or not line.strip():
+                continue
+            if line.startswith(first_l):
+                break
+            if ENTRY_LABEL_RE.match(line):
+                entry_named = True
+                break
+        if entry_named:
+            named_entry.append((p.name, delta))
         else:
-            bad.append((p.name, int(labels[0], 16) - name))
-    return ok, bad, nolabel
+            bad.append((p.name, delta))
+    return ok, bad, nolabel, named_entry
 
 
 def report() -> int:
-    ok, bad, nolabel = scan()
+    ok, bad, nolabel, named_entry = scan()
     off = [b for b in bad if b[0] not in EXCEPTIONS]
     print(f"label_offset_gate: {len(ok)} files on the convention (first label = name + 0x200), "
-          f"{len(nolabel)} with no labels")
+          f"{len(named_entry)} with the entry labelled by name instead, {len(nolabel)} with no labels")
+    for name, delta in named_entry:
+        print(f"  named entry  {name:34} first L_ label {delta:+#x}")
     for name, delta in bad:
         tag = "exception" if name in EXCEPTIONS else "OFF CONVENTION"
         print(f"  {tag:14} {name:34} delta {delta:+#x}")
@@ -66,7 +88,8 @@ def report() -> int:
 
 
 def _mk(tmp, fname, label):
-    (tmp / fname).write_text(f"# t\nsub_x:\nL_{label:06x}:\n        ret\n")
+    # No named entry label: these fixtures exist to test the unexplained cases.
+    (tmp / fname).write_text(f"# t\nL_{label:06x}:\n        ret\n")
 
 
 def selftest() -> int:
@@ -79,17 +102,23 @@ def selftest() -> int:
         _mk(tmp, "2000_b.asm", 0x2000)      # label == name: the mistake this catches
         _mk(tmp, "3000_c.asm", 0x3201)      # off by one
         (tmp / "4000_d.asm").write_text("# t\nsub_x:\n        ret\n")  # no labels
+        (tmp / "5000_e.asm").write_text(  # entry labelled by name, L_ later: legitimate
+            "# t\ncmd_x:\n        call L_0051df\n        db \"X-\",0\nsub_520d:\n"
+            "L_00520d:\n        ret\n")
         global ROOT
         keep = ROOT
         ROOT = pathlib.Path(td)
         try:
-            ok, bad, nolabel = scan()
+            ok, bad, nolabel, named_entry = scan()
             checks.append(("a file on the convention passes", ok == ["1000_a.asm"]))
             checks.append(("a label equal to the filename is caught, not skipped",
                            ("2000_b.asm", 0) in bad))
             checks.append(("a delta of one is caught", ("3000_c.asm", 0x201) in bad))
             checks.append(("a file with no labels is reported separately, not as a pass",
                            nolabel == ["4000_d.asm"]))
+            checks.append(("a named entry label explains a later first L_ label",
+                           [n for n, _ in named_entry] == ["5000_e.asm"]
+                           and not any(n == "5000_e.asm" for n, _ in bad)))
         finally:
             ROOT = keep
     checks.append(("every exception names a reason",
