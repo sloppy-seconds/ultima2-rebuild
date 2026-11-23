@@ -139,7 +139,9 @@ def page_html(page: str, facts: dict[str, dict]) -> str:
                             for t in facts[f].get("evidence_tool", "").split(",") if t})
             badges = "".join(f'<span class="badge {GRADE_CLASS.get(g, "")}">{esc(g)}</span>'
                              for g in grades)
-            ev = "".join(f'<a href="../../asm/{esc(s)}">{esc(s)}</a>' for s in srcs)
+            # Not a link: the served root is site/, and asm/ is not inside it. A link here would
+            # 404, and a filename that lies about being clickable is worse than plain text.
+            ev = "".join(f'<span class="mono">{esc(s)}</span> ' for s in srcs)
             ev += "".join(f' <span class="mono">{esc(t)}</span>' for t in tools)
             body.append(f'<div class="sent">{badges}{esc(item["text"])}'
                         f"<details><summary>evidence</summary>{ev}</details></div>")
