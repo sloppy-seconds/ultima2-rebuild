@@ -281,13 +281,30 @@ def main():
     # A removal is now permitted when the same address reappears as a new file carrying a
     # marker — i.e. the rename is attributed to a correction, which is the only legitimate
     # reason for a body to move between filenames.
+    # Two rename shapes, and they are not the same case. A PURE rename keeps the same address and a
+    # byte-identical body and moves only the filename: that is what section 3 REQUIRES when a
+    # session learns what a routine does, and it owes no marker because no body changed. Ten such
+    # pairs made main red on 2026-11-23 -- the guard had no case for them, so every legitimate
+    # rename was reported as an unmarked body edit. A rename that ALSO corrects a body is the other
+    # shape: the new file must carry the marker, and the removal is attributed to it.
+    head_by_addr = {os.path.basename(p).split('_')[0]: p for p in head_raw}
+    work_by_addr = {os.path.basename(p).split('_')[0]: p for p in work_raw}
+    pure_renames = set()
+    for addr, old_path in head_by_addr.items():
+        new_path = work_by_addr.get(addr)
+        if (new_path and new_path != old_path
+                and body_lines(head_raw[old_path]) == body_lines(work_raw[new_path])):
+            pure_renames.add(old_path)
+            pure_renames.add(new_path)
     renamed_targets = {os.path.basename(p).split('_')[0]
                        for p, raw in work_raw.items()
                        if p not in head_raw and marker_in(raw)}
     offenders, permitted = [], []
     for path in sorted(set(head_raw) | set(work_raw)):
         old, new = head_raw.get(path), work_raw.get(path)
-        if old is None:            # brand-new file: its body is new content
+        if path in pure_renames:
+            permitted.append((path, 'renamed; body byte-identical, so a name change is not a body change'))
+        elif old is None:          # brand-new file: its body is new content
             mk = marker_in(new) if new else None
             (permitted if mk else offenders).append((path, mk or 'new file, no marker'))
         elif new is None:          # removed file: its body went somewhere or vanished

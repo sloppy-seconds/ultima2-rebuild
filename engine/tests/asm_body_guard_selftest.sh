@@ -19,6 +19,7 @@
 #
 #   9  file RENAMED + body changed, WITH marker -> guard MUST pass, and must say 'renamed'
 #  10  file RENAMED + body changed, NO marker   -> guard MUST fail
+#  11  file RENAMED, body byte-identical, NO marker -> guard MUST pass (a name is not a body)
 #
 # Runs in a throwaway git worktree so the real checkout is never touched. Skips cleanly if
 # git worktree is unavailable.
@@ -222,6 +223,19 @@ apply_ctrl "$REN2" nomark
 rc10=$(env -u CI -u GITHUB_ACTIONS python3 "$ROOT/engine/tests/asm_body_guard.py" >/dev/null 2>&1; echo $?)
 [ "$rc10" != "0" ] && ok "10 unmarked rename + body change still goes red" \
                    || no "10 guard waved through an unmarked rename -- the exception is too wide"
+git reset -q --hard HEAD >/dev/null 2>&1; git clean -qfd asm/ >/dev/null 2>&1
+
+# ---- 11: a PURE rename, body untouched, no marker, must pass -----------------------------
+# The shape section 3 mandates: a session learns what a routine does, the name goes into the
+# filename, and not one body byte moves. Ten of these made main red on 2026-11-23 because the
+# guard had no case for an unmarked rename, so every legitimate rename looked like a smuggled edit.
+# If this control ever goes red, the guard has stopped distinguishing a name change from a body
+# change, and every future rename will get marked to get past it -- which is how the marker stops
+# meaning anything.
+git mv -q "$REN" "$REN2" 2>/dev/null || { mv "$REN" "$REN2"; }
+rc11=$(env -u CI -u GITHUB_ACTIONS python3 "$ROOT/engine/tests/asm_body_guard.py" >/dev/null 2>&1; echo $?)
+[ "$rc11" = "0" ] && ok "11 pure rename, identical body, no marker is permitted" \
+                  || no "11 guard flagged a pure rename as an unmarked body edit (exit $rc11)"
 git reset -q --hard HEAD >/dev/null 2>&1; git clean -qfd asm/ >/dev/null 2>&1
 
 echo
