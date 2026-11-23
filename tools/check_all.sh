@@ -174,6 +174,11 @@ run "index_engine_map selftest" engine/src asm -- python3 tools/index_engine_map
 run "index_engine_map verify" engine/src asm -- python3 tools/index_engine_map.py --verify
 run "index_engine_map fresh" disasm/index/engine-map.tsv -- python3 tools/index_engine_map.py --check-fresh
 
+# The runtime call graph. Only the selftest is wired: --verify and --merge re-read all 292
+# ExecutionFlow harvests, which is minutes of work for a check that only changes when a capture
+# lands, and a gate that makes every commit wait teaches people to stop running the gate.
+run "index_xref selftest" asm captures -- python3 tools/index_xref.py --selftest
+
 # The bible loop (docs/plan-game-bible.md § 4-5). No model runs in CI (ADR 0003), so these assert
 # the committed artefacts instead: every sentence has a verdict, no prose moved under a verdict,
 # the recorded pair still matches the prompt files, and the three judge controls are still red. A

@@ -216,6 +216,13 @@ def selftest() -> int:
         ("a call is a call and a fall-through is not a transfer",
          classify({0x100: "call"}, 0x100) == "call"
          and classify({0x101: "mov"}, 0x101) == "fallthrough"),
+        ("a callee no harvest reached is the honest gap, not a contradiction",
+         classify_gap("b.asm", set(), {}) == ("callee-never-reached",
+                                              "no harvest ever reached the callee")),
+        ("a callee proven from elsewhere is a caller gap, not a callee gap",
+         classify_gap("b.asm", {"b.asm"}, {})[0] == "callee-reached-elsewhere"),
+        ("an unexercised handler is named as such, with its count",
+         classify_gap("b.asm", set(), {"b.asm": 0})[0] == "handler-unexercised"),
         ("CFG blocks are named only as a seed list",
          "seed list" in pathlib.Path(__file__).read_text()),
     ]
@@ -352,6 +359,57 @@ def es_sources() -> int:
     return 0
 
 
+def handler_exec():
+    """file -> executed-count, from cmd_handlers.py, which is the authority on whether a command
+    handler has ever been seen running. Imported by subprocess rather than by hand-copying its
+    derivation: two implementations of 'was this handler reached' is the drift this project keeps
+    refusing."""
+    import subprocess
+    try:
+        out = subprocess.run([sys.executable, str(ROOT / "tools" / "cmd_handlers.py"), "--json"],
+                             capture_output=True, text=True, timeout=600)
+        data = json.loads(out.stdout)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return {}
+    return {d["file"]: d["executed"] for d in data if isinstance(d, dict) and "file" in d}
+
+
+def classify_gap(to, reached, hx):
+    """Why a body claims a transfer no harvest proved. Pure, so the controls can hit it directly."""
+    if to in hx:
+        return ("handler-unexercised", f"handler exec count {hx[to]}") if hx[to] == 0 \
+            else ("handler-exercised-elsewhere", f"handler ran {hx[to]}x, not via this caller")
+    if to in reached:
+        return "callee-reached-elsewhere", "callee is proven; this caller's edge is not"
+    return "callee-never-reached", "no harvest ever reached the callee"
+
+
+def reconcile() -> int:
+    """The 884 claimed-but-never-seen edges, split by what that actually means."""
+    r = routines()
+    st, ob = static_edges(r), observed_edges(r)
+    reached = {b for (_, b) in ob}
+    hx = handler_exec()
+    rows, counts = [], {}
+    for key in sorted(set(st) - set(ob)):
+        cls, note = classify_gap(key[1], reached, hx)
+        rows.append([key[0], key[1], cls, note])
+        counts[cls] = counts.get(cls, 0) + 1
+    p = ROOT / "disasm" / "index" / "xref-gaps.tsv"
+    p.write_text("from_asm\tto_asm\tclass\tnote\n"
+                 + "".join("\t".join(x) + "\n" for x in rows))
+    print(f"wrote {p.relative_to(ROOT)} ({len(rows)} static-only edges)")
+    for k, v in sorted(counts.items(), key=lambda kv: -kv[1]):
+        print(f"  {k:34} {v}")
+    unexercised = sum(1 for v in hx.values() if v == 0)
+    print(f"  cmd_handlers reports {unexercised} handler(s) never executed; "
+          f"{counts.get('handler-unexercised', 0)} gap edge(s) point at one.")
+    print("  callee-never-reached is the honest gap: a body says control can get there and no")
+    print("  capture in the corpus has ever been there. That is what an UNPROVEN marker is for,")
+    print("  and it is a capture queue, not a code defect.")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--write", action="store_true")
@@ -363,6 +421,8 @@ def main() -> int:
                     help="write the static+observed merge and print the disagreement counts")
     ap.add_argument("--es-sources", action="store_true",
                     help="for files whose es: setup arrives from a caller, name the callers")
+    ap.add_argument("--reconcile", action="store_true",
+                    help="split claimed-but-never-observed edges into what each one means")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
@@ -372,6 +432,8 @@ def main() -> int:
         return merge()
     if a.es_sources:
         return es_sources()
+    if a.reconcile:
+        return reconcile()
     if a.reached:
         return reached(a.reached)
     if a.verify:
