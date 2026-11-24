@@ -197,6 +197,10 @@ run "index_xref selftest" asm captures -- python3 tools/index_xref.py --selftest
 # confident wrong header about a three-line routine on 2026-11-23; see docs/needs-gameplay.md G95.
 run "label_offset_gate" asm -- python3 tools/label_offset_gate.py --verify
 run "label_offset_gate selftest" asm -- python3 tools/label_offset_gate.py --selftest
+# The dungeon stroke decoder. The selftest needs no game file; the read needs original/monsters,
+# which is gitignored by policy, so that one is an opt_run and exits 77 when absent.
+run "dungeon_strokes selftest" tools/dungeon_strokes.py -- python3 tools/dungeon_strokes.py --selftest
+opt_run "dungeon_strokes reads monsters" original/monsters -- python3 tools/dungeon_strokes.py
 
 # The bible loop (docs/plan-game-bible.md § 4-5). No model runs in CI (ADR 0003), so these assert
 # the committed artefacts instead: every sentence has a verdict, no prose moved under a verdict,

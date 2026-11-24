@@ -106,12 +106,19 @@ the binary" does. So the honest split is three grades, not two:
 | 7 | Balron | corroborated | proven special (sleep) matches the third-party special for Balron; the message does not name it |
 | 1, 3, 4, 6 | Orc, Carrion creeper, Viper, Daemon/Minotaur | **hypothesis** | position in the third-party level-ordered list, and nothing else |
 
-**What would settle the remaining four is the stroke data, not a capture.** The original ships a
-file named `monsters` — 8 blocks of 256 bytes of stroke data, read by `asm/07F3` as one 0x800
-block, and `asm/68ED` indexes it as `(stamp & 7) * 256`. So the binary contains a *shape* per
-stamp. Rendering those eight blocks and comparing silhouettes against the four contested names is
-a decode plus a frame, and it is the only evidence about those four that would not be a guess
-about a wiki's ordering.
+**What settled the remaining four is the stroke data, and it is now looked at.** The original ships
+a file named `monsters` — 8 blocks of 256 bytes of stroke data, read by `asm/07F3` as one 0x800
+block, and indexed by `asm/68ED` as `(stamp & 7) * 256` — so the binary contains a *shape* per
+stamp. `tools/dungeon_strokes.py` renders them; **`docs/dungeon-stroke-art.md`** records what each
+one is. The result, briefly: stamp 4 plots as a **limbless sinuous serpent** and stamp 3 as a
+**domed body with many splaying legs**, and neither shape has an alternative candidate on this
+list, so Viper and Carrion creeper move from "position in a wiki list" to corroborated. Stamp 7 is
+the **largest figure with a wide fan of wings** — a winged demon whose proven special is the sleep
+the guide attributes to a balron, so it agrees twice over. Stamp 2 is a **legless mass drawn
+entirely in one translucent half-dither**, which is a plausible way to draw a ghost in four colours
+with no alpha. **Stamp 1 stays the weakest row**: a generic humanoid, which is the one shape that
+would survive any reordering and therefore proves the least, and stamp 6's horned humanoid fits both
+Daemon and Minotaur when the source itself cannot choose between them.
 
 Design consequence: the three proven creatures should visibly *do* their thing
 (a ghost that reads as cold and immaterial, a gremlin that reads as a thieving

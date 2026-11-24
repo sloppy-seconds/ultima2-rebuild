@@ -2784,3 +2784,23 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   → Tier 1, evidence discipline: a negative of the form "nothing pairs X with Y" must be checked
   against the print sites of the routine being discussed, not asserted beside them. Under-grading is
   the quieter failure: an over-claim gets challenged, an under-claim just becomes permanent.
+- 2026-11-23 — **a note that says a procedure "yields" something visible has not finished the decode
+  until someone looks.** A header recorded that plotting a shipped art file a particular way "yields
+  seven distinct creature silhouettes", and that sentence was load-bearing for an open identity
+  question — it was the only evidence that a shape existed per entity. But nobody had ever plotted
+  it, so the evidence sat in the tree contributing nothing for weeks while the identity question was
+  graded as unresolvable and queued as needing a capture. The decode was one rendering away from
+  being an observation, and the assertion was mistaken for the observation.
+  → Tier 1, evidence discipline: when a note claims a procedure produces something observable, the
+  observation is part of the decode, not an application of it. Either record what it yields or mark
+  the claim as decoration. A shape nobody has looked at has the same evidentiary value as a shape
+  that does not exist.
+- 2026-11-23 — **"parses to nothing" is a statement about the parser's starting point, not about the
+  bytes.** In a fixed-stride container of terminator-delimited records, the block whose first byte is
+  the terminator yields zero records when parsed from its own base and is routinely reported as
+  empty — while the same bytes hold real, reachable data at interior offsets that another code path
+  indexes directly. Calling that block empty is a parser artefact that then propagates into every
+  description of the container's layout.
+  → Tier 1, derived data: for terminator-delimited records in a strided file, never report a region
+  empty without also scanning it for nonzero bytes and reporting the first nonzero offset. If any
+  code path indexes into the region's interior, the region is not empty by definition.

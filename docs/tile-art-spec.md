@@ -44,6 +44,8 @@ following, in this repository or anywhere else:**
 | `tmp/*.png`, `tmp/screens/` | screenshots of the running game |
 | `tmp/*.html` | the map viewer and tile review sheet embed the extracted originals as base64 |
 | `docs/tile-art-evidence.md` | **the answer key**: measured structure of every original |
+| `docs/dungeon-stroke-art.md` | **another answer key**: measured descriptions of the seven dungeon creature shapes, plotted from the original's own stroke data |
+| `tools/dungeon_strokes.py` | the renderer that produces those shapes, and the shipped `monsters` file it reads |
 | `tools/tile_rules.py` | **also the answer key**: the gate's bands were fitted to the originals — density ranges, periods, component sizes, diagonal runs |
 | `bestiary/cache/` | **original art in bulk**: copyrighted rips of the game's tiles in seven platform variants, plus the FM Towns animation frames split from them. Collected for *naming*, not for drawing. |
 | `bestiary/view.html` | embeds those rips and our extracted tiles as data URIs |
