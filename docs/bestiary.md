@@ -342,6 +342,27 @@ not by an argument about which wiki is likelier.
   reopened when a compound run read 255 for everything, then settled properly by the
   existing capture corpus.
 * **Merchant HP.** Codex 5–50, Gamer Corner 1. Unresolved.
+* **`bestiary.tsv` contains byte-identical duplicate rows, and `creature.tsv` inherits them —
+  found 2026-11-23.** `art=0B` "Sea Monster" appears **three times, identical in all thirteen
+  columns**: same `art_index`, same source, same `image`, same `sha256`. Nothing in the pipeline
+  checks for it, so every table generated from it re-imports the defect. Measured on
+  `disasm/census/creature.tsv`: 120 rows, **16 distinct `art` values**, 24 distinct names, 36
+  distinct `(art, name)` pairs, and **no combination of up to three columns is unique**. `source`
+  and `grade` are constant across all 120 rows, so they carry no information at all.
+* **What that actually means: `creature.tsv` is not a creature table.** Of the eight upstream rows
+  matching "Sea Monster", three are the duplicates above and **five have no `art_index` at all** —
+  they are Codex rows for the Sea Serpent on `c64`, `dos`, `dos-fan-upgrade`, `fm-towns` and
+  `pc88-starcraft`, each with its own bitmap and a `verdict` like `near-49` or `animated (2 frames)
+  — not a single tile`. Those are **art-matching candidates**, the evidence trail for which
+  platform's sprite best matches a DOS tile index. `tools/census.py` copies bestiary rows verbatim
+  and drops `section`, `variant`, `image`, `sha256` and `note` — the only columns that distinguished
+  them — so five pieces of evidence arrive looking like five creatures. The 120 rows are roughly 36
+  creatures multiplied by their matching evidence.
+  **Ruled 2026-11-23:** the fix is to separate the two things that are currently one table — a
+  creature table with one row per art index, keyed by `art`, and an art-variant table keyed by
+  `art + variant`, which is what this data actually is. De-duplicating `bestiary.tsv` and giving it
+  a uniqueness assertion comes first, because a source file with silent duplicates re-infects every
+  table generated from it. See `docs/plan-record-index.md` § 7, slice S-1.
 * **The codex HP/DMG columns are not HP and DMG in two of the four tables.** Those
   tables carry a second header row (`Min`, `Max`) written without `colspan`, so in
   the raw HTML the two sub-labels land under *Name* and *Apple II* and cannot be
