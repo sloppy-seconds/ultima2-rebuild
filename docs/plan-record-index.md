@@ -1,16 +1,15 @@
 # The Record Index — Plan (third epic)
 
-**Status: VERDICT NOT RATIFIED, 2026-11-25. The 2026-11-24 cut was measured with a broken
-instrument and is withdrawn.** § 7a reported 12 attributable entities against the pre-registered
-kill threshold of 25. Two defects made that number too low: items were queried at the item array's
-base address instead of their per-slot absolute addresses, and the footprint index could not see
-memory access written as forced-keep `.byte` lines (142 such accesses, now decoded -- see
-`tools/index_footprint.py`). Re-measured in § 7b: **25 entities, exactly on the threshold**, and
-the count moves 24/25/26 depending on which creature rule is used, so the threshold is coarser
-than the decision it was set to make and cannot decide it. What survives unchanged is the shape:
-creatures and items work (25 entities), spells/NPCs/gates are structurally unreachable. That is a
-two-kind index, not the five-kind index G10 was written to approve or refuse, and that is the
-question for the owner. S0b (the column contract) landed and stands on its own merits.
+**Status: CLOSED 2026-11-25, by replacement rather than by building.** The owner was asked
+whether a creature+item-only code index justified an epic, and ruled **option B: no new
+store.** The query the epic existed to answer now lives as two columns on the table that
+already owns the rows -- `entity` and `entity_basis` in `disasm/index/footprint.tsv`, 48 rows,
+20 distinct entities, names drawn only from generated gated sources. § 7c records what shipped
+and what it closes; § 7b records why the 2026-11-24 cut was withdrawn (a broken instrument, not
+a failed threshold); § 7a is kept as the original measurement with its errors marked rather than
+deleted. **S1–S4 will not be built.** The one deliverable independent of entities -- the
+record-address model, which DS span holds which file's records at what stride -- remains unbuilt
+and undecided, and it is the thing that would have prevented the `0xD6` mistake recurring.
 
 This is the join layer between the two finished epics. The code index produced four
 generated tables about *addresses*; the census produced ten about *things*; the bible
@@ -379,6 +378,40 @@ was really testing. Three of the five v1 kinds are not address-shaped things and
 them: spells have no literal naming a slot even now, and NPCs and gates have no DS address at all.
 What works is creatures and items, 25 entities between them. That is a two-kind index, not the
 five-kind index G10 was written to approve or refuse.
+
+### 7c. Decided 2026-11-25: the epic is closed, and a column replaced it
+
+The owner was asked whether a creature+item-only code index was worth building, given that
+three of the five v1 kinds are unreachable from code. **Ruling: option B -- no new store.**
+What the epic would have answered was a query, and the query did not need its own table, its
+own generator and its own gates.
+
+**What shipped instead:** `disasm/index/footprint.tsv` gained `entity` and `entity_basis`.
+48 rows carry an entity, 20 distinct -- 13 items by slot address, 7 creatures by file
+literal, 0 spells. `entity_basis` names its own grade so the column cannot be quoted without
+it: `slot-address` is measured (the absolute address *is* the item), `file-literal-inferred`
+is inferred (a creature-array base names no creature; a type literal elsewhere in the same
+file is the only evidence, and only when the file holds exactly one). A file naming several
+types is left blank rather than guessed, and that refusal is controlled.
+
+Names come only from generated, gated sources -- `U2_T_ITEMS` / `U2_T_SPELLS` from the
+extractor, creature types from `census/creature.tsv` via `type = art << 2`. Nothing
+hand-copied, which was already justified: **the § 7a and § 7b creature counts came from a
+hand-typed type table that disagreed with the census on several type bytes.**
+
+**That reconciles a number reported two ways.** 12 creatures are named by literal somewhere
+in code. 7 can be pinned to specific rows, because their file names only that type. The
+other 5 sit in files naming several types and are deliberately blank. Both counts were
+right and answered different questions; the column now says which is which, and the
+hand-copied table that caused the confusion is gone.
+
+**What this closes.** S1–S4 of this plan are not built and will not be. The entity-id minting
+(S1/S2) is unnecessary because the census already owns names and the join is now done inside
+the tool that owns the rows. The record-address model -- which DS span holds which file's
+records, at what stride -- was the one deliverable independent of entities and remains
+unbuilt and undecided; it is what would have stopped the `0xD6` mistake from § 7b recurring.
+
+---
 
 ## 8. Decisions — all ruled 2026-11-23
 
