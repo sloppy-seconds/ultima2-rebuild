@@ -2804,3 +2804,14 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   → Tier 1, derived data: for terminator-delimited records in a strided file, never report a region
   empty without also scanning it for nonzero bytes and reporting the first nonzero offset. If any
   code path indexes into the region's interior, the region is not empty by definition.
+- Two true numbers for one field arrived three times in one day (a creature's HP read from a placement
+  table, from a spawn routine, and from a generated-dungeon formula), and each time the instinct was
+  to pick one and mark the other wrong. They were all correct: the field was not a property of the
+  entity but a property of the *route by which the entity came to exist*. Separately, a different
+  pair of numbers for the same field really was a source disagreement with one side wrong. The two
+  shapes look identical in a table and need opposite treatment.
+  → Tier 2, schema: when a field has several defensible values, ask whether they are populations
+  keyed by a closed context vocabulary, or sources in conflict. Model populations as rows keyed
+  (entity, context) with the value allowed to be a formula over a named variable, and keep conflicting
+  sources in a visibly different column. Merging them lets a real error hide behind a plausible
+  label; keeping them apart is what makes "which is right" a question that stops being malformed.

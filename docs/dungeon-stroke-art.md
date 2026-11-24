@@ -40,7 +40,7 @@ ladder in `docs/monster-spawn.md` § 9.
 | 3 | 75 | A domed, bell-like body with **many legs splaying outward and downward** on both sides. | Carrion creeper | **corroborated** — the only many-legged thing in the candidate list, and nothing else in the list it could be |
 | 4 | 86 | A long, low, **sinuous S-curve with no limbs at all**, a thicker head end carrying two bright pixels. | Viper | **corroborated** — it is a serpent; there is no other serpent to choose |
 | 5 | 87 | A low domed body with a bright central band and small feet, plus four detached diamond marks floating at the corners. | Gremlin | **proven** — `asm/12DB` keys on `cmp $0x5` and prints `A GREMLIN STOLE SOME FOOD!` |
-| 6 | 93 | Broad-shouldered upright humanoid, two horn-like protrusions above the head, arms at the sides, bright feet. | Daemon / Minotaur | **weak** — a horned humanoid fits both candidate names, and the third-party source is itself ambiguous here |
+| 6 | 93 | Broad-shouldered upright humanoid, two horn-like protrusions above the head, arms at the sides, bright feet. | **Minotaur** | **inferred, differential** — see *The special asymmetry* below. The shape alone cannot choose between Daemon and Minotaur; the specials can, and they choose Minotaur |
 | 7 | 127 | The largest figure by a wide margin: an upright torso with a **wide fan of wings spreading from the shoulders** to both sides, head at top centre, two legs with feet. | Balron | **corroborated twice** — the proven sleep special, and a winged demon |
 
 **What this is worth.** Before looking, four of the seven names rested on nothing but their position
@@ -141,6 +141,32 @@ Depth ladder inside block 0: 24 records at `0x080`, 6 at `0x0C0`, 4 at `0x0E0`, 
 1 at `0x0F8`, nothing at `0x0FC`. Never-transferred tail: 128 bytes, a complete 63-record list closed by `00 00`; 62 of its records are
 identical and in order to records 65..126 of stamp 7, and the 63rd differs from stamp 7's record 64
 by one x coordinate (26 vs 32).
+
+### The special asymmetry settles stamp 6
+
+**The dungeon gives a contact special to exactly three of the seven stamps, and the set is not
+arbitrary.** `asm/12DB_dungeon_events` switches on the dungeon type and does something for three of
+them and *nothing at all* for the other four: type 2 blows out the torch, type 5 steals food, type 7
+prints `YOU FEEL A STRONG MAGIC!` and writes `paral_sleep`. That is the whole table.
+
+**And Balron is the positive control that makes the absence meaningful.** The overworld Balron
+(`0x3C`) puts you to sleep, resisted by GREEN IDOL; dungeon stamp 7 puts you to sleep. So when the
+original carries a creature between domains, it carries the creature's signature effect with it.
+That turns "stamp 6 has no special" from a curiosity into evidence: the overworld Daemon's entire
+identity *is* leg paralysis (`0x34`, resisted by BOOTS), so a dungeon Daemon missing its paralysis
+would be a broken copy of itself, while the Minotaur has no special in either domain and is
+therefore fully consistent with a stamp that does nothing.
+
+**So stamp 6 is Minotaur, not Daemon.** Grade **inferred** — it is an argument from a differential
+with a positive control, not an observation, and it outranks the list-position hypothesis it replaces
+without pretending to be proof. The same asymmetry leaves stamp 1 untouched: the Orc has no special
+in either domain, so its pairing still rests on name and position alone, and no argument of this kind
+can reach it.
+
+A second consequence, and it is the one that matters for the record index: **Orc and Balron exist in
+both domains with different stats**, which is ruled in `docs/plan-record-index.md` § 8 as D6 — one
+creature, stats keyed by population. See also the sea serpent's placed-versus-spawned pair, which is
+the same shape.
 
 ## The names are already shipped
 

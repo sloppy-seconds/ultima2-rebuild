@@ -77,7 +77,7 @@ dungeon creatures, each with a level range and, for three of them, a special:
 | 3 | Carrion creeper | 5–16 | — | — |
 | 4 | Viper | 7–16 | — | — |
 | 5 | Gremlin | 9–16 | steals 100 meals | **yes — type 5** |
-| 6 | Daemon / Minotaur | 11–16 | — | — |
+| 6 | Minotaur | 11–16 | — | — |
 | 7 | Balron | 13–16 | puts enemies to sleep | **yes — type 7** |
 
 Lay the wiki's level-ordered list onto the seven stamps 1–7 and the three
@@ -104,7 +104,8 @@ the binary" does. So the honest split is three grades, not two:
 | 5 | Gremlin | **proven** | `asm/12DB` keys on `cmp $0x5` and prints `A GREMLIN STOLE SOME FOOD!` — the string names it |
 | 2 | Ghost | corroborated | proven special (torch blown out) matches the third-party special for Ghost; the message does not name it |
 | 7 | Balron | corroborated | proven special (sleep) matches the third-party special for Balron; the message does not name it |
-| 1, 3, 4, 6 | Orc, Carrion creeper, Viper, Daemon/Minotaur | **hypothesis** | position in the third-party level-ordered list, and nothing else |
+| 1, 3, 4 | Orc, Carrion creeper, Viper | **hypothesis** | position in the third-party level-ordered list, and nothing else |
+| 6 | Minotaur | **inferred, differential** | the dungeon gives a contact special to exactly three stamps and Balron proves the mechanism carries a creature's signature effect across domains; stamp 6 has none, and the Daemon's whole identity is leg paralysis while the Minotaur has no special anywhere. See *The special asymmetry settles stamp 6* in `docs/dungeon-stroke-art.md` |
 
 **What settled the remaining four is the stroke data, and it is now looked at.** The original ships
 a file named `monsters` — 8 blocks of 256 bytes of stroke data, read by `asm/07F3` as one 0x800
@@ -117,8 +118,10 @@ the **largest figure with a wide fan of wings** — a winged demon whose proven 
 the guide attributes to a balron, so it agrees twice over. Stamp 2 is a **legless mass drawn
 entirely in one translucent half-dither**, which is a plausible way to draw a ghost in four colours
 with no alpha. **Stamp 1 stays the weakest row**: a generic humanoid, which is the one shape that
-would survive any reordering and therefore proves the least, and stamp 6's horned humanoid fits both
-Daemon and Minotaur when the source itself cannot choose between them.
+would survive any reordering and therefore proves the least. **Stamp 6's shape does not settle its
+name** — a horned humanoid fits both Daemon and Minotaur, and the third-party source itself cannot
+choose — but the *specials* do, and they choose Minotaur: see *The special asymmetry settles stamp 6*
+in `docs/dungeon-stroke-art.md`.
 
 Design consequence: the three proven creatures should visibly *do* their thing
 (a ghost that reads as cold and immaterial, a gremlin that reads as a thieving
@@ -255,7 +258,7 @@ a brute. One bright hand or a small stolen bundle so the thieving reads at a
 glance.
 ```
 
-### C6 — Daemon / Minotaur  *(stamp 6, no proven special)*
+### C6 — Minotaur  *(stamp 6, no special in either domain)*
 The heavy of the dungeon — big, broad, horned, the thing you meet deep down that
 you are glad the ghost is not. Where the balron (C7) is a mind, this one is
 *muscle and mass*: a hulking horned brute, wide shoulders, a heavy weapon. Make
