@@ -2706,3 +2706,38 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   → Tier 1, derived data: declare every table's key as data and assert all of them, and treat a
   column that holds one value across a whole table as a warning. A dead join and a healthy column
   look identical until someone counts the distinct values.
+- 2026-11-23 — **"absent from the data file" is not "absent from the program", and the two get
+  confused in one sentence.** A claim that a certain entity could not be a creature was made by
+  searching the placed-entity tables for its identifier and finding nothing. It was a correct search
+  of the wrong mechanism: the same program also *generates* entities at runtime through a dispatch
+  chain, and the entity was there, in a routine whose filename already named it. The claim was
+  recorded, repeated, and only re-examined after a human repeated their recollection for the second
+  time. The whole thing was a directory listing away from being caught.
+  → Tier 1, evidence discipline: before recording that something does not exist, enumerate every
+  mechanism by which it could exist — shipped data, generated at runtime, derived from another value —
+  and say which were checked. A negative over one mechanism is a claim about that mechanism.
+- 2026-11-23 — **two true numbers for one field is more common than one wrong number, and a
+  single-value column silently picks.** A creature's hit points were recorded as 255 from shipped
+  data and 64 from a third-party guide, and the finding written up was "the game wins, the guide is
+  wrong". Both were right: 64 is what the runtime spawn path writes and 255 is what the shipped data
+  carries, so the entity has two populations with different statistics. The conflict was an artefact
+  of a table that offers one column per attribute.
+  → Tier 1, derived data: when a reference and the binary disagree, ask whether they are describing
+  the same population before ruling one of them wrong. Any schema with one value per key is an
+  unannounced decision when the key spans two populations.
+- 2026-11-23 — **a decoded, measured check that no gate runs is a rumour.** A verification script
+  compared every relevant runtime capture against a formula derived from the disassembly and passed on
+  54 of 54 cases — a strong result, cited in prose as the basis for a whole section. It appeared in no
+  gate runner and no workflow, so nothing would notice if the code it protects regressed. The project
+  had already caught two gates that could not fail; this one could fail and simply was never asked.
+  → Tier 1, gate design: a finding's grade should imply a wired check. If a number is load-bearing
+  enough to quote, it is load-bearing enough to re-verify, and "someone can run it" is not a gate.
+- 2026-11-23 — **independent agreement is a different grade from citation, and it is easy to miss
+  because the data source did not change.** A third-party statistics table had been treated throughout
+  as an unverified hypothesis. Reading the binary's spawn dispatch turned up nine immediates that
+  matched nine of the guide's figures exactly — including an odd ceiling value that the guide reported
+  and a naive progression model would have predicted differently. Nothing about the guide changed; the
+  evidence grade moved from "someone wrote this down" to "two independent sources agree", which is the
+  strongest validation of that source available.
+  → Tier 1, evidence discipline: when derived facts and third-party facts agree by accident of
+  discovery, say so and re-grade. Agreement nobody looked for is worth more than either source alone.
