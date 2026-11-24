@@ -218,13 +218,299 @@ def parse_es_setup(lines: list[str]) -> str:
     return "+".join(x for x in ("ds", "cs", "io(video)", "from-reg") if x in found)
 
 
+# --------------------------------------------------------------- forced-keep bytes
+# A forced-keep line holds raw bytes because gas re-encodes the same instruction a
+# different way. The trailing comment names the instruction, but a comment is prose and
+# prose can be stale, and the body is authoritative over prose without exception. So
+# these tables decode the BYTES; the comment is used only as a cross-check whose
+# disagreements are printed. An opcode not listed here is reported as undecoded, never
+# guessed at -- the same rule the mnemonic path applies to an unknown mnemonic with a
+# memory operand.
+#
+# Coverage is the 8086 mr/rm/modrm family plus the four direct-displacement movs, which
+# is where the memory accesses actually live. ss-relative bases are emitted without a
+# segment prefix because classify_operand already collapses ss onto ds; that is the
+# pre-existing behaviour of this tool, not a new claim.
+
+REG8 = ["al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"]
+REG16 = ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di"]
+# 8086 r/m encodings for mod != 3, in encoding order, as (base, index-or-None).
+# Written as pairs and rendered AT&T-style `(%bx,%si)` because that is both what objdump
+# prints and what classify_operand's MEM_RE parses as base+idx. The order here was got
+# wrong once (bx at index 0, bx+di at index 7) and a wrong row silently attributes an
+# access to the wrong base register, so --selftest pins every eight entries against
+# objdump rather than trusting anyone's memory including this file's.
+RM16 = [("bx", "si"), ("bx", "di"), ("bp", "si"), ("bp", "di"),
+        ("si", None), ("di", None), ("bp", None), ("bx", None)]
+
+# opcode -> (mnemonic, width_bits, shape). Shape is named for the AT&T text this tool
+# emits, not for the Intel operand order, because AT&T reverses Intel: opcode 8b is
+# `mov r, r/m` in Intel and `mov mem, %reg` here, while opcode 89 is the mirror.
+#   "mr"  modrm, memory is the first (source) operand   (mov 0x197(%di),%al)
+#   "rm"  modrm, memory is the last (dest) operand      (mov %al,0x197(%di))
+#   "rmi" modrm, memory dest, immediate source         (c6 /0 ib)
+#   "grp" modrm, memory dest, mnemonic from reg field  (80/81/83)
+#   "ms"  no modrm, disp16 follows, memory is source   (a0/a1)
+#   "md"  no modrm, disp16 follows, memory is dest     (a2/a3)
+BYTE_OPS: dict[int, tuple[str, int, str]] = {
+    0x00: ("add", 8, "rm"),   0x01: ("add", 16, "rm"),
+    0x02: ("add", 8, "mr"),   0x03: ("add", 16, "mr"),
+    0x08: ("or", 8, "rm"),    0x09: ("or", 16, "rm"),
+    0x0a: ("or", 8, "mr"),    0x0b: ("or", 16, "mr"),
+    0x10: ("adc", 8, "rm"),   0x11: ("adc", 16, "rm"),
+    0x12: ("adc", 8, "mr"),   0x13: ("adc", 16, "mr"),
+    0x18: ("sbb", 8, "rm"),   0x19: ("sbb", 16, "rm"),
+    0x1a: ("sbb", 8, "mr"),   0x1b: ("sbb", 16, "mr"),
+    0x20: ("and", 8, "rm"),   0x21: ("and", 16, "rm"),
+    0x22: ("and", 8, "mr"),   0x23: ("and", 16, "mr"),
+    0x28: ("sub", 8, "rm"),   0x29: ("sub", 16, "rm"),
+    0x2a: ("sub", 8, "mr"),   0x2b: ("sub", 16, "mr"),
+    0x30: ("xor", 8, "rm"),   0x31: ("xor", 16, "rm"),
+    0x32: ("xor", 8, "mr"),   0x33: ("xor", 16, "mr"),
+    0x38: ("cmp", 8, "rm"),   0x39: ("cmp", 16, "rm"),
+    0x3a: ("cmp", 8, "mr"),   0x3b: ("cmp", 16, "mr"),
+    0x80: ("grp", 8, "grp"),  0x81: ("grp", 16, "grp"),  0x83: ("grp", 16, "grp"),
+    0x84: ("test", 8, "rm"),  0x85: ("test", 16, "rm"),
+    0x86: ("xchg", 8, "rm"),  0x87: ("xchg", 16, "rm"),
+    0x88: ("mov", 8, "rm"),   0x89: ("mov", 16, "rm"),
+    0x8a: ("mov", 8, "mr"),   0x8b: ("mov", 16, "mr"),
+    0xa0: ("mov", 8, "ms"),   0xa1: ("mov", 16, "ms"),
+    0xa2: ("mov", 8, "md"),   0xa3: ("mov", 16, "md"),
+    0xc6: ("mov", 8, "rmi"),  0xc7: ("mov", 16, "rmi"),
+}
+GRP_MN = ["add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"]
+
+BYTE_RE = re.compile(r"^\.byte\b\s*(.*?)(?:\s*#\s*(.*))?$")
+HEXBYTE = re.compile(r"0x([0-9a-fA-F]{1,2})")
+# A forced-keep run can be the tail of an instruction that began in a DIFFERENT file, and
+# then its first byte is not an opcode at all. Decoding such a run invents a memory access
+# that does not exist: 49 runs say they are a tail, and 7 of them decode into something
+# plausible, which is the worst possible failure because nothing downstream would notice.
+# The comment is the only evidence of a fragment that exists, so it is load-bearing here
+# even though the bytes outrank it everywhere else.
+TAIL_RE = re.compile(r"\b(tail|continuation|rest of|remainder)\b", re.I)
+
+
+def _le(buf: list[int], i: int, n: int):
+    """Little-endian unsigned read of n bytes, or None if the run is too short."""
+    if i + n > len(buf):
+        return None
+    return sum(buf[i + k] << (8 * k) for k in range(n))
+
+
+def _modrm(buf: list[int], i: int, width: int):
+    """Decode one modrm byte.
+
+    Returns (mem_or_None, reg_name, rm_reg_or_None, next_index, reg_index); the numeric
+    reg_index is what the group opcodes need to pick their mnemonic.
+    """
+    if i >= len(buf):
+        return None
+    m = buf[i]
+    i += 1
+    mode, reg, rm = (m >> 6) & 3, (m >> 3) & 7, m & 7
+    rn = (REG8 if width == 8 else REG16)[reg]
+    if mode == 3:
+        return None, rn, (REG8 if width == 8 else REG16)[rm], i, reg
+    if mode == 0 and rm == 6:
+        d = _le(buf, i, 2)
+        if d is None:
+            return None
+        return f"0x{d:x}", rn, None, i + 2, reg
+    if mode == 1:
+        d = _le(buf, i, 1)
+        if d is None:
+            return None
+        if d > 0x7F:
+            d -= 0x100
+        i += 1
+    elif mode == 2:
+        d = _le(buf, i, 2)
+        if d is None:
+            return None
+        if d > 0x7FFF:
+            d -= 0x10000
+        i += 2
+    else:
+        d = 0
+    base, idx = RM16[rm]
+    # The % on the base register is not decoration: classify_operand's MEM_RE only matches
+    # a base written %di, so emitting (di) would decode cleanly here and then produce no
+    # row at all -- the worst kind of failure, a decoder that looks like it worked.
+    mem = f"%{base}" + (f",%{idx}" if idx else "")
+    mem = f"({mem})" if d == 0 else f"{d:#x}({mem})"
+    return mem, rn, None, i, reg
+
+
+def decode_run(buf: list[int]) -> tuple[str, str] | None:
+    """Decode a forced-keep byte run to (mnemonic, AT&T operands), or None if uncovered.
+
+    The operand text is deliberately well-formed AT&T: an immediate is written `$0` and
+    not `$imm`, because classify_operand skips anything starting with `$` and a
+    malformed source would silently swallow the memory operand beside it.
+    """
+    if not buf:
+        return None
+    ent = BYTE_OPS.get(buf[0])
+    if ent is None:
+        return None
+    mn, width, shape = ent
+    acc = "al" if width == 8 else "ax"
+    if shape == "ms":
+        d = _le(buf, 1, 2)
+        return None if d is None else (mn, f"0x{d:x},%{acc}")
+    if shape == "md":
+        d = _le(buf, 1, 2)
+        return None if d is None else (mn, f"%{acc},0x{d:x}")
+    r = _modrm(buf, 1, width)
+    if r is None:
+        return None
+    mem, rn, rmreg, nxt, reg_idx = r
+    if shape == "grp":
+        mn = GRP_MN[reg_idx]
+    if mem is None:                       # register-to-register: touches no memory
+        if shape in ("rmi", "grp"):
+            imm = _imm(buf, nxt, buf[0])
+            return mn, f"{imm},%{rmreg}"
+        return mn, f"%{rmreg},%{rn}"
+    if shape == "mr":
+        return mn, f"{mem},%{rn}"
+    if shape in ("rmi", "grp"):
+        # The immediate is decoded rather than stubbed. It cannot change a footprint row,
+        # because an immediate is never a memory operand, but a placeholder in emitted
+        # text is a small lie that the next reader would have to re-check.
+        imm = _imm(buf, nxt, buf[0])
+        return mn, f"{imm},{mem}"
+    return mn, f"%{rn},{mem}"
+
+
+def _imm(buf: list[int], i: int, opcode: int) -> str:
+    """Read the immediate an r/m-plus-immediate opcode carries, or $0 if the run is short."""
+    n = 2 if opcode in (0x81, 0xc7) else 1
+    v = _le(buf, i, n)
+    if v is None:
+        return "$0"
+    if n == 2:
+        return f"$0x{v:x}"
+    return f"$0x{v:x}"
+
+
+def byte_runs(lines: list[str]) -> tuple[dict, set, int, int, int]:
+    """Pre-pass: join consecutive .byte lines into runs and decode each one.
+
+    Returns (start_line -> (mn, ops, comment), lines consumed as data, decoded, undecoded,
+    fragments). Consecutive joining matters because a forced-keep line can be the tail of
+    an instruction that began on the previous line, so a single line is not always a whole
+    instruction. A run that says it is the tail of something in another file is never
+    decoded -- see TAIL_RE.
+    """
+    out: dict[int, tuple[str, str, str]] = {}
+    consumed: set[int] = set()
+    decoded = undecoded = fragments = 0
+    i = 0
+    while i < len(lines):
+        m = BYTE_RE.match(lines[i].strip())
+        if not m:
+            i += 1
+            continue
+        buf: list[int] = []
+        comment = ""
+        start = i
+        while i < len(lines):
+            m2 = BYTE_RE.match(lines[i].strip())
+            if not m2:
+                break
+            buf += [int(h, 16) for h in HEXBYTE.findall(m2.group(1))]
+            if m2.group(2):
+                comment = m2.group(2)
+            consumed.add(i + 1)
+            i += 1
+        if TAIL_RE.search(comment):
+            fragments += 1
+            continue
+        d = decode_run(buf)
+        if d:
+            out[start + 1] = (d[0], d[1], comment)
+            decoded += 1
+        else:
+            undecoded += 1
+    return out, consumed, decoded, undecoded, fragments
+
+
+def comment_disagrees(mn: str, ops: str, comment: str) -> bool:
+    """True when the comment names an instruction whose mnemonic is not what we decoded.
+
+    Only a mnemonic comparison is made. A comment that names no mnemonic at all is not a
+    disagreement, because plenty of forced-keep comments describe something else.
+    """
+    if not comment:
+        return False
+    named = re.findall(r"\b(mov|add|or|adc|sbb|and|sub|xor|cmp|test|xchg)\b", comment)
+    if not named:
+        return False
+    return mn not in named
+
+
+def emit_rows(mn: str, ops: str, lineno: int, fname: str, es_as: str,
+              note_extra: str = "") -> tuple[list[dict], list[str]]:
+    """One instruction's footprint rows. Shared by the mnemonic path and the byte path."""
+    rows: list[dict] = []
+    errors: list[str] = []
+    if mn.startswith(CONTROL):
+        return rows, errors
+    acc = access_for(mn)
+    operands = split_operands(ops) if ops else []
+    if acc is None:
+        if any(classify_operand(o) for o in operands):
+            if mn in IMPOSSIBLE:
+                errors.append(f"{fname}:{lineno}: {mn!r} cannot exist on this target -- "
+                              "misdecode candidate, needs a ruling (see IMPOSSIBLE)")
+            else:
+                errors.append(f"{fname}:{lineno}: mnemonic {mn!r} with a memory operand is "
+                              "not in the access table -- refusing to guess")
+        return rows, errors
+    reads, writes = acc[1], acc[2]
+    dst_role, src_role = roles_for(acc[0], reads, writes)
+    last = len(operands) - 1
+    for pos, op in enumerate(operands):
+        cm = classify_operand(op)
+        if cm is None:
+            continue
+        role = dst_role if pos == last else src_role
+        if not role:
+            continue
+        access = {"read": "read", "write": "write", "rmw": "read-modify-write"}[role]
+        seg, offset = cm["seg"], cm["offset"]
+        indexed = bool(cm["base"]) or bool(cm["idx"])
+        note = "absolute operand, no base register" if cm["bare"] else ""
+        if note_extra:
+            note = (note + "; " if note else "") + note_extra
+        span = ""
+        if indexed:
+            for base, (length, cite) in SPANS.items():
+                if offset == base:
+                    span = f"{offset:#06x}+{length}"
+                    note = cite
+            if not span:
+                span = "unknown"
+        if seg == "es" and es_as == "io(video)":
+            seg = "video"
+        rows.append({"segment": seg, "offset": offset, "span": span, "access": access,
+                     "file": fname, "line": str(lineno),
+                     "indexed": "yes" if indexed else "no",
+                     "es_as": es_as if seg == "es" else "", "note": note})
+    return rows, errors
+
+
 def parse_file(path: pathlib.Path) -> tuple[list[dict], list[str], dict]:
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     rows: list[dict] = []
     errors: list[str] = []
     stats = {"parsed": 0, "labels": 0, "data": 0, "comments": 0, "blank": 0, "unparsed": 0}
     es_as = parse_es_setup(lines)
-    forced_keep = 0
+    runs, consumed, byte_decoded, byte_undecoded, byte_fragments = byte_runs(lines)
+    forced_keep = len(consumed)
+    disagreements: list[str] = []
     for i, raw in enumerate(lines, start=1):
         line = raw.strip()
         if raw.lstrip().startswith("#"):
@@ -238,8 +524,19 @@ def parse_file(path: pathlib.Path) -> tuple[list[dict], list[str], dict]:
             continue
         if FORCED_KEEP.match(line) or line.startswith("db ") or line.startswith("."):
             stats["data"] += 1
-            if FORCED_KEEP.match(line):
-                forced_keep += 1
+            # A forced-keep run that decoded is an instruction like any other, so it goes
+            # through the same emitter. The line number reported is the run's first line,
+            # because that is where the opcode lives.
+            if i in runs:
+                bmn, bops, bcomment = runs[i]
+                r, e = emit_rows(bmn, bops, i, path.name, es_as,
+                                 note_extra="decoded from forced-keep bytes")
+                rows += r
+                errors += e
+                if comment_disagrees(bmn, bops, bcomment):
+                    disagreements.append(
+                        f"{path.name}:{i}: bytes decode to {bmn} but comment says "
+                        f"{bcomment.strip()[:60]!r}")
             continue
         m = INSTR_RE.match(line)
         if not m:
@@ -248,49 +545,15 @@ def parse_file(path: pathlib.Path) -> tuple[list[dict], list[str], dict]:
             continue
         mn, ops = m.group(1), (m.group(2) or "").strip()
         stats["parsed"] += 1
-        if mn.startswith(CONTROL):
-            continue
-        acc = access_for(mn)
-        if acc is None:
-            if any(classify_operand(o) for o in (split_operands(ops) if ops else [])):
-                if mn in IMPOSSIBLE:
-                    errors.append(f"{path.name}:{i}: {mn!r} cannot exist on this target -- "
-                                  "misdecode candidate, needs a ruling (see IMPOSSIBLE)")
-                else:
-                    errors.append(f"{path.name}:{i}: mnemonic {mn!r} with a memory operand is "
-                                  "not in the access table -- refusing to guess")
-            continue
-        reads, writes, _ = acc[1], acc[2], acc[3]
-        dst_role, src_role = roles_for(acc[0], reads, writes)
-        operands = split_operands(ops) if ops else []
-        last = len(operands) - 1
-        for pos, op in enumerate(operands):
-            cm = classify_operand(op)
-            if cm is None:
-                continue
-            role = dst_role if pos == last else src_role
-            if not role:
-                continue  # this mnemonic does not touch an operand in that position
-            access = {"read": "read", "write": "write", "rmw": "read-modify-write"}[role]
-            seg, offset = cm["seg"], cm["offset"]
-            indexed = bool(cm["base"]) or bool(cm["idx"])
-            note = "absolute operand, no base register" if cm["bare"] else ""
-            span = ""
-            if indexed:
-                for base, (length, cite) in SPANS.items():
-                    if offset == base:
-                        span = f"{offset:#06x}+{length}"
-                        note = cite
-                if not span:
-                    span = "unknown"
-            if seg == "es" and es_as == "io(video)":
-                seg = "video"
-            rows.append({"segment": seg, "offset": offset, "span": span,
-                         "access": access,
-                         "file": path.name, "line": str(i),
-                         "indexed": "yes" if indexed else "no",
-                         "es_as": es_as if seg == "es" else "", "note": note})
-    return rows, errors, {**stats, "forced_keep_lines": forced_keep, "es_as": es_as}
+        r, e = emit_rows(mn, ops, i, path.name, es_as)
+        rows += r
+        errors += e
+    return rows, errors, {**stats, "forced_keep_lines": forced_keep,
+                          "byte_decoded": byte_decoded, "byte_undecoded": byte_undecoded,
+                          "byte_fragments": byte_fragments,
+                          "byte_comment_disagree": len(disagreements),
+                          "byte_disagreements": disagreements,
+                          "es_as": es_as}
 
 
 def build() -> tuple[list[dict], list[str], dict]:
@@ -300,7 +563,9 @@ def build() -> tuple[list[dict], list[str], dict]:
     rows: list[dict] = []
     errors: list[str] = []
     tot = {"files": 0, "parsed": 0, "labels": 0, "data": 0, "comments": 0, "blank": 0,
-           "unparsed": 0, "forced_keep_lines": 0}
+           "unparsed": 0, "forced_keep_lines": 0, "byte_decoded": 0, "byte_undecoded": 0,
+           "byte_fragments": 0, "byte_comment_disagree": 0}
+    byte_disagree: list[str] = []
     es_unresolved: list[str] = []
     for path in sorted(ASM.glob("*.asm")):
         r, e, st = parse_file(path)
@@ -308,11 +573,14 @@ def build() -> tuple[list[dict], list[str], dict]:
         errors += e
         tot["files"] += 1
         for k in ("parsed", "labels", "data", "comments", "blank", "unparsed",
-                  "forced_keep_lines"):
+                  "forced_keep_lines", "byte_decoded", "byte_undecoded",
+                  "byte_fragments", "byte_comment_disagree"):
             tot[k] += st[k]
+        byte_disagree += st["byte_disagreements"]
         if st["es_as"] == "none" and any(x["segment"] == "es" for x in r):
             es_unresolved.append(path.name)
     tot["es_unresolved"] = es_unresolved
+    tot["byte_disagreements"] = byte_disagree
     tot["selfmod"] = [f"{r['file']}:{r['line']}" for r in rows
                       if r["segment"] == "cs" and r["access"] != "read"]
     return rows, errors, tot
@@ -376,6 +644,15 @@ def verify() -> int:
     print(f"index_footprint: {len(rows)} rows from {tot['files']} files; "
           f"parsed {tot['parsed']}, data {tot['data']}, labels {tot['labels']}, "
           f"forced-keep {tot['forced_keep_lines']}, unparsed {tot['unparsed']}")
+    # The forced-keep tally is printed because a number that is never shown is a number
+    # that quietly grows. Undecoded runs are not a failure today -- they are the known
+    # hole -- but the count must move in public.
+    print(f"index_footprint: forced-keep byte runs: decoded {tot['byte_decoded']}, "
+          f"undecoded {tot['byte_undecoded']}, refused as cross-file fragments "
+          f"{tot['byte_fragments']}, comment-disagreements "
+          f"{tot['byte_comment_disagree']}")
+    for d in tot["byte_disagreements"][:10]:
+        print(f"  WARN  {d} -- the bytes are the authority, the comment is a claim")
     print(f"index_footprint: cs writes (selfmod) = {len(tot['selfmod'])}")
     ok = not errors and not tot["unparsed"] and not unexempt and not stale
     print("index_footprint: " + ("ok" if ok else "FAIL"))
@@ -465,6 +742,56 @@ def _selftest() -> int:
          False, lambda r: not r)
     case("es: with no setup is a failure", "# s\nsub_0001:\n        mov    %al,%es:0x6c\n        ret\n",
          True)
+
+    # ---- forced-keep byte decoding ------------------------------------------------
+    # Every expected string below was confirmed against objdump -mi8086 before it was
+    # written down, because hand-computed modrm expectations were wrong three times in a
+    # row while this decoder was being built. A wrong r/m row attributes an access to the
+    # wrong base register and looks completely healthy doing it.
+    def dcase(label: str, seq: list[int], want: str | None):
+        nonlocal ok
+        got = decode_run(seq)
+        s = f"{got[0]} {got[1]}" if got else None
+        if s != want:
+            ok = False
+            print(f"FAIL  decode {label}: got {s!r} want {want!r}")
+        else:
+            print(f"ok    decode {label}")
+
+    dcase("load from absolute address", [0xa0, 0xdf, 0x00], "mov 0xdf,%al")
+    dcase("store to absolute address", [0xa2, 0xe5, 0x00], "mov %al,0xe5")
+    dcase("indexed read via %di", [0x8b, 0x85, 0x97, 0x01], "mov 0x197(%di),%ax")
+    dcase("indexed write with disp8", [0x88, 0x45, 0x02], "mov %al,0x2(%di)")
+    dcase("rm=0 is bx+si", [0x8a, 0x00], "mov (%bx,%si),%al")
+    dcase("rm=1 is bx+di", [0x8a, 0x01], "mov (%bx,%di),%al")
+    dcase("rm=2 is bp+si", [0x8a, 0x02], "mov (%bp,%si),%al")
+    dcase("rm=3 is bp+di", [0x8a, 0x03], "mov (%bp,%di),%al")
+    dcase("rm=4 is si", [0x8a, 0x04], "mov (%si),%al")
+    dcase("rm=5 is di", [0x8a, 0x05], "mov (%di),%al")
+    dcase("rm=6 at mod=0 is disp16 not bp", [0x8a, 0x06, 0x34, 0x12], "mov 0x1234,%al")
+    dcase("rm=6 at mod=1 is bp", [0x8a, 0x46, 0x7f], "mov 0x7f(%bp),%al")
+    dcase("rm=7 is bx", [0x8a, 0x07], "mov (%bx),%al")
+    dcase("group opcode takes mnemonic from reg field", [0x80, 0xc9, 0x20], "or $0x20,%cl")
+    dcase("mov immediate to memory", [0xc6, 0x85, 0x97, 0x01, 0x05], "mov $0x5,0x197(%di)")
+    dcase("register-to-register decodes but touches no memory", [0x8a, 0xc1], "mov %cl,%al")
+    dcase("an opcode outside the table is refused, not guessed", [0xf6, 0xc0], None)
+
+    case("a decoded forced-keep produces a real row",
+         "# s\nsub_0001:\n        .byte 0xa0,0xdf,0x00  # forced-kept: gas re-encodes "
+         "'mov    0xdf,%al' differently\n        ret\n", False,
+         lambda r: any(x["offset"] == 0xdf and x["access"] == "read"
+                       and "forced-keep" in x["note"] for x in r))
+    case("a decoded forced-keep store is a write",
+         "# s\nsub_0001:\n        .byte 0xa2,0xe5,0x00  # forced-kept\n        ret\n", False,
+         lambda r: any(x["offset"] == 0xe5 and x["access"] == "write" for x in r))
+    case("an indexed forced-keep gets its span",
+         "# s\nsub_0001:\n        .byte 0x8b,0x85,0x97,0x01  # forced-kept\n        ret\n", False,
+         lambda r: any(x["offset"] == 0x197 and x["span"] == "0x0197+32" for x in r))
+    # The control that matters most: a fragment is not an instruction, and a decoder that
+    # does not know that invents accesses out of nothing. This must produce no rows.
+    case("a cross-file fragment is refused, never decoded",
+         "# s\nsub_0001:\n        .byte 0xa0,0x7b,0x04  # tail of `mov 0x76(%di),%al` "
+         "started at asm/0000_sub_0000.asm\n        ret\n", False, lambda r: not r)
 
     # The mirror control, because an exemption tested only in the failing direction is a permission
     # nobody can trust: a file named in ES_CONVENTION must let verify() pass, and an entry that stops

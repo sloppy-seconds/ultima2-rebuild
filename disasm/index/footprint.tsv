@@ -270,22 +270,48 @@ ds	0	unknown	write	268C_sub_268c.asm	12	yes
 ds	0		read	26A8_sub_26a8.asm	8	no		absolute operand, no base register
 ds	0		write	26CC_time_door_place_player.asm	33	no		absolute operand, no base register
 ds	0	unknown	write	2735_sub_2735.asm	27	yes		
+ds	0	unknown	write	277B_dungeon_move_commands.asm	73	yes		decoded from forced-keep bytes
+ds	0	unknown	read	277B_dungeon_move_commands.asm	87	yes		decoded from forced-keep bytes
+ds	0	unknown	read	277B_dungeon_move_commands.asm	89	yes		decoded from forced-keep bytes
+ds	0	unknown	read	277B_dungeon_move_commands.asm	91	yes		decoded from forced-keep bytes
+ds	0	unknown	read-modify-write	277B_dungeon_move_commands.asm	93	yes		decoded from forced-keep bytes
+ds	0	unknown	read	277B_dungeon_move_commands.asm	97	yes		decoded from forced-keep bytes
+ds	0	unknown	read-modify-write	277B_dungeon_move_commands.asm	101	yes		decoded from forced-keep bytes
+ds	0	unknown	read	277B_dungeon_move_commands.asm	103	yes		decoded from forced-keep bytes
+ds	0	unknown	read	277B_dungeon_move_commands.asm	105	yes		decoded from forced-keep bytes
+ds	0	unknown	read	277B_dungeon_move_commands.asm	107	yes		decoded from forced-keep bytes
+ds	0	unknown	read-modify-write	277B_dungeon_move_commands.asm	111	yes		decoded from forced-keep bytes
+ds	0	unknown	read	277B_dungeon_move_commands.asm	115	yes		decoded from forced-keep bytes
+ds	0	unknown	read	277B_dungeon_move_commands.asm	117	yes		decoded from forced-keep bytes
+ds	0	unknown	read-modify-write	277B_dungeon_move_commands.asm	121	yes		decoded from forced-keep bytes
+ds	0		read	277B_dungeon_move_commands.asm	283	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	0		write	277B_dungeon_move_commands.asm	289	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	0		read	277B_dungeon_move_commands.asm	445	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	0		write	277B_dungeon_move_commands.asm	457	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	0	unknown	write	2C38_minax_teleport_swap.asm	66	yes		
 ds	0	unknown	write	2C38_minax_teleport_swap.asm	88	yes		
 ds	0	unknown	write	2CB5_combat_kill_cell_restore.asm	49	yes		
 ds	0		read	2E13_sub_2e13.asm	14	no		absolute operand, no base register
+ds	0	unknown	read	2E3D_combat_attack_flow.asm	261	yes		decoded from forced-keep bytes
+ds	0	unknown	write	2E3D_combat_attack_flow.asm	267	yes		decoded from forced-keep bytes
 ds	0		read	2F9E_sub_2f9e.asm	8	no		absolute operand, no base register
 ds	0	unknown	write	2FD6_vehicle_horse.asm	25	yes		
+ds	0	unknown	read	3048_vehicle_plane.asm	47	yes		decoded from forced-keep bytes
+ds	0	unknown	write	3048_vehicle_plane.asm	79	yes		decoded from forced-keep bytes
+ds	0	unknown	write	3048_vehicle_plane.asm	115	yes		decoded from forced-keep bytes
 ds	0		read	3139_cast_spell_flow.asm	463	no		absolute operand, no base register
 ds	0	unknown	write	3139_cast_spell_flow.asm	493	yes		
 ds	0		write	3139_cast_spell_flow.asm	563	no		absolute operand, no base register
 ds	0		read	330C_cast_target_finder.asm	113	no		absolute operand, no base register
 ds	0		read	341B_sub_341b.asm	7	no		absolute operand, no base register
 ds	0		write	342A_sub_342a.asm	10	no		absolute operand, no base register
+ds	0		read	343F_sub_343f.asm	18	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	0		write	343F_sub_343f.asm	30	no		absolute operand, no base register
+ds	0		read	343F_sub_343f.asm	53	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	0		write	343F_sub_343f.asm	75	no		absolute operand, no base register
 ds	0		read	34C0_sub_34c0.asm	7	no		absolute operand, no base register
 ds	0		write	34CF_sub_34cf.asm	10	no		absolute operand, no base register
+ds	0		read	34E4_site_enter_dungeon.asm	45	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	0		write	34E4_site_enter_dungeon.asm	67	no		absolute operand, no base register
 ds	0		read	3611_monster_damage_apply.asm	39	no		absolute operand, no base register
 ds	0	unknown	write	3611_monster_damage_apply.asm	53	yes		
@@ -310,6 +336,7 @@ ds	0		read	3F5D_steal_attempt.asm	142	no		absolute operand, no base register
 ds	0		read	3F5D_steal_attempt.asm	158	no		absolute operand, no base register
 ds	0		read	4326_unlock_target.asm	21	no		absolute operand, no base register
 ds	0	unknown	write	435E_open_write_tile.asm	69	yes		
+ds	0		read	44D4_cmd_X.asm	55	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	0	unknown	write	44D4_cmd_X.asm	98	yes		
 ds	0	unknown	read	4A89_sub_4a89.asm	11	yes		
 ds	0		read	4F11_monster_step_vector.asm	49	no		absolute operand, no base register
@@ -341,6 +368,10 @@ ds	0	unknown	read-modify-write	6144_dungeon_shape_dispatch.asm	317	yes
 ds	0	unknown	read	6144_dungeon_shape_dispatch.asm	319	yes		
 ds	0	unknown	read	6144_dungeon_shape_dispatch.asm	353	yes		
 ds	0	unknown	read	68C0_dungeon_grid_byte.asm	55	yes		
+ds	0	unknown	read	68ED_dungeon_sprite_pass.asm	106	yes		decoded from forced-keep bytes
+ds	0	unknown	read	68ED_dungeon_sprite_pass.asm	120	yes		decoded from forced-keep bytes
+ds	0	unknown	read	68ED_dungeon_sprite_pass.asm	128	yes		decoded from forced-keep bytes
+ds	0	unknown	read-modify-write	68ED_dungeon_sprite_pass.asm	158	yes		decoded from forced-keep bytes
 ds	0	unknown	read-modify-write	6B3D_space_field_draw.asm	535	yes		
 ds	0	unknown	read	6B3D_space_field_draw.asm	537	yes		
 ds	0	unknown	read-modify-write	6B3D_space_field_draw.asm	541	yes		
@@ -356,6 +387,7 @@ ds	0	unknown	read	6FA3_space_status_values.asm	156	yes
 ds	0	unknown	read-modify-write	7289_sub_7289.asm	20	yes		
 ds	0	unknown	read	8CD0_sub_8cd0.asm	31	yes		
 ds	0	unknown	write	8CD0_sub_8cd0.asm	35	yes		
+ds	0	unknown	read-modify-write	8CD0_sub_8cd0.asm	118	yes		decoded from forced-keep bytes
 ds	0	unknown	write	8CD0_sub_8cd0.asm	200	yes		
 ds	0	unknown	read-modify-write	8DCD_clock_tick_read.asm	28	yes		
 ds	0	unknown	read-modify-write	8DCD_clock_tick_read.asm	30	yes		
@@ -382,6 +414,10 @@ ds	1		write	2664_sub_2664.asm	17	no		absolute operand, no base register
 ds	1		read	2677_sub_2677.asm	16	no		absolute operand, no base register
 ds	1		read	26A8_sub_26a8.asm	12	no		absolute operand, no base register
 ds	1		write	26CC_time_door_place_player.asm	39	no		absolute operand, no base register
+ds	1		read	277B_dungeon_move_commands.asm	293	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	1		write	277B_dungeon_move_commands.asm	299	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	1		read	277B_dungeon_move_commands.asm	459	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	1		write	277B_dungeon_move_commands.asm	471	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	1		read	2E13_sub_2e13.asm	22	no		absolute operand, no base register
 ds	1		read	2F9E_sub_2f9e.asm	12	no		absolute operand, no base register
 ds	1		read	3139_cast_spell_flow.asm	473	no		absolute operand, no base register
@@ -425,6 +461,14 @@ ds	1		read	6000_dungeon_render.asm	83	no		absolute operand, no base register
 ds	1		read	6000_dungeon_render.asm	107	no		absolute operand, no base register
 ds	1		read	6078_dungeon_depth_scan.asm	38	no		absolute operand, no base register
 ds	1		read	6078_dungeon_depth_scan.asm	64	no		absolute operand, no base register
+ds	2		read	277B_dungeon_move_commands.asm	285	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	2		write	277B_dungeon_move_commands.asm	368	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	2		read	277B_dungeon_move_commands.asm	380	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	2		write	277B_dungeon_move_commands.asm	388	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	2		read	277B_dungeon_move_commands.asm	397	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	2		write	277B_dungeon_move_commands.asm	407	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	2		write	277B_dungeon_move_commands.asm	419	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	2		read	277B_dungeon_move_commands.asm	451	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	2		read	2E13_sub_2e13.asm	18	no		absolute operand, no base register
 ds	2		read	3139_cast_spell_flow.asm	465	no		absolute operand, no base register
 ds	2		read	330C_cast_target_finder.asm	117	no		absolute operand, no base register
@@ -441,6 +485,14 @@ ds	2		write	5B98_sub_5b98.asm	55	no		absolute operand, no base register
 ds	2		read	5BC2_sub_5bc2.asm	11	no		absolute operand, no base register
 ds	2		read	6000_dungeon_render.asm	37	no		absolute operand, no base register
 ds	2		read	6000_dungeon_render.asm	55	no		absolute operand, no base register
+ds	3		read	277B_dungeon_move_commands.asm	295	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	3		read	277B_dungeon_move_commands.asm	362	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	3		write	277B_dungeon_move_commands.asm	372	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	3		write	277B_dungeon_move_commands.asm	384	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	3		write	277B_dungeon_move_commands.asm	403	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	3		read	277B_dungeon_move_commands.asm	415	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	3		write	277B_dungeon_move_commands.asm	423	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	3		read	277B_dungeon_move_commands.asm	465	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	3		read	2E13_sub_2e13.asm	26	no		absolute operand, no base register
 ds	3		read	3139_cast_spell_flow.asm	475	no		absolute operand, no base register
 ds	3		read	330C_cast_target_finder.asm	127	no		absolute operand, no base register
@@ -467,6 +519,7 @@ ds	4		read-modify-write	5C25_sub_5c25.asm	11	no		absolute operand, no base regis
 ds	4		read	5C25_sub_5c25.asm	13	no		absolute operand, no base register
 ds	4		write	5C35_sub_5c35.asm	9	no		absolute operand, no base register
 ds	4		read	68A3_sprite_stroke.asm	28	no		absolute operand, no base register
+ds	4		write	68ED_dungeon_sprite_pass.asm	114	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	5		write	5ABB_sub_5abb.asm	49	no		absolute operand, no base register
 ds	5		read	5AED_sub_5aed.asm	9	no		absolute operand, no base register
 ds	5		read-modify-write	5B5D_sub_5b5d.asm	11	no		absolute operand, no base register
@@ -476,6 +529,7 @@ ds	5		read	5BC2_sub_5bc2.asm	19	no		absolute operand, no base register
 ds	5		read-modify-write	5C35_sub_5c35.asm	11	no		absolute operand, no base register
 ds	5		read	5C35_sub_5c35.asm	13	no		absolute operand, no base register
 ds	5		read	68A3_sprite_stroke.asm	36	no		absolute operand, no base register
+ds	5		write	68ED_dungeon_sprite_pass.asm	124	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	6		read	0839_restage_parked_rocket.asm	35	no		absolute operand, no base register
 ds	6		read	0D4F_monster_hp_orc.asm	32	no		absolute operand, no base register
 ds	6		read	0D6F_monster_hp_thief_daemon.asm	28	no		absolute operand, no base register
@@ -491,11 +545,16 @@ ds	6		read	225A_sub_225a.asm	21	no		absolute operand, no base register
 ds	6		read	245A_restage_parked_rocket.asm	44	no		absolute operand, no base register
 ds	6		read	268C_sub_268c.asm	10	no		absolute operand, no base register
 ds	6		read	2735_sub_2735.asm	25	no		absolute operand, no base register
+ds	6		read	277B_dungeon_move_commands.asm	71	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	6		read	2C38_minax_teleport_swap.asm	64	no		absolute operand, no base register
 ds	6		read	2C38_minax_teleport_swap.asm	86	no		absolute operand, no base register
 ds	6		read	2CB5_combat_kill_cell_restore.asm	47	no		absolute operand, no base register
+ds	6	unknown	read	2FD6_vehicle_horse.asm	23	yes		decoded from forced-keep bytes
+ds	6		read	3048_vehicle_plane.asm	77	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	6		read	3048_vehicle_plane.asm	113	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	6		read	3611_monster_damage_apply.asm	51	no		absolute operand, no base register
 ds	6		read	3823_site_floor_down.asm	107	no		absolute operand, no base register
+ds	6	unknown	read	435E_open_write_tile.asm	67	yes		decoded from forced-keep bytes
 ds	6		read	44D4_cmd_X.asm	96	no		absolute operand, no base register
 ds	6	unknown	read	4B08_sub_4b08.asm	7	yes		
 ds	6		write	50B3_map_tile_ptr.asm	30	no		absolute operand, no base register
@@ -521,6 +580,8 @@ ds	8		write	1451_site_cell_open_on_floor.asm	41	no		absolute operand, no base re
 ds	8		read	1451_site_cell_open_on_floor.asm	49	no		absolute operand, no base register
 ds	8		read	147F_dungeon_monster_spawn.asm	186	no		absolute operand, no base register
 ds	8		read	147F_dungeon_monster_spawn.asm	192	no		absolute operand, no base register
+ds	8		read	2E3D_combat_attack_flow.asm	259	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	8		read	2E3D_combat_attack_flow.asm	265	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	8		read	3139_cast_spell_flow.asm	491	no		absolute operand, no base register
 ds	8		read	363B_cmd_G.asm	185	no		absolute operand, no base register
 ds	8	unknown	read	4B08_sub_4b08.asm	11	yes		
@@ -539,12 +600,15 @@ ds	19		write	080D_sub_080d.asm	43	no		absolute operand, no base register
 ds	19		read	08DC_sub_08dc.asm	7	no		absolute operand, no base register
 ds	19		read	0A7C_sub_0a7c.asm	10	no		absolute operand, no base register
 ds	19		read	0A83_sub_0a83.asm	37	no		absolute operand, no base register
+ds	19		write	1D1D_shop_menus.asm	314	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	19		read	253B_food_mode_dispatch.asm	26	no		absolute operand, no base register
 ds	19		read	2677_sub_2677.asm	8	no		absolute operand, no base register
 ds	19		write	268C_sub_268c.asm	20	no		absolute operand, no base register
 ds	19		write	269F_sub_269f.asm	10	no		absolute operand, no base register
 ds	19		read	2F96_sub_2f96.asm	9	no		absolute operand, no base register
 ds	19		write	2FD6_vehicle_horse.asm	29	no		absolute operand, no base register
+ds	19		write	3048_vehicle_plane.asm	83	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	19		write	3048_vehicle_plane.asm	119	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	19		read	33A6_sub_33a6.asm	9	no		absolute operand, no base register
 ds	19		read	35C9_sub_35c9.asm	7	no		absolute operand, no base register
 ds	19		read	38B0_cmd_L.asm	167	no		absolute operand, no base register
@@ -568,10 +632,13 @@ ds	20		write	5B71_mode_table_copy.asm	33	no		absolute operand, no base register
 ds	20		write	5C49_sub_5c49.asm	9	no		absolute operand, no base register
 ds	20		write	6000_dungeon_render.asm	73	no		absolute operand, no base register
 ds	21		read	0962_sub_0962.asm	7	no		absolute operand, no base register
+ds	21		read	277B_dungeon_move_commands.asm	264	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	21		read	277B_dungeon_move_commands.asm	275	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	21		write	5B71_mode_table_copy.asm	37	no		absolute operand, no base register
 ds	21		write	5C49_sub_5c49.asm	13	no		absolute operand, no base register
 ds	21		write	6000_dungeon_render.asm	93	no		absolute operand, no base register
 ds	22		read	0989_sub_0989.asm	7	no		absolute operand, no base register
+ds	22		read	277B_dungeon_move_commands.asm	432	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	22		write	5B71_mode_table_copy.asm	41	no		absolute operand, no base register
 ds	22		write	5C49_sub_5c49.asm	17	no		absolute operand, no base register
 ds	22		write	6000_dungeon_render.asm	121	no		absolute operand, no base register
@@ -585,6 +652,7 @@ ds	25		read	0AAA_combat_special_attack_gate.asm	20	no		absolute operand, no base
 ds	25		read	0B0F_sub_0b0f.asm	13	no		absolute operand, no base register
 ds	25		write	0B0F_sub_0b0f.asm	15	no		absolute operand, no base register
 ds	25		read	0B25_sub_0b25.asm	11	no		absolute operand, no base register
+ds	25		write	0F8E_combat_minax_attack.asm	51	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	25		write	1086_creature_wander_step.asm	79	no		absolute operand, no base register
 ds	25		write	10AA_sub_10aa.asm	16	no		absolute operand, no base register
 ds	25		read	10CE_sub_10ce.asm	19	no		absolute operand, no base register
@@ -662,6 +730,20 @@ ds	31		write	1869_cleric_shrine.asm	76	no		absolute operand, no base register
 ds	31		read	1869_cleric_shrine.asm	81	no		absolute operand, no base register
 ds	31		read	1869_cleric_shrine.asm	92	no		absolute operand, no base register
 ds	31		read	1869_cleric_shrine.asm	131	no		absolute operand, no base register
+ds	31		write	19D7_magic_shop_menu.asm	78	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		read	19D7_magic_shop_menu.asm	83	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		read	19D7_magic_shop_menu.asm	94	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		read	19D7_magic_shop_menu.asm	135	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		write	19D7_magic_shop_menu.asm	159	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		read	19D7_magic_shop_menu.asm	171	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		write	1D1D_shop_menus.asm	70	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		read	1D1D_shop_menus.asm	75	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		read	1D1D_shop_menus.asm	86	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		read	1D1D_shop_menus.asm	139	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		write	1D1D_shop_menus.asm	177	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		read	1D1D_shop_menus.asm	182	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		read	1D1D_shop_menus.asm	193	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		read	1D1D_shop_menus.asm	244	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	31		write	2199_creature_step_gate.asm	77	no		absolute operand, no base register
 ds	31		read	2199_creature_step_gate.asm	108	no		absolute operand, no base register
 ds	31		read	2199_creature_step_gate.asm	117	no		absolute operand, no base register
@@ -685,7 +767,10 @@ ds	31		write	2DB7_sub_2db7.asm	12	no		absolute operand, no base register
 ds	31		read	2DC1_combat_gold_gain.asm	19	no		absolute operand, no base register
 ds	31		write	2DE4_sub_2de4.asm	12	no		absolute operand, no base register
 ds	31		read	2DEE_combat_exp_gain.asm	18	no		absolute operand, no base register
+ds	31		write	2E3D_combat_attack_flow.asm	132	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	31		read-modify-write	2E3D_combat_attack_flow.asm	156	no		absolute operand, no base register
+ds	31		read	2E3D_combat_attack_flow.asm	160	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	31		read	2E3D_combat_attack_flow.asm	215	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	31		write	3606_sub_3606.asm	10	no		absolute operand, no base register
 ds	31		write	3C2E_cmd_O.asm	75	no		absolute operand, no base register
 ds	31		read	3C2E_cmd_O.asm	107	no		absolute operand, no base register
@@ -732,6 +817,12 @@ ds	32		read-modify-write	2383_sub_2383.asm	7	no		absolute operand, no base regis
 ds	32		write	2BC7_sub_2bc7.asm	9	no		absolute operand, no base register
 ds	32		read	2BFB_sub_2bfb.asm	29	no		absolute operand, no base register
 ds	32		read	2C38_minax_teleport_swap.asm	48	no		absolute operand, no base register
+ds	32		write	2E3D_combat_attack_flow.asm	219	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	32		read	2E3D_combat_attack_flow.asm	227	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	32		write	2E3D_combat_attack_flow.asm	278	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	32		read	2E3D_combat_attack_flow.asm	286	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	32		write	2E3D_combat_attack_flow.asm	307	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	32		read	2E3D_combat_attack_flow.asm	315	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	32		write	3139_cast_spell_flow.asm	517	no		absolute operand, no base register
 ds	32		read	3139_cast_spell_flow.asm	523	no		absolute operand, no base register
 ds	32		write	35F3_sub_35f3.asm	9	no		absolute operand, no base register
@@ -746,6 +837,10 @@ ds	33		read-modify-write	0B79_melee_damage_pool.asm	25	no		absolute operand, no 
 ds	33		read-modify-write	0BBC_sub_0bbc.asm	9	no		absolute operand, no base register
 ds	33		read-modify-write	0F12_combat_magic_missile.asm	37	no		absolute operand, no base register
 ds	33		read-modify-write	0F12_combat_magic_missile.asm	39	no		absolute operand, no base register
+ds	33		write	1D1D_shop_menus.asm	111	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	33		read	1D1D_shop_menus.asm	119	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	33		write	1D1D_shop_menus.asm	216	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	33		read	1D1D_shop_menus.asm	224	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	33		write	38B0_cmd_L.asm	354	no		absolute operand, no base register
 ds	33		read	38B0_cmd_L.asm	415	no		absolute operand, no base register
 ds	33		write	38B0_cmd_L.asm	465	no		absolute operand, no base register
@@ -763,6 +858,8 @@ ds	34		write	0BDB_apply_hp_damage.asm	43	no		absolute operand, no base register
 ds	34		read	0BDB_apply_hp_damage.asm	51	no		absolute operand, no base register
 ds	34		write	0C09_sub_0c09.asm	7	no		absolute operand, no base register
 ds	34		read	0C09_sub_0c09.asm	15	no		absolute operand, no base register
+ds	34		read	0F12_combat_magic_missile.asm	43	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	34		write	0F12_combat_magic_missile.asm	47	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	34		write	38B0_cmd_L.asm	358	no		absolute operand, no base register
 ds	34		read	38B0_cmd_L.asm	425	no		absolute operand, no base register
 ds	34		write	38B0_cmd_L.asm	469	no		absolute operand, no base register
@@ -795,12 +892,15 @@ ds	35		write	245A_restage_parked_rocket.asm	34	no		absolute operand, no base reg
 ds	35		write	2677_sub_2677.asm	14	no		absolute operand, no base register
 ds	35		write	2708_sub_2708.asm	49	no		absolute operand, no base register
 ds	35		write	2744_sub_2744.asm	58	no		absolute operand, no base register
+ds	35		read	277B_dungeon_move_commands.asm	75	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	35		write	29D2_sub_29d2.asm	30	no		absolute operand, no base register
 ds	35		write	2C38_minax_teleport_swap.asm	54	no		absolute operand, no base register
 ds	35		read	2C38_minax_teleport_swap.asm	68	no		absolute operand, no base register
 ds	35		write	2C38_minax_teleport_swap.asm	76	no		absolute operand, no base register
 ds	35		write	2CA4_combat_kill_cell_ptr.asm	43	no		absolute operand, no base register
 ds	35		write	2E13_sub_2e13.asm	20	no		absolute operand, no base register
+ds	35		read	2E3D_combat_attack_flow.asm	136	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	35		write	2E3D_combat_attack_flow.asm	249	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	35		write	2F9E_sub_2f9e.asm	10	no		absolute operand, no base register
 ds	35		write	3139_cast_spell_flow.asm	471	no		absolute operand, no base register
 ds	35		write	3139_cast_spell_flow.asm	541	no		absolute operand, no base register
@@ -816,6 +916,8 @@ ds	35		write	3F5D_steal_attempt.asm	67	no		absolute operand, no base register
 ds	35		read	4050_cmd_T.asm	171	no		absolute operand, no base register
 ds	35		write	4050_cmd_T.asm	175	no		absolute operand, no base register
 ds	35		write	4326_unlock_target.asm	27	no		absolute operand, no base register
+ds	35		write	437E_cmd_V.asm	87	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	35		write	44D4_cmd_X.asm	57	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	35		read	50B3_map_tile_ptr.asm	24	no		absolute operand, no base register
 ds	35		write	6000_dungeon_render.asm	65	no		absolute operand, no base register
 ds	35		write	6000_dungeon_render.asm	81	no		absolute operand, no base register
@@ -849,12 +951,15 @@ ds	36		write	245A_restage_parked_rocket.asm	38	no		absolute operand, no base reg
 ds	36		write	2677_sub_2677.asm	18	no		absolute operand, no base register
 ds	36		write	2708_sub_2708.asm	55	no		absolute operand, no base register
 ds	36		write	2744_sub_2744.asm	64	no		absolute operand, no base register
+ds	36		read	277B_dungeon_move_commands.asm	79	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	36		write	29D2_sub_29d2.asm	40	no		absolute operand, no base register
 ds	36		write	2C38_minax_teleport_swap.asm	58	no		absolute operand, no base register
 ds	36		read	2C38_minax_teleport_swap.asm	72	no		absolute operand, no base register
 ds	36		write	2C38_minax_teleport_swap.asm	80	no		absolute operand, no base register
 ds	36		write	2CA4_combat_kill_cell_ptr.asm	47	no		absolute operand, no base register
 ds	36		write	2E13_sub_2e13.asm	28	no		absolute operand, no base register
+ds	36		read	2E3D_combat_attack_flow.asm	142	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	36		write	2E3D_combat_attack_flow.asm	253	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	36		write	2F9E_sub_2f9e.asm	14	no		absolute operand, no base register
 ds	36		write	3139_cast_spell_flow.asm	481	no		absolute operand, no base register
 ds	36		write	3139_cast_spell_flow.asm	549	no		absolute operand, no base register
@@ -870,6 +975,7 @@ ds	36		write	3F5D_steal_attempt.asm	75	no		absolute operand, no base register
 ds	36		read	4050_cmd_T.asm	179	no		absolute operand, no base register
 ds	36		write	4050_cmd_T.asm	183	no		absolute operand, no base register
 ds	36		write	4326_unlock_target.asm	19	no		absolute operand, no base register
+ds	36		write	437E_cmd_V.asm	89	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	36		write	44D4_cmd_X.asm	61	no		absolute operand, no base register
 ds	36		read	50B3_map_tile_ptr.asm	16	no		absolute operand, no base register
 ds	36		write	6000_dungeon_render.asm	69	no		absolute operand, no base register
@@ -890,7 +996,14 @@ ds	37		read	12DB_dungeon_events.asm	99	no		absolute operand, no base register
 ds	37		read	12DB_dungeon_events.asm	139	no		absolute operand, no base register
 ds	37		read	12DB_dungeon_events.asm	177	no		absolute operand, no base register
 ds	37		read	143C_dungeon_cell_gate.asm	26	no		absolute operand, no base register
+ds	37		write	15E1_tavern_menu.asm	88	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	37		read	15E1_tavern_menu.asm	104	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	37		write	15E1_tavern_menu.asm	114	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	37		read	15E1_tavern_menu.asm	119	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	37		read	277B_dungeon_move_commands.asm	303	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	37		read	2E13_sub_2e13.asm	30	no		absolute operand, no base register
+ds	37		read	2E3D_combat_attack_flow.asm	148	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	37		read	2E3D_combat_attack_flow.asm	255	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	37		read	3139_cast_spell_flow.asm	408	no		absolute operand, no base register
 ds	37		read-modify-write	3139_cast_spell_flow.asm	429	no		absolute operand, no base register
 ds	37		read	3139_cast_spell_flow.asm	439	no		absolute operand, no base register
@@ -919,6 +1032,7 @@ ds	38		read	1151_dungeon_turn.asm	286	no		absolute operand, no base register
 ds	38		read-modify-write	1151_dungeon_turn.asm	301	no		absolute operand, no base register
 ds	38		read	12DB_dungeon_events.asm	223	no		absolute operand, no base register
 ds	38		write	12DB_dungeon_events.asm	236	no		absolute operand, no base register
+ds	38		write	277B_dungeon_move_commands.asm	315	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	38		write	3139_cast_spell_flow.asm	398	no		absolute operand, no base register
 ds	38		write	37AE_ignite_torch_burn.asm	48	no		absolute operand, no base register
 ds	38		read	6000_dungeon_render.asm	45	no		absolute operand, no base register
@@ -927,8 +1041,17 @@ ds	39		read-modify-write	08A7_sub_08a7.asm	35	no		absolute operand, no base regi
 ds	39		write	0B4D_sub_0b4d.asm	11	no		absolute operand, no base register
 ds	39		read	0B65_sub_0b65.asm	9	no		absolute operand, no base register
 ds	39		read	155D_chatter_table_selector.asm	27	no		absolute operand, no base register
+ds	39		write	15E1_tavern_menu.asm	64	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	39		write	15E1_tavern_menu.asm	94	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	39		write	15E1_tavern_menu.asm	129	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	39		read	17B7_sub_17b7.asm	8	no		absolute operand, no base register
 ds	39		read	1869_cleric_shrine.asm	96	no		absolute operand, no base register
+ds	39		read	19D7_magic_shop_menu.asm	98	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	39		write	19D7_magic_shop_menu.asm	161	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	39		write	19D7_magic_shop_menu.asm	179	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	39		read	1D1D_shop_menus.asm	92	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	39		read	1D1D_shop_menus.asm	197	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	39		read	1D1D_shop_menus.asm	269	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	39		read	2052_gold_spend_price.asm	80	no		absolute operand, no base register
 ds	39		read	2052_gold_spend_price.asm	103	no		absolute operand, no base register
 ds	39		write	20AB_bcd_price_from_stats.asm	223	no		absolute operand, no base register
@@ -937,6 +1060,7 @@ ds	39		read	20AB_bcd_price_from_stats.asm	302	no		absolute operand, no base regi
 ds	39		write	20AB_bcd_price_from_stats.asm	310	no		absolute operand, no base register
 ds	39		write	2216_sub_2216.asm	12	no		absolute operand, no base register
 ds	39		read	2233_sub_2233.asm	38	no		absolute operand, no base register
+ds	39		write	277B_dungeon_move_commands.asm	136	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	39		read-modify-write	277B_dungeon_move_commands.asm	151	no		absolute operand, no base register
 ds	39		write	3C2E_cmd_O.asm	97	no		absolute operand, no base register
 ds	39		read	3C2E_cmd_O.asm	162	no		absolute operand, no base register
@@ -948,8 +1072,15 @@ ds	39		read	3C2E_cmd_O.asm	262	no		absolute operand, no base register
 ds	39		write	4282_sub_4282.asm	18	no		absolute operand, no base register
 ds	39		write	51B0_sub_51b0.asm	34	no		absolute operand, no base register
 ds	39		read	51B0_sub_51b0.asm	56	no		absolute operand, no base register
+ds	40		write	15E1_tavern_menu.asm	60	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	40		write	15E1_tavern_menu.asm	90	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	40		read	17B7_sub_17b7.asm	12	no		absolute operand, no base register
 ds	40		read	1869_cleric_shrine.asm	100	no		absolute operand, no base register
+ds	40		read	19D7_magic_shop_menu.asm	102	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	40		write	19D7_magic_shop_menu.asm	165	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	40		read	1D1D_shop_menus.asm	96	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	40		read	1D1D_shop_menus.asm	201	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	40		read	1D1D_shop_menus.asm	273	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	40		read	2052_gold_spend_price.asm	68	no		absolute operand, no base register
 ds	40		read	2052_gold_spend_price.asm	95	no		absolute operand, no base register
 ds	40		write	20AB_bcd_price_from_stats.asm	229	no		absolute operand, no base register
@@ -987,7 +1118,9 @@ ds	46		write	0246_sub_0246.asm	13	no		absolute operand, no base register
 ds	46		write	025E_sub_025e.asm	17	no		absolute operand, no base register
 ds	46		write	0273_sub_0273.asm	16	no		absolute operand, no base register
 ds	46		write	0288_sub_0288.asm	15	no		absolute operand, no base register
+ds	46		write	02A3_sub_02a3.asm	21	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	46		write	02CC_sub_02cc.asm	15	no		absolute operand, no base register
+ds	46		write	02E6_sub_02e6.asm	21	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	46		write	02F8_demo_help_line_print.asm	25	no		absolute operand, no base register
 ds	46		write	031F_sub_031f.asm	15	no		absolute operand, no base register
 ds	46		write	034B_sub_034b.asm	15	no		absolute operand, no base register
@@ -995,10 +1128,15 @@ ds	46		write	0375_sub_0375.asm	15	no		absolute operand, no base register
 ds	46		write	03AC_sub_03ac.asm	43	no		absolute operand, no base register
 ds	46		write	03AC_sub_03ac.asm	48	no		absolute operand, no base register
 ds	46		write	03AC_sub_03ac.asm	83	no		absolute operand, no base register
+ds	46		write	03AC_sub_03ac.asm	90	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	46		write	03AC_sub_03ac.asm	129	no		absolute operand, no base register
+ds	46		write	03AC_sub_03ac.asm	136	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	46		write	03AC_sub_03ac.asm	171	no		absolute operand, no base register
+ds	46		write	03AC_sub_03ac.asm	178	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	46		write	03AC_sub_03ac.asm	213	no		absolute operand, no base register
+ds	46		write	03AC_sub_03ac.asm	220	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	46		write	03AC_sub_03ac.asm	255	no		absolute operand, no base register
+ds	46		write	03AC_sub_03ac.asm	262	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	46		write	456B_sub_456b.asm	10	no		absolute operand, no base register
 ds	46		write	48A7_sub_48a7.asm	7	no		absolute operand, no base register
 ds	46		write	4A22_sub_4a22.asm	11	no		absolute operand, no base register
@@ -1053,6 +1191,7 @@ ds	54		read	07AA_sub_07aa.asm	7	no		absolute operand, no base register
 ds	54		read	2305_sector_store.asm	131	no		absolute operand, no base register
 ds	54		read	2474_sub_2474.asm	12	no		absolute operand, no base register
 ds	54		read	3823_site_floor_down.asm	113	no		absolute operand, no base register
+ds	54	unknown	read	507D_sub_507d.asm	7	yes		decoded from forced-keep bytes
 ds	70		read	1869_cleric_shrine.asm	38	no		absolute operand, no base register
 ds	70		read	4598_sub_4598.asm	8	no		absolute operand, no base register
 ds	70		read	505F_sub_505f.asm	7	no		absolute operand, no base register
@@ -1106,6 +1245,7 @@ ds	74		write	343F_sub_343f.asm	81	no		absolute operand, no base register
 ds	74		write	34CF_sub_34cf.asm	18	no		absolute operand, no base register
 ds	74		write	34E4_site_enter_dungeon.asm	71	no		absolute operand, no base register
 ds	74		read	3611_monster_damage_apply.asm	35	no		absolute operand, no base register
+ds	74		read	363B_cmd_G.asm	67	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	74		read	37A4_sub_37a4.asm	7	no		absolute operand, no base register
 ds	74		read	37F2_klimb_msg.asm	27	no		absolute operand, no base register
 ds	74		read	3812_klimb_gate.asm	24	no		absolute operand, no base register
@@ -1117,14 +1257,19 @@ ds	74		read	3DDD_sub_3ddd.asm	7	no		absolute operand, no base register
 ds	74		read	3F5D_steal_attempt.asm	126	no		absolute operand, no base register
 ds	74		read	4050_cmd_T.asm	142	no		absolute operand, no base register
 ds	74		read	4232_sub_4232.asm	7	no		absolute operand, no base register
+ds	74		read	437E_cmd_V.asm	62	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	74		write	7030_space_collision.asm	365	no		absolute operand, no base register
 ds	74		write	7030_space_collision.asm	401	no		absolute operand, no base register
 ds	75		read	2BFB_sub_2bfb.asm	15	no		absolute operand, no base register
+ds	75		read	2E3D_combat_attack_flow.asm	203	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	75	unknown	read	3C2E_cmd_O.asm	248	yes		decoded from forced-keep bytes
+ds	75	unknown	write	3C2E_cmd_O.asm	266	yes		decoded from forced-keep bytes
 ds	75		read	43F3_cmd_W.asm	77	no		absolute operand, no base register
 ds	75		read	4698_sub_4698.asm	8	no		absolute operand, no base register
 ds	76	unknown	read-modify-write	0776_sub_0776.asm	22	yes		
 ds	76	unknown	read-modify-write	17F5_sub_17f5.asm	37	yes		
 ds	76		read	2BDA_sub_2bda.asm	11	no		absolute operand, no base register
+ds	76		read	2E3D_combat_attack_flow.asm	178	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	76		read	3ED4_ready_weapon_agility_gate.asm	56	no		absolute operand, no base register
 ds	76		read	46B7_sub_46b7.asm	8	no		absolute operand, no base register
 ds	77		read	46D6_sub_46d6.asm	8	no		absolute operand, no base register
@@ -1197,11 +1342,15 @@ ds	85		write	2626_food_drain_mounted.asm	91	no		absolute operand, no base regist
 ds	86		write	0C62_death.asm	61	no		absolute operand, no base register
 ds	86		read	2DEE_combat_exp_gain.asm	24	no		absolute operand, no base register
 ds	86		write	2DEE_combat_exp_gain.asm	30	no		absolute operand, no base register
+ds	86		read	2E3D_combat_attack_flow.asm	321	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	86		write	2E3D_combat_attack_flow.asm	327	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	86		read	3139_cast_spell_flow.asm	511	no		absolute operand, no base register
 ds	86		read	458D_sub_458d.asm	8	no		absolute operand, no base register
 ds	87		write	0C62_death.asm	63	no		absolute operand, no base register
 ds	87		read	2DEE_combat_exp_gain.asm	16	no		absolute operand, no base register
 ds	87		write	2DEE_combat_exp_gain.asm	22	no		absolute operand, no base register
+ds	87		read	2E3D_combat_attack_flow.asm	313	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	87		write	2E3D_combat_attack_flow.asm	319	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	88		write	0C62_death.asm	65	no		absolute operand, no base register
 ds	88		read	2052_gold_spend_price.asm	76	no		absolute operand, no base register
 ds	88		write	2052_gold_spend_price.asm	86	no		absolute operand, no base register
@@ -1209,6 +1358,8 @@ ds	88		read	2052_gold_spend_price.asm	101	no		absolute operand, no base register
 ds	88		write	2052_gold_spend_price.asm	107	no		absolute operand, no base register
 ds	88		read	2DC1_combat_gold_gain.asm	25	no		absolute operand, no base register
 ds	88		write	2DC1_combat_gold_gain.asm	31	no		absolute operand, no base register
+ds	88		read	2E3D_combat_attack_flow.asm	292	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	88		write	2E3D_combat_attack_flow.asm	298	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	88		read	363B_cmd_G.asm	222	no		absolute operand, no base register
 ds	88		write	363B_cmd_G.asm	228	no		absolute operand, no base register
 ds	89		write	0C62_death.asm	67	no		absolute operand, no base register
@@ -1218,6 +1369,8 @@ ds	89		read	2052_gold_spend_price.asm	93	no		absolute operand, no base register
 ds	89		write	2052_gold_spend_price.asm	99	no		absolute operand, no base register
 ds	89		read	2DC1_combat_gold_gain.asm	17	no		absolute operand, no base register
 ds	89		write	2DC1_combat_gold_gain.asm	23	no		absolute operand, no base register
+ds	89		read	2E3D_combat_attack_flow.asm	284	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	89		write	2E3D_combat_attack_flow.asm	290	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	89		read	363B_cmd_G.asm	216	no		absolute operand, no base register
 ds	89		write	363B_cmd_G.asm	220	no		absolute operand, no base register
 ds	90		read	080D_sub_080d.asm	55	no		absolute operand, no base register
@@ -1251,6 +1404,7 @@ ds	96		read	0CEE_spawn_tile_store.asm	79	no		absolute operand, no base register
 ds	96		read-modify-write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	33	no		absolute operand, no base register
 ds	96	unknown	read-modify-write	6144_dungeon_shape_dispatch.asm	203	yes		
 ds	97		read	2BFB_sub_2bfb.asm	7	no		absolute operand, no base register
+ds	97		read	2E3D_combat_attack_flow.asm	195	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	97		write	3ED4_ready_weapon_agility_gate.asm	70	no		absolute operand, no base register
 ds	98		read	0B71_sub_0b71.asm	9	no		absolute operand, no base register
 ds	98		read	12DB_dungeon_events.asm	157	no		absolute operand, no base register
@@ -1273,6 +1427,9 @@ ds	101		write	2CD3_combat_kill_drop_dispatch.asm	81	no		absolute operand, no bas
 ds	101		read	433E_sub_433e.asm	7	no		absolute operand, no base register
 ds	101		read	435E_open_write_tile.asm	45	no		absolute operand, no base register
 ds	101		write	435E_open_write_tile.asm	55	no		absolute operand, no base register
+ds	102		read	277B_dungeon_move_commands.asm	330	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	102		read	277B_dungeon_move_commands.asm	343	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	102		write	277B_dungeon_move_commands.asm	353	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	102		read	2CD3_combat_kill_drop_dispatch.asm	105	no		absolute operand, no base register
 ds	102		write	2CD3_combat_kill_drop_dispatch.asm	111	no		absolute operand, no base register
 ds	105		read	080D_sub_080d.asm	63	no		absolute operand, no base register
@@ -1316,6 +1473,7 @@ ds	111		read-modify-write	2701_sub_2701.asm	7	no		absolute operand, no base regi
 ds	111		write	2744_sub_2744.asm	36	no		absolute operand, no base register
 ds	112		read	268C_sub_268c.asm	8	no		absolute operand, no base register
 ds	112		read	2735_sub_2735.asm	23	no		absolute operand, no base register
+ds	112		write	277B_dungeon_move_commands.asm	61	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	116		write	06B0_sub_06b0.asm	12	no		absolute operand, no base register
 ds	116		read-modify-write	06DA_sub_06da.asm	9	no		absolute operand, no base register
 ds	116		read	06ED_speed_rescale.asm	27	no		absolute operand, no base register
@@ -1325,17 +1483,33 @@ ds	116		write	4F8E_speed_slower_f8.asm	34	no		absolute operand, no base register
 ds	116		read	4FA5_speed_faster_f7.asm	19	no		absolute operand, no base register
 ds	116		write	4FA5_speed_faster_f7.asm	27	no		absolute operand, no base register
 ds	116		read	5F08_sub_5f08.asm	48	no		absolute operand, no base register
+ds	118	unknown	read	1D1D_shop_menus.asm	248	yes		decoded from forced-keep bytes
+ds	118	unknown	write	1D1D_shop_menus.asm	256	yes		decoded from forced-keep bytes
+ds	118	unknown	read	363B_cmd_G.asm	111	yes		decoded from forced-keep bytes
+ds	118	unknown	write	363B_cmd_G.asm	117	yes		decoded from forced-keep bytes
+ds	118	unknown	read	3C2E_cmd_O.asm	217	yes		decoded from forced-keep bytes
+ds	118	unknown	write	3C2E_cmd_O.asm	223	yes		decoded from forced-keep bytes
+ds	118	unknown	read	3EAB_ds76_index_test.asm	20	yes		decoded from forced-keep bytes
+ds	118	unknown	read	3F5D_steal_attempt.asm	225	yes		decoded from forced-keep bytes
+ds	118	unknown	write	3F5D_steal_attempt.asm	231	yes		decoded from forced-keep bytes
+ds	118	unknown	read	4778_sub_4778.asm	20	yes		decoded from forced-keep bytes
 ds	127		write	3C2E_cmd_O.asm	173	no		absolute operand, no base register
+ds	150	unknown	read	1D1D_shop_menus.asm	143	yes		decoded from forced-keep bytes
+ds	150	unknown	write	1D1D_shop_menus.asm	151	yes		decoded from forced-keep bytes
 ds	150	unknown	read	363B_cmd_G.asm	143	yes		
 ds	150	unknown	write	363B_cmd_G.asm	149	yes		
 ds	150	unknown	read	3F5D_steal_attempt.asm	198	yes		
 ds	150	unknown	write	3F5D_steal_attempt.asm	204	yes		
 ds	150	unknown	read	43F3_cmd_W.asm	52	yes		
+ds	150	unknown	read	47D0_sub_47d0.asm	20	yes		decoded from forced-keep bytes
 ds	182	unknown	read	1869_cleric_shrine.asm	135	yes		
 ds	182	unknown	write	1869_cleric_shrine.asm	143	yes		
+ds	182	unknown	read	19D7_magic_shop_menu.asm	139	yes		decoded from forced-keep bytes
+ds	182	unknown	write	19D7_magic_shop_menu.asm	145	yes		decoded from forced-keep bytes
 ds	182	unknown	read	3139_cast_spell_flow.asm	296	yes		
 ds	182	unknown	read	3139_cast_spell_flow.asm	319	yes		
 ds	182	unknown	write	3139_cast_spell_flow.asm	329	yes		
+ds	182	unknown	read	4829_sub_4829.asm	18	yes		decoded from forced-keep bytes
 ds	214	unknown	read	0FCD_combat_thief_steal.asm	92	yes		
 ds	214	unknown	read	0FCD_combat_thief_steal.asm	100	yes		
 ds	214	unknown	write	0FCD_combat_thief_steal.asm	110	yes		
@@ -1345,16 +1519,27 @@ ds	214	unknown	write	2CD3_combat_kill_drop_dispatch.asm	134	yes
 ds	214	unknown	read	2D22_combat_type_drop_table.asm	94	yes		
 ds	214	unknown	write	2D22_combat_type_drop_table.asm	100	yes		
 ds	214		write	3C2E_cmd_O.asm	201	no		absolute operand, no base register
+ds	214	unknown	read	488C_sub_488c.asm	19	yes		decoded from forced-keep bytes
 ds	215		read	3139_cast_spell_flow.asm	267	no		absolute operand, no base register
 ds	216		read	3139_cast_spell_flow.asm	271	no		absolute operand, no base register
+ds	217		read	0E70_combat_paralyzed_legs.asm	35	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	218		read	0EC2_combat_paralyzed_arms.asm	32	no		absolute operand, no base register
 ds	219		read	2D22_combat_type_drop_table.asm	36	no		absolute operand, no base register
 ds	219		write	2D22_combat_type_drop_table.asm	42	no		absolute operand, no base register
+ds	219		read	437E_cmd_V.asm	51	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	219		read	437E_cmd_V.asm	73	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	219		write	437E_cmd_V.asm	83	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	221		read	3048_vehicle_plane.asm	92	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	223		read	3048_vehicle_plane.asm	53	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	225		read	38B0_cmd_L.asm	339	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	226		read	2FF6_vehicle_ship_gate.asm	20	no		absolute operand, no base register
 ds	227		read	3BDD_sub_3bdd.asm	7	no		absolute operand, no base register
+ds	227		read	3C04_coin_rub.asm	26	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	227		write	3C04_coin_rub.asm	36	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	228		read	0F48_combat_sleep_spell.asm	31	no		absolute operand, no base register
 ds	229		read	363B_cmd_G.asm	252	no		absolute operand, no base register
 ds	229		write	363B_cmd_G.asm	258	no		absolute operand, no base register
+ds	229		read	38B0_cmd_L.asm	189	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	229		read	6999_space_status.asm	162	no		absolute operand, no base register
 ds	229		write	6999_space_status.asm	174	no		absolute operand, no base register
 ds	229		read	6DFD_hyperwarp_flow.asm	174	no		absolute operand, no base register
@@ -1383,6 +1568,8 @@ ds	311	0x0137+32	read	2C38_minax_teleport_swap.asm	52	yes		engine/src/core/state
 ds	311	0x0137+32	write	2C38_minax_teleport_swap.asm	74	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
 ds	311	0x0137+32	read	2CA4_combat_kill_cell_ptr.asm	41	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
 ds	311	0x0137+32	write	2D8C_combat_kill_reward.asm	17	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
+ds	311	0x0137+32	read	2E3D_combat_attack_flow.asm	134	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
+ds	311	0x0137+32	read	2E3D_combat_attack_flow.asm	247	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
 ds	311	0x0137+32	read	330C_cast_target_finder.asm	119	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
 ds	311	0x0137+32	read	4F11_monster_step_vector.asm	51	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
 ds	311	0x0137+32	read	4F36_monster_pursuit_vector.asm	44	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
@@ -1406,6 +1593,8 @@ ds	343	0x0157+32	write	2C38_minax_teleport_swap.asm	70	yes		engine/src/core/stat
 ds	343	0x0157+32	read	2C38_minax_teleport_swap.asm	78	yes		engine/src/core/state.h creature grid slot 2
 ds	343	0x0157+32	read	2CA4_combat_kill_cell_ptr.asm	45	yes		engine/src/core/state.h creature grid slot 2
 ds	343	0x0157+32	write	2D8C_combat_kill_reward.asm	19	yes		engine/src/core/state.h creature grid slot 2
+ds	343	0x0157+32	read	2E3D_combat_attack_flow.asm	140	yes		engine/src/core/state.h creature grid slot 2
+ds	343	0x0157+32	read	2E3D_combat_attack_flow.asm	251	yes		engine/src/core/state.h creature grid slot 2
 ds	343	0x0157+32	read	330C_cast_target_finder.asm	129	yes		engine/src/core/state.h creature grid slot 2
 ds	343	0x0157+32	read	4F20_sub_4f20.asm	14	yes		engine/src/core/state.h creature grid slot 2
 ds	343	0x0157+32	read	4F36_monster_pursuit_vector.asm	52	yes		engine/src/core/state.h creature grid slot 2
@@ -1427,6 +1616,9 @@ ds	375	0x0177+32	read-modify-write	212A_sub_212a.asm	7	yes		engine/src/core/stat
 ds	375	0x0177+32	read	2C19_monster_hp_subtract.asm	36	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	write	2C26_monster_hp_set.asm	15	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	write	2D8C_combat_kill_reward.asm	15	yes		engine/src/core/state.h creature grid slot 3
+ds	375	0x0177+32	read	2E3D_combat_attack_flow.asm	221	yes		engine/src/core/state.h creature grid slot 3
+ds	375	0x0177+32	write	2E3D_combat_attack_flow.asm	233	yes		engine/src/core/state.h creature grid slot 3
+ds	375	0x0177+32	write	2E3D_combat_attack_flow.asm	241	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	read	3139_cast_spell_flow.asm	519	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	write	3139_cast_spell_flow.asm	527	yes		engine/src/core/state.h creature grid slot 3
 ds	407	0x0197+32	read	0A74_monster_sweep_slot_test.asm	19	yes		engine/src/core/state.h creature grid slot 4
@@ -1458,6 +1650,7 @@ ds	407	0x0197+32	read	2C2D_minax_hit_teleport_gate.asm	22	yes		engine/src/core/s
 ds	407	0x0197+32	read	2C38_minax_teleport_swap.asm	84	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	read	2CB5_combat_kill_cell_restore.asm	51	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	write	2D8C_combat_kill_reward.asm	21	yes		engine/src/core/state.h creature grid slot 4
+ds	407	0x0197+32	write	2E3D_combat_attack_flow.asm	243	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	read	330C_cast_target_finder.asm	91	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	read	40CB_transact_type_chain.asm	19	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	read	40D7_sub_40d7.asm	9	yes		engine/src/core/state.h creature grid slot 4
@@ -1483,6 +1676,8 @@ ds	439	unknown	write	225A_sub_225a.asm	17	yes
 ds	439	unknown	read	2C38_minax_teleport_swap.asm	62	yes		
 ds	439	unknown	read	2CB5_combat_kill_cell_restore.asm	45	yes		
 ds	439	unknown	write	2D8C_combat_kill_reward.asm	13	yes		
+ds	439	unknown	read	2E3D_combat_attack_flow.asm	146	yes		decoded from forced-keep bytes
+ds	439	unknown	write	2E3D_combat_attack_flow.asm	245	yes		decoded from forced-keep bytes
 ds	439	unknown	read	330C_cast_target_finder.asm	107	yes		
 ds	471	0x01d7+32	read	102B_sub_102b.asm	7	yes		engine/src/core/state.h creature grid slot 5
 ds	471	0x01d7+32	write	114A_sub_114a.asm	7	yes		engine/src/core/state.h creature grid slot 5
@@ -1539,6 +1734,7 @@ ds	618		write	080D_sub_080d.asm	47	no		absolute operand, no base register
 ds	618		read	0C54_sub_0c54.asm	7	no		absolute operand, no base register
 ds	618		read-modify-write	0C5B_sub_0c5b.asm	7	no		absolute operand, no base register
 ds	618		read	2199_creature_step_gate.asm	79	no		absolute operand, no base register
+ds	618		write	3C04_coin_rub.asm	43	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	619		write	080D_sub_080d.asm	49	no		absolute operand, no base register
 ds	619		read	0C33_sub_0c33.asm	7	no		absolute operand, no base register
 ds	619		read-modify-write	0C3A_sub_0c3a.asm	7	no		absolute operand, no base register
@@ -1555,25 +1751,32 @@ ds	621		read	0C49_sub_0c49.asm	7	no		absolute operand, no base register
 ds	621		read-modify-write	0C50_sub_0c50.asm	7	no		absolute operand, no base register
 ds	621		write	0F48_combat_sleep_spell.asm	54	no		absolute operand, no base register
 ds	621		write	12DB_dungeon_events.asm	276	no		absolute operand, no base register
+ds	621		read	277B_dungeon_move_commands.asm	125	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	621		read-modify-write	277B_dungeon_move_commands.asm	155	no		absolute operand, no base register
 ds	622		read	2396_sub_2396.asm	7	no		absolute operand, no base register
+ds	622		read	277B_dungeon_move_commands.asm	225	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	622		read	38B0_cmd_L.asm	377	no		absolute operand, no base register
 ds	622		read	6999_space_status.asm	306	no		absolute operand, no base register
 ds	623		read	0976_sub_0976.asm	7	no		absolute operand, no base register
 ds	623		read	239C_sub_239c.asm	7	no		absolute operand, no base register
+ds	623		read	277B_dungeon_move_commands.asm	245	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	623		read	38B0_cmd_L.asm	385	no		absolute operand, no base register
 ds	623		read	6999_space_status.asm	314	no		absolute operand, no base register
 ds	624		read	09C3_sub_09c3.asm	7	no		absolute operand, no base register
 ds	624		read	23A2_sub_23a2.asm	7	no		absolute operand, no base register
+ds	624		read	277B_dungeon_move_commands.asm	239	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	624		read	38B0_cmd_L.asm	393	no		absolute operand, no base register
 ds	624		read	6999_space_status.asm	298	no		absolute operand, no base register
 ds	625		read	099D_sub_099d.asm	7	no		absolute operand, no base register
 ds	625		read	23A8_sub_23a8.asm	7	no		absolute operand, no base register
+ds	625		read	277B_dungeon_move_commands.asm	233	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	625		read	38B0_cmd_L.asm	399	no		absolute operand, no base register
 ds	625		read	6999_space_status.asm	290	no		absolute operand, no base register
 ds	626	unknown	write	0859_sub_0859.asm	9	yes		
 ds	626	unknown	write	3823_site_floor_down.asm	67	yes		
 ds	626	unknown	write	38B0_cmd_L.asm	239	yes		
+ds	626	unknown	write	437E_cmd_V.asm	107	yes		decoded from forced-keep bytes
+ds	626		write	437E_cmd_V.asm	115	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	626	unknown	write	4A64_sub_4a64.asm	7	yes		
 ds	626	unknown	read	4ABB_sub_4abb.asm	7	yes		
 ds	626	unknown	write	5B4D_sub_5b4d.asm	7	yes		
@@ -1594,6 +1797,8 @@ ds	755		read	5C49_sub_5c49.asm	15	no		absolute operand, no base register
 ds	882	unknown	write	0859_sub_0859.asm	11	yes		
 ds	882	unknown	write	3823_site_floor_down.asm	69	yes		
 ds	882	unknown	write	38B0_cmd_L.asm	241	yes		
+ds	882	unknown	write	437E_cmd_V.asm	109	yes		decoded from forced-keep bytes
+ds	882		write	437E_cmd_V.asm	117	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	882	unknown	write	4A64_sub_4a64.asm	9	yes		
 ds	882	unknown	read	5B33_sub_5b33.asm	7	yes		
 ds	882	unknown	read	5BC2_sub_5bc2.asm	63	yes		
@@ -1607,6 +1812,8 @@ ds	1138		read	68C0_dungeon_grid_byte.asm	29	no		absolute operand, no base regist
 ds	1139		read	5AFF_sub_5aff.asm	33	no		absolute operand, no base register
 ds	1139		read	5BC2_sub_5bc2.asm	49	no		absolute operand, no base register
 ds	1140		read	07F3_dos_block_read.asm	21	no		absolute operand, no base register
+ds	1140		read	68ED_dungeon_sprite_pass.asm	70	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	1140		read	68ED_dungeon_sprite_pass.asm	92	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	1142		read	154E_tlkx_record_printer.asm	46	no		absolute operand, no base register
 ds	1142		read	22D5_sub_22d5.asm	26	no		absolute operand, no base register
 ds	1144		write	4A2F_sub_4a2f.asm	13	no		absolute operand, no base register
@@ -1826,6 +2033,7 @@ ds	1150		write	67B3_line.asm	108	no		absolute operand, no base register
 ds	1150		read	67B3_line.asm	154	no		absolute operand, no base register
 ds	1150		read	67B3_line.asm	216	no		absolute operand, no base register
 ds	1151		read	68A3_sprite_stroke.asm	24	no		absolute operand, no base register
+ds	1151		write	68ED_dungeon_sprite_pass.asm	150	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	1152		write	67B3_line.asm	122	no		absolute operand, no base register
 ds	1152		read-modify-write	67B3_line.asm	168	no		absolute operand, no base register
 ds	1152		write	67B3_line.asm	176	no		absolute operand, no base register
@@ -1899,6 +2107,7 @@ ds	1154		read	66CB_sub_66cb.asm	104	no		absolute operand, no base register
 ds	1154		read	66CB_sub_66cb.asm	120	no		absolute operand, no base register
 ds	1154		read	66CB_sub_66cb.asm	144	no		absolute operand, no base register
 ds	1154		read-modify-write	68ED_dungeon_sprite_pass.asm	42	no		absolute operand, no base register
+ds	1154		read	68ED_dungeon_sprite_pass.asm	54	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	1155		write	6000_dungeon_render.asm	39	no		absolute operand, no base register
 ds	1155		write	6000_dungeon_render.asm	57	no		absolute operand, no base register
 ds	1155		read	6000_dungeon_render.asm	79	no		absolute operand, no base register
@@ -1934,8 +2143,17 @@ ds	1156		read	67B3_line.asm	196	no		absolute operand, no base register
 ds	1159		write	68C0_dungeon_grid_byte.asm	45	no		absolute operand, no base register
 ds	1159		read	68C0_dungeon_grid_byte.asm	53	no		absolute operand, no base register
 ds	1160		write	68C0_dungeon_grid_byte.asm	31	no		absolute operand, no base register
+ds	1161		write	68ED_dungeon_sprite_pass.asm	76	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	1161		read	68ED_dungeon_sprite_pass.asm	82	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	1161		write	68ED_dungeon_sprite_pass.asm	96	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	1161		read	68ED_dungeon_sprite_pass.asm	104	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	1161		read-modify-write	68ED_dungeon_sprite_pass.asm	116	no		absolute operand, no base register
+ds	1161		read	68ED_dungeon_sprite_pass.asm	118	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	1161		read	68ED_dungeon_sprite_pass.asm	126	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	1161		read-modify-write	68ED_dungeon_sprite_pass.asm	152	no		absolute operand, no base register
+ds	1162		write	68ED_dungeon_sprite_pass.asm	72	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	1162		read	68ED_dungeon_sprite_pass.asm	78	no		absolute operand, no base register; decoded from forced-keep bytes
+ds	1162		write	68ED_dungeon_sprite_pass.asm	94	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	1167	unknown	write	6078_dungeon_depth_scan.asm	104	yes		
 ds	1167	unknown	read	6144_dungeon_shape_dispatch.asm	135	yes		
 ds	1167	unknown	read	6144_dungeon_shape_dispatch.asm	143	yes		
@@ -1952,6 +2170,7 @@ ds	1183	unknown	read	6144_dungeon_shape_dispatch.asm	163	yes
 ds	1183	unknown	read	6144_dungeon_shape_dispatch.asm	171	yes		
 ds	1183	unknown	read	6144_dungeon_shape_dispatch.asm	177	yes		
 ds	1199	unknown	write	6078_dungeon_depth_scan.asm	140	yes		
+ds	1199	unknown	read	68ED_dungeon_sprite_pass.asm	60	yes		decoded from forced-keep bytes
 ds	1215		read	4B76_pixel_plot.asm	38	no		absolute operand, no base register
 ds	1215		read	4BAA_pixel_erase.asm	18	no		absolute operand, no base register
 ds	1215		read	4BE0_pixel_block.asm	49	no		absolute operand, no base register
@@ -2031,6 +2250,7 @@ ds	1357		read	5E3A_sub_5e3a.asm	40	no		absolute operand, no base register
 ds	1357		read	5E83_sub_5e83.asm	8	no		absolute operand, no base register
 ds	1357		read	5EC7_play_seq0.asm	16	no		absolute operand, no base register
 ds	1357		read	5F08_sub_5f08.asm	18	no		absolute operand, no base register
+ds	1358		write	38B0_cmd_L.asm	363	no		absolute operand, no base register; decoded from forced-keep bytes
 ds	1358		write	38B0_cmd_L.asm	453	no		absolute operand, no base register
 ds	1358		write	38B0_cmd_L.asm	532	no		absolute operand, no base register
 ds	1358		read	5B3D_sub_5b3d.asm	7	no		absolute operand, no base register

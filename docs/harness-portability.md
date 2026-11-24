@@ -189,6 +189,33 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **A parser that reads only mnemonics is silently blind to every access written as raw bytes, and
+  self-accounting will not tell you.** An index of memory accesses reported "zero unparsed" while
+  missing every access that lived in a forced-keep `.byte` line, because such a line is data-shaped
+  and so was never counted as an instruction the parser had failed on. Self-accounting only counts
+  the categories it already knows to look in, so a whole class can be absent and the check stays
+  green. The tell was not the count but the shape: a hand-written comment beside the bytes named an
+  instruction the index had no row for. A tool that claims completeness should be asked what it
+  would print if a whole category were missing, and the answer should be tested.
+* **Hand-computed instruction encodings are the least reliable evidence in the building.** While a
+  byte decoder was being written, hand-derived modrm expectations were wrong three times in a row,
+  and in one case the wrong expectation and the wrong table agreed, which is the arrangement that
+  hides a bug rather than revealing one. The fix was to pin every addressing-mode and r/m encoding
+  against an independent disassembler; that immediately found a wrong r/m table which would have
+  attributed accesses to the wrong base register while looking entirely healthy. A decoder's first
+  control should come from something that is not the author's arithmetic.
+* **A decoder has to be told which of its inputs are not instructions.** A raw-byte run can be the
+  tail of an instruction that began in a different file, so its first byte is not an opcode; 49 such
+  runs existed and 7 of them decoded into perfectly plausible instructions, each inventing a memory
+  access that does not exist. Plausible invention is the worst failure a decoder can have, because
+  nothing downstream can spot it. The only evidence that a fragment is a fragment was the prose
+  comment, so the comment was made load-bearing in exactly that one place, which is a deliberate
+  exception to the rule that bytes outrank prose and is written down as one.
+* **A recovery should show additions and no deletions.** When an index is repaired by teaching the
+  parser something it could not see, the diff should be pure insertion; a changed or vanished
+  existing row means the fix also altered something that was already right, which is a different and
+  much more expensive claim. Checking that is free and it is the cheapest proof that a large
+  row-count jump is new knowledge rather than churn.
 * **A column whose values are legal in two bases cannot be classified by looking at it, only by
   being told.** `375`, `10`, `99` are valid decimal and valid hex, so no query reveals which was
   meant, and guessing wrong returns zero rows -- which reads as absence of evidence rather than as
