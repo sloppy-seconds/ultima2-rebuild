@@ -266,6 +266,74 @@ def self_test(tiles, entries, tmpdir, trivial):
     return fails
 
 
+def dedupe_rows(rows):
+    """Collapse byte-identical rows, then refuse to continue if rows are still not keyable.
+
+    The cache can hand us the same image more than once -- three sources all citing one Gamer
+    Corner PNG -- and a source file with silent duplicates re-infects every table generated from
+    it: disasm/census/creature.tsv inherited three identical 'Sea Monster' rows this way and
+    ended up with no unique key at all (docs/bestiary.md section 8). Fixing it here, at the
+    generator, is the only place it can be fixed; hand-editing the output is undone by the next run.
+
+    Returns (rows, n_collapsed). Dies if two rows remain that differ only in a column this table
+    does not carry, because a reader could not tell them apart and the table would have no key.
+    """
+    all_cols = ('art_index', 'name', 'section', 'source', 'variant', 'verdict', 'nearest',
+                'hp', 'dmg', 'special', 'image', 'sha256', 'note')
+    seen, out = set(), []
+    for r in rows:
+        key = tuple(str(r[c]) for c in all_cols)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(r)
+    n = len(rows) - len(out)
+
+    row_key = ('art_index', 'name', 'section', 'source', 'variant', 'image')
+    keys = [tuple(str(r[c]) for c in row_key) for r in out]
+    dups = sorted({k for k in keys if keys.count(k) > 1})
+    if dups:
+        for k in dups[:10]:
+            print('DUPLICATE ROW (differs only in columns not carried): %s'
+                  % (' / '.join(k) or '(blanks)'))
+        die('%d row keys are not unique after collapsing identical rows -- the table would have '
+            'no key, so refusing to write it' % len(dups))
+    return out, n
+
+
+def writer_controls():
+    """Controls for dedupe_rows: a collapse that must happen, and a collision that must be fatal.
+
+    A gate that has never been able to fail is a rumour, so both directions are checked here --
+    the dedupe firing when it should, and the uniqueness refusal firing when it must.
+    """
+    fails = []
+    base = dict.fromkeys(('art_index', 'name', 'section', 'source', 'variant', 'verdict',
+                          'nearest', 'hp', 'dmg', 'special', 'image', 'sha256', 'note'), '')
+    a = dict(base, art_index='0B', name='Sea Monster', variant='gamercorner-dos',
+             image='art/gamercorner-dos/sea-monster.png')
+    # Control 1: an exact duplicate must collapse to one row.
+    got, n = dedupe_rows([a, dict(a), dict(a)])
+    if len(got) != 1 or n != 2:
+        fails.append('control 1 FAILED: three identical rows should collapse to 1 (2 dropped), '
+                     'got %d rows, %d dropped' % (len(got), n))
+    # Control 2: two rows differing only in `note` are not distinguishable by any key this table
+    # can offer, so the tool must refuse rather than emit an unkeyable table.
+    b = dict(a, note='second source says the same thing twice')
+    try:
+        dedupe_rows([a, b])
+        fails.append('control 2 FAILED: rows differing only in `note` must be fatal, and were not')
+    except SystemExit:
+        pass
+    # Control 3: distinct variants of one art index are legitimate and must survive untouched.
+    c = dict(a, variant='c64', image='art/c64/SeaSerpentC64U2.png')
+    got, n = dedupe_rows([a, c])
+    if len(got) != 2 or n != 0:
+        fails.append('control 3 FAILED: two real variants must both survive, got %d rows, '
+                     '%d dropped' % (len(got), n))
+    return fails
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--cache', default=os.path.join(PROJECT_ROOT, 'bestiary', 'cache'))
@@ -292,6 +360,15 @@ def main():
         print('self-test passed: 6/6 controls (round-trip matches, corruption does not, '
               'flat does not match a figure, FM Towns does not match DOS, flat cannot '
               'earn a name, crops are ineligible)')
+        wfails = writer_controls()
+        if wfails:
+            for f in wfails:
+                print(f)
+            print('\nWRITER CONTROLS FAILED (%d) — the dedupe/uniqueness gate cannot be trusted'
+                  % len(wfails))
+            sys.exit(1)
+        print('writer controls passed: 3/3 (identical rows collapse, an unkeyable collision is '
+              'fatal, real variants survive)')
         return
 
     rows = []
@@ -308,6 +385,12 @@ def main():
         stat_note = ''
         if '-' in str(hp):
             hp, stat_note = hp.replace('\u2013', '-'), HP_RANGE_NOTE
+            # A range whose two endpoints agree is not a range, it is a value written twice:
+            # the guides print '224-224' and '255-255' for fixed HP. Normalising here keeps the
+            # source honest and stops a notational difference reaching consumers as a conflict.
+            lo, _, hi = hp.partition('-')
+            if lo == hi:
+                hp, stat_note = lo, ''
         special = (stats.get('Special') or stats.get('Notes') or
                    stats.get('Special Notes') or stats.get('special') or '')
         for n in (hits or [None]):
@@ -327,6 +410,9 @@ def main():
             'note': (note + ('; ' + stat_note if stat_note else '')),
         })
 
+    # Collapse byte-identical rows and prove the rest are keyable. See dedupe_rows().
+    rows, n_dupes = dedupe_rows(rows)
+
     conflicts = {n: sorted(set(v)) for n, v in claims.items() if len(set(v)) > 1}
 
     header = ['# art_index name section source variant verdict nearest hp dmg special image sha256 note']
@@ -334,6 +420,9 @@ def main():
     header.append('# name/verdict columns: bitmap identity is measured against original/ultimaii.exe;')
     header.append('# the NAME itself is third-party (Ultima Codex / Gamer Corner) and is not proof.')
     header.append('# art 0x0C == codex "Orc" is the reference case; see docs/bestiary.md.')
+    header.append('# uniqueness: %d byte-identical rows collapsed at generation; every remaining '
+                  'row is unique on (art_index, name, section, source, variant, image), and the '
+                  'tool refuses to write the file otherwise.' % n_dupes)
     cols = ['art_index', 'name', 'section', 'source', 'variant', 'verdict', 'nearest',
             'hp', 'dmg', 'special', 'image', 'sha256', 'note']
     lines = header + ['\t'.join(cols)]
@@ -360,7 +449,7 @@ def main():
         print('  no art index is claimed by two different names')
     un = sorted({r['name'] for r in rows} - {r['name'] for r in exact})
     print('  %d names never matched a tile: %s' % (len(un), ', '.join(un)))
-    print('wrote %s' % args.out)
+    print('wrote %s (%d rows, %d byte-identical duplicates collapsed)' % (args.out, len(rows), n_dupes))
 
     if args.md:
         md = ['# Bestiary matches — generated', '',

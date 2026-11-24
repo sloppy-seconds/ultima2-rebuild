@@ -3,9 +3,8 @@
 # name/verdict columns: bitmap identity is measured against original/ultimaii.exe;
 # the NAME itself is third-party (Ultima Codex / Gamer Corner) and is not proof.
 # art 0x0C == codex "Orc" is the reference case; see docs/bestiary.md.
+# uniqueness: 2 byte-identical rows collapsed at generation; every remaining row is unique on (art_index, name, section, source, variant, image), and the tool refuses to write the file otherwise.
 art_index	name	section	source	variant	verdict	nearest	hp	dmg	special	image	sha256	note
-0B	Sea Monster	gamercorner	gamercorner	gamercorner-dos	exact		64		Travels on water	art/gamercorner-dos/sea-monster.png	5823a7453d37ff74	resized 48x48 -> 16x16 nearest/3
-0B	Sea Monster	gamercorner	gamercorner	gamercorner-dos	exact		64		Travels on water	art/gamercorner-dos/sea-monster.png	5823a7453d37ff74	resized 48x48 -> 16x16 nearest/3
 0B	Sea Monster	gamercorner	gamercorner	gamercorner-dos	exact		64		Travels on water	art/gamercorner-dos/sea-monster.png	5823a7453d37ff74	resized 48x48 -> 16x16 nearest/3
 0C	Orc	gamercorner	gamercorner	gamercorner-dos	exact		16			art/gamercorner-dos/orc-1.png	a291426330aeeb8a	resized 48x48 -> 16x16 nearest/3
 0D	Daemon	Creatures of the land	codex	dos	exact		64		Paralyzes legs (range 2)	art/dos/U2Daemon.PNG	4acac1b5571716cc	resized 32x32 -> 16x16 nearest/2
@@ -15,7 +14,7 @@ art_index	name	section	source	variant	verdict	nearest	hp	dmg	special	image	sha25
 0F	Balron	Creatures of the land	codex	dos	exact		255		Puts enemies to sleep (range 2)	art/dos/U2Balron.PNG	43a371ab54488c7a	resized 32x32 -> 16x16 nearest/2
 10	Minax	gamercorner	gamercorner	gamercorner-dos	exact				Deals exactly 100 damage (range 3)	art/gamercorner-dos/minax.png	7eb7732dc56ca67e	resized 48x48 -> 16x16 nearest/3
 12	Frigate	gamercorner	gamercorner	gamercorner-dos	exact		160		Can be B	art/gamercorner-dos/frigate.png	7fbb1b156e6d246f	resized 48x48 -> 16x16 nearest/3
-18	Guard	Townsfolk	codex	dos-cga	exact		255-255			art/dos-cga/U2Guard.PNG	774c96cfed8e1521	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
+18	Guard	Townsfolk	codex	dos-cga	exact		255			art/dos-cga/U2Guard.PNG	774c96cfed8e1521	resized 32x32 -> 16x16 nearest/2
 18	Guard	gamercorner	gamercorner	gamercorner-dos	exact		500		Drops 2 keys	art/gamercorner-dos/guard.png	1924b109947f4b54	resized 48x48 -> 16x16 nearest/3
 19	Jester	Townsfolk	codex	dos-cga	exact		1-255			art/dos-cga/JesterDOSCGAU2.png	0bf770a604ea6a43	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
 19	Jester	gamercorner	gamercorner	gamercorner-dos	exact		1		Will sometimes steal your highest-tier unequipped weapon when adjacent; drops the key to a random prison cell	art/gamercorner-dos/jester.png	aa0398ad523cfd02	resized 48x48 -> 16x16 nearest/3
@@ -27,7 +26,7 @@ art_index	name	section	source	variant	verdict	nearest	hp	dmg	special	image	sha25
 3D	Cleric	Townsfolk	codex	dos-cga	exact		10-60			art/dos-cga/U2Cleric.PNG	70afcdc03ede22b6	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
 3D	Cleric	gamercorner	gamercorner	gamercorner-dos	exact					art/gamercorner-dos/cleric.png	00c50b2aca50a28e	resized 48x48 -> 16x16 nearest/3
 3E	Wizard	Creatures of the land	codex	dos	exact		224		Magic Missile (range 2)	art/dos/U2Wizard.PNG	d4cfbf2d71d9850a	resized 32x32 -> 16x16 nearest/2
-3E	Wizard	Townsfolk	codex	dos-cga	exact		224-224		Magic Missile (range 2)	art/dos-cga/U2Wizard.PNG	d4cfbf2d71d9850a	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
+3E	Wizard	Townsfolk	codex	dos-cga	exact		224		Magic Missile (range 2)	art/dos-cga/U2Wizard.PNG	d4cfbf2d71d9850a	resized 32x32 -> 16x16 nearest/2
 3E	Wizard	gamercorner	gamercorner	gamercorner-dos	exact		224		Casts magic missile (range 2), sometimes drops a wand or staff	art/gamercorner-dos/wizard.png	6b86c456083b2983	resized 48x48 -> 16x16 nearest/3
 3F	Thief	gamercorner	gamercorner	gamercorner-dos	exact		32		Can steal any item, can drop any item except the ring, can drop tools	art/gamercorner-dos/thief.png	6d3e808dee8ba786	resized 48x48 -> 16x16 nearest/3
 	Balron	Creatures of the land	codex	c64	near-86	3A:86 3B:86 2B:98	255		Puts enemies to sleep (range 2)	art/c64/BalronC64U2.png	b88a2e1214cefc02	resized 32x32 -> 16x16 nearest/2
@@ -64,10 +63,10 @@ art_index	name	section	source	variant	verdict	nearest	hp	dmg	special	image	sha25
 	Gremlin	Creatures in Dungeons	codex	dos-cga	not-1:1 (64x41, no integer path to 16x16)		145-217		Sometimes steals 100 meals	art/dos-cga/64px-U2DungeonGremlin.PNG	50a4f0cab536ff63	not-1:1 (64x41, no integer path to 16x16); codex HP is a Min-Max range, not a single value
 	Gremlin	Creatures in Dungeons	codex	dos-ega	not-1:1 (64x41, no integer path to 16x16)		145-217		Sometimes steals 100 meals	art/dos-ega/64px-U2-GremlinDung.png	a5aaab2c52f329d6	not-1:1 (64x41, no integer path to 16x16); codex HP is a Min-Max range, not a single value
 	Gremlin	gamercorner	gamercorner	gamercorner-dos	not-1:1 (74x58, no integer path to 16x16)				Sometimes steals 100 food with an attack	art/gamercorner-dos/gremlin.png	9e428cb3e0183d9f	not-1:1 (74x58, no integer path to 16x16)
-	Guard	Townsfolk	codex	c64	near-106	1E:106 30:116 34:124	255-255			art/c64/GuardC64U2.png	00d25cce481ec9d0	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
-	Guard	Townsfolk	codex	dos-ega	near-42	1D:42 16:48 02:49	255-255			art/dos-ega/U2-Guard.png	ccc0130c0993c07c	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
-	Guard	Townsfolk	codex	fm-towns	animated (2 frames) — not a single tile		255-255			art/fm-towns/FMGuard.gif	3c0e6d1dc5f7d120	animated (2 frames) — not a single tile; codex HP is a Min-Max range, not a single value
-	Guard	Townsfolk	codex	pc88-starcraft	near-36	0D:36 3C:36 1A:38	255-255			art/pc88-starcraft/GuardPC-88StarcraftU2.png	cf6e7140925aa7de	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
+	Guard	Townsfolk	codex	c64	near-106	1E:106 30:116 34:124	255			art/c64/GuardC64U2.png	00d25cce481ec9d0	resized 32x32 -> 16x16 nearest/2
+	Guard	Townsfolk	codex	dos-ega	near-42	1D:42 16:48 02:49	255			art/dos-ega/U2-Guard.png	ccc0130c0993c07c	resized 32x32 -> 16x16 nearest/2
+	Guard	Townsfolk	codex	fm-towns	animated (2 frames) — not a single tile		255			art/fm-towns/FMGuard.gif	3c0e6d1dc5f7d120	animated (2 frames) — not a single tile
+	Guard	Townsfolk	codex	pc88-starcraft	near-36	0D:36 3C:36 1A:38	255			art/pc88-starcraft/GuardPC-88StarcraftU2.png	cf6e7140925aa7de	resized 32x32 -> 16x16 nearest/2
 	Jester	Townsfolk	codex	c64	near-60	1E:60 30:100 35:130	1-255			art/c64/JesterC64U2.png	22f2d4cc4b1fb6ec	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
 	Jester	Townsfolk	codex	dos-ega	trivial	1D:0 02:11 16:16	1-255			art/dos-ega/U2-Jester.png	2eeff7112262226e	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
 	Jester	Townsfolk	codex	fm-towns	animated (2 frames) — not a single tile		1-255			art/fm-towns/JesterFM-Towns.gif	6e2a4835d3589dd8	animated (2 frames) — not a single tile; codex HP is a Min-Max range, not a single value
@@ -104,23 +103,23 @@ art_index	name	section	source	variant	verdict	nearest	hp	dmg	special	image	sha25
 	Sea serpent	Creatures of the land	codex	fm-towns	animated (2 frames) — not a single tile		64		Sea enemy	art/fm-towns/FMSeaSerp.gif	9be473dd772602c9	animated (2 frames) — not a single tile
 	Sea serpent	Creatures of the land	codex	pc88-starcraft	near-66	16:66 1D:66 1A:69	64		Sea enemy	art/pc88-starcraft/SeaSerpentPC-88StarcraftU2.png	7bab8018d5075968	resized 32x32 -> 16x16 nearest/2
 	Thief	Creatures of the land	codex	c64	near-60	1E:60 30:136 36:164	32		Steals items	art/c64/ThiefC64U2.png	442abcc7b245f82b	resized 32x32 -> 16x16 nearest/2
-	Thief	Townsfolk	codex	c64	near-60	1E:60 30:136 36:164	32-32		Steals items	art/c64/ThiefC64U2.png	442abcc7b245f82b	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
+	Thief	Townsfolk	codex	c64	near-60	1E:60 30:136 36:164	32		Steals items	art/c64/ThiefC64U2.png	442abcc7b245f82b	resized 32x32 -> 16x16 nearest/2
 	Thief	Creatures of the land	codex	dos	near-58	0E:58 1D:59 3F:64	32		Steals items	art/dos/U2Thief.PNG	16bddb8852bfb39d	resized 32x32 -> 16x16 nearest/2
-	Thief	Townsfolk	codex	dos-cga	near-58	0E:58 1D:59 3F:64	32-32		Steals items	art/dos-cga/U2Thief.PNG	16bddb8852bfb39d	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
-	Thief	Townsfolk	codex	dos-ega	near-39	1D:39 02:48 16:52	32-32		Steals items	art/dos-ega/U2-Thief.png	a4acbd194c1aee81	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
+	Thief	Townsfolk	codex	dos-cga	near-58	0E:58 1D:59 3F:64	32		Steals items	art/dos-cga/U2Thief.PNG	16bddb8852bfb39d	resized 32x32 -> 16x16 nearest/2
+	Thief	Townsfolk	codex	dos-ega	near-39	1D:39 02:48 16:52	32		Steals items	art/dos-ega/U2-Thief.png	a4acbd194c1aee81	resized 32x32 -> 16x16 nearest/2
 	Thief	Creatures of the land	codex	dos-fan-upgrade	near-39	1D:39 02:48 16:52	32		Steals items	art/dos-fan-upgrade/U2-Thief.png	a4acbd194c1aee81	resized 32x32 -> 16x16 nearest/2
 	Thief	Creatures of the land	codex	fm-towns	animated (2 frames) — not a single tile		32		Steals items	art/fm-towns/FMThief.gif	c10fb5ad90324247	animated (2 frames) — not a single tile
-	Thief	Townsfolk	codex	fm-towns	animated (2 frames) — not a single tile		32-32		Steals items	art/fm-towns/FMThief.gif	c10fb5ad90324247	animated (2 frames) — not a single tile; codex HP is a Min-Max range, not a single value
+	Thief	Townsfolk	codex	fm-towns	animated (2 frames) — not a single tile		32		Steals items	art/fm-towns/FMThief.gif	c10fb5ad90324247	animated (2 frames) — not a single tile
 	Thief	Creatures of the land	codex	pc88-starcraft	near-40	1A:40 3C:40 1D:42	32		Steals items	art/pc88-starcraft/ThiefPC-88StarcraftU2.png	fd3f66562c178d92	resized 32x32 -> 16x16 nearest/2
-	Thief	Townsfolk	codex	pc88-starcraft	near-40	1A:40 3C:40 1D:42	32-32		Steals items	art/pc88-starcraft/ThiefPC-88StarcraftU2.png	fd3f66562c178d92	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
+	Thief	Townsfolk	codex	pc88-starcraft	near-40	1A:40 3C:40 1D:42	32		Steals items	art/pc88-starcraft/ThiefPC-88StarcraftU2.png	fd3f66562c178d92	resized 32x32 -> 16x16 nearest/2
 	Viper	Creatures in Dungeons	codex	dos-cga	not-1:1 (64x41, no integer path to 16x16)		113-185			art/dos-cga/64px-U2DungeonViper.PNG	7ebb8cece57d6550	not-1:1 (64x41, no integer path to 16x16); codex HP is a Min-Max range, not a single value
 	Viper	Creatures in Dungeons	codex	dos-ega	not-1:1 (64x41, no integer path to 16x16)		113-185			art/dos-ega/64px-U2-SnakeDung.png	9cf384c59e119f53	not-1:1 (64x41, no integer path to 16x16); codex HP is a Min-Max range, not a single value
 	Viper	gamercorner	gamercorner	gamercorner-dos	not-1:1 (81x46, no integer path to 16x16)					art/gamercorner-dos/viper.png	06c177709391420b	not-1:1 (81x46, no integer path to 16x16)
 	Wizard	Creatures of the land	codex	c64	near-63	1E:63 30:141 2C:166	224		Magic Missile (range 2)	art/c64/WizardC64U2.png	09e59efa01e1d8fc	resized 32x32 -> 16x16 nearest/2
-	Wizard	Townsfolk	codex	c64	near-63	1E:63 30:141 2C:166	224-224		Magic Missile (range 2)	art/c64/WizardC64U2.png	09e59efa01e1d8fc	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
-	Wizard	Townsfolk	codex	dos-ega	near-13	1D:13 02:24 16:29	224-224		Magic Missile (range 2)	art/dos-ega/U2-Wizard.png	07552f05b2fb2663	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
+	Wizard	Townsfolk	codex	c64	near-63	1E:63 30:141 2C:166	224		Magic Missile (range 2)	art/c64/WizardC64U2.png	09e59efa01e1d8fc	resized 32x32 -> 16x16 nearest/2
+	Wizard	Townsfolk	codex	dos-ega	near-13	1D:13 02:24 16:29	224		Magic Missile (range 2)	art/dos-ega/U2-Wizard.png	07552f05b2fb2663	resized 32x32 -> 16x16 nearest/2
 	Wizard	Creatures of the land	codex	dos-fan-upgrade	near-13	1D:13 02:24 16:29	224		Magic Missile (range 2)	art/dos-fan-upgrade/U2-Wizard.png	07552f05b2fb2663	resized 32x32 -> 16x16 nearest/2
 	Wizard	Creatures of the land	codex	fm-towns	animated (2 frames) — not a single tile		224		Magic Missile (range 2)	art/fm-towns/FMWizard.gif	99fe49130a2ece51	animated (2 frames) — not a single tile
-	Wizard	Townsfolk	codex	fm-towns	animated (2 frames) — not a single tile		224-224		Magic Missile (range 2)	art/fm-towns/FMWizard.gif	99fe49130a2ece51	animated (2 frames) — not a single tile; codex HP is a Min-Max range, not a single value
+	Wizard	Townsfolk	codex	fm-towns	animated (2 frames) — not a single tile		224		Magic Missile (range 2)	art/fm-towns/FMWizard.gif	99fe49130a2ece51	animated (2 frames) — not a single tile
 	Wizard	Creatures of the land	codex	pc88-starcraft	near-47	1A:47 1D:47 3C:47	224		Magic Missile (range 2)	art/pc88-starcraft/WizardPC-88StarcraftU2.png	383f06e2db8ce417	resized 32x32 -> 16x16 nearest/2
-	Wizard	Townsfolk	codex	pc88-starcraft	near-47	1A:47 1D:47 3C:47	224-224		Magic Missile (range 2)	art/pc88-starcraft/WizardPC-88StarcraftU2.png	383f06e2db8ce417	resized 32x32 -> 16x16 nearest/2; codex HP is a Min-Max range, not a single value
+	Wizard	Townsfolk	codex	pc88-starcraft	near-47	1A:47 1D:47 3C:47	224		Magic Missile (range 2)	art/pc88-starcraft/WizardPC-88StarcraftU2.png	383f06e2db8ce417	resized 32x32 -> 16x16 nearest/2

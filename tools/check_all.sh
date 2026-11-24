@@ -354,12 +354,15 @@ opt_run "recut_bytes selftest" original/ultimaii.exe -- python3 tools/recut_byte
 # were exercised before this line was added, because the first version of the control passed
 # vacuously when Z was clipped from the mapping.
 opt_run "place_index" original/mapx22 -- python3 tools/place_index.py --verify
-# The census joins every generated table into one lookup. Two gates, because they catch
-# different failures: --verify asserts the invariants of the data, --check-fresh asserts that
-# the committed tables are what the generator produces. The second one exists because
-# place-index.tsv sat stale with five wiki names unjoined and --verify could not see it:
-# --verify re-derives in memory and never compares against the committed artefact, so it was
-# checking the generator and not the file everyone reads.
+# The census joins every generated table into one lookup. Three gates, because they catch
+# different failures: --selftest proves the key gate can still go red, --verify asserts the
+# invariants of the data, --check-fresh asserts that the committed tables are what the generator
+# produces. The second one exists because place-index.tsv sat stale with five wiki names unjoined
+# and --verify could not see it: --verify re-derives in memory and never compares against the
+# committed artefact, so it was checking the generator and not the file everyone reads. The third
+# exists because census asserted row uniqueness for exactly one of its eleven tables while
+# creature.tsv had none at all -- and a gate that checks one table in eleven is a rumour.
+run "census selftest" tools/census.py -- python3 tools/census.py --selftest
 opt_run "census verify" disasm/place-index.tsv disasm/source-gamercorner-locations.csv original/ultimaii.exe -- python3 tools/census.py --verify
 # One gate covers every committed generated table, including the census: regenerate each to a
 # temp dir and byte-compare. This caught a second stale file the moment it was written --

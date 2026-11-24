@@ -32,6 +32,10 @@ WHAT IT READS (generated tables and curated inputs only -- it invents nothing):
     disasm/npc-wiki-names.tsv     third-party NPC names, hand-curated, graded
     disasm/source-gamercorner-locations.csv   vendored upstream table
     bestiary/bestiary.tsv         creature names joined by bitmap identity
+
+`creature` is one row per art index -- the creature. `art-variant` is one row per (source, platform
+sprite) -- the evidence that a third-party bitmap is the same picture as one of ours. They were one
+table until 2026-11-23, which left creature.tsv with no key; docs/bestiary.md section 8 is the story.
     original/ultimaii.exe         the time-door cell table, read at 0x2998
     original/mapx*, updated/MAPG* tile instances (vehicles, racks, site doors)
     engine/src/game/overworld.c   the tile -> site-sector rule, site_for_tile()
@@ -438,19 +442,70 @@ def build():
             'line': n['line'], 'quest': n['quest'],
             'source': 'tlkxNN record position = quest role (npc_index.py)'})
 
-    # ---- creature: bestiary, joined to art by bitmap identity ------------------------------
-    crows = []
+    # ---- creature: one row per art index; the art-matching evidence kept separate -----------
+    #
+    # bestiary.tsv is one row per (third-party source, platform art variant), not one row per
+    # creature. Art 0x0B "Sea Monster" arrived three times byte-identical, and five more rows are
+    # Sea Serpent sprites from c64 / dos / dos-fan-upgrade / fm-towns / pc88-starcraft kept as
+    # bitmap-match candidates with no art_index at all. Copying those rows verbatim gave
+    # disasm/census/creature.tsv 120 rows with 16 distinct art values and no unique key across any
+    # combination of up to three columns -- docs/bestiary.md section 8.
+    #
+    # So the two things that were one table are now two: `creature` is keyed by `art` and carries
+    # the creature; `art-variant` is keyed by (art, name, section, source, variant, image) and
+    # carries the evidence. Rows with no art_index belong only to the latter -- they are candidates,
+    # not creatures.
+    #
+    # Where sources disagree, every distinct value is kept and the field is named in `conflicts`.
+    # Choosing one silently is the failure this split exists to remove: art 0x18 Guard is HP 255 in
+    # one guide and 500 in another, and side-by-side duplicates made that read as two facts. The
+    # resolution of that particular conflict is a capture, not a rule, and lives in docs/bestiary.md.
+    _VERDICT_RANK = {'exact': 0, 'ambiguous': 1}
+    byart = collections.defaultdict(list)
+    avrows = []
     for b in bestiary:
-        crows.append({'art': '0x%02x' % int(b['art_index'], 16) if b.get('art_index') else '',
-                      'name': b.get('name', ''), 'hp': b.get('hp', ''), 'damage': b.get('dmg', ''),
-                      'special': b.get('special', ''), 'verdict': b.get('verdict', ''),
+        avrows.append({'art': '0x%02x' % int(b['art_index'], 16) if b.get('art_index') else '',
+                       'name': b.get('name', ''), 'section': b.get('section', ''),
+                       'source_variant': b.get('source', ''), 'variant': b.get('variant', ''),
+                       'verdict': b.get('verdict', ''), 'nearest': b.get('nearest', ''),
+                       'image': b.get('image', ''), 'sha256': b.get('sha256', ''),
+                       'hp': b.get('hp', ''), 'dmg': b.get('dmg', ''),
+                       'special': b.get('special', ''), 'note': b.get('note', ''),
+                       'grade': 'inferred'})
+        if b.get('art_index'):
+            byart[b['art_index']].append(b)
+
+    def _field(rows_, key):
+        """Every distinct value a source gives for one field, and whether they disagree."""
+        vals = [str(r_.get(key, '') or '') for r_ in rows_]
+        distinct = sorted(set(vals) - {''}) or ['']
+        return ' | '.join(distinct), (key if len(distinct) > 1 else '')
+
+    crows = []
+    for art in sorted(byart):
+        grp = byart[art]
+        cells, clash = {}, []
+        for f, out in (('name', 'name'), ('hp', 'hp'), ('dmg', 'damage'), ('special', 'special')):
+            cells[out], bad = _field(grp, f)
+            if bad:
+                clash.append(bad)
+        verdict = sorted({g.get('verdict', '') for g in grp},
+                         key=lambda v: (_VERDICT_RANK.get(v, 2), v))[0]
+        crows.append({'art': '0x%02x' % int(art, 16), 'name': cells['name'],
+                      'hp': cells['hp'], 'damage': cells['damage'],
+                      'special': cells['special'], 'verdict': verdict,
+                      'sources': len(grp),
+                      'variants': ' '.join(sorted({g.get('variant', '') for g in grp if g.get('variant')})),
+                      'conflicts': ' '.join(clash),
                       'source': 'bestiary/bestiary.tsv (third-party art, joined by bitmap identity)',
                       'grade': 'inferred'})
 
     # Join creature characteristics onto the tile rows. The bestiary names are third-party and
     # joined by bitmap identity, so they carry `inferred` and a source even though they land in
     # a tile row whose other columns are measured -- the grades must not flatten on the join.
-    by_art = {c['art']: c for c in crows if c['art']}
+    # `by_art` is now one row per art index, so a conflicting field arrives already showing every
+    # value rather than silently carrying whichever duplicate the dict happened to see last.
+    by_art = {c['art']: c for c in crows}
     for r in trows:
         c = by_art.get(r['art'])
         if c:
@@ -539,7 +594,7 @@ def build():
 
     return {'world': wrows, 'sector': srows, 'place': prows, 'vehicle': vrows,
             'tile': trows, 'npc': nrows, 'creature': crows, 'site': sirows,
-            'vendor': varows,
+            'vendor': varows, 'art-variant': avrows,
             'gate': gate_rows(D('original', 'ultimaii.exe'))}
 
 
@@ -559,7 +614,10 @@ COLUMNS = {
              'instances', 'description', 'note', 'source', 'grade'],
     'npc': ['layer', 'sector', 'world', 'era', 'kind', 'record_index', 'role',
             'game_speaker', 'name', 'name_source', 'line', 'quest', 'source'],
-    'creature': ['art', 'name', 'hp', 'damage', 'special', 'verdict', 'source', 'grade'],
+    'creature': ['art', 'name', 'hp', 'damage', 'special', 'verdict', 'sources', 'variants',
+                 'conflicts', 'source', 'grade'],
+    'art-variant': ['art', 'name', 'section', 'source_variant', 'variant', 'verdict', 'nearest',
+                    'image', 'sha256', 'hp', 'dmg', 'special', 'note', 'grade'],
     'gate': ['era', 'era_index', 'gate_index', 'x', 'y', 'dest_era', 'dest_era_index',
              'source', 'grade'],
     'site': ['layer', 'from_sector', 'world', 'era', 'kind', 'art', 'map_byte',
@@ -744,6 +802,116 @@ def font_name(art_index):
     return ''
 
 
+# Each table's key, declared as data. `--verify` asserts every table is unique on its key, which
+# is the check that was missing when creature.tsv reached 120 rows with 16 distinct art values and
+# no combination of up to three columns was unique: the tool asserted uniqueness for exactly one
+# table (sector) and reported green. A generated table with no key cannot be joined to anything, so
+# every row of everything built on top of it is silently ambiguous.
+#
+# These are semantic keys, not accidental ones. npc is (layer, sector, record_index) even though its
+# dialogue `line` column happens to be unique today, because a second NPC saying the same sentence
+# is a thing that can happen and would break the join silently.
+KEYS = {
+    'world': ('index', 'era_index'),
+    'sector': ('layer', 'sector'),
+    'place': ('sectors',),
+    'vehicle': ('layer', 'sector', 'x', 'y'),
+    'tile': ('art',),
+    'npc': ('layer', 'sector', 'record_index'),
+    'creature': ('art',),
+    'art-variant': ('name', 'section', 'source_variant', 'variant', 'image'),
+    'gate': ('era', 'gate_index'),
+    'site': ('layer', 'from_sector', 'x', 'y'),
+    'vendor': ('layer', 'sector', 'x', 'y'),
+}
+
+
+def check_keys(tables):
+    """Assert every table is unique on its declared key, and flag columns that say one thing
+    about every row."""
+    bad, notes = [], []
+    for name, key in sorted(KEYS.items()):
+        rows = tables.get(name, [])
+        if not rows:
+            bad.append('%s: table is empty, so its key cannot be checked' % name)
+            continue
+        missing = [c for c in key if c not in COLUMNS[name]]
+        if missing:
+            bad.append('%s: key names column(s) %s that the table does not emit' % (name, missing))
+            continue
+        seen, dups = {}, []
+        for r in rows:
+            # A blank key cell is not itself an error: EARTH has no era_index, and an art-variant
+            # row that never matched a tile has no art. Both are honest absences. What is fatal is a
+            # collision, which is what a blank usually causes -- two rows that cannot be told apart.
+            k = tuple(str(r.get(c, '')) for c in key)
+            if k in seen:
+                dups.append(k)
+            seen[k] = 1
+        if dups:
+            bad.append('%s: %d row(s) collide on key %s -- first offender %s; a table without a key '
+                       'cannot be joined' % (name, len(dups), key, dups[0]))
+        # A column with one value across the whole table carries no information. Usually that means
+        # a join or a derivation stopped working, and it is invisible unless someone counts: both
+        # `source` and `grade` were constant across all 120 creature rows while the table looked fine.
+        for c in COLUMNS[name]:
+            if len({str(r.get(c, '')) for r in rows}) == 1 and len(rows) > 1:
+                notes.append('%s.%s is the same value in all %d rows' % (name, c, len(rows)))
+    return bad, notes
+
+
+def key_controls():
+    """Controls for check_keys. A gate that has never gone red is a rumour, so each direction is
+    exercised here with a table built to trip it, and one built to pass."""
+    fails = []
+    good = [{'art': '0x0b', 'name': 'Sea Monster', 'hp': '64', 'damage': '', 'special': '',
+             'verdict': 'exact', 'sources': '1', 'variants': '', 'conflicts': '',
+             'source': 'bestiary', 'grade': 'inferred'},
+            {'art': '0x0c', 'name': 'Orc', 'hp': '16', 'damage': '', 'special': '',
+             'verdict': 'exact', 'sources': '1', 'variants': '', 'conflicts': '',
+             'source': 'bestiary', 'grade': 'inferred'}]
+    # Control 1: a clean table must produce no complaint about itself. Note the filter: check_keys
+    # deliberately treats a table missing from the build as an error (control 5), so a partial dict
+    # is correctly red for the absent tables and must still be clean for the one under test.
+    bad, _ = check_keys({'creature': [dict(r) for r in good]})
+    if [b for b in bad if b.startswith('creature')]:
+        fails.append('control 1 FAILED: a clean creature table was rejected: %s'
+                     % [b for b in bad if b.startswith('creature')])
+    # Control 2: a duplicated key must be caught. This is the exact defect that shipped --
+    # three byte-identical Sea Monster rows -- so it is the case the gate exists for.
+    dup = [dict(r) for r in good] + [dict(good[0])]
+    bad, _ = check_keys({'creature': dup})
+    if not [b for b in bad if b.startswith('creature')]:
+        fails.append('control 2 FAILED: a duplicated creature art index was not caught')
+    # Control 3: two rows that become indistinguishable once a disambiguator is blank must be
+    # caught. A blank on its own is legitimate -- EARTH has no era_index -- so the fatal thing is
+    # the collision a blank produces, not the blank itself.
+    blank = [dict(good[0], art=''), dict(good[1], art='')]
+    bad, _ = check_keys({'creature': blank})
+    if not [b for b in bad if b.startswith('creature')]:
+        fails.append('control 3 FAILED: two rows colliding because both blanked their key '
+                     'were not caught')
+    # Control 3b: a single blank key cell must NOT be fatal on its own, or the gate would reject
+    # EARTH for having no era and every unmatched art-variant row for having no art.
+    solo = [dict(r) for r in good] + [dict(good[1], art='0x99')]
+    bad, _ = check_keys({'creature': solo})
+    if [b for b in bad if b.startswith('creature')]:
+        fails.append('control 3b FAILED: distinct rows were rejected: %s'
+                     % [b for b in bad if b.startswith('creature')])
+    # Control 4: a column constant across every row must be noted, which is how a dead join shows
+    # up before anyone builds on it.
+    _, notes = check_keys({'creature': [dict(r, grade='inferred') for r in good]})
+    if not any('grade' in n for n in notes):
+        fails.append('control 4 FAILED: a constant `grade` column was not noted')
+    # Control 5: a table declared in KEYS but absent from the build must be fatal, not skipped --
+    # a gate that inspects zero files is the failure mode this project keeps meeting.
+    bad, _ = check_keys({})
+    if len(bad) != len(KEYS):
+        fails.append('control 5 FAILED: an empty build should flag all %d tables, flagged %d'
+                     % (len(KEYS), len(bad)))
+    return fails
+
+
 def verify(tables):
     """The invariants. Each one names what it caught, because a check without a story rots."""
     bad = []
@@ -900,6 +1068,13 @@ def verify(tables):
           % (len(tables.get('vendor', [])), len({(r['layer'], r['sector'])
                                                  for r in tables.get('vendor', [])}),
              sum(1 for r in tables.get('vendor', []) if r['sign_word'])))
+    key_bad, key_notes = check_keys(tables)
+    bad.extend(key_bad)
+    if key_notes:
+        print('  census NOTE -- constant columns (a column that says one thing about every row '
+              'says nothing; check the join that fills it):')
+        for n in key_notes:
+            print('    %s' % n)
     return bad, named, len(unnamed)
 
 
@@ -922,10 +1097,25 @@ def main():
     ap.add_argument('--verify', action='store_true', help='build in memory and assert invariants')
     ap.add_argument('--check-fresh', action='store_true',
                     help='fail if the committed census differs from a fresh build')
-    ap.add_argument('--what', default=None, help='print one entity: world|sector|place|npc|tile|creature|gate|vehicle|site|vendor')
+    ap.add_argument('--selftest', action='store_true',
+                    help='run the key-gate controls and exit (no inputs needed, safe in CI)')
+    ap.add_argument('--what', default=None, help='print one entity: world|sector|place|npc|tile|'
+                  'creature|art-variant|gate|vehicle|site|vendor')
     ap.add_argument('--where', default=None, help='filter as column=value, substring match')
     ap.add_argument('--out', default=CENSUS_DIR)
     a = ap.parse_args()
+
+    if a.selftest:
+        fails = key_controls()
+        if fails:
+            for f in fails:
+                print(f)
+            print('\nCENSUS SELFTEST FAILED (%d) -- the key gate cannot be trusted' % len(fails))
+            sys.exit(1)
+        print('CENSUS SELFTEST OK: 6/6 key-gate controls (clean table passes, a colliding key is '
+              'caught, a blank that causes a collision is caught, a lone blank is not fatal, a '
+              'constant column is noted, an empty build is fatal for all %d tables)' % len(KEYS))
+        return
 
     tables = build()
 
@@ -968,4 +1158,10 @@ def main():
         print('  %-9s %4d rows' % (name, len(tables[name])))
 
 
-main()
+# Without this guard, importing census.py falls through to write_tables() with the default --out,
+# so any importer silently regenerates the eleven committed tables as a side effect of `import
+# census`. bot/launch.py does exactly that, which means every bot launch rewrote tracked files --
+# and worse, a `census --check-fresh` gate run after such an import compares a fresh build against
+# a fresh build and can never go red. Guarded so importing is a read and only the CLI writes.
+if __name__ == '__main__':
+    main()
