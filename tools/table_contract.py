@@ -38,6 +38,7 @@ COVERED = [
     'disasm/index/state.tsv',
     'disasm/index/coverage.tsv',
     'disasm/index/footprint.tsv',
+    'disasm/index/record-spans.tsv',
     'disasm/index/engine-map.tsv',
     'disasm/index/unnamed-offsets.tsv',
     'disasm/index/xref.tsv',
@@ -102,6 +103,13 @@ CONTRACT = {
         # entity is `kind:name` and entity_basis names its own grade, so neither can be
         # lifted out of the table without carrying how it was known.
         'entity': 'text', 'entity_basis': 'text',
+    },
+    'disasm/index/record-spans.tsv': {
+        'ds_start': 'hexp', 'ds_end': 'hexp',
+        'n_records': 'dec', 'record_stride': 'dec',
+        'group': 'text', 'shape': 'text', 'member_fields': 'text',
+        'entity_kind': 'text', 'backing_file': 'text', 'evidence': 'text',
+        'grade': 'text',
     },
     'disasm/index/engine-map.tsv': {
         'asm_addr': 'dec',        # decimal: 256 is 0x100

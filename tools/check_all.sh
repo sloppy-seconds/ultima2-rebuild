@@ -185,6 +185,8 @@ run "index_footprint selftest" tools/index_footprint.py -- python3 tools/index_f
 # fails, and so does a convention entry that no longer matches anything.
 run "index_footprint verify" tools/index_footprint.py -- python3 tools/index_footprint.py --verify
 run "index_footprint fresh" disasm/index/footprint.tsv -- python3 tools/index_footprint.py --check-fresh
+run "record_spans selftest" tools/record_spans.py -- python3 tools/record_spans.py --selftest
+run "record_spans fresh" disasm/index/record-spans.tsv -- python3 tools/record_spans.py --check-fresh
 # Every numeric column of a covered table declares its base, and the data must agree.
 # The motivating trap is footprint.tsv's decimal offset column: filtering it as hex
 # returns zero rows, which reads as absence of evidence rather than a bad query.
