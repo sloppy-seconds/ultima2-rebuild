@@ -42,6 +42,7 @@ USAGE
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import pathlib
 import re
@@ -54,7 +55,109 @@ from state_layout import fields as state_fields  # noqa: E402
 
 ASM = REPO / "asm"
 OUT = REPO / "disasm" / "index" / "footprint.tsv"
-COLS = ("segment", "offset", "span", "access", "file", "line", "indexed", "es_as", "note")
+COLS = ("segment", "offset", "span", "access", "file", "line", "indexed", "es_as", "note",
+        "entity", "entity_basis")
+
+# ------------------------------------------------------------------ entity names
+# Two columns join an access to the THING it touches, and they are populated only where
+# the evidence really names it. The basis string carries the grade in its own name, so a
+# reader cannot lift the entity out of the table without also lifting how it was known:
+#   slot-address        -- the absolute DS address IS the entity. Measured.
+#   file-literal-inferred -- the row is a creature-array base, which names no creature;
+#                            the only evidence is a type literal elsewhere in the same
+#                            file, and only when the file holds exactly one. Inferred,
+#                            and blank rather than guessed whenever a file holds several.
+# Names come from generated, gated sources only. Nothing here is hand-copied: a hand-typed
+# creature table already drifted from the census once and produced a wrong count.
+
+ITEM_BASE, SPELL_BASE = 0xD6, 0xB6
+MON_TYPE_BASE = 0x197
+
+# Populated by build() before any file is parsed. emit_rows reads them, which is why they
+# are module-level rather than threaded through every call.
+ENTITY_BY_OFFSET: dict[int, str] = {}
+ENTITY_BY_FILE: dict[str, str] = {}
+
+
+def _read_generated_tsv(path: pathlib.Path) -> list[dict]:
+    """Read a committed generated table, skipping the '#' preamble every census table has.
+
+    Feeding one of these straight to DictReader makes a comment line the header and yields
+    zero usable rows, which looks like an empty table instead of a parsing mistake.
+    """
+    body = [ln for ln in path.read_text(encoding="utf-8").splitlines()
+            if not ln.lstrip().startswith("#")]
+    return list(csv.DictReader(body, delimiter="\t"))
+
+
+def load_entity_names() -> tuple[dict[int, str], dict[int, str], dict[str, str]]:
+    """Return (ds_offset -> entity, file -> entity, diagnostics).
+
+    Items and spells come from the arrays the extractor generates from the executable, so
+    the slot order is the executable's and not this tool's opinion. Creature types come
+    from the census, which is the entity authority; the type byte is art << 2.
+    """
+    diag: dict[str, str] = {}
+    by_offset: dict[int, str] = {}
+
+    content = REPO / "engine" / "content" / "gen_content.h"
+    if not content.is_file():
+        raise SystemExit("index_footprint: engine/content/gen_content.h is missing -- it is "
+                         "committed and generated, so its absence is a tree fault, not an "
+                         "optional input")
+    text = content.read_text(encoding="utf-8", errors="replace")
+    for array, base, kind in (("U2_T_ITEMS", ITEM_BASE, "item"),
+                              ("U2_T_SPELLS", SPELL_BASE, "spell")):
+        m = re.search(rf"{array}\[[^]]*\]\s*=\s*\{{(.*?)\}};", text, re.S)
+        if not m:
+            raise SystemExit(f"index_footprint: could not find {array} in gen_content.h -- "
+                             "the extractor changed shape, so entity names would be silently "
+                             "incomplete")
+        names = re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(1))
+        for i, nm in enumerate(names):
+            if nm.upper() == "NONE":
+                continue          # slot 0 of the spell list is a placeholder, not a spell
+            by_offset[base + i] = f"{kind}:{nm.lower().replace(' ', '-').replace('.', '')}"
+        diag[f"{kind}_slots"] = str(len(names))
+
+    creature_tsv = REPO / "disasm" / "census" / "creature.tsv"
+    if not creature_tsv.is_file():
+        raise SystemExit("index_footprint: disasm/census/creature.tsv is missing -- run "
+                         "tools/census.py; creature entities would otherwise be silently empty")
+    types = {}
+    for r in _read_generated_tsv(creature_tsv):
+        art = (r.get("art") or "").strip()
+        if art:
+            types[int(art, 0) << 2] = r["name"]     # art is 0x-prefixed hex
+    diag["creature_types"] = str(len(types))
+    return by_offset, types, diag
+
+
+def creature_file_literals(paths: list[pathlib.Path], types: dict[int, str]
+                           ) -> tuple[dict[str, str], int]:
+    """Map a file to the one creature its type literals name, and only when there is one.
+
+    Returns (file -> entity, count of files left blank for holding several types). A file
+    holding two or more type literals is unattributed on purpose: spreading its
+    creature-array rows over every type mentioned in it would invent edges that look
+    exactly as good as the real ones.
+    """
+    pats = {t: re.compile(rf"\$0x{t:02x}\b") for t in types}
+    out: dict[str, str] = {}
+    ambiguous = 0
+    for path in paths:
+        found: set[str] = set()
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.lstrip().startswith("#"):
+                continue
+            for t, pat in pats.items():
+                if pat.search(line):
+                    found.add(types[t])
+        if len(found) == 1:
+            out[path.name] = "creature:" + next(iter(found)).lower().replace(" ", "-")
+        elif len(found) > 1:
+            ambiguous += 1
+    return out, ambiguous
 
 # ---------------------------------------------------------------- access table
 # (reads, writes) for the memory operand(s). AT&T: destination is the LAST operand.
@@ -495,10 +598,18 @@ def emit_rows(mn: str, ops: str, lineno: int, fname: str, es_as: str,
                 span = "unknown"
         if seg == "es" and es_as == "io(video)":
             seg = "video"
+        entity, basis = "", ""
+        if seg == "ds":
+            if offset in ENTITY_BY_OFFSET:
+                entity, basis = ENTITY_BY_OFFSET[offset], "slot-address"
+            elif offset == MON_TYPE_BASE and fname in ENTITY_BY_FILE:
+                # The row itself names only the creature array; the file is the evidence.
+                entity, basis = ENTITY_BY_FILE[fname], "file-literal-inferred"
         rows.append({"segment": seg, "offset": offset, "span": span, "access": access,
                      "file": fname, "line": str(lineno),
                      "indexed": "yes" if indexed else "no",
-                     "es_as": es_as if seg == "es" else "", "note": note})
+                     "es_as": es_as if seg == "es" else "", "note": note,
+                     "entity": entity, "entity_basis": basis})
     return rows, errors
 
 
@@ -560,6 +671,10 @@ def build() -> tuple[list[dict], list[str], dict]:
     if not ASM.is_dir():
         raise SystemExit("index_footprint: no asm/ -- refusing to report success on a tree it "
                          "cannot see")
+    global ENTITY_BY_OFFSET, ENTITY_BY_FILE
+    paths = sorted(ASM.glob("*.asm"))
+    ENTITY_BY_OFFSET, creature_types, ent_diag = load_entity_names()
+    ENTITY_BY_FILE, ent_ambiguous = creature_file_literals(paths, creature_types)
     rows: list[dict] = []
     errors: list[str] = []
     tot = {"files": 0, "parsed": 0, "labels": 0, "data": 0, "comments": 0, "blank": 0,
@@ -567,7 +682,7 @@ def build() -> tuple[list[dict], list[str], dict]:
            "byte_fragments": 0, "byte_comment_disagree": 0}
     byte_disagree: list[str] = []
     es_unresolved: list[str] = []
-    for path in sorted(ASM.glob("*.asm")):
+    for path in paths:
         r, e, st = parse_file(path)
         rows += r
         errors += e
@@ -580,6 +695,10 @@ def build() -> tuple[list[dict], list[str], dict]:
         if st["es_as"] == "none" and any(x["segment"] == "es" for x in r):
             es_unresolved.append(path.name)
     tot["es_unresolved"] = es_unresolved
+    tot["entity_diag"] = ent_diag
+    tot["entity_rows"] = sum(1 for r in rows if r["entity"])
+    tot["entity_distinct"] = len({r["entity"] for r in rows if r["entity"]})
+    tot["entity_ambiguous_files"] = ent_ambiguous
     tot["byte_disagreements"] = byte_disagree
     tot["selfmod"] = [f"{r['file']}:{r['line']}" for r in rows
                       if r["segment"] == "cs" and r["access"] != "read"]
@@ -654,6 +773,12 @@ def verify() -> int:
     for d in tot["byte_disagreements"][:10]:
         print(f"  WARN  {d} -- the bytes are the authority, the comment is a claim")
     print(f"index_footprint: cs writes (selfmod) = {len(tot['selfmod'])}")
+    d = tot["entity_diag"]
+    print(f"index_footprint: entity column filled on {tot['entity_rows']} rows, "
+          f"{tot['entity_distinct']} distinct entities "
+          f"(item slots {d.get('item_slots')}, spell slots {d.get('spell_slots')}, "
+          f"creature types {d.get('creature_types')}; "
+          f"{tot['entity_ambiguous_files']} files left blank for naming several types)")
     ok = not errors and not tot["unparsed"] and not unexempt and not stale
     print("index_footprint: " + ("ok" if ok else "FAIL"))
     return 0 if ok else 1
@@ -792,6 +917,37 @@ def _selftest() -> int:
     case("a cross-file fragment is refused, never decoded",
          "# s\nsub_0001:\n        .byte 0xa0,0x7b,0x04  # tail of `mov 0x76(%di),%al` "
          "started at asm/0000_sub_0000.asm\n        ret\n", False, lambda r: not r)
+
+    # ---- entity column -----------------------------------------------------------
+    # The refusal controls matter more than the positive ones: an entity column that
+    # guesses is worse than one that leaves a cell blank.
+    case("an item slot names its item",
+         "# s\nsub_0001:\n        mov    0xe5,%al\n        ret\n", False,
+         lambda r: any(x["entity"] == "item:tri-lithium" and x["entity_basis"] == "slot-address"
+                       for x in r))
+    case("the ring slot names the ring",
+         "# s\nsub_0001:\n        mov    0xd6,%al\n        ret\n", False,
+         lambda r: any(x["entity"] == "item:ring" for x in r))
+    case("a spell slot names its spell",
+         "# s\nsub_0001:\n        mov    0xb7,%al\n        ret\n", False,
+         lambda r: any(x["entity"].startswith("spell:") for x in r))
+    case("slot 0 of the spell list is a placeholder, not an entity",
+         "# s\nsub_0001:\n        mov    0xb6,%al\n        ret\n", False,
+         lambda r: all(x["entity"] == "" for x in r))
+    case("a creature array read is attributed when the file names one type",
+         "# s\nsub_0001:\n        mov    0x197(%di),%al\n        cmp    $0x34,%al\n        ret\n",
+         False,
+         lambda r: any(x["entity"] == "creature:daemon"
+                       and x["entity_basis"] == "file-literal-inferred" for x in r))
+    # The most important control in this tool: two types in one file means the array rows
+    # cannot be attributed to either, and inventing one would look exactly as good.
+    case("a file naming two creature types is left blank, not guessed",
+         "# s\nsub_0001:\n        mov    0x197(%di),%al\n        cmp    $0x34,%al\n"
+         "        cmp    $0x38,%al\n        ret\n", False,
+         lambda r: all(x["entity"] == "" for x in r if x["offset"] == 0x197))
+    case("an unrelated offset carries no entity",
+         "# s\nsub_0001:\n        mov    0x4e,%al\n        ret\n", False,
+         lambda r: all(x["entity"] == "" for x in r))
 
     # The mirror control, because an exemption tested only in the failing direction is a permission
     # nobody can trust: a file named in ES_CONVENTION must let verify() pass, and an entry that stops

@@ -99,6 +99,9 @@ CONTRACT = {
         'offset': 'dec', 'line': 'int', 'segment': 'text', 'span': 'text',
         'access': 'text', 'file': 'text', 'indexed': 'text', 'es_as': 'text',
         'note': 'text',
+        # entity is `kind:name` and entity_basis names its own grade, so neither can be
+        # lifted out of the table without carrying how it was known.
+        'entity': 'text', 'entity_basis': 'text',
     },
     'disasm/index/engine-map.tsv': {
         'asm_addr': 'dec',        # decimal: 256 is 0x100
