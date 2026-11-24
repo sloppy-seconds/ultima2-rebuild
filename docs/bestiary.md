@@ -332,10 +332,61 @@ not by an argument about which wiki is likelier.
 
 ## 8. Conflicts on the record
 
-* **art `0B`.** Gamer Corner's "Sea Monster" tile is pixel-identical to our `0B`,
-  but `disasm/tile-art.tsv` reads `0B` as a doorway set in a magenta field, and its
-  kind is `object`, not `creature`. One of the two readings is wrong. Marked
-  `Sea Monster?` and left as a dispute; do not rename on this evidence.
+* **art `0B` — CLOSED 2026-11-23, and it was a creature all along.** The dispute above read it as
+  "a doorway set in a magenta field" and `disasm/tile-art.tsv` carried it as `kind: object`. The owner
+  read the tile and said what it is: **a sea serpent, mostly submerged.** The magenta speckles are
+  water, not decoration; the white is the back surfacing, then the neck, the head, and an open jaw.
+  Grade **recalled (owner)**, and the bytes agree with it independently, which is the part worth
+  writing down:
+  * it is placed **only in harbour sectors** — `monx31` Port Bonifice (3 slots), `monx32` New San
+    Antonio (2), `monx41` Pirates Harbour (2), and nowhere else in the pack;
+  * every one of those 7 slots is **exclusively kind `0x08`** with **HP fixed at 255** and flag `0x01`.
+    Every other placed creature shows both `0x08` and `0x70`; Minax and King show only `0x70`. So `0x2c`
+    sits apart from the land creatures in exactly the way a water creature should;
+  * the type byte `0x2c` **is** art `0x0b`, because `art = map_byte >> 2`. The first pass at this
+    missed that and reported `0x2c` as an unidentified creature type, because the lookup filtered the
+    tile table on `kind=creature` and `0x0b` was misclassified as `object`. **A wrong classification in
+    a generated table hides the fact it contradicts.**
+  The name is now `Sea serpent` with `Sea Monster` as an alias. **HP remains an open conflict**: the
+  game's own byte is 255, the third-party figure is 64, and the game wins. Do not "fix" the engine to
+  match the wiki.
+* **"Sea Monster" and "Sea serpent" are one creature, and the join was counting case variants as two
+  names — ruled 2026-11-23.** The Codex's "Sea serpent" sat in the never-matched list while Gamer
+  Corner's "Sea Monster" held the matched tile, so the correct name and the correct tile were in
+  separate rows and neither looked complete. `Carrion Creeper` and `Carrion creeper` were likewise
+  counted as two names because the comparison was case-sensitive. **Fold case before treating names
+  as distinct.** The consequence is a headline number: the tool's `9 names never matched a tile` is
+  really **7** — Carrion creeper, Ghost, Goblin, Gremlin, Kings, Pirate ship, Viper.
+* **Those seven are not failures of the join, and four of them cannot match by construction.** Owner,
+  2026-11-23: Carrion creeper, Ghost, Goblin, Gremlin and Viper are **dungeon-only** creatures. Dungeon
+  sectors do not use `monx` at all (`dungeon-35-live` matched `monx35` at 0/27) and the dungeon view is
+  first-person wireframe, so **there is no sector-map tile for them to match against** — the bestiary
+  join was matching against sector art and could never have named them. `Kings` is not unmatched
+  either, see the next bullet. That leaves `Pirate ship` as the one genuinely open name, and it is
+  filed as a decode, not a capture.
+* **Kings: four placements, three castles, and the king/queen pair is in the bytes.** Owner recalled
+  kings in a few castles, mostly Lord British, with one other king/queen pair. Measured, all HP 255:
+  `monx23` Castle of Lord British (Earth 1423 BC) slot 8; `monx33` Castle of Lord British (Earth 1990
+  AD) slot 8; **`monx93` CASTLE BARATARIA (Planet X) slots 10 and 11 — two King-sprite creatures side
+  by side**, which is the pair. **A shared sprite can be two creatures**, which is the same shape as
+  the pirate-ship claim below and the reason "same graphic" is not evidence of "same creature".
+* **The creature count, settled: 15 creature tiles, 14 placed monster types, and the difference is the
+  horse.** After `0x0b` was reclassified, `tile.tsv` has 15 `kind=creature` rows and the `monx` type
+  bytes give 14 distinct creature arts. The extra is **art `0x11`, "quadruped, head at left, four legs
+  and a tail — horse candidate"**, which is never placed as a monster because it is placed as a
+  **vehicle** (`census.py --what vehicle` lists the horses). Every placed type now has a creature tile,
+  and the one creature tile without a placed type has an explanation. That is the invariant worth
+  keeping: **placed creature arts ⊆ creature tiles, with the difference explained row by row.**
+* **Mounts are the reason "creature" and "vehicle" are not disjoint.** Owner: the frigate is a mount;
+  a **pirate ship** is the same picture used by a creature that roams the water and fires cannon, and
+  can be boarded with a tassel, which takes it over, or fought. The bytes say the frigate's map byte
+  `0x48` is **never** a monster type in any real `monx` file, and all 64 tiles have **distinct**
+  bitmaps, so "same graphic" cannot mean two art indices with identical pixels — it has to mean one
+  art index used two ways. The reconciliation is already in this project's own findings: `monx` holds
+  **placed** monsters, and `docs/monster-spawn.md` § 3 closed the townsfolk question by establishing
+  that **wandering spawns come from spawn arms instead**. A roaming creature would therefore have no
+  `monx` type at all, which is exactly what is observed. **Filed as a decode of the spawn arms in
+  `asm/`, not a capture.**
 * **Guard HP — RESOLVED by observation, 2026-10-22.** Codex 255, Gamer Corner 500.
   `castle-03-live` has type `0x60` (Guard) at HP **255**, so the codex is right and
   500 is wrong. Note the route here: first "resolved" by a byte-width argument, then

@@ -24,6 +24,13 @@
 # transform is still unknown, so no row here is a statement about what a mapxNN
 # byte means. See docs/passability-findings.md.
 #
+# CORRECTION 2026-11-23: the transform is no longer unknown. `art = map_byte >> 2`,
+# which census.py states on every tile row and which identifies 13 of the 14 placed
+# creature types in `monx` by their type byte alone (the fourteenth, type `0x2c`, is
+# art `0x0B`; it was missed once already for exactly the reason in the 0B row below).
+# The paragraph above is kept because the caution still holds in the other direction:
+# naming an art entry is not the same act as naming a map byte's behaviour.
+#
 # kind: terrain | object | creature | font | block
 #
 # Creature names (2026-10-22): a leading name before the em-dash is a THIRD-PARTY
@@ -32,6 +39,12 @@
 # the gate was proven able to fail). The identity is measured; the name is not.
 # A name with a question mark conflicts with something. Unnamed rows are unnamed.
 # Per-art detail and the conflicts are in bestiary/bestiary.tsv and docs/bestiary.md.
+#
+# Aliases (2026-11-23): two third-party names can be one creature. "Sea Monster"
+# (Gamer Corner) and "Sea serpent" (Codex) are the same animal at art `0x0B`, ruled
+# by the owner, and the join counted "Carrion Creeper" and "Carrion creeper" as two
+# names because it compared case-sensitively. Fold case before treating names as
+# distinct, or the unmatched list inflates and one creature looks like two.
 
 	id	hex	kind	description	glyph	notes
 	00	00	terrain	magenta dashes in loose diagonal rows on black	:	most common byte in every *x0 sector
@@ -45,7 +58,7 @@
 	08	08	object	white gate frame, two posts under a lintel	+	NOT a plane; corrects the old 8=plane note
 	09	09	terrain	white diamond lattice with an arch opening at bottom centre	!	cave or pass through a range
 	0A	0A	object	solid white cross standing on a base	/	monument
-	0B	0B	object	Sea Monster? — magenta field with a white arch and a white mound	[	doorway set in a field
+	0B	0B	creature	Sea serpent — magenta speckles are water; the white is a mostly submerged body: the back surfacing, then neck, head and open jaw	[	kind was `object` until 2026-11-23; owner read the tile and the bytes agree (placed only in harbour sectors 31/32/41, exclusively kind 0x08, HP fixed 255). Third-party names are aliases: Gamer Corner "Sea Monster", Codex "Sea serpent". HP conflicts: game 255, wiki 64; the game wins.
 	0C	0C	creature	Orc — white humanoid, arms down, legs apart	\	first NPC figure
 	0D	0D	creature	Daemon — white humanoid, arms raised out to the sides	]	
 	0E	0E	creature	Devil — white humanoid beside a magenta-topped staff	{	
