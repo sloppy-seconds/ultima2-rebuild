@@ -2874,3 +2874,14 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   reported instance. "Fixed the y truncation" invites the next reader to treat the family as closed;
   the fix is a check that every coordinate reaching that division is on the grid. And a written-up fix
   without a gate behind it is a claim with an expiry date.
+- A rules document said a generated table was owed a freshness check. It was not: the check had landed
+  weeks earlier and the prose had not caught up. Auditing the real gap found it somewhere else and in a
+  different shape -- eight generated tables with no freshness check, not because nobody thought of it,
+  but because their generators write to hardcoded paths and take no output argument, so the gate is
+  unbuildable without changing each tool first. One of the eight had thirteen separate writers, which
+  makes "its generator" not a thing and any freshness assertion on it meaningless. And the one table
+  that could be gated immediately went red on being gated, four rows short.
+  → Tier 1, evidence discipline: before building a check the docs ask for, run the docs' own claim
+  against the tree. A rules file is a hypothesis about the present. And when a class of check is
+  missing, ask what makes it missing -- "nobody added it" and "the tools cannot be diffed in their
+  current shape" need opposite fixes, and only one of them is a line in a script.

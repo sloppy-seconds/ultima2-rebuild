@@ -50,9 +50,45 @@ check() {
     rm -rf "$tmp"
 }
 
+# check_stdout COMMITTED_PATH GENERATOR...  -- same, but the generator prints to stdout
+# and the committed file is its redirect. fragment_splits.py is this shape: `--tsv` prints,
+# and the documented recipe in AGENTS.md is `--tsv --all > disasm/fragment-splits.tsv`.
+# A generator that writes to a hardcoded path cannot be diffed without changing it, so this
+# covers the stdout half of the tree without touching a single generator.
+check_stdout() {
+    local out="$1"; shift
+    local tmp
+    tmp=$(mktemp -d "${TMPDIR:-/var/tmp}/genfresh.XXXXXX") || { echo "  SKIP  $out (no tmpdir)"; skips=$((skips+1)); return; }
+    if ! "$@" >"$tmp/out.tsv" 2>"$tmp/log"; then
+        printf '  SKIP  %-26s generator exited non-zero: %s\n' "$out" "$(tail -1 "$tmp/log" 2>/dev/null | cut -c1-60)"
+        skips=$((skips + 1)); rm -rf "$tmp"; return
+    fi
+    if [ ! -s "$tmp/out.tsv" ]; then
+        printf '  FAIL  %-26s generator printed nothing\n' "$out"
+        fail=1; rm -rf "$tmp"; return
+    fi
+    if [ ! -f "$out" ]; then
+        printf '  FAIL  %-26s committed file is missing\n' "$out"
+        fail=1; rm -rf "$tmp"; return
+    fi
+    if cmp -s "$tmp/out.tsv" "$out"; then
+        printf '  PASS  %-26s matches its generator\n' "$out"
+    else
+        printf '  FAIL  %-26s STALE -- regenerate it\n' "$out"
+        fail=1
+    fi
+    rm -rf "$tmp"
+}
+
 check disasm/place-index.tsv  python3 tools/place_index.py --tsv
 check disasm/npc-index.tsv    python3 tools/npc_index.py --tsv
 check disasm/planet-index.tsv python3 tools/planet_index.py --tsv
+
+# Added 2026-11-24, and it went red immediately: the committed copy had 43 rows and the
+# generator produces 52, because asm/ gained named splits (20AB, 50F9, 23E6, 51A5 and five
+# more) after the file was last written. AGENTS.md already said "regenerate with --tsv --all,
+# never hand-edit"; nothing enforced it, which is the same defect that made place-index stale.
+check_stdout disasm/fragment-splits.tsv python3 tools/fragment_splits.py --tsv --all
 
 # The census is its own tool with its own --check-fresh, which diffs eight tables at once.
 # Scratch goes under /var/tmp: /tmp here is tmpfs, so every byte of it is RAM taken from the
