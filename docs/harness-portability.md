@@ -189,6 +189,29 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **In a struct-of-arrays, the quotient is the array index and the remainder is the record
+  number, and swapping them is a confident wrong answer in the right table.** A stride-32
+  block of 8 parallel arrays means base+96 is the fourth array's record 0, not the first
+  array's record 3. Both readings are plausible arithmetic, both land inside the block, and
+  only one names a real field, so the wrong one surfaces as a subtly mislabelled column
+  rather than an error. Derive the convention from one known field and assert it, do not
+  reason it out per call site.
+* **A control that checks a subset instead of an exact set passes while the declared list is
+  wrong.** `expected <= actual` was green while the declared list named 2 of the 7 groups
+  actually on disk, so the check that existed to catch a new unregistered array was itself
+  the thing out of date. When a declaration enumerates a corpus, assert set equality; a
+  subset test only proves the declaration is not ahead of reality, which is the direction
+  that was never the risk.
+* **Where prose cross-references a value by name and address, that prose can be a gate.** The
+  stride of an inventory array was about to be assumed. The header comment already named
+  three entries with their addresses, and those three agree with stride 1 and the generated
+  name order only if both are correct, so the assumption became a check with a failing
+  control for free. Before assuming a layout constant, look for a sentence elsewhere in the
+  tree that would break if the constant moved.
+* **A tool that prints a maintenance notice on every query trains people to ignore it.** The
+  same "these groups have no ruling yet" line printed on lookups as on table regeneration,
+  so the one reader who needed it stopped seeing it. A notice belongs to the mode that can
+  act on it.
 * **A credential prompt on a pipe is indistinguishable from a slow network, and it will burn the
   whole timeout before anything says so.** A push hung until it was killed, and the plausible
   reading was a transport problem, because the remote was reachable and read operations returned

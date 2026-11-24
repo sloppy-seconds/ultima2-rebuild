@@ -8,8 +8,9 @@ already owns the rows -- `entity` and `entity_basis` in `disasm/index/footprint.
 and what it closes; § 7b records why the 2026-11-24 cut was withdrawn (a broken instrument, not
 a failed threshold); § 7a is kept as the original measurement with its errors marked rather than
 deleted. **S1–S4 will not be built.** The one deliverable independent of entities -- the
-record-address model, which DS span holds which file's records at what stride -- remains unbuilt
-and undecided, and it is the thing that would have prevented the `0xD6` mistake recurring.
+record-address model, which DS span holds which file's records at what stride -- also
+shipped, as `tools/record_spans.py`, and it is the thing that would have prevented the
+`0xD6` mistake recurring.
 
 This is the join layer between the two finished epics. The code index produced four
 generated tables about *addresses*; the census produced ten about *things*; the bible
@@ -407,9 +408,25 @@ hand-copied table that caused the confusion is gone.
 
 **What this closes.** S1–S4 of this plan are not built and will not be. The entity-id minting
 (S1/S2) is unnecessary because the census already owns names and the join is now done inside
-the tool that owns the rows. The record-address model -- which DS span holds which file's
-records, at what stride -- was the one deliverable independent of entities and remains
-unbuilt and undecided; it is what would have stopped the `0xD6` mistake from § 7b recurring.
+the tool that owns the rows.
+
+**The record-address model shipped the same day**, as `tools/record_spans.py` -- which DS span
+holds which file's records, at what stride. It is the thing that would have prevented the
+`0xD6` mistake, and it answers the question directly:
+
+```
+$ tools/record_spans.py --at 0xD9
+DS:00D9 is record 3 of 16 in items (items_held), stride 1, named 'BOOTS'; entity item, grade measured
+```
+
+Its shape is derived from `state.tsv` (parallel arrays found mechanically, nothing
+hand-typed); its meaning is declared with evidence per row, and a declared group that no
+longer derives is a hard failure rather than a skip. The inventory stride is gated rather
+than assumed: `state.h` cross-references `items_held[BOOTS]` at `DS:D9`, `[CLOAK]` at
+`DS:DA` and `[GREEN IDOL]` at `DS:E4`, and those three agree with stride 1 and the
+extractor's item order only if both are right. Five spans are published; the seven derived
+groups with no ruling are named, and the selftest pins that set exactly so a new array in
+`state.h` turns the suite red instead of arriving as a silent gap.
 
 ---
 
