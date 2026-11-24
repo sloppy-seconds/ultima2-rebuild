@@ -2829,3 +2829,12 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   → Tier 2, schema: when an external source agrees with a derived value, ask which population it
   measured before recording the agreement as corroboration. Agreement between a constant and one
   population of a varying field is the weakest evidence that looks strongest.
+- A documented quirk was described as an accident of position -- "only when the spawner happens to
+  hand out that slot, which is one in thirty-two" -- and that framing was used to argue the behaviour
+  could not express the design the players remembered. Counting the authored data said the opposite:
+  the slot was written deliberately in most of the corpus, and with the same creature type almost
+  everywhere. The quirk was the design.
+  → Tier 1, evidence discipline: before calling a mechanism incidental or incidental-only, count how
+  often the corpus actually produces it. "Can happen" and "happens in 23 of 30 authored cases" support
+  opposite conclusions, and a one-line count is cheap enough that there is no excuse for reasoning
+  from the first framing.
