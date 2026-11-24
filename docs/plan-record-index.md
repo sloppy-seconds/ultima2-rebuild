@@ -1,11 +1,16 @@
 # The Record Index — Plan (third epic)
 
-**Status: CUT TO BIBLE SLICES, 2026-11-24. All decisions were ruled 2026-11-23 (§ 8) and the grill
-was closed, but S0 — the spike, run before any store was built — measured 12 attributable entities
-against the pre-registered kill threshold of 25, and ruling G10 says that cuts the epic. § 7a holds
-the numbers, the method, and the three ways this plan was wrong about its own inputs. S0b (the column
-contract) survives the cut; S1–S4 do not. Owner may ratify or amend G10, and § 7a is the evidence for
-either.**
+**Status: VERDICT NOT RATIFIED, 2026-11-25. The 2026-11-24 cut was measured with a broken
+instrument and is withdrawn.** § 7a reported 12 attributable entities against the pre-registered
+kill threshold of 25. Two defects made that number too low: items were queried at the item array's
+base address instead of their per-slot absolute addresses, and the footprint index could not see
+memory access written as forced-keep `.byte` lines (142 such accesses, now decoded -- see
+`tools/index_footprint.py`). Re-measured in § 7b: **25 entities, exactly on the threshold**, and
+the count moves 24/25/26 depending on which creature rule is used, so the threshold is coarser
+than the decision it was set to make and cannot decide it. What survives unchanged is the shape:
+creatures and items work (25 entities), spells/NPCs/gates are structurally unreachable. That is a
+two-kind index, not the five-kind index G10 was written to approve or refuse, and that is the
+question for the owner. S0b (the column contract) landed and stands on its own merits.
 
 This is the join layer between the two finished epics. The code index produced four
 generated tables about *addresses*; the census produced ten about *things*; the bible
@@ -238,6 +243,15 @@ S0 exists because a plan built on assumed edges is worth less than an afternoon.
 
 ### 7a. S0 result, 2026-11-24: the threshold was breached
 
+> **CORRECTION, 2026-11-25. The number below is wrong and finding 2 is refuted.** The
+> measurement was taken against a footprint index that could not see memory access written as
+> raw bytes, and it looked at the item array's base address instead of its slots. Re-measured
+> after `tools/index_footprint.py` learned to decode forced-keep `.byte` lines: **25 named
+> entities, not 12**, and items are the 13 of them. Finding 2 below is false -- items were
+> always attributable. See § 7b. The G10 verdict is therefore **not ratified**: a threshold
+> breached by a broken instrument is not a measurement, and the re-measured number sits exactly
+> on the line it was supposed to decide, which means the line cannot decide it either.
+
 **12 distinct named entities of the v1 kinds carry at least one `measured` code edge. The
 pre-registered kill threshold is 25. Per ruling G10 the epic is therefore cut to bible
 slices.** The number was fixed before the measurement precisely so that this sentence could
@@ -263,7 +277,16 @@ anything unnamed in between. Conservative by construction — it can under-repor
 invent. That resolved **23 of 193** rows on the backward leg and **17 of 193** on the forward
 leg.
 
-**2. The item and spell legs are structurally empty, not under-mined.** Every one of the six
+**2. ~~The item and spell legs are structurally empty, not under-mined.~~ REFUTED 2026-11-25,
+see § 7b.** The claim below was produced by looking at `0xD6`, the base of the item array, and
+finding only relative indexing there. It is false. Each item has its **own absolute address**
+(`DS:D7` is the wand, `DS:E5` is tri-lithium) and the code touches those directly; the engine's
+own `overworld.h` documents seven of them with the asm file each came from, which is the
+"look it up before you derive" rule broken inside the session that was supposed to be measuring
+carefully. The spell half survives: `0xB6..0xBF` really does yield nothing, and it still yields
+nothing after the index was repaired, which makes it a stronger claim than it was.
+
+Every one of the six
 `0xD6` (items held) and six `0xB6` (spell counts) sites addresses through a computed `%di`
 (`mov 0xd6(%di),%al`), and no literal anywhere in the tree names which item or which spell a
 site means. The slot index is a loop counter or a cursor, never an immediate. This was checked
@@ -310,6 +333,52 @@ was the only evidence that this epic earned its existence.** S0 found that the e
 there, which is the outcome the threshold existed to allow.
 
 ---
+
+### 7b. Re-measured, 2026-11-25: the instrument was broken, and the number now sits on the line
+
+Two independent defects made the § 7a count too low. Both were found by a question from the owner,
+not by the spike auditing itself, which is the part of this worth recording.
+
+**Defect 1 -- items were read at the wrong address.** The spike queried `0xD6`, the base of the
+item array, found only register-relative access there, and concluded no literal names an item.
+But `items_held` is 16 slots at absolute addresses and the code touches each slot directly:
+`DS:D7` is the wand, `DS:DD` the ankh, `DS:E5` tri-lithium. `engine/src/game/overworld.h`
+documents seven of them with the asm file each was derived from, so the answer was in the tree
+and was not looked up before deriving.
+
+**Defect 2 -- the footprint index could not see access written as raw bytes.** A forced-keep
+`.byte` line holds a real instruction that gas re-encodes differently, with the instruction named
+only in a comment. The index parses mnemonics, so it recorded nothing, and its self-accounting
+could not flag it because a `.byte` is not instruction-shaped and so was never counted as a line
+it failed to parse. **142 memory accesses were invisible**, including three creature-HP sites and
+five spell-count sites. `tools/index_footprint.py` now decodes them from the bytes (cross-checked
+60-for-60 against objdump, with 17 committed controls) and refuses cross-file fragments; the
+index went 2079 rows to 2299, pure insertion.
+
+**Re-measured:**
+
+| leg | § 7a | re-measured | note |
+| --- | --- | --- | --- |
+| creature | 12 | **12** | unchanged; the strict rule is a type literal in a file that reads `mon_type` |
+| item | 0 | **13** | per-slot absolute addresses; RING 10 sites, TRI-LITHIUM 9, HELM 5 |
+| spell | 0 | **0** | still nothing, and now nothing in a repaired index |
+| npc, gate | 0 | **0** | no DS address; unchanged and not fixable this way |
+| **total** | **12** | **25** | threshold is 25 |
+
+**Why the threshold no longer decides anything.** The re-measured total lands exactly on the line,
+and it moves by ±2 depending on which creature attribution rule is used: literal-anywhere gives
+26 (and is wrong, because `$0x20` and `$0x14` are just the numbers 32 and 20 and appear all over
+the tree in files that have nothing to do with monsters), strict-file-co-occurrence gives 25, and
+the original spike's narrower rule gives 24. A pre-registered threshold is a promise to lose an
+argument, and that promise is only worth keeping if the measurement resolves finer than the
+decision boundary. This one does not. So the honest report is not "met" or "not met" but **the
+instrument is coarser than the threshold**, and the decision has to be made on the merits.
+
+**What survives the correction unchanged.** The shape of the answer, which is what the threshold
+was really testing. Three of the five v1 kinds are not address-shaped things and no repair reaches
+them: spells have no literal naming a slot even now, and NPCs and gates have no DS address at all.
+What works is creatures and items, 25 entities between them. That is a two-kind index, not the
+five-kind index G10 was written to approve or refuse.
 
 ## 8. Decisions — all ruled 2026-11-23
 
