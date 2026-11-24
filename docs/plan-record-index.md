@@ -1,6 +1,8 @@
 # The Record Index — Plan (third epic)
 
-**Status: planned, not built. Five decisions at § 8 need the owner before S1 starts.**
+**Status: planned, not built. All decisions ruled 2026-11-23 (§ 8); the grill's round one is
+complete and nothing is silently assumed. Build order is S-1, then S0 — and S0's kill threshold
+is pre-registered at § 7, so the measurement can actually change the plan.**
 
 This is the join layer between the two finished epics. The code index produced four
 generated tables about *addresses*; the census produced ten about *things*; the bible
@@ -145,9 +147,13 @@ loaded file data.
 | `leg` | how the edge was derived: `record-touch`, `immediate`, `c-citation` |
 | `grade` | per leg, per § 3 ceilings |
 
-`tools/entity_index.py` would be the single writer for all three, extending `census.py`'s
-discipline: it invents nothing, every row names its source, and `--verify` asserts the
-invariants while `--check-fresh` proves the committed copy is current.
+**Who writes what (ruled 2026-11-23).** `census.py` mints the entity ids, because it is already
+the entity authority, already owns the ten tables, and already carries `--verify` and
+`--check-fresh`. A second tool emitting `entities.tsv` would have been a second writer over the
+same facts — the exact drift ADR 0002 exists to stop. The new tool, `tools/entity_index.py`,
+writes only `records.tsv` and `entity-code.tsv` and references ids it did not create. Both tools
+follow `census.py`'s discipline: invent nothing, name a source on every row, and let `--verify`
+assert the invariants while `--check-fresh` proves the committed copy is current.
 
 ---
 
@@ -200,6 +206,14 @@ that decodes `tlkxNN` dialogue and shows slack bytes is a text-republication mac
    read.
 6. **No GPL or AGPL-derived data in committed tables.** Apache-2.0 compatibility is enforced
    by `.gitignore` and is not to be worked around.
+7. **Three name grades, ruled 2026-11-23, because public is now the goal.** Attribution is not a
+   licence, and `creature.tsv`'s names come from the Ultima Codex and the vendored Gamer Corner
+   table. **(1)** names the binary itself contains — Origin's copyright, gated behind the bible
+   plan's game-text ruling; **(2)** generic words nobody owns (`GUARD`, `HORSE`, or a name we chose);
+   **(3)** third-party wiki names, **internal-only until someone establishes the source's licence**.
+   A public site therefore ships with fewer proper nouns than the internal one, and that is an
+   honest outcome rather than a defect. `name_source` and `grade` stay visible in any render, as the
+   bible plan's D7 already requires.
 
 ---
 
@@ -210,7 +224,7 @@ S0 exists because a plan built on assumed edges is worth less than an afternoon.
 | # | work | gate |
 | --- | --- | --- |
 | **S-1** | **Fix the source before building on it (ruled 2026-11-23).** `bestiary.tsv` carries byte-identical duplicate rows and `census.py` drops the columns that distinguished its art-matching rows, so `creature.tsv` has **no unique key**: 120 rows, 16 distinct `art` values, no combination of up to three columns unique, `source` and `grade` constant across every row. De-duplicate the source, assert uniqueness, and split the creature table from the art-variant table. Full finding: `docs/bestiary.md` § 8. | `bestiary.tsv` and `census.py --verify` both assert row uniqueness per table; a constant-valued column across a whole table is a warning, because a column that says one thing about everything says nothing |
-| **S0** | **Spike: do the derivable legs actually yield edges?** Join `records` × `footprint` for creature, item and spell spans; join sector/world immediates. Report how many entities get at least one code edge, by leg and grade. No store is written. | the spike's own numbers, written into this doc; if creature attribution yields fewer than a hand-picked dozen edges the design is wrong and says so here first |
+| **S0** | **Spike: do the derivable legs actually yield edges?** Join `records` × `footprint` for creature, item and spell spans; join sector/world immediates. Report how many entities get at least one code edge, by leg and grade. No store is written. | the spike's own numbers, written into this doc. **Kill threshold pre-registered 2026-11-23: fewer than 25 distinct entities of the v1 kinds (Q11) with at least one `measured` edge, and this epic is cut to bible slices** — the number is fixed before the measurement so the measurement can actually change the plan |
 | **S0b** | **Column contract, per ADR 0005.** Every generated table declares each column's type and base, and `--verify` asserts every value against it. The motivating case is real and recent: `footprint.tsv`'s offset column holds **decimal**, and filtering it as hex returns zero rows, which reads as absence of evidence rather than a bad query. | a control per declared column: feed a value of the wrong type or base and the gate goes red; a table with no contract is a `--verify` failure, not a warning |
 | S1 | `records.tsv` — the record-address model, with stride, count and file provenance | `--verify` asserts every span is inside the DS block, strides tile without overlap, and every row names an evidence site; `--check-fresh` |
 | S2 | `entities.tsv` — census joined under stable ids | `--verify` asserts every census row appears exactly once, no id is minted for a row census does not have, and `name_source` is never blank where census had one |
@@ -224,17 +238,24 @@ hand-maintained doc is the only evidence that this epic earned its existence.**
 
 ---
 
-## 8. Decisions needed from the owner
+## 8. Decisions — all ruled 2026-11-23
 
 | # | decision | recommendation |
 | --- | --- | --- |
 | ~~**D1**~~ | ~~Store format~~ **RULED: TSV, JSONL only for nested rows** — `docs/adr/0005-...md` | done |
-| **D2** | Does ADR 0004 stand — prose generator-only, no hand-written MDX? | **Yes, keep it.** The draft's human-prose layer is the drift this project has been eliminating all year |
-| **D3** | Entity id scheme | Namespaced **composite** natural keys, corrected after measurement: `sector:<layer>:<n>` works because `(layer, sector)` is unique across all 54 rows; the bare sector number does not (33 distinct across 54). `tile` is keyable on `art`, `gate` on `(era, gate_index)`, `npc` on `(layer, sector, record_index)`, `vehicle` and `vendor` need the full four-column cell key. **`creature` is not keyable at all until S-1 lands.** Namespaced because census has no id column today |
+| ~~**D2**~~ | ~~Does ADR 0004 stand — prose generator-only, no hand-written MDX?~~ | **RULED: it stands, amended.** Quirks become facts via an observation-mining pass, and voice gets a separate visibly-ungraded editorial lane. Recorded as D9/D10/D11 of `docs/plan-game-bible.md` and as an amendment to `docs/adr/0004-prose-is-a-generated-view.md`. The draft's hand-written MDX layer is still rejected — it is the drift this project has been eliminating all year |
+| ~~**D3**~~ | **RULED — entity id scheme:** | Namespaced **composite** natural keys, corrected after measurement: `sector:<layer>:<n>` works because `(layer, sector)` is unique across all 54 rows; the bare sector number does not (33 distinct across 54). `tile` is keyable on `art`, `gate` on `(era, gate_index)`, `npc` on `(layer, sector, record_index)`, `vehicle` and `vendor` need the full four-column cell key. **`creature` is not keyable at all until S-1 lands.** Namespaced because census has no id column today |
 | **D4** | ~~Is any public site ever in scope?~~ **RULED 2026-11-23: yes, public is the goal** — with the owner's condition that copyright is handled carefully when we get there. That *raises* the bar rather than lowering it: the wall has to be built now, not at publishing time, because retrofitting a leak is not possible. `--public` still refuses until the text ruling (D6 of the bible plan) lands, and no extracted dialogue or art may ever enter a committed generated table. | done — see § 6, and the open follow-on below |
-| **Q14 (open)** | **Third-party names are not ours to publish either.** Attribution is not a licence. `creature.tsv` names come from the Ultima Codex and the vendored Gamer Corner table; citing them internally is good practice, republishing them publicly is a licensing question nobody has asked. Proposed: three name grades — (1) names the binary itself contains, gated behind the game-text ruling; (2) generic words nobody owns; (3) third-party wiki names, internal-only until someone establishes the source's licence. A public site would then ship with fewer proper nouns than the internal one, which is an honest outcome rather than a defect. | owner |
-| **D4** | Is any public site ever in scope, and if so what may it show? | **Not in this epic.** Keep `--public` refusing; revisit only with an explicit ruling on game text |
-| **D5** | How far to go on map-cell attribution, given § 3's limit | **Don't chase it.** Attribute sectors through `DS:49`/`4A`/`6D` immediates and record the limit in the table's own notes |
+| ~~**Q14**~~ | ~~Third-party names are not ours to publish either.~~ | **RULED — the three name grades are in § 6 item 7.** Attribution is not a licence: binary names are gated behind the game-text ruling, generic words are free, and third-party wiki names stay internal-only until someone establishes the source's licence. A public site ships with fewer proper nouns than the internal one, which is an honest outcome rather than a defect |
+| ~~**D5**~~ | ~~How far to go on map-cell attribution, given § 3's limit~~ | **RULED: fence it.** Attribute sectors through the `DS:49`/`4A`/`6D` immediates a routine already tests, and record the limit in the table's own notes. Chasing address computations is a dataflow problem this index deliberately is not |
+| **G1** | Epic, or bible slices? | **Ruled: own epic, conditionally.** If S0 falls below its pre-registered threshold, it is cut to bible slices and this file says so. The condition is the point — the answer is not settled by preference but by the measurement |
+| **G6** | Composite or surrogate ids? | **Ruled: composite**, with a gate that refuses to mint an id when a disambiguator is blank. Meaningless ids that never break are worse than verbose ones that fail loudly |
+| **G7** | Who mints the ids? | **Ruled: `census.py`**, because it already owns the ten tables and their gates. `entity_index.py` writes only `records` and `entity-code` and references ids it did not create (§ 4) |
+| **G8** | Where do record strides come from? | **Ruled: asm load site = `measured`; agreement with our own C parser = `inferred`, and the row names which.** The engine is our code and can be wrong in exactly the way the asm proves it isn't |
+| **G9** | Grade inheritance for an edge | **Ruled: the edge inherits the weakest grade in its chain, and the row names which leg was weakest.** Showing `measured` beside a claim resting on an inferred span is grade laundering, which the bible's own critic already caught once |
+| **G10** | S0's kill threshold | **Ruled in advance: fewer than 25 distinct entities of the v1 kinds with at least one `measured` edge cuts the epic to bible slices.** Set before the measurement so the measurement can change the plan |
+| **G11** | Which entity kinds in v1? | **Ruled: creature, item, spell, npc, gate.** Sector and place via immediates, explicitly `inferred`. Tile and vendor deferred — tile touches the cleanroom wall, vendor is derived from tile |
+| **G12** | Commit `entity-code.tsv` or generate on demand? | **Ruled: committed, with `--check-fresh`,** like every other generated table. An edge nobody can diff is an edge nobody checks |
 
 ---
 
