@@ -56,6 +56,21 @@ COVERED = [
     'disasm/census/art-variant.tsv',
     'disasm/creature-populations.tsv',
     'disasm/facts/asm.tsv',
+    # --- second increment -------------------------------------------------
+    'disasm/function-map.tsv',
+    'disasm/fragment-splits.tsv',
+    'disasm/data-regions.tsv',
+    'disasm/bytecheck-map.tsv',
+    'disasm/bytecheck-full.tsv',
+    'disasm/functions.tsv',
+    'disasm/content-inventory.tsv',
+    'disasm/planet-index.tsv',
+    'disasm/npc-index.tsv',
+    'disasm/place-index.tsv',
+    'disasm/npc-wiki-names.tsv',
+    'disasm/place-wiki-names.tsv',
+    'disasm/source-third-party-spells.tsv',
+    'disasm/bible/statistics.verdicts.tsv',
 ]
 
 # kind names:
@@ -187,6 +202,71 @@ CONTRACT = {
         'source_line': 'int', 'id': 'text', 'kind': 'text', 'grade': 'text',
         'entities': 'text', 'statement': 'text', 'evidence_tool': 'text',
         'source_file': 'text',
+    },
+    # --- second increment -------------------------------------------------
+    'disasm/function-map.tsv': {
+        'start': 'hexd', 'end': 'hexd', 'len': 'hexd',
+        'evidence': 'text', 'name_hint': 'text',
+    },
+    'disasm/fragment-splits.tsv': {
+        'start': 'hexd', 'end': 'hexd', 'n_fragments': 'int', 'rets': 'int',
+        'entry_call': 'text', 'grade': 'text',
+    },
+    'disasm/data-regions.tsv': {
+        'start': 'hexd', 'end': 'hexd', 'len': 'hexd', 'kind': 'text',
+    },
+    'disasm/bytecheck-map.tsv': {
+        'start': 'hexd', 'lits': 'int', 'drift': 'int', 'fabricated': 'int',
+        'verdict': 'text',
+    },
+    'disasm/bytecheck-full.tsv': {
+        'entry': 'hexd', 'g_lits': 'int', 'g_missing': 'int', 'r_lits': 'int',
+        'r_missing': 'int', 'verdict': 'text', 'ghidra': 'text',
+    },
+    'disasm/functions.tsv': {
+        'entry': 'hexd', 'size_bytes': 'int', 'ghidra_status': 'text',
+        'reko_status': 'text', 'bytecheck': 'text', 'confidence': 'text',
+        'source': 'text',
+    },
+    'disasm/content-inventory.tsv': {
+        'size': 'dec', 'body': 'dec', 'tail0': 'dec', 'tail_nonzero': 'dec',
+        'distinct': 'dec', 'nonzero': 'dec', 'file': 'text', 'class': 'text',
+        'key': 'text', 'entropy': 'text', 'highbit_ratio': 'text',
+        'printable_ratio': 'text',
+    },
+    'disasm/planet-index.tsv': {
+        'world': 'dec', 'xeno': 'dec', 'yako': 'dec', 'zebo': 'dec',
+        'sector': 'dec', 'name': 'text', 'settlements': 'text',
+        'dungeons_towers': 'text', 'codex': 'text', 'agree': 'text',
+    },
+    'disasm/npc-index.tsv': {
+        'sector': 'dec', 'role': 'hexp', 'index': 'int', 'layer': 'text',
+        'world': 'text', 'era': 'text', 'kind': 'text', 'speaker': 'text',
+        'wiki': 'text', 'line': 'text', 'quest': 'text',
+    },
+    'disasm/place-index.tsv': {
+        'sector': 'dec', 'glyphs': 'int', 'dialogue': 'int', 'layer': 'text',
+        'world': 'text', 'era': 'text', 'kind': 'text', 'candidate': 'text',
+        'candidate_at': 'text', 'wiki': 'text', 'rooms': 'text',
+        'text_status': 'text', 'note': 'text',
+    },
+    'disasm/npc-wiki-names.tsv': {
+        'sector': 'dec', 'record': 'int', 'layer': 'text',
+        'wiki_name': 'text', 'evidence': 'text', 'grade': 'text',
+        'source': 'text',
+    },
+    'disasm/place-wiki-names.tsv': {
+        'sector': 'dec', 'layer': 'text', 'wiki_name': 'text',
+        'evidence': 'text', 'grade': 'text', 'source': 'text',
+    },
+    'disasm/source-third-party-spells.tsv': {
+        'slot': 'int', 'price_gold': 'dec', 'name': 'text', 'class': 'text',
+        'claim': 'text', 'verdict': 'text', 'grade': 'text',
+    },
+    'disasm/bible/statistics.verdicts.tsv': {
+        'sentence_id': 'text', 'resolves': 'text', 'supported': 'text',
+        'grade_survived': 'text', 'non_vacuous': 'text', 'reason': 'text',
+        'judge_model': 'text', 'prompt_sha': 'hexd', 'prose_sha': 'hexd',
     },
 }
 
