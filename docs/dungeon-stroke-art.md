@@ -90,6 +90,53 @@ Two small things worth writing down because both are easy to get wrong:
   **inferred** for any intent. `tools/dungeon_strokes.py` deliberately does not render it, so nobody
   mistakes it for in-game art.
 
+## No pictures in this file, deliberately
+
+**Rendered plots are not committed here, and ASCII art was considered and rejected for the same
+reason.** A plot of the strokes — PNG or ASCII — is not a *description* of the artwork, it is the
+artwork in a lossier encoding. The test is recognisability, and it passes: the renders made from
+this data were sparse, dithered and coarse, and stamp 7 was still recognisably a winged demon. The
+project's ruled line on art (AGENTS, "the text/art line", 2026-10-28) is that art is never committed
+and is substituted under the cleanroom, and the argument that a small or low-fidelity excerpt is too
+slight to protect was already rejected for text: there is no category exemption.
+
+There is also a second cost specific to this repository. **A committed picture would be a better
+answer key than the prose above**, which is the exact thing the cleanroom wall exists to keep away
+from anyone drawing substitutes. This document is already on the forbidden list in
+`docs/tile-art-spec.md` § 2 for describing the shapes in words; putting the shapes themselves in the
+repo would be building the wall and then setting the originals into it.
+
+What is committed instead, and why that is enough: the **prose shape descriptions** above (which are
+what actually carried the evidentiary argument — "the only limbless serpent on the list" does the
+work, a picture adds nothing to it), and the **measurements** below. The renders live under
+`/var/tmp` and are regenerated on demand from the player's own files by `tools/dungeon_strokes.py`,
+which is the same arrangement as the tile viewer: the tool is committed, the derived originals are
+not.
+
+The sanctioned route to a committed *picture* of a dungeon creature is **generative, not
+reproductive**: a procedural substitute that emits format-compatible stroke blocks from an intent
+spec, never from these shapes. That is filed in `docs/outstanding.md` § 1, and it has a real
+function rather than a documentary one — without the `monsters` file the engine currently draws no
+dungeon creatures at all.
+
+### Measurements
+
+Structural, not visual: enough to argue from, not enough to see.
+
+| stamp | records | x extent | y extent | pattern histogram |
+| --- | --- | --- | --- | --- |
+| 1 | 64 | 24..38 | 11..23 | `p1:59 p2:3 p5:2` |
+| 2 | 66 | 28..38 | 11..22 | `p4:66` (single pattern — the whole figure is half-on) |
+| 3 | 75 | 23..41 | 8..22 | `p1:3 p2:20 p3:38 p4:14` |
+| 4 | 86 | 22..41 | 13..23 | `p0:4 p1:80 p2:2` |
+| 5 | 87 | 24..41 | 10..23 | `p0:10 p1:45 p2:4 p3:6 p4:22` |
+| 6 | 93 | 26..38 | 9..23 | `p0:4 p1:64 p3:23 p4:2` |
+| 7 | 127 | 19..45 | 8..23 | `p0:11 p1:62 p2:4 p3:29 p4:21` |
+
+Depth ladder inside block 0: 24 records at `0x080`, 6 at `0x0C0`, 4 at `0x0E0`, 2 at `0x0F0`,
+1 at `0x0F8`, nothing at `0x0FC`. Never-transferred tail: 128 bytes, 126 nonzero, 63 records, an
+order-preserving half-density subsequence of stamp 7.
+
 ## Related
 
 * `docs/concept-dungeon-brief.md` — the stamp → name hypothesis, the three proven contact specials,
