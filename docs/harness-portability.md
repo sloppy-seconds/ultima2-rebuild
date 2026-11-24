@@ -2838,3 +2838,11 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   often the corpus actually produces it. "Can happen" and "happens in 23 of 30 authored cases" support
   opposite conclusions, and a one-line count is cheap enough that there is no excuse for reasoning
   from the first framing.
+- A recalled claim about what the game's manual says was accepted, written up as the strongest
+  available evidence on a design question, and only then checked -- against a scanned copy of the
+  manual already sitting in the repository's own reference directory, readable with a one-line
+  extraction. The manual did not say it. The write-up had to be rewritten.
+  → Tier 1, evidence discipline: when a claim is about what a document says, and a copy of that
+  document may be in-tree, search for the file before reasoning about its contents. A recollection is
+  a pointer at a lookup, not a substitute for one, and "we do not have the manual" is a claim worth
+  spending ten seconds on before it is written down.
