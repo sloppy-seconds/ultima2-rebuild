@@ -142,6 +142,28 @@ Depth ladder inside block 0: 24 records at `0x080`, 6 at `0x0C0`, 4 at `0x0E0`, 
 identical and in order to records 65..126 of stamp 7, and the 63rd differs from stamp 7's record 64
 by one x coordinate (26 vs 32).
 
+## The names are already shipped
+
+**The engine binds these seven names today, and the enhanced renderer is hard-wired to them.**
+`engine/src/game/dungeon_assets.c:306-312` loads `MON1..MON7` as `dg_spr_orc`, `dg_spr_ghost`,
+`dg_spr_carrion_creeper`, `dg_spr_viper_emerald`, `dg_spr_gremlin`, `dg_spr_daemon_minotaur`,
+`dg_spr_balron`, and `engine/src/game/dungeon3d.c:339` maps `stamp 1..7` onto `MON1..MON7`. The
+sprites are generated from `concepts/dungeon2/`, which is our own concept art, so the naming is a
+**decision already made and already drawn**, not an open question. The grades in the table above
+describe the *evidence* behind that decision; they are not a queue.
+
+The only live consequence is a risk note: **stamps 1 and 6 rest on list position alone**, so if a
+capture ever reordered the set, those two are the art that would have to be redrawn. The concept
+brief anticipated exactly this — "the art should stand on its own silhouette even if a later capture
+reorders them" — which is the right posture for art built on a hypothesis.
+
+**And the executable's own text names exactly one of the seven.** Searching every `db` string in
+`asm/` for the candidate names returns only the gremlin, via `A GREMLIN STOLE SOME FOOD!` in
+`asm/12DB_dungeon_events.asm`. Every apparent `ORC` hit is inside `TORCH` or `TORCHES`, which is
+worth recording because it is exactly the false positive a naive grep produces: ten files "contain
+ORC", none of them names an orc. So the one proven pairing in the whole set is the one the string
+hands us, and the other six names are ours to defend or replace.
+
 ## Related
 
 * `docs/concept-dungeon-brief.md` — the stamp → name hypothesis, the three proven contact specials,
