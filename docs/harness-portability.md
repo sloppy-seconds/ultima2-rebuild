@@ -189,6 +189,26 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **A csv reader on unquoted TSV silently loses every row after an unescaped quote, and a
+  checker built on it inspects part of the table and prints PASS.** A field whose entire value
+  is a double quote put the reader into quoted mode, where it swallowed tabs and newlines
+  until it found a closing one: 39 of 64 rows came back, no error, and the gate was green.
+  If the format is `"\t".join(fields)` with no quoting, then the reader must split on tabs.
+  Any time a parser is chosen for convenience rather than for the format actually written,
+  count the rows on both sides before trusting a verdict.
+* **A freshness chain that compares each artefact only to its immediate input can be stale two
+  levels up with every gate green.** A generated table was derived from a curated one, and a
+  C header was compiled from the generated table. The curated input changed, the middle link
+  went stale, and the header matched the stale middle perfectly, so both gates reported
+  healthy. A gate on the last link is not a gate on the chain; when a value is derived twice,
+  at least one link must be compared against the original source.
+* **A phantom empty column does not break readers, it teaches them an off-by-one.** A table
+  whose header and every row began with a tab gave readers an unnamed first field, and two
+  consumers adapted by indexing from the second field instead of the first. Nothing failed,
+  which is how the defect migrated from the data into the code that read it; removing the
+  column then looked like it would break working code. When a shape defect is absorbed rather
+  than surfaced, the fix has to move the consumers in the same commit and prove each one by
+  running it, not by counting lines.
 * **In a struct-of-arrays, the quotient is the array index and the remainder is the record
   number, and swapping them is a confident wrong answer in the right table.** A stride-32
   block of 8 parallel arrays means base+96 is the fourth array's record 0, not the first
