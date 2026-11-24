@@ -93,6 +93,25 @@ spots, because absences are only as strong as the search. A negative fact may no
 above `inferred` until the method is exhaustive.
 _Avoid_: treating "nobody saw it" as an absence proof; a negative fact without a scope.
 
+## Observation mining
+
+The pass that derives candidate facts from tensions between the index tables rather than from
+reading one routine at a time: a field written and never read, a guard that never fires, a claimed
+call edge never observed executing, a cap that does not cap. Its purpose is to make quirks arrive
+as **facts** — cited, graded, and checkable — because a quirk written as a prose aside is a claim
+nobody can verify. Ruled 2026-11-23, `docs/adr/0004-prose-is-a-generated-view.md`.
+_Avoid_: calling a guess "interesting" instead of filing it as an `inferred` fact; mining for
+confirmations of a story already told.
+
+## Editorial lane
+
+The one place in the bible where prose is not anchored to a fact: voice and judgement that cannot be
+fact-backed, kept visibly ungraded, never sharing a sentence with a graded claim, and marked as not
+derived from the store. The critic reviews it only for containing no checkable claim. It exists
+because unanchored colour smuggled into an anchored sentence is how grade laundering happens.
+_Avoid_: an editorial sentence that asserts something checkable; a page where the reader cannot tell
+which sentences carry evidence.
+
 ## Evidence grade
 
 How a claim was established: `observed`, `measured`, `inferred`, `recalled`, per the AGENTS.md
