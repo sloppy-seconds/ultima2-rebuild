@@ -3,9 +3,14 @@
 #           then `mov $0x40,%al` stored to [DI+0x177] (monster HP, proven by
 #           asm/2E3D_combat_attack_flow). Type 0x2C >> 2 == art 0x0B, named Sea
 #           serpent / Sea Monster by bitmap identity, third-party HP 64.
-#           NOTE art 0x0B carries a standing dispute (see docs/bestiary.md § 8):
-#           tile-art.tsv reads it as a doorway, not a creature. The HP value is not
-#           in dispute; what the art depicts is.
+#           RESOLVED 2026-11-23, and the resolution came from this arm: art 0x0B is the sea
+#           serpent, and the dispute in docs/bestiary.md § 8 was tile-art.tsv misclassifying it
+#           as `object` (a doorway in a magenta field). Owner read the tile: the magenta speckles
+#           are water and the white is a mostly submerged back, neck, head and open jaw. The HP
+#           written here, 64, is the SPAWNED serpent's HP and matches the third-party figure
+#           exactly; the serpents the game ships placed in harbour sectors 31/32/41 carry 255 in
+#           monx. Two populations, two HP values, both correct — so this arm is what dissolved the
+#           apparent conflict rather than a source being wrong.
 # provenance: static, 2026-10-22; extracted by tools/monster_hp_dispatch.py
 # confidence: high for the field and the value (bytes)
 # label: kept as sub_0daf on purpose — labels are body (CP0)

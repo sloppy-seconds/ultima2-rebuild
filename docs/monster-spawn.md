@@ -430,6 +430,16 @@ retracted § 10.
 
 Runtime address = file address + `0x200`.
 
+> **CORRECTION 2026-11-23: the column below is mislabelled, and the direction in the line above is
+> backwards.** The enforced convention (`tools/label_offset_gate.py`) is that an `asm/` **filename is
+> the runtime offset** and its first `L_` label is the **file** offset, with
+> **label = filename + 0x200**. `asm/0C9C` proves it: its first label is `L_000e9c`, so `0E9C` is the
+> **file** address and `0C9C` is the runtime one. Every value in the table below is therefore a **file**
+> address, not a runtime one. This is not pedantry: read as runtime, the row `0DAF (common exit)`
+> appears to contradict `asm/0DAF_monster_hp_sea_serpent.asm`, which is a spawn arm and not an exit at
+> all, and the two are different places. The table is correct as a description of the code; only its
+> column heading lies.
+
 | runtime | instruction | reading |
 | --- | --- | --- |
 | `0E9C` | `mov bh,0` / `mov bl,0x1f` / `mov di,bx` | `DI = 31`. **The operand is the immediate `0x1f`, not a read of `DS:1F`** — see the trap below |

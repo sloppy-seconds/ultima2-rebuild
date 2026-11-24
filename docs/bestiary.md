@@ -347,9 +347,49 @@ not by an argument about which wiki is likelier.
     missed that and reported `0x2c` as an unidentified creature type, because the lookup filtered the
     tile table on `kind=creature` and `0x0b` was misclassified as `object`. **A wrong classification in
     a generated table hides the fact it contradicts.**
-  The name is now `Sea serpent` with `Sea Monster` as an alias. **HP remains an open conflict**: the
-  game's own byte is 255, the third-party figure is 64, and the game wins. Do not "fix" the engine to
-  match the wiki.
+  The name is now `Sea serpent` with `Sea Monster` as an alias.
+* **The sea serpent HP "conflict" was not a conflict, and this section said it was — corrected the
+  same day.** `monx` gives placed sea serpents HP **255**; the third-party table says **64**. Both are
+  right, because they describe **two different populations**. `asm/0DAF_monster_hp_sea_serpent.asm`
+  is a wandering-spawn arm and it writes `mov $0x2c,%al` to `mon_type` and **`mov $0x40,%al` — 64 —**
+  to `mon_hp`. So 64 is the HP of a serpent that spawned in open water and 255 is the HP of the ones
+  the game ships standing in harbour sectors. **A single "creature HP" column cannot hold that**, and
+  any table that offers one number per creature is silently choosing between two true ones. The same
+  reasoning applies to every third-party HP in this file: see the next bullet for what they actually
+  describe.
+* **The third-party HP figures describe *spawned* monsters, and they match the spawn arms exactly —
+  which is a much stronger statement than "the wiki is a hypothesis".** The overworld spawn arms are
+  runtime `0C9A..0E00`, extracted by `tools/monster_hp_dispatch.py`, and every arm writes a type
+  immediate and an HP immediate. Read end to end they give:
+
+  | type | HP | art (`type>>2`) | name | third-party HP | terrain gate |
+  | --- | --- | --- | --- | --- | --- |
+  | `0x30` | 16 | `0x0c` | Orc | 16 ✓ | land |
+  | `0xFC` | 32 | `0x3f` | Thief | 32 ✓ | land |
+  | `0x34` | 64 | `0x0d` | Daemon | 64 ✓ | land |
+  | `0x2C` | 64 | `0x0b` | **Sea serpent** | 64 ✓ | **water `0x00`** |
+  | `0xF0` | 128 | `0x3c` | Fighter | 128 ✓ | land |
+  | `0x48` | 160 | `0x12` | **Frigate** | 160 ✓ | **water `0x00`** |
+  | `0x38` | 192 | `0x0e` | Devil | 192 ✓ | land |
+  | `0xF8` | 224 | `0x3e` | Wizard | 224 ✓ | land |
+  | `0x3C` | 255 | `0x0f` | Balron | 255 ✓ | land |
+
+  **Nine of nine exact agreement.** That is two independent kinds of evidence — a 2000-era guide and
+  immediates in a 1983 binary — landing on the same nine numbers, and it is the best validation of the
+  third-party table this project has. It also explains Balron's odd 255: the arm writes `mov $0xff`,
+  the literal byte ceiling, which is why sources report 255 where a 32-step progression predicts 256.
+  Note what is **not** in the arms: Guard, Merchant, Jester, King, Cleric, Minax. Those are placed-only,
+  which is the same fact `docs/monster-spawn.md` § 3 reached from the other direction.
+* **The Frigate is a spawned creature, and that is the pirate ship.** Owner recalled a pirate ship
+  using the frigate's picture, roaming the water and firing cannon. `asm/0DC4` has a **Frigate arm:
+  type `0x48`, HP 160, gated on terrain `0x00` — water**, and its header records that it and the sea
+  serpent are *the only two arms that want water*, which is described as the strongest single
+  corroboration that `[DI+0x1B7]` is the terrain tile and not an index. So the frigate sprite is used
+  by a spawned creature that appears on water, which is exactly the reported behaviour, and the
+  earlier "`0x48` is never a monster type" observation was measuring the wrong mechanism: `monx` holds
+  **placed** monsters, and this one is **spawned**. What remains genuinely open is narrower than the
+  original claim — the boarding-with-a-tassel interaction and the cannon attack, not whether the
+  creature exists.
 * **"Sea Monster" and "Sea serpent" are one creature, and the join was counting case variants as two
   names — ruled 2026-11-23.** The Codex's "Sea serpent" sat in the never-matched list while Gamer
   Corner's "Sea Monster" held the matched tile, so the correct name and the correct tile were in

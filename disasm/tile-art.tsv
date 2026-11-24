@@ -58,7 +58,7 @@
 	08	08	object	white gate frame, two posts under a lintel	+	NOT a plane; corrects the old 8=plane note
 	09	09	terrain	white diamond lattice with an arch opening at bottom centre	!	cave or pass through a range
 	0A	0A	object	solid white cross standing on a base	/	monument
-	0B	0B	creature	Sea serpent — magenta speckles are water; the white is a mostly submerged body: the back surfacing, then neck, head and open jaw	[	kind was `object` until 2026-11-23; owner read the tile and the bytes agree (placed only in harbour sectors 31/32/41, exclusively kind 0x08, HP fixed 255). Third-party names are aliases: Gamer Corner "Sea Monster", Codex "Sea serpent". HP conflicts: game 255, wiki 64; the game wins.
+	0B	0B	creature	Sea serpent — magenta speckles are water; the white is a mostly submerged body: the back surfacing, then neck, head and open jaw	[	kind was `object` until 2026-11-23; owner read the tile and the bytes agree (wandering-spawn arm asm/0DAF gates on water terrain 0x00; placed only in harbour sectors 31/32/41). Third-party names are aliases: Gamer Corner "Sea Monster", Codex "Sea serpent". HP is two numbers, both correct: 64 spawned (asm/0DAF writes 0x40) and 255 placed (monx31/32/41).
 	0C	0C	creature	Orc — white humanoid, arms down, legs apart	\	first NPC figure
 	0D	0D	creature	Daemon — white humanoid, arms raised out to the sides	]	
 	0E	0E	creature	Devil — white humanoid beside a magenta-topped staff	{	

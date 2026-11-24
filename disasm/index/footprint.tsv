@@ -229,7 +229,7 @@ ds	0		read	0B25_sub_0b25.asm	15	no		absolute operand, no base register
 ds	0	unknown	write	0D4F_monster_hp_orc.asm	34	yes		
 ds	0	unknown	write	0D6F_monster_hp_thief_daemon.asm	30	yes		
 ds	0	unknown	write	0D6F_monster_hp_thief_daemon.asm	54	yes		
-ds	0	unknown	write	0DAF_monster_hp_sea_serpent.asm	27	yes		
+ds	0	unknown	write	0DAF_monster_hp_sea_serpent.asm	32	yes		
 ds	0	unknown	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	61	yes		
 ds	0	unknown	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	83	yes		
 ds	0	unknown	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	105	yes		
@@ -480,7 +480,7 @@ ds	6		read	0839_restage_parked_rocket.asm	35	no		absolute operand, no base regis
 ds	6		read	0D4F_monster_hp_orc.asm	32	no		absolute operand, no base register
 ds	6		read	0D6F_monster_hp_thief_daemon.asm	28	no		absolute operand, no base register
 ds	6		read	0D6F_monster_hp_thief_daemon.asm	52	no		absolute operand, no base register
-ds	6		read	0DAF_monster_hp_sea_serpent.asm	25	no		absolute operand, no base register
+ds	6		read	0DAF_monster_hp_sea_serpent.asm	30	no		absolute operand, no base register
 ds	6		read	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	59	no		absolute operand, no base register
 ds	6		read	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	81	no		absolute operand, no base register
 ds	6		read	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	103	no		absolute operand, no base register
@@ -1414,7 +1414,7 @@ ds	375	0x0177+32	read	0B79_melee_damage_pool.asm	27	yes		engine/src/core/state.h
 ds	375	0x0177+32	write	0D4F_monster_hp_orc.asm	40	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	write	0D6F_monster_hp_thief_daemon.asm	36	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	write	0D6F_monster_hp_thief_daemon.asm	60	yes		engine/src/core/state.h creature grid slot 3
-ds	375	0x0177+32	write	0DAF_monster_hp_sea_serpent.asm	33	yes		engine/src/core/state.h creature grid slot 3
+ds	375	0x0177+32	write	0DAF_monster_hp_sea_serpent.asm	38	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	67	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	89	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	111	yes		engine/src/core/state.h creature grid slot 3
@@ -1437,7 +1437,7 @@ ds	407	0x0197+32	read	0CA2_sub_0ca2.asm	7	yes		engine/src/core/state.h creature 
 ds	407	0x0197+32	write	0D4F_monster_hp_orc.asm	36	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	write	0D6F_monster_hp_thief_daemon.asm	32	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	write	0D6F_monster_hp_thief_daemon.asm	56	yes		engine/src/core/state.h creature grid slot 4
-ds	407	0x0197+32	write	0DAF_monster_hp_sea_serpent.asm	29	yes		engine/src/core/state.h creature grid slot 4
+ds	407	0x0197+32	write	0DAF_monster_hp_sea_serpent.asm	34	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	63	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	85	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	107	yes		engine/src/core/state.h creature grid slot 4
