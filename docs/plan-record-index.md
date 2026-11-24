@@ -102,8 +102,14 @@ Consequences, stated as ceilings rather than hopes:
 
 ## 4. Proposed store
 
-Three new generated tables, one writer each, committed, freshness-gated. TSV, per ADR 0002
-— see D1.
+Three new generated tables, one writer each, committed, freshness-gated. **Format is ruled: TSV,
+per `docs/adr/0005-generated-tables-stay-tsv-jsonl-for-nested-rows.md`** — the split is by row
+shape, not by age, so a table goes JSONL only if its rows are genuinely nested and ships a sidecar
+for the do-not-hand-edit marker and column contract that a TSV header carries inline. Of the three
+below, `records` and `entity-code` are flat by construction (an edge is a row, and a multi-citation
+edge is several rows, which is also what makes citations diffable). `entities` is the one with a
+real case for nesting, because entity rows want alias lists and several evidence citations; if it
+goes JSONL it must ship its sidecar in the same commit.
 
 **`disasm/index/records.tsv`** — the record-address model. One row per DS span that holds
 loaded file data.
@@ -204,6 +210,7 @@ S0 exists because a plan built on assumed edges is worth less than an afternoon.
 | # | work | gate |
 | --- | --- | --- |
 | **S0** | **Spike: do the derivable legs actually yield edges?** Join `records` × `footprint` for creature, item and spell spans; join sector/world immediates. Report how many entities get at least one code edge, by leg and grade. No store is written. | the spike's own numbers, written into this doc; if creature attribution yields fewer than a hand-picked dozen edges the design is wrong and says so here first |
+| **S0b** | **Column contract, per ADR 0005.** Every generated table declares each column's type and base, and `--verify` asserts every value against it. The motivating case is real and recent: `footprint.tsv`'s offset column holds **decimal**, and filtering it as hex returns zero rows, which reads as absence of evidence rather than a bad query. | a control per declared column: feed a value of the wrong type or base and the gate goes red; a table with no contract is a `--verify` failure, not a warning |
 | S1 | `records.tsv` — the record-address model, with stride, count and file provenance | `--verify` asserts every span is inside the DS block, strides tile without overlap, and every row names an evidence site; `--check-fresh` |
 | S2 | `entities.tsv` — census joined under stable ids | `--verify` asserts every census row appears exactly once, no id is minted for a row census does not have, and `name_source` is never blank where census had one |
 | S3 | `entity-code.tsv` from `record-touch` and `immediate` legs | a control per leg: a known-true edge must appear, and a thing with no record must get no edge — plus the negative-edge grade ceiling enforced in code, not in prose |
@@ -220,7 +227,7 @@ hand-maintained doc is the only evidence that this epic earned its existence.**
 
 | # | decision | recommendation |
 | --- | --- | --- |
-| **D1** | Store format: committed generated TSV, or SQLite/DuckDB? | **TSV.** Diffable, greppable by an agent, matches ADR 0002, and 19k rows is a dictionary lookup |
+| **D1** | ~~Store format: committed generated TSV, or SQLite/DuckDB?~~ **RULED 2026-11-23: TSV, and JSONL only for rows that are genuinely nested.** Recorded in `docs/adr/0005-generated-tables-stay-tsv-jsonl-for-nested-rows.md`. DuckDB is allowed as a gitignored query surface over the committed text, never as a committed source of truth. | done — see ADR 0005 |
 | **D2** | Does ADR 0004 stand — prose generator-only, no hand-written MDX? | **Yes, keep it.** The draft's human-prose layer is the drift this project has been eliminating all year |
 | **D3** | Entity id scheme | Namespaced natural keys: `creature:0x0c`, `sector:21`, `npc:21:3`, `gate:3:2`, `tile:0x1f`, `item:helm`. Natural because the game addresses things by index; namespaced because census has no id column today |
 | **D4** | Is any public site ever in scope, and if so what may it show? | **Not in this epic.** Keep `--public` refusing; revisit only with an explicit ruling on game text |

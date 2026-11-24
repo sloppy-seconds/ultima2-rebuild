@@ -16,6 +16,8 @@ so on — because sole-writer and freshness are only meaningful as per-file prop
 alternative, one extractor re-emitting another tool's output so a directory has a single author,
 is a copy with extra steps that also drops the grade the originating tool already carried.
 
+**Format is not decided here.** This ADR rules that generated tables are committed and single-writer; which *format* they use — TSV by default, JSONL only for nested rows, and DuckDB as a query surface rather than a store — is ruled in `docs/adr/0005-generated-tables-stay-tsv-jsonl-for-nested-rows.md`.
+
 ## Considered Options
 
 A gitignored build dir was rejected: it loses reviewable generated diffs, and an unreviewed
