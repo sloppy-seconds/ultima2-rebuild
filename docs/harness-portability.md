@@ -189,6 +189,26 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **A column whose values are legal in two bases cannot be classified by looking at it, only by
+  being told.** `375`, `10`, `99` are valid decimal and valid hex, so no query reveals which was
+  meant, and guessing wrong returns zero rows -- which reads as absence of evidence rather than as
+  a bad query. Three columns in this project had that shape and only one of them was documented.
+  The fix is a declaration per column plus a gate that refuses an undeclared numeric column, so the
+  knowledge is written down where a generator change has to answer to it. Two signs the gate was
+  worth building: it caught the author's own wrong declaration (a commit-prefix column typed as a
+  count) before it caught any real drift, and the control that was supposed to pass on a clean tree
+  failed for a reason that proved the gate was right and the control wrong.
+  → Tier 1, data contracts: where a value's base is not inferable, make it declared and gated; a
+  comment naming the base is worth less than a check that goes red when the base moves.
+* **A gate that depends on a build artifact but is declared mandatory is red on every clean
+  checkout**, and red-for-the-wrong-reason is worse than red, because it trains the next person to
+  rerun until green or to skip the suite. The failure was latent for as long as everyone happened
+  to build before checking. The fix has two halves and both are needed: the tool exits with the
+  automake "cannot run" code when its input is absent rather than tracebacking, and the runner
+  declares the artifact as a precondition so the skip is counted as a skip. A traceback is not a
+  verdict, and "could not run" is not the same fact as "failed".
+  → Tier 2, gate design: every gate names whether its inputs are built, gitignored, or optional, and
+  distinguishes cannot-run from failed in its exit code.
 * **A plan's claim about what its own index can attribute is a hypothesis about the bytes, and the
   cheapest way to be wrong for a week is to build on it.** A spike measured a planned entity-to-code
   index against its own pre-registered kill threshold and found twelve attributable entities where
