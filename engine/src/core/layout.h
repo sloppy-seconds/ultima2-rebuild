@@ -110,7 +110,7 @@
 #define U2_ENH_CMD_W     (U2_ENH_PANEL_W - 2 * U2_ENH_GUT) /* 544 */
 #define U2_ENH_CMD_H     (10 * U2_ENH_TEXT_H)   /* 160 */
 #define U2_ENH_CMD_Y     (U2_ENH_MAP_Y + U2_ENH_MAP_ROWS * 32 - U2_ENH_CMD_H)
-#define U2_ENH_CMD_COLS  ((U2_ENH_CMD_W - 2 * U2_ENH_BOX_PAD) / U2_ENH_TEXT_W) /* 34 */
+#define U2_ENH_CMD_COLS  ((U2_ENH_CMD_W - 2 * U2_ENH_BOX_PAD) / U2_ENH_TEXT_W) /* 32 */
 
 #define U2_ENH_TEXT_COLS U2_ENH_CMD_COLS
 

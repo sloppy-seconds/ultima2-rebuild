@@ -2863,3 +2863,14 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   Re-run the tool before citing its number anywhere, and where prose must name a figure, name the
   command that prints it alongside, so the next reader has a way to check rather than a reason to
   trust.
+- A layout module documented that a coordinate was being silently truncated by integer division, said
+  the truncation had been fixed, and cited the screenshot that proved it. It had been fixed on one
+  axis. The other axis still truncated, in the same expression, in the same routine, and nobody looked
+  because the bug report had been about the first axis. A new pixel-level gate found it on its first
+  run, alongside a second defect of its own: a band declared exactly one text cell tall was also
+  declared to have a border, and the glyph necessarily covers both border rows, so the border had
+  never been visible where there was text.
+  → Tier 1, verification: when a defect class is fixed and written up, assert the whole class, not the
+  reported instance. "Fixed the y truncation" invites the next reader to treat the family as closed;
+  the fix is a check that every coordinate reaching that division is on the grid. And a written-up fix
+  without a gate behind it is a claim with an expiry date.

@@ -1080,6 +1080,34 @@ else
     printf '  SKIP  T5 creation-tail checks (no content dir holding mapx00)\n'
 fi
 
+# ---- enhanced panel geometry and no-silent-mutation ----------------------
+# The enhanced panel is drawn on screen and had no assertion at all: S1..S5 of
+# docs/enhanced-layout-plan.md landed as code with no gate over the boxes they place.
+# Every defect this catches is invisible at runtime -- the frame clips silently and a
+# wrong palette colour is simply not there -- so none of them can be found by looking.
+# See tests/panel_check.c.
+if u2_check "$WORK/panel_check" tests/panel_check.c 2>"$WORK/pc.build"; then
+    if "$WORK/panel_check" --selftest >"$WORK/pc-st.out" 2>&1; then
+        if "$WORK/panel_check" >"$WORK/pc.out" 2>&1; then
+            n=$(sed -n 's/^panel_check: \([0-9]\{1,\}\) checks.*/\1/p' "$WORK/pc.out")
+            if [ "${n:-0}" -eq 0 ]; then
+                bad "CP4 panel: executed 0 checks — the test is not running"
+            else
+                ok "CP4 panel: geometry, borders and no-silent-mutation hold ($n checks)"
+            fi
+        else
+            bad "CP4 panel check failed:"
+            sed 's/^/        /' "$WORK/pc.out"
+        fi
+    else
+        bad "CP4 panel gate cannot fail (selftest broke):"
+        sed 's/^/        /' "$WORK/pc-st.out"
+    fi
+else
+    bad "CP4 panel check would not build:"
+    sed 's/^/        /' "$WORK/pc.build"
+fi
+
 printf '\n'
 if [ "$fail" -eq 0 ]; then
     printf 'CP4 TEST: PASS\n'
