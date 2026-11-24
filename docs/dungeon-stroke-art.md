@@ -75,20 +75,24 @@ Two small things worth writing down because both are easy to get wrong:
   blank space. The ladder's record counts shrink monotonically (24, 6, 4, 2, 1): the distant
   creatures are deliberately typeless, which is why a far-off monster never tells you what it is.
 * **The last 128 bytes are never transferred, and they are not padding.** `asm/07F3` reads
-  `CX = 0x800` from a 2176-byte file, so bytes `2048..2175` never reach memory. They are 126 bytes
-  nonzero and they parse as **63 records** in the same framing. Measured against the seven loaded
-  blocks: **all 63 distinct records also appear in block 7**, in the same order (their positions in
-  block 7 are monotonically increasing), at roughly half the density — block 7's pattern histogram
-  `p0:11 p1:62 p2:4 p3:29 p4:21` thins to `p0:4 p1:32 p2:2 p3:15 p4:10`, and no pattern class is
-  dropped. So the tail is an **order-preserving simplification of the stamp-7 figure**, not slack,
-  not a duplicate, and not an eighth creature. Its bounding box matches block 7's exactly
-  (`x 26..45` inside `19..45`, `y 8..23` identical). **Purpose unknown.** The nearest reading is a
-  type-bearing distance simplification — the depth ladder in block 0 is deliberately *typeless*, so
-  a simplified-but-still-recognisable variant is the thing the ladder cannot provide — and the
-  obvious competing reading is a cut experiment, since the game never reads it and nothing in the
-  loaded 2048 bytes points at it. Grade: **observed** for the bytes and the subsequence relation,
-  **inferred** for any intent. `tools/dungeon_strokes.py` deliberately does not render it, so nobody
-  mistakes it for in-game art.
+  `CX = 0x800` from a 2176-byte file, so bytes `2048..2175` never reach memory. They are a
+  **complete, properly terminated record list**: 63 records in 126 bytes, closed by `00 00` at the
+  very end of the file. Measured against block 7 record by record: **62 of the 63 are identical, in
+  order, to records 65..126 of block 7**, and the remaining one differs from block 7's record 64 by
+  a single coordinate — `(x=26, y=15, p=1)` in the tail against `(x=32, y=15, p=1)` in block 7. So
+  the tail is **a near-copy of the second half of the stamp-7 figure, with one stroke moved**, not
+  slack, not an eighth creature, and not a deliberate simplification. Block 7 itself is complete and
+  self-terminated: 127 records × 2 bytes + terminator = exactly 256, filling its block.
+
+  **Purpose: dead data, and the honest answer is that the bytes cannot say more.** Two readings fit
+  everything observed. Either it is an **authoring artefact** — a stale copy left behind when the
+  stamp-7 figure was edited, which is what a one-record difference looks like — or the file **grew
+  past the read length the loader was written for**, since 2048 is exactly eight blocks of 256 and
+  the extra chunk is exactly half a block of the previous block's tail. Both predict a near-copy with
+  a one-record difference sitting past the boundary nothing reads, and nothing in the loaded 2048
+  bytes points at it. Grade: **observed** for the record list, its termination and the one-record
+  difference; **inferred** for either intent. `tools/dungeon_strokes.py` deliberately does not render
+  it, so nobody mistakes it for in-game art.
 
 ## No pictures in this file, deliberately
 
@@ -134,8 +138,9 @@ Structural, not visual: enough to argue from, not enough to see.
 | 7 | 127 | 19..45 | 8..23 | `p0:11 p1:62 p2:4 p3:29 p4:21` |
 
 Depth ladder inside block 0: 24 records at `0x080`, 6 at `0x0C0`, 4 at `0x0E0`, 2 at `0x0F0`,
-1 at `0x0F8`, nothing at `0x0FC`. Never-transferred tail: 128 bytes, 126 nonzero, 63 records, an
-order-preserving half-density subsequence of stamp 7.
+1 at `0x0F8`, nothing at `0x0FC`. Never-transferred tail: 128 bytes, a complete 63-record list closed by `00 00`; 62 of its records are
+identical and in order to records 65..126 of stamp 7, and the 63rd differs from stamp 7's record 64
+by one x coordinate (26 vs 32).
 
 ## Related
 
