@@ -7,8 +7,21 @@ flip wearing a test suite.
 """
 import glob
 import json
+import os
 import subprocess
 import sys
+
+# Exit 77 is automake's "cannot run", and check_all.sh counts it as a skip rather than a
+# failure. This check needs the built engine binary and the gitignored capture corpus; on a
+# clean tree, or under --fast which does not build, neither is guaranteed to exist, and a
+# traceback is not the same verdict as a failure. Declaring it optional without this would
+# still leave the traceback, because the precondition only names one input.
+if not os.path.exists("engine/u2"):
+    print("SKIP: engine/u2 is not built -- run 'make -C engine' first")
+    sys.exit(77)
+if not glob.glob("captures/spice86/*/*.ds"):
+    print("SKIP: no DS captures on disk (captures/ is gitignored)")
+    sys.exit(77)
 
 DS = 1616          # sizeof(u2_state); a .ds dump is 0x2800 and the mirror is the head
 STAGE_A, STAGE_B = 0x272, 0x372

@@ -185,6 +185,11 @@ run "index_footprint selftest" tools/index_footprint.py -- python3 tools/index_f
 # fails, and so does a convention entry that no longer matches anything.
 run "index_footprint verify" tools/index_footprint.py -- python3 tools/index_footprint.py --verify
 run "index_footprint fresh" disasm/index/footprint.tsv -- python3 tools/index_footprint.py --check-fresh
+# Every numeric column of a covered table declares its base, and the data must agree.
+# The motivating trap is footprint.tsv's decimal offset column: filtering it as hex
+# returns zero rows, which reads as absence of evidence rather than a bad query.
+run "table_contract selftest" tools/table_contract.py -- python3 tools/table_contract.py --selftest
+run "table_contract verify" disasm/index/footprint.tsv -- python3 tools/table_contract.py --verify
 
 # The engine map (docs/plan-code-index.md § 3.2): which C implements which asm. The citation check
 # lives in xref_provenance --c rather than here on purpose -- two gates that both resolve asm/XXXX
@@ -259,8 +264,8 @@ run "bot census loader" bot/census.py -- python3 bot/census.py
 # proves the rule is self-consistent; these prove it is TRUE of the original. The ordering
 # bug it caught — a dungeon's staging pair is also all-0xFF, so eighteen dungeon frames read
 # as space — was invisible to the synthetic test, which is the whole reason both exist.
-run "mode vs capture corpus" bot/mode_probe.py -- python3 bot/mode_probe.py
-opt_run "mode vs orbit capture" captures/spice86/w6-orbit-dive/PAD.txt -- python3 bot/mode_orbit_check.py
+opt_run "mode vs capture corpus" engine/u2 captures/spice86 -- python3 bot/mode_probe.py
+opt_run "mode vs orbit capture" engine/u2 captures/spice86/w6-orbit-dive/PAD.txt -- python3 bot/mode_orbit_check.py
 # Whether a container image still matches its Containerfile. The old test was "does
 # an image exist", so an edited recipe was silently ignored — which cost a full
 # SDL3 container cycle to a message blaming the Makefile. Runs against a podman

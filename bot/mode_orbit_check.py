@@ -20,6 +20,7 @@ the reason a mode report that only looks at the settlement digit is not merely i
 wrong in a way a bot would act on.
 """
 import json
+import os
 import re
 import subprocess
 import sys
@@ -27,6 +28,16 @@ import sys
 DS_LEN = 1616
 CAP = "captures/spice86/w6-orbit-dive"
 CASES = [("PAD.txt", "site"), ("ORBIT.txt", "space"), ("LANDED.txt", "world")]
+
+# Exit 77 is automake's "cannot run"; check_all.sh counts it as a skip. This needs the
+# built engine binary and one gitignored capture directory, and a traceback when either is
+# absent is not the same verdict as a failure.
+if not os.path.exists("engine/u2"):
+    print("SKIP: engine/u2 is not built -- run 'make -C engine' first")
+    sys.exit(77)
+if not os.path.isdir(CAP):
+    print("SKIP: %s is not present (captures/ is gitignored)" % CAP)
+    sys.exit(77)
 
 
 def rebuild(path):
