@@ -89,12 +89,14 @@ def load_tsv(path):
         if not line or line.startswith("#"):
             continue
         p = line.split("\t")
-        if len(p) < 5 or p[1].strip() == "id":
+        # Indexed from 0: the file used to carry a phantom empty first column, and this
+        # function had silently adapted by starting at p[1]. Both moved together.
+        if len(p) < 4 or p[0].strip() == "id":
             continue
-        art[int(p[1].strip(), 16)] = {
-            "byte": p[2].strip(), "kind": p[3].strip(), "desc": p[4].strip(),
-            "glyph": p[5].strip() if len(p) > 5 else "",
-            "note": p[6].strip() if len(p) > 6 else "",
+        art[int(p[0].strip(), 16)] = {
+            "byte": p[1].strip(), "kind": p[2].strip(), "desc": p[3].strip(),
+            "glyph": p[4].strip() if len(p) > 4 else "",
+            "note": p[5].strip() if len(p) > 5 else "",
         }
     return art
 

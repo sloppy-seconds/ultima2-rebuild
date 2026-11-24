@@ -22,7 +22,7 @@
 # the true FM identification MAP2_3/35 so the table resolves against a single
 # planet-1 atlas. See docs/fmtowns-graphics.md.
 #
-# art	fm_tiles	count	source	description
+art	fm_tiles	count	source	description
 00	MAP2_1/10	1	owner	magenta dashes in loose diagonal rows on black
 01	MAP2_1/1	1	owner	sparse cyan and white single pixels
 02	MAP2_1/2	1	owner	sparser cyan-only pixels on black
@@ -34,7 +34,7 @@
 08	EXTRA/3,EXTRA/4	2	owner	white gate frame, two posts under a lintel
 09	MAP2_1/6	1	owner	white diamond lattice with an arch opening at bottom centre
 0A	MAP2_1/15	1	owner	solid white cross standing on a base
-0B	ENEMY2/58,ENEMY2/59	2	owner	Sea Monster? — magenta field with a white arch and a white mound
+0B	ENEMY2/58,ENEMY2/59	2	owner	Sea serpent — magenta speckles are water; the white is a mostly submerged body: the back surfacing, then neck, head and open jaw
 0C	ENEMY2/17,ENEMY2/16	2	owner	Orc — white humanoid, arms down, legs apart
 0D	ENEMY2/44,ENEMY2/45	2	owner	Daemon — white humanoid, arms raised out to the sides
 0E	ENEMY2/40,ENEMY2/41	2	owner	Devil — white humanoid beside a magenta-topped staff

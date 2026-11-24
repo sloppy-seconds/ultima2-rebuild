@@ -828,7 +828,11 @@ def do_export(owner_path, out_path, banks, art):
         "# the true FM identification MAP2_3/35 so the table resolves against a single",
         "# planet-1 atlas. See docs/fmtowns-graphics.md.",
         "#",
-        "# art\tfm_tiles\tcount\tsource\tdescription",
+        # A real header row, not a commented one. Every other generated table in disasm/
+        # has one, and a commented header makes the first data row the header for anything
+        # that tries to parse the file -- which is why this table could not be covered by
+        # tools/table_contract.py at all.
+        "art\tfm_tiles\tcount\tsource\tdescription",
     ]
     for k in sorted(merged, key=lambda x: int(x, 16)):
         ts, src = merged[k]
@@ -857,6 +861,8 @@ def do_check(path, art):
         if not line or line.startswith("#"):
             continue
         c = line.split("\t")
+        if c[0].strip() == "art":
+            continue          # header row
         if len(c) < 4:
             problems.append("line %d: expected 5 tab-separated fields" % ln)
             continue

@@ -102,11 +102,14 @@ def load_art(tsv):
             if not line or line.startswith('#'):
                 continue
             p = line.split('\t')
-            if len(p) < 5 or p[1].strip() == 'id':
+            # Indexed from 0 since tile-art.tsv lost its phantom empty first column; the
+            # header check moved with it, so a stale copy of the file is skipped, not
+            # silently read one column to the right.
+            if len(p) < 4 or p[0].strip() == 'id':
                 continue
-            a = int(p[1].strip(), 16)
-            art[a] = {'kind': p[3].strip(), 'desc': p[4].strip(),
-                      'note': p[6].strip() if len(p) > 6 else ''}
+            a = int(p[0].strip(), 16)
+            art[a] = {'kind': p[2].strip(), 'desc': p[3].strip(),
+                      'note': p[5].strip() if len(p) > 5 else ''}
     return art
 
 

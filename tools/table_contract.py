@@ -39,6 +39,10 @@ COVERED = [
     'disasm/index/coverage.tsv',
     'disasm/index/footprint.tsv',
     'disasm/index/record-spans.tsv',
+    'disasm/tile-art.tsv',
+    'disasm/unassigned-regions.tsv',
+    'disasm/fmtowns-crosswalk.tsv',
+    'disasm/bible/controls.tsv',
     'disasm/index/engine-map.tsv',
     'disasm/index/unnamed-offsets.tsv',
     'disasm/index/xref.tsv',
@@ -110,6 +114,31 @@ CONTRACT = {
         'group': 'text', 'shape': 'text', 'member_fields': 'text',
         'entity_kind': 'text', 'backing_file': 'text', 'evidence': 'text',
         'grade': 'text',
+    },
+    'disasm/tile-art.tsv': {
+        # id and hex are the art index and its map byte, both 2-digit hex without a prefix.
+        # The glyph column can hold a bare `"`, which is why read_table splits by hand.
+        'id': 'hexd', 'hex': 'hexd', 'kind': 'text', 'description': 'text',
+        'glyph': 'text', 'notes': 'text',
+    },
+    'disasm/unassigned-regions.tsv': {
+        # All three are hex; `end` holding 00FF proves it, and len is the span width in hex
+        # too (0000..00FF is 0100 bytes), so the column set reads consistently.
+        'start': 'hexd', 'end': 'hexd', 'len': 'hexd',
+    },
+    'disasm/fmtowns-crosswalk.tsv': {
+        # art is a 2-digit hex index; count is a decimal tile count. The header used to be
+        # a comment line, which made the first data row the header for any parser.
+        'art': 'hexd', 'fm_tiles': 'text', 'count': 'dec', 'source': 'text',
+        'description': 'text',
+    },
+    'disasm/bible/controls.tsv': {
+        'control_id': 'text', 'resolves': 'text', 'supported': 'text',
+        'grade_survived': 'text', 'non_vacuous': 'text', 'reason': 'text',
+        'judge_model': 'text',
+        # A 12-char prefix of the critic prompt sha, not a full sha, so it cannot be
+        # declared `sha` without lying about the field width.
+        'critic_prompt_sha': 'text', 'control_note': 'text',
     },
     'disasm/index/engine-map.tsv': {
         'asm_addr': 'dec',        # decimal: 256 is 0x100
@@ -288,12 +317,26 @@ SHA_RE = re.compile(r'^[0-9a-fA-F]{64}$')
 
 
 def read_table(path):
+    """Read a generated table by splitting on tabs, deliberately not with csv.DictReader.
+
+    Every generator in this project writes `"\t".join(fields)` with no quoting, so a field
+    holding a bare double quote -- art 0x17's glyph column is literally `"` -- puts a csv
+    reader into quoted mode, where it swallows tabs and newlines until it finds a closing
+    quote. That silently dropped 25 of 64 rows from tile-art.tsv and reported no error, which
+    is the dangerous shape: a checker that inspects a third of a table and prints PASS.
+    """
     body = [l for l in path.read_text(encoding='utf-8').splitlines()
             if not l.startswith('#') and l.strip()]
     if not body:
         return [], []
     hdr = body[0].split('\t')
-    return hdr, list(csv.DictReader(body, delimiter='\t'))
+    rows = []
+    for line in body[1:]:
+        f = line.split('\t')
+        if len(f) < len(hdr):
+            f += [''] * (len(hdr) - len(f))
+        rows.append(dict(zip(hdr, f)))
+    return hdr, rows
 
 
 def numericish(vals):
@@ -479,6 +522,13 @@ def selftest():
     cases.append(('short sha is caught', check_value('sha', 'abcd') is not None))
     # 6 negative count rejected by int but allowed by dec
     cases.append(('negative value rejected as int', check_value('int', '-3') is not None))
+    # 7 the reader must not lose rows to a bare quote. tile-art.tsv's art 0x17 glyph is
+    # literally `"`, and a csv reader swallows every row after it and still prints PASS.
+    p = write_tbl('q.tsv', ['id', 'glyph', 'note'],
+                  [['01', 'x', 'ok'], ['17', '"', 'bare quote glyph'], ['18', 'y', 'after']])
+    hdr, rws = read_table(p)
+    cases.append(('a bare quote in a field loses no rows', len(rws) == 3
+                  and rws[1]['glyph'] == '"' and rws[2]['note'] == 'after'))
     # 7 numericish flags the ambiguous column and not a text one
     cases.append(('numericish sees the ambiguous column',
                   numericish(['375', '10']) and not numericish(['0100_sub.asm', 'x'])))

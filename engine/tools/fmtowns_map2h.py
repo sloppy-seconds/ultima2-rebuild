@@ -76,6 +76,8 @@ def load_rows(path):
             if not ln or ln.startswith("#"):
                 continue
             cols = ln.split("\t")
+            if cols[0].strip() == "art":
+                continue          # header row
             if len(cols) < 2:
                 continue
             toks = [t.strip() for t in cols[1].split(",") if t.strip()]

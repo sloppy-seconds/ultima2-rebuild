@@ -187,6 +187,14 @@ def judge_in(page: str, draft: pathlib.Path) -> str:
 VCOLS = ("sentence_id", "resolves", "supported", "grade_survived", "non_vacuous", "reason",
          "judge_model", "prompt_sha", "prose_sha")
 
+# The judge's own controls, recorded when a human or an agent runs the model. Same four
+# questions as VCOLS so a verdict and the control that broke it can be read the same way.
+# It had no header row at all, which made every reader count fields by hand and made the
+# first data row the header for anything that tried to parse it.
+CCOLS = ("control_id", "resolves", "supported", "grade_survived", "non_vacuous", "reason",
+         "judge_model", "critic_prompt_sha", "control_note")
+QUESTIONS = ("resolves", "supported", "grade_survived", "non_vacuous")
+
 
 def record(page: str, draft: pathlib.Path, verdicts: pathlib.Path) -> int:
     """Commit the artefacts. The critic's TSV gets the hashes appended here, never by the model."""
@@ -283,18 +291,26 @@ def verify() -> int:
     if not cf.exists():
         fails.append("no controls.tsv -- the judge has never been seen red")
     else:
-        cl = [l.split("\t") for l in cf.read_text(encoding="utf-8").splitlines() if l.strip()]
-        if len(cl) < 3:
-            fails.append(f"controls.tsv has {len(cl)} row(s); three controls are required")
-        for r in cl:
-            if len(r) < 6:
-                fails.append("controls.tsv row too short")
-            else:
-                if pair_now and len(r) > 7 and r[7] != pair_now["critic_prompt_sha"]:
-                    fails.append(f"control {r[0]} was judged under a stale critic prompt")
-                if not any(v != "pass" for v in r[1:5]):
-                    fails.append(f"control {r[0]} PASSED -- a control that cannot fail is worse "
-                                 "than no control")
+        clines = [l for l in cf.read_text(encoding="utf-8").splitlines() if l.strip()]
+        if not clines or clines[0].split("\t") != list(CCOLS):
+            fails.append("controls.tsv is missing its header row -- expected "
+                         + "\t".join(CCOLS))
+            clines = clines[1:] if clines else clines
+        else:
+            clines = clines[1:]
+        rows = [dict(zip(CCOLS, l.split("\t"))) for l in clines]
+        if len(rows) < 3:
+            fails.append(f"controls.tsv has {len(rows)} row(s); three controls are required")
+        for r in rows:
+            cid = r.get("control_id", "?")
+            if len(r) < 6 or not r.get("reason", "").strip():
+                fails.append(f"control {cid} row too short or has no reason")
+                continue
+            if pair_now and r.get("critic_prompt_sha") != pair_now["critic_prompt_sha"]:
+                fails.append(f"control {cid} was judged under a stale critic prompt")
+            if all(r.get(q) == "pass" for q in QUESTIONS):
+                fails.append(f"control {cid} PASSED -- a control that cannot fail is worse "
+                             "than no control")
     for f in fails:
         print(f"  FAIL  {f}")
     print(f"bible: {'FAIL' if fails else 'ok'}")

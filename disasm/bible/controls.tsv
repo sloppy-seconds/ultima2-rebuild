@@ -1,3 +1,4 @@
+control_id	resolves	supported	grade_survived	non_vacuous	reason	judge_model	critic_prompt_sha	control_note
 c1	fail	fail	pass	pass	Second clause names DS:50, but stat.charisma.at-ds-4e states charisma is the byte at DS:4E (a character whose DS:4E held 0x20 printed CHARISMA-20)	local/deepseek-flash	109df50d5790	control: deliberately false sentence
 c2	pass	pass	fail	pass	Hedged with "appears" on an observed fact that states flatly that charisma is the byte at DS:4E	local/deepseek-flash	109df50d5790	control: grade-laundered sentence
 c3	pass	fail	pass	pass	"decides the maximum a stat can reach" is stated by no cited fact; stat.charisma.at-ds-4e only says the byte at DS:4E is added to intelligence to scale a quoted price	local/deepseek-flash	109df50d5790	control: unsourced but true-sounding sentence

@@ -52,8 +52,8 @@ sys.path.insert(0, str(REPO / "tools"))
 
 
 def load_crosswalk(path):
-    """[(art_index, [BANK/tile, ...]), ...] in file order. Rows are tab-separated
-    and the header is comments, same contract `--check` gates."""
+    """[(art_index, [BANK/tile, ...]), ...] in file order. Rows are tab-separated;
+    comments are preamble and the first non-comment line is a header row."""
     rows = []
     with open(path, encoding="utf-8") as fh:
         for ln in fh:
@@ -61,6 +61,8 @@ def load_crosswalk(path):
             if not ln or ln.startswith("#"):
                 continue
             cols = ln.split("\t")
+            if cols[0].strip() == "art":
+                continue          # header row
             if len(cols) < 2:
                 continue
             toks = [t.strip() for t in cols[1].split(",") if t.strip()]
