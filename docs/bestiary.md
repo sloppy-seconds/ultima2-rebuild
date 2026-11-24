@@ -362,9 +362,14 @@ is new here is the placed population, its per-slot variation, and the two-layer 
   that own the behaviour instead.
 * **No HP value is verified against a live session.** § 6 promoted the nine
   overworld figures to *measured* from the binary's own immediates, which is stronger
-  than a capture of the same bytes — but the townsfolk (Guard, Jester, Merchant,
-  Cleric, King) have no arm, so their HP is still third-party and the Guard
-  255-vs-500 conflict is still open. See **G17**.
+  than a capture of the same bytes. The townsfolk (Guard, Jester, Merchant, Cleric,
+  King) have no spawn arm, so for a long time their HP was third-party only and the
+  Guard 255-vs-500 conflict looked open — **it is closed twice over**: the field is one
+  byte so 500 is not representable, and `castle-03-live` read type `0x60` at HP 255 on
+  2026-10-22. Townsfolk HP is now also **measured per placement** from the monster tables
+  in `disasm/creature-populations.tsv`, which is a better answer than the single number
+  the guides gave. What remains genuinely unverified is whether a live monster's HP ever
+  differs from its authored byte beyond damage. See **G17**.
 
 ## 8. Conflicts on the record
 
