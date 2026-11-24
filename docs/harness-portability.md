@@ -2741,3 +2741,13 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   strongest validation of that source available.
   → Tier 1, evidence discipline: when derived facts and third-party facts agree by accident of
   discovery, say so and re-grade. Agreement nobody looked for is worth more than either source alone.
+- 2026-11-23 — **a closed item that survives in a second queue gets re-recommended as new work,
+  complete with its retired blocker.** An investigation was proposed as "blocked, needs a certain
+  game state" from a summary list. The detailed worklist had closed that question three weeks earlier,
+  twice, by two independent methods, and the blocker was a false premise — the state was reachable by
+  a single memory write and had in fact also been reached by real play in between. The summary list was
+  the only stale copy, and it was the one being consulted when planning what to do next.
+  → Tier 1, queue hygiene: one derived queue, regenerated from the detailed records, or none. Where
+  two levels of queue must coexist, the coarse one needs a rule that it is closed by a pointer to the
+  fine one and never by its own text — otherwise it freezes the moment the item below it moves, and
+  then advertises finished work as the plan.
