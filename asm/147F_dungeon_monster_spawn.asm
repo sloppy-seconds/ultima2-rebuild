@@ -27,16 +27,25 @@
 #           kind index; in a dungeon it is neither, it is slot>>1. The carry out of the
 #           `adc 0x1B7(%di),%al` was 0 in all 54 observations, so its contribution is
 #           untested rather than proven absent.
-#           The stamp store at L_00171b reads `mov 0x8,%bx` and indexes (%bx,%si), but %si
-#           is set by L_00164c, and this file's declared range ends before whatever
-#           computes the cell address -- the (x,y)->cell transform is NOT in this span.
+#           The stamp store at L_00171b reads `mov 0x8,%bx` and indexes (%bx,%si). DS:08/09
+#           is not a fixed base: it is the cell pointer left by asm/1451_site_cell_open_on_floor,
+#           which computes `AX = word[DS:472] + AL*256` then `offset = DS:24*16 + DS:23` and
+#           stores the result back into DS:08/09. asm/144C_dungeon_cell_gate_tail is the line
+#           that supplies AL -- `mov 0x1b7(%di),%al`, the CREATURE's floor byte, not the
+#           player's DS:25. So the cell transform is
+#             byte = word[DS:472] + (slot>>1)*256 + y*16 + x      (word[DS:472] = 0x1800)
+#           and it is the same page arithmetic as asm/68C0_dungeon_grid_byte. Measured 27/27
+#           against captures/spice86/dungeon-35-live on 2026-11-23: every monster's stamp lands
+#           at that byte and carries that type. The earlier "no linear map of the tested shapes
+#           reproduces the cell" was true of the shapes tested -- none of them used the
+#           monster's own floor; they all used DS:25 or no page term at all.
 # IMPORTANT: this is NOT the townsfolk path. Townsfolk have no HP assignment anywhere
 #           in the monster-kind dispatch — see docs/bestiary.md § 6.
 # provenance: static, 2026-10-22; formula validated live 2026-10-23 against
 #           captures/spice86/dungeon-35-live and captures/spice86/airport32 by
 #           tools/dungeon_spawn_check.py (54/54 slots)
 # confidence: high for the formula and for [DI+0x1B7]=slot>>1 (bytes + 54/54 live);
-#           low for the cell-address computation, which is outside this span
+#           high for the cell-address computation (asm/144C + asm/1451, and 27/27 measured)
 # label: kept as sub_147f on purpose — labels are body (CP0)
 # func 147F..152D  len 00AF B  evidence: call+reko
 # calls: L_00164c, L_001694, L_005417

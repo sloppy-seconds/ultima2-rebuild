@@ -2751,3 +2751,25 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   two levels of queue must coexist, the coarse one needs a rule that it is closed by a pointer to the
   fine one and never by its own text — otherwise it freezes the moment the item below it moves, and
   then advertises finished work as the plan.
+- 2026-11-23 — **"no candidate formula fits" is a claim about the candidates, and the missing one is
+  usually an input someone held constant.** A coordinate transform was recorded as unresolved after
+  several plausible index formulas were tried and the best matched 2 of 27 records; the write-up
+  concluded the code that computes it must be outside the analysed range, and that conclusion was
+  repeated into a queue as a to-do. It was wrong. Every candidate had used the *player's* page index;
+  each record carried its **own** page index in a field nobody had considered geometric. Adding that
+  one term made it exact on 27 of 27. The tell was free: the field's value range was identical to the
+  range of pages the observed outputs occupied, which was visible the moment both were printed.
+  → Tier 1, derived data: when no formula in a family fits, print the value range of every candidate
+  operand next to the range of the observed outputs before declaring the family exhausted. A held
+  constant is an assumption, not a fact, and it is the cheapest thing to test.
+- 2026-11-23 — **an older findings section outranked a newer decoded header, and the stale negative
+  became the work queue.** One note recorded that a computation was "not established" and blamed a
+  wrong function boundary. A header written a week later named the routine, its operands and its
+  semantics, and said outright that the lookup used the entity's own page rather than the player's.
+  Nothing reconciled the two, so the queue cited the older text and an agent was about to re-derive
+  something the tree had already settled. The cost was not the derivation — it was that a closed
+  question was being advertised as open, which is the same defect as a stale queue row, one layer
+  down.
+  → Tier 1, evidence discipline: a findings document's "not established" has an expiry the moment any
+  header or tool establishes the thing. When a decode closes a question that a prose note calls open,
+  the correction belongs in the same commit as the decode, not in a follow-up.

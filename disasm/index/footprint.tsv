@@ -244,8 +244,8 @@ ds	0	unknown	write	1151_dungeon_turn.asm	256	yes
 ds	0	unknown	read	1151_dungeon_turn.asm	274	yes		
 ds	0	unknown	write	1151_dungeon_turn.asm	280	yes		
 ds	0	unknown	read	1451_site_cell_open_on_floor.asm	51	yes		
-ds	0	unknown	read	147F_dungeon_monster_spawn.asm	179	yes		
-ds	0	unknown	write	147F_dungeon_monster_spawn.asm	185	yes		
+ds	0	unknown	read	147F_dungeon_monster_spawn.asm	188	yes		
+ds	0	unknown	write	147F_dungeon_monster_spawn.asm	194	yes		
 ds	0		read	152E_dungeon_step_vector.asm	20	no		absolute operand, no base register
 ds	0		read	1590_transact_shop_selector.asm	52	no		absolute operand, no base register
 ds	0		read	2201_sub_2201.asm	10	no		absolute operand, no base register
@@ -519,8 +519,8 @@ ds	8		read	1151_dungeon_turn.asm	272	no		absolute operand, no base register
 ds	8		read	1151_dungeon_turn.asm	278	no		absolute operand, no base register
 ds	8		write	1451_site_cell_open_on_floor.asm	41	no		absolute operand, no base register
 ds	8		read	1451_site_cell_open_on_floor.asm	49	no		absolute operand, no base register
-ds	8		read	147F_dungeon_monster_spawn.asm	177	no		absolute operand, no base register
-ds	8		read	147F_dungeon_monster_spawn.asm	183	no		absolute operand, no base register
+ds	8		read	147F_dungeon_monster_spawn.asm	186	no		absolute operand, no base register
+ds	8		read	147F_dungeon_monster_spawn.asm	192	no		absolute operand, no base register
 ds	8		read	3139_cast_spell_flow.asm	491	no		absolute operand, no base register
 ds	8		read	363B_cmd_G.asm	185	no		absolute operand, no base register
 ds	8	unknown	read	4B08_sub_4b08.asm	11	yes		
@@ -653,11 +653,11 @@ ds	31		read	1151_dungeon_turn.asm	78	no		absolute operand, no base register
 ds	31		read	1151_dungeon_turn.asm	92	no		absolute operand, no base register
 ds	31		read	12DB_dungeon_events.asm	95	no		absolute operand, no base register
 ds	31		read	12DB_dungeon_events.asm	135	no		absolute operand, no base register
-ds	31		write	147F_dungeon_monster_spawn.asm	57	no		absolute operand, no base register
-ds	31		read	147F_dungeon_monster_spawn.asm	67	no		absolute operand, no base register
-ds	31		read	147F_dungeon_monster_spawn.asm	83	no		absolute operand, no base register
-ds	31		read	147F_dungeon_monster_spawn.asm	101	no		absolute operand, no base register
-ds	31		read	147F_dungeon_monster_spawn.asm	131	no		absolute operand, no base register
+ds	31		write	147F_dungeon_monster_spawn.asm	66	no		absolute operand, no base register
+ds	31		read	147F_dungeon_monster_spawn.asm	76	no		absolute operand, no base register
+ds	31		read	147F_dungeon_monster_spawn.asm	92	no		absolute operand, no base register
+ds	31		read	147F_dungeon_monster_spawn.asm	110	no		absolute operand, no base register
+ds	31		read	147F_dungeon_monster_spawn.asm	140	no		absolute operand, no base register
 ds	31		write	1869_cleric_shrine.asm	76	no		absolute operand, no base register
 ds	31		read	1869_cleric_shrine.asm	81	no		absolute operand, no base register
 ds	31		read	1869_cleric_shrine.asm	92	no		absolute operand, no base register
@@ -780,7 +780,7 @@ ds	35		read	1151_dungeon_turn.asm	230	no		absolute operand, no base register
 ds	35		write	1151_dungeon_turn.asm	240	no		absolute operand, no base register
 ds	35		write	1151_dungeon_turn.asm	260	no		absolute operand, no base register
 ds	35		read	1451_site_cell_open_on_floor.asm	39	no		absolute operand, no base register
-ds	35		write	147F_dungeon_monster_spawn.asm	95	no		absolute operand, no base register
+ds	35		write	147F_dungeon_monster_spawn.asm	104	no		absolute operand, no base register
 ds	35		write	212E_sub_212e.asm	18	no		absolute operand, no base register
 ds	35		write	215C_sub_215c.asm	13	no		absolute operand, no base register
 ds	35		write	216E_sub_216e.asm	17	no		absolute operand, no base register
@@ -835,7 +835,7 @@ ds	36		read	1151_dungeon_turn.asm	234	no		absolute operand, no base register
 ds	36		write	1151_dungeon_turn.asm	244	no		absolute operand, no base register
 ds	36		write	1151_dungeon_turn.asm	266	no		absolute operand, no base register
 ds	36		read	1451_site_cell_open_on_floor.asm	29	no		absolute operand, no base register
-ds	36		write	147F_dungeon_monster_spawn.asm	113	no		absolute operand, no base register
+ds	36		write	147F_dungeon_monster_spawn.asm	122	no		absolute operand, no base register
 ds	36		write	212E_sub_212e.asm	28	no		absolute operand, no base register
 ds	36		write	216E_sub_216e.asm	21	no		absolute operand, no base register
 ds	36		read	2199_creature_step_gate.asm	175	no		absolute operand, no base register
@@ -1369,7 +1369,7 @@ ds	311	0x0137+32	read	1151_dungeon_turn.asm	134	yes		engine/src/core/state.h cre
 ds	311	0x0137+32	read	1151_dungeon_turn.asm	184	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
 ds	311	0x0137+32	read	1151_dungeon_turn.asm	238	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
 ds	311	0x0137+32	write	1151_dungeon_turn.asm	262	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
-ds	311	0x0137+32	write	147F_dungeon_monster_spawn.asm	93	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
+ds	311	0x0137+32	write	147F_dungeon_monster_spawn.asm	102	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
 ds	311	0x0137+32	read	152E_dungeon_step_vector.asm	26	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
 ds	311	0x0137+32	read	212E_sub_212e.asm	12	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
 ds	311	0x0137+32	read	215C_sub_215c.asm	11	yes		engine/src/core/state.h creature grid slot 1 (32 slots); asm/ names it a base
@@ -1394,7 +1394,7 @@ ds	343	0x0157+32	read	1151_dungeon_turn.asm	138	yes		engine/src/core/state.h cre
 ds	343	0x0157+32	read	1151_dungeon_turn.asm	180	yes		engine/src/core/state.h creature grid slot 2
 ds	343	0x0157+32	read	1151_dungeon_turn.asm	242	yes		engine/src/core/state.h creature grid slot 2
 ds	343	0x0157+32	write	1151_dungeon_turn.asm	268	yes		engine/src/core/state.h creature grid slot 2
-ds	343	0x0157+32	write	147F_dungeon_monster_spawn.asm	111	yes		engine/src/core/state.h creature grid slot 2
+ds	343	0x0157+32	write	147F_dungeon_monster_spawn.asm	120	yes		engine/src/core/state.h creature grid slot 2
 ds	343	0x0157+32	read	152E_dungeon_step_vector.asm	38	yes		engine/src/core/state.h creature grid slot 2
 ds	343	0x0157+32	read	212E_sub_212e.asm	22	yes		engine/src/core/state.h creature grid slot 2
 ds	343	0x0157+32	read	216E_sub_216e.asm	19	yes		engine/src/core/state.h creature grid slot 2
@@ -1421,7 +1421,7 @@ ds	375	0x0177+32	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	1
 ds	375	0x0177+32	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	133	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	write	0DC4_monster_hp_fighter_frigate_devil_wizard_balron.asm	155	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	read	1151_dungeon_turn.asm	98	yes		engine/src/core/state.h creature grid slot 3
-ds	375	0x0177+32	write	147F_dungeon_monster_spawn.asm	173	yes		engine/src/core/state.h creature grid slot 3
+ds	375	0x0177+32	write	147F_dungeon_monster_spawn.asm	182	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	read	2122_sub_2122.asm	7	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	read-modify-write	212A_sub_212a.asm	7	yes		engine/src/core/state.h creature grid slot 3
 ds	375	0x0177+32	read	2C19_monster_hp_subtract.asm	36	yes		engine/src/core/state.h creature grid slot 3
@@ -1448,9 +1448,9 @@ ds	407	0x0197+32	read	1040_minax_proximity_check.asm	49	yes		engine/src/core/sta
 ds	407	0x0197+32	read	1151_dungeon_turn.asm	68	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	read	1151_dungeon_turn.asm	276	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	read	12DB_dungeon_events.asm	109	yes		engine/src/core/state.h creature grid slot 4
-ds	407	0x0197+32	read	147F_dungeon_monster_spawn.asm	59	yes		engine/src/core/state.h creature grid slot 4
-ds	407	0x0197+32	write	147F_dungeon_monster_spawn.asm	159	yes		engine/src/core/state.h creature grid slot 4
-ds	407	0x0197+32	read	147F_dungeon_monster_spawn.asm	181	yes		engine/src/core/state.h creature grid slot 4
+ds	407	0x0197+32	read	147F_dungeon_monster_spawn.asm	68	yes		engine/src/core/state.h creature grid slot 4
+ds	407	0x0197+32	write	147F_dungeon_monster_spawn.asm	168	yes		engine/src/core/state.h creature grid slot 4
+ds	407	0x0197+32	read	147F_dungeon_monster_spawn.asm	190	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	read	2199_creature_step_gate.asm	91	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	read	225A_sub_225a.asm	19	yes		engine/src/core/state.h creature grid slot 4
 ds	407	0x0197+32	read	23E6_find_creature_at_cursor.asm	90	yes		engine/src/core/state.h creature grid slot 4
@@ -1475,9 +1475,9 @@ ds	439	unknown	read	12DB_dungeon_events.asm	101	yes
 ds	439	unknown	read	12DB_dungeon_events.asm	141	yes		
 ds	439	unknown	read	143C_dungeon_cell_gate.asm	28	yes		
 ds	439	unknown	read	144C_dungeon_cell_gate_tail.asm	17	yes		
-ds	439	unknown	write	147F_dungeon_monster_spawn.asm	121	yes		
-ds	439	unknown	read	147F_dungeon_monster_spawn.asm	143	yes		
-ds	439	unknown	read	147F_dungeon_monster_spawn.asm	163	yes		
+ds	439	unknown	write	147F_dungeon_monster_spawn.asm	130	yes		
+ds	439	unknown	read	147F_dungeon_monster_spawn.asm	152	yes		
+ds	439	unknown	read	147F_dungeon_monster_spawn.asm	172	yes		
 ds	439	unknown	read	2233_sub_2233.asm	26	yes		
 ds	439	unknown	write	225A_sub_225a.asm	17	yes		
 ds	439	unknown	read	2C38_minax_teleport_swap.asm	62	yes		

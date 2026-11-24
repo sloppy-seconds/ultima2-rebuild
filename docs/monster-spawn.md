@@ -273,9 +273,31 @@ accepting on equal-or-below. So a monster is only admitted when
 
 Slot 4 admits types 1–2; slot 31 admits 1–8, capped at 7 by the draw. **Higher-numbered
 slots hold stronger creatures, and HP rises with the slot too**, because the same
-`slot>>1` is an operand of the HP expression. That is the mechanism the overworld lacked
-and the reason "area can raise HP" looked true from one sector: in a dungeon, strength is
-a function of slot, not of place.
+`slot>>1` is an operand of the HP expression. **Corrected 2026-11-23:** the conclusion this section
+drew — "strength is a function of slot, not of place" — was half right and stated the wrong way
+round. `slot>>1` is not merely a difficulty number, it **is the floor** (see the transform below), so
+strength *is* a function of depth. The owner recalled exactly that, on two counts: different
+creatures at different levels, and higher HP deeper. Both are true, and both fall out of `slot>>1`
+appearing in the accept test *and* inside the HP expression. The capture shows the structure
+directly — **two monster slots per floor**, floors 2..15 occupied, admitted type ceiling rising with
+the floor:
+
+```
+floor  2: [slot 4 type 2 hp 48]  [slot 5 type 2 hp 48]
+floor  3: [slot 6 type 2 hp 56]  [slot 7 type 1 hp 56]
+floor  4: [slot 8 type 2 hp 80]  [slot 9 type 1 hp 48]
+floor  5: [slot 11 type 2 hp 88]                      <- slot 10 was free, not a rule
+floor  6: [slot 12 type 2 hp 80] [slot 13 type 4 hp 112]
+floor  7: [slot 14 type 4 hp 120] [slot 15 type 3 hp 120]
+floor  8: [slot 16 type 1 hp 80] [slot 17 type 3 hp 112]
+floor  9: [slot 18 type 1 hp 88] [slot 19 type 4 hp 152]
+floor 10: [slot 20 type 2 hp 112] [slot 21 type 6 hp 176]
+floor 11: [slot 22 type 6 hp 184] [slot 23 type 2 hp 120]
+floor 12: [slot 24 type 2 hp 144] [slot 25 type 6 hp 208]
+floor 13: [slot 26 type 2 hp 152] [slot 27 type 6 hp 216]
+floor 14: [slot 28 type 4 hp 176] [slot 29 type 1 hp 144]
+floor 15: [slot 30 type 1 hp 152] [slot 31 type 5 hp 216]
+```
 
 ### The HP formula, and the third-party table
 
@@ -321,22 +343,38 @@ exactly **27** bytes in `0x01..0x07`, and their per-value histogram
 `{1:6, 2:10, 3:2, 4:4, 5:1, 6:4}` is **identical** to the per-type histogram of the 27
 monster records. So the objects are in the grid, one stamp per monster.
 
-**What is not established is the coordinate transform.** The monster record's `x` and `y`
-are odd values in 1..15 — `and $0x7` then `add %al,%al` then `or $0x1` — a 16-wide crawl
-space, while the stamps sit at rows 8..61 and columns 19..63 of a 64-wide buffer. No
-linear map of the tested shapes (`y*16+x`, `y*64+x`, `x*16+y`, with or without a page
-offset from `DS:25`) reproduces the cell from the record coordinates: the best attempt
-matched 2 of 27. The stamp address comes from `%si`, which is set by a routine the tree
-calls `L_00164c` — a five-byte fragment (`nop ; mov 0x1b7(%di),%al`) that cannot be
-computing it, so **the fragment boundary is wrong there and the real index computation is
-outside the declared range**. That is the same class of defect as G22, and it is where the
-dungeon geometry question picks up.
+**The coordinate transform — CLOSED 2026-11-23, and it was already in the tree.** This section
+previously recorded that no linear map of the tested shapes reproduced the cell (best attempt 2 of
+27) and blamed a wrong fragment boundary at `L_00164c`. The shapes tested were `y*16+x`, `y*64+x`,
+`x*16+y`, each with or without **a page offset from `DS:25`** — and `DS:25` is the *player's* floor.
+**The missing term was the monster's own floor, which is `slot>>1`.** The computation is not missing
+and the fragment boundary is not wrong: `asm/144C_dungeon_cell_gate_tail` supplies
+`AL = [DI+0x1B7]`, the creature's floor byte — its own header says so outright, decoded 2026-10-29
+for G54: *"a dungeon creature is looked up on its own page, not the player's"* — and falls through
+into `asm/1451_site_cell_open_on_floor`, which does `mov %al,%ah ; mov $0x0,%al` (so `AX =
+floor*256`), `add 0x472,%ax` (the grid base; `word[DS:472] = 0x1800` in the capture), then `y*16` by
+four `add %al,%al` and `adc 0x23,%al` for `+x`, and stores the resulting pointer into `DS:08/09`.
+That is what `asm/147F`'s `mov 0x8,%bx` loads before `(%bx,%si)`. Same page arithmetic as
+`asm/68C0_dungeon_grid_byte`. So:
+
+```
+cell byte = word[DS:472] + (slot>>1)*256 + y*16 + x     # = 0x1800 + 256*floor + 16*y + x
+```
+
+**Measured 27/27** against `captures/spice86/dungeon-35-live`: every monster's stamp lands at that
+byte and carries that type, and the 27 stamps occupy pages 2..15 — the same range as the 27 `slot>>1`
+values, which is how the connection was spotted at all. The old observation that "the stamps sit at
+rows 8..61 and columns 19..63 of a 64-wide buffer" is not a second geometry: a 4 KB buffer of 16
+pages of 16x16 *displayed* 64 wide puts page *p* at rows `4p..4p+3`, so pages 2..15 are exactly rows
+8..63. The buffer is paged, not a 64x64 torus, which is what `engine/src/game/dungeon.h` says and
+what the row/column envelope had been quietly agreeing with all along.
 
 ### Correction to § 2 of `docs/sector-rulesets.md`
 
 That table lists the dungeon `kind` column under the same record layout as the
 overworld. The layout is the same but the **meaning** is not: `0x1B7` is `slot>>1` in a
-dungeon and a kind index on the overworld. Anyone re-deriving this should read this
+dungeon — which is the **floor**, and the operand of both the accept test and the HP
+expression — and a kind index on the overworld. Anyone re-deriving this should read this
 section rather than infer from that table.
 
 ## 10. A false alarm against § 2, raised and retracted the same day (2026-10-23)
