@@ -785,6 +785,32 @@ CLI; the token is in `.env` and an agent shell must export it first. See
 because their rows carry evidence and grades an issue body cannot hold. An issue that maps to
 a G-row links to it and never restates it.
 
+### Pushing to GitHub from an agent shell
+
+**Export `.env` before `git push`, exactly as you would before `gh`.**
+
+```bash
+set -a && . ./.env && set +a
+export GIT_TERMINAL_PROMPT=0
+git push origin main
+```
+
+`gh auth setup-git` has already been run on this host, so git's credential helper for
+`github.com` is `gh auth git-credential`. That helper has no stored login of its own —
+`gh auth status` reports "not logged into any GitHub hosts" — so it reads `GH_TOKEN` from
+the environment, and an agent shell starts without it.
+
+**The failure signature is a hang, not an error.** With no credential, git falls back to
+prompting for a username, and a prompt on a pipe with no terminal never returns. A push
+that is waiting on credentials is indistinguishable from a slow network, and it will sit
+until the command timeout kills it. This has been misdiagnosed as a transport problem.
+`GIT_TERMINAL_PROMPT=0` makes git fail immediately instead, which names the real cause in
+one second rather than after a full timeout.
+
+Do not rewrite the remote URL to embed the token. The helper already does the right thing
+once the token is in the environment, and a token in a URL ends up in shell history and
+`git remote -v`.
+
 ### Domain docs
 
 Single-context: `GLOSSARY.md` at the repo root, ADRs in `docs/adr/`. See `docs/agents/domain.md`.

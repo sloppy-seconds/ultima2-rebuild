@@ -189,6 +189,15 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **A credential prompt on a pipe is indistinguishable from a slow network, and it will burn the
+  whole timeout before anything says so.** A push hung until it was killed, and the plausible
+  reading was a transport problem, because the remote was reachable and read operations returned
+  instantly. The actual cause was a missing token: the credential helper had no stored login and
+  read the token from an environment the automation shell did not have, so the tool fell back to
+  prompting, and a prompt with no terminal never returns. Two generalisable pieces: any tool that
+  can authenticate interactively should be run with its non-interactive switch on, so a missing
+  credential is a fast named failure rather than a hang; and when a write hangs while reads
+  succeed, suspect an input the tool is waiting for before suspecting the wire.
 * **A parser that reads only mnemonics is silently blind to every access written as raw bytes, and
   self-accounting will not tell you.** An index of memory accesses reported "zero unparsed" while
   missing every access that lived in a forced-keep `.byte` line, because such a line is data-shaped
