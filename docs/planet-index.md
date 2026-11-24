@@ -70,16 +70,50 @@ finding them, so the miss is left visible instead.
 3. The game's own dialogue says **`SHE'S GOT TO BE AT 9-9-9!`** (`tlkx11`, the Phylosopher),
    agreeing with `table[9]` from inside the binary.
 
-**A fourth source was looked for and is not in the tree.** The owner recalled a manual printing the
-XYZ coordinates of every planet except Planet X — which would have been a nice independent
-confirmation, and the omission of Planet X would have matched `table[9]` being the odd entry out. The
-manual we hold, `references/manuals/u2black-manual.pdf` (Black Gate, 1985), **contains no coordinate
-table**: the entire extracted text has 102 digits, and none of the decoded triples (`6-6-6`, `5-4-5`,
-`3-3-4`, `6-2-3`, `2-8-5`, `9-4-6`) appears in it. The coordinate table belongs to the **1982 Origin
-booklet**, which is not in this repository. Recorded so the check is not repeated: if a scan of the
-1982 booklet is ever added under `references/manuals/`, diffing it against `table[0..8]` is a
-one-command cross-check, and it would be a genuinely independent source rather than the Codex citation
-restated.
+**A fourth source arrived after that note was written, and it is independent of the Codex.**
+`references/manuals/c64man_ultima2.pdf` — the **Commodore 64** Ultima II manual, 22 pages, image-only
+with no text layer, so it was read visually from a 300 DPI render of page 17 (the scan is 96×127 pt,
+so that is the real resolution ceiling). Page 17 carries **`ULTIMA II GALACTIC MAP OF KNOWN SPACE`**
+under an orbital diagram, with columns `Xzna Yzna Zzna Life Terrain`:
+
+| letter | body | manual XYZ | our `table[n]` | match |
+| --- | --- | --- | --- | --- |
+| `*` | Sun | 4,4,4 | *(not in the table; the Codex digit-census includes it)* | ✓ |
+| A | Mercury | 5,4,5 | `5,4,5` | ✓ |
+| B | Venus | 3,3,4 | `3,3,4` | ✓ |
+| C | Earth | 6,6,6 | `6,6,6` | ✓ |
+| D | Mars | 6,2,3 | `6,2,3` | ✓ |
+| E | Jupiter | 1,3,4 | `1,3,4` | ✓ |
+| F | Saturn | 2,8,5 | `2,8,5` | ✓ |
+| G | Uranus | 9,4,6 | `9,4,6` | ✓ |
+| H | Neptune | 4,0,5 | `4,0,5` | ✓ |
+| I | Pluto | 0,1,4 | `0,1,4` | ✓ |
+
+**Nine of nine plus the Sun, from a document that is not derived from the wiki.** This is a different
+grade from bullet 1: the Codex agreement is a citation of a community table, and someone there could
+in principle have read a manual like this one. A 1985 console manual agreeing byte-for-byte with a
+30-byte table found by signature in the DOS executable is independent agreement, and it is the
+strongest confirmation of the set.
+
+**The owner's recollection was right, and the missing planet is the interesting part.** The manual
+lists no Planet X, and closes the table with: *"Space travel continues, and the courageous and
+creative space explorer may discover unknown planets to add to this map."* So the manual documents
+nine worlds and hints at a tenth, which is exactly what `table[9] = (9,9,9)` is — a coordinate the
+game names in dialogue (`SHE'S GOT TO BE AT 9-9-9!`) and the paper manual leaves to the player.
+
+**Two caveats, and one piece of genuinely new data.** The manual is the **C64 port**, a different
+codebase, so this confirms the *world model* rather than our bytes; the bytes remain confirmed by the
+digit census and the dialogue. Its letter ordering is also not our index order — the manual runs
+Mercury=A … Pluto=I with **Earth=C**, while the world byte is `0 EARTH, 1 MERCURY … 8 PLUTO, 9 PLANET
+X`, so the mapping is `A→1, B→2, C→0, D→3, E→4, F→5, G→6, H→7, I→8` and the letters are third-party
+labels, not the game's.
+
+The new data is the two columns we have no equivalent for: **`Life`** (`Y` Earth, Mars, Uranus, Pluto;
+`N` Venus, Saturn; `?` Mercury, Jupiter, Neptune) and **`Terrain`** (Mercury *water, swamp*; Venus
+*water, swamp, grass*; Earth *all varieties*; Mars *mountains*; Jupiter *water, grass*; Saturn *water,
+grass*; Uranus *forest, grass*; Neptune *grass*; Pluto *mountains*). Those are checkable claims about
+the shipped data and are **not yet checked** — several look doubtful against what the sector maps
+show, so they are recorded as third-party assertions with a grade of their own, not as facts.
 
 `--verify` asserts all three, plus that the locator is unique and that `7` never appears. The
 controls were exercised, not assumed: reading the table as ten triples — the original mistake —

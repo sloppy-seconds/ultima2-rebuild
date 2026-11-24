@@ -2846,3 +2846,11 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   document may be in-tree, search for the file before reasoning about its contents. A recollection is
   a pointer at a lookup, not a substitute for one, and "we do not have the manual" is a claim worth
   spending ten seconds on before it is written down.
+- A scanned manual needed reading and the agent reached for a dedicated vision subagent, which then
+  died on that provider's billing limit. The agent was itself multimodal and could have read the
+  render directly; it had matched the task to the tool named for it instead of checking its own
+  capabilities. The detour cost a failed run and a round trip.
+  → Tier 2, orchestration: before delegating a capability task, check whether the current model
+  already has that capability. Delegation is for work the caller cannot do, for isolation, or for
+  parallelism -- not for naming symmetry, and a delegation hop adds a failure domain the caller did
+  not have to have.
