@@ -465,14 +465,19 @@ Verification, in two independent layers:
   wiki names unjoined while its own gate reported green. **A generated artefact with no freshness
   check will go stale and look healthy doing it.** The hazard did not stop there, which is the point
   of keeping the gate rather than closing the list: `fragment-splits.tsv` was found stale on the day
-  its own freshness check was added — 43 committed rows against the 52 the generator produces,
-  because `asm/` gained named splits after the file was last written — and the honest remaining gap
-  is now named instead of assumed. **Seven generated tables under `disasm/` still have no freshness
-  check, and the reason is not oversight: their generators write to hardcoded paths and accept no
-  output argument**, so each one needs a tool change plus its own control, not a line in a shell
-  script. `function-map.tsv` is a worse case than that — thirteen tools reference it, so "its
-  generator" is not a single thing, and a freshness gate there would be meaningless until exactly one
-  writer is declared.
+  its own freshness check was added — 43 committed rows against the 42 the generator now produces,
+  with one run shortened (`4C1E..4F10` is now `4C1E..4C54`) and two runs dropped (`6144..6303`,
+  `2305..2361`), because `function-map.tsv` moved on 2026-11-15 and the splits table was last
+  regenerated 2026-10-25. **The first measurement of that diff was wrong and was committed wrong:** the
+  working tree held a silently rewritten `function-map.tsv` from before the 2026-10-23 merges, and the
+  generator faithfully produced 52 rows from it. The tell was the selftest going red in the same
+  moment, which is not what a merely stale output does — see § 5, "a script's output is a hypothesis,
+  not a measurement". The honest remaining gap is now named instead of assumed. **Seven generated
+  tables under `disasm/` still have no freshness check, and the reason is not oversight: their
+  generators write to hardcoded paths and accept no output argument**, so each one needs a tool change
+  plus its own control, not a line in a shell script. `function-map.tsv` is a worse case than that —
+  thirteen tools reference it, so "its generator" is not a single thing, and a freshness gate there
+  would be meaningless until exactly one writer is declared.
 
 * **The cleanroom wall separates the implementer from the originals, and an answer key is a
   breach just like a screenshot is.** `docs/tile-art-spec.md` is the only document someone

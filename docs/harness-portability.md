@@ -2880,8 +2880,19 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   but because their generators write to hardcoded paths and take no output argument, so the gate is
   unbuildable without changing each tool first. One of the eight had thirteen separate writers, which
   makes "its generator" not a thing and any freshness assertion on it meaningless. And the one table
-  that could be gated immediately went red on being gated, four rows short.
+  that could be gated immediately went red on being gated.
   → Tier 1, evidence discipline: before building a check the docs ask for, run the docs' own claim
   against the tree. A rules file is a hypothesis about the present. And when a class of check is
   missing, ask what makes it missing -- "nobody added it" and "the tools cannot be diffed in their
   current shape" need opposite fixes, and only one of them is a line in a script.
+- The measurement of that first red was wrong, and the wrong number was committed. A tracked generated
+  input had been silently rewritten in the working tree by something nobody could identify, and the
+  generator faithfully produced a plausible table from it: 52 rows against a committed 43, reported as
+  nine missing splits, when the true diff on clean inputs was 42 rows with one run shortened and two
+  dropped. The selftest went red at the same instant, which is the signal -- a stale output does not
+  break a selftest, a changed input does.
+  → Tier 1, evidence discipline: regenerate the inputs' provenance before the output's. When a
+  generator's output disagrees with its committed copy, `git status` on the inputs is a cheaper test
+  than any theory about why the tool changed, and a selftest that goes red alongside a freshness gate
+  means the inputs moved, not that the output is stale. Commit the diff, not the conclusion, until the
+  working tree is clean.
