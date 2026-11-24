@@ -38,6 +38,7 @@ esac
 fails=0
 skips=0
 opt_skips=0
+cannot=0
 OPT=0
 
 # run <label> <required-path...> -- <command...>
@@ -80,6 +81,11 @@ run() {
     out=$("$@" 2>&1); rc=$?
     if [ $rc -eq 0 ]; then
         printf '  PASS  %-26s %s\n' "$label" "$(printf '%s' "$out" | tail -1 | cut -c1-72)"
+    elif [ $rc -eq 77 ]; then
+        # automake's "cannot run". A gate that lacks its input is not a regression,
+        # and reporting it as one is how a gate gets ignored after its first false red.
+        printf '  SKIP  %-26s cannot run (exit 77): %s\n' "$label" "$(printf '%s' "$out" | tail -1 | cut -c1-60)"
+        cannot=$((cannot + 1))
     else
         printf '  FAIL  %-26s %s\n' "$label" "$(printf '%s' "$out" | tail -3 | tr '\n' '|' | cut -c1-160)"
         fails=$((fails + 1))
@@ -201,6 +207,12 @@ run "label_offset_gate selftest" asm -- python3 tools/label_offset_gate.py --sel
 # which is gitignored by policy, so that one is an opt_run and exits 77 when absent.
 run "dungeon_strokes selftest" tools/dungeon_strokes.py -- python3 tools/dungeon_strokes.py --selftest
 opt_run "dungeon_strokes reads monsters" original/monsters -- python3 tools/dungeon_strokes.py
+
+# The dungeon spawn formula, measured 54/54 against asm/147F on the capture corpus.
+# Decoded in 2026-10-29 and cited in docs/monster-spawn.md section 9, but wired into
+# no runner until now, so nothing could ever go red here.
+run "dungeon_spawn_check selftest" tools/dungeon_spawn_check.py -- python3 tools/dungeon_spawn_check.py --selftest
+opt_run "dungeon_spawn formula" "captures/spice86/*/spice86dumpMemoryDump.bin" -- python3 tools/dungeon_spawn_check.py
 
 # The bible loop (docs/plan-game-bible.md § 4-5). No model runs in CI (ADR 0003), so these assert
 # the committed artefacts instead: every sentence has a verdict, no prose moved under a verdict,
@@ -398,6 +410,10 @@ if [ "$CI_MODE" = 1 ]; then
 fi
 if [ "$skips" -gt 0 ]; then
     echo "CHECK-ALL: PASS ($skips gate(s) skipped for missing inputs — see above)"
+    exit 0
+fi
+if [ "$cannot" -gt 0 ]; then
+    echo "CHECK-ALL: PASS ($cannot gate(s) reported exit 77: input present but unusable — see SKIP above)"
     exit 0
 fi
 echo "CHECK-ALL: PASS"

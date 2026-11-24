@@ -14,7 +14,7 @@ There are two:
 | --- | --- | --- |
 | **placed monsters** | `monxNN[64 + slot]` — a byte in the sector's data file | **32/32, 32/32, 31/32** across three captures in two sectors |
 | **wandering spawns** | the nine per-kind immediates in the spawn arms | ~40 captures in sector 20 match the arms exactly |
-| dungeon spawns | computed in `asm/147F_dungeon_monster_spawn` — **now validated live, 54/54 slots, see § 9** | read + `tools/dungeon_spawn_check.py` |
+| dungeon spawns | computed in `asm/147F_dungeon_monster_spawn` — **now validated live, 543/543 slots across four distinct dungeon sectors, see § 9** | read + `tools/dungeon_spawn_check.py` |
 
 **There is no "area override" rule.** That was the wrong frame. Sector 00 reads HP 255
 for every monster because `monx00[64:96]` is literally all `0xFF`. Sector 20 matches the
@@ -237,10 +237,18 @@ shop's "mystical language" is a real language rather than invented noise.
 selects dungeon-shaped ones **by encoding rather than by directory name**, and checks
 them against what `asm/147F_dungeon_monster_spawn.asm` computes. Result:
 
-> **54 of 54 monster slots across both dungeon captures satisfy the formula exactly.**
-> The captures are `dungeon-35-live` and `airport32`, and both are sector 35
-> (`DS:49=3`, `DS:4A=5`) — the second is the stale name `docs/monster-spawn.md` § 5
-> warns about, and its monster record is identical to the first.
+> **543 of 543 monster slots across 20 dungeon-shaped captures satisfy the formula exactly.**
+>
+> That is the whole capture corpus, not the two dumps this section first cited. The captures span
+> **four distinct dungeon sectors — 24, 25, 34 and 35** — so the formula is no longer validated on one
+> sector sampled twice. The original two were `dungeon-35-live` and `airport32`, both sector 35, and
+> the second is the stale name § 5 warns about; its monster record is identical to the first.
+>
+> **Wired into `check_all.sh` as of 2026-11-24**, as `dungeon_spawn_check selftest` (always runs) and
+> `dungeon_spawn formula` (an `opt_run` on the capture corpus). The tool distinguishes *cannot run*
+> from *failed*: exit 77 when there is no capture directory or no dungeon-shaped capture in it, exit 1
+> only when a slot contradicts the formula. Before that, "nothing to check" returned 1, which would
+> have made the gate's first act in CI a false red — and a gate's first false red is its last.
 
 ### What `0x01`–`0x06` are
 

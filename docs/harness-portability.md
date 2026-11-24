@@ -2854,3 +2854,12 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   already has that capability. Delegation is for work the caller cannot do, for isolation, or for
   parallelism -- not for naming symmetry, and a delegation hop adds a failure domain the caller did
   not have to have.
+- A measured result was quoted in prose as "54 of 54 slots" and copied between documents for weeks.
+  The tool still said 54 only because nobody had run it: the corpus had grown from two captures to
+  twenty and the real figure was 543 of 543 across four distinct sectors instead of one sector twice.
+  The prose was understating the project's own strongest validation, and the row that complained the
+  gate never ran was itself quoting the stale number.
+  → Tier 1, evidence discipline: a count over a growing corpus is a measurement with an expiry date.
+  Re-run the tool before citing its number anywhere, and where prose must name a figure, name the
+  command that prints it alongside, so the next reader has a way to check rather than a reason to
+  trust.
