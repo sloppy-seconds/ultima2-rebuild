@@ -356,7 +356,6 @@ static int group_b(void)
 
 static void selftest(void)
 {
-    int before = fails;
     const int W = U2_ENH_W, H = U2_ENH_H;
     int bad = 0;
 
@@ -382,7 +381,6 @@ static void selftest(void)
     printf("selftest: %d control(s) failed\n", bad);
     fails += bad;
     checks += 8;
-    if (fails > before) fails = fails; /* keep the count honest */
 }
 
 int main(int argc, char **argv)

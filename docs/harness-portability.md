@@ -2896,3 +2896,10 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   than any theory about why the tool changed, and a selftest that goes red alongside a freshness gate
   means the inputs moved, not that the output is stale. Commit the diff, not the conclusion, until the
   working tree is clean.
+- A new check program was written, built, run, and its controls demonstrated -- on the host compiler.
+  CI's clang job rejected it on a line that did nothing, with a warning gcc never emits, and the
+  workflow's own comment already said every one of clang's warnings is one gcc stays silent about. The
+  local suite was never going to catch it and passing it was not evidence about CI.
+  → Tier 2, verification: when CI compiles with more than one compiler, "green locally" names a
+  compiler and is not a verdict about the build. Run the second one before pushing, in the container
+  the project already ships -- it is a minute, and it is the only way the local run means what CI means.
