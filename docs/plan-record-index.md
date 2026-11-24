@@ -1,8 +1,11 @@
 # The Record Index — Plan (third epic)
 
-**Status: planned, not built. All decisions ruled 2026-11-23 (§ 8); the grill's round one is
-complete and nothing is silently assumed. Build order is S-1, then S0 — and S0's kill threshold
-is pre-registered at § 7, so the measurement can actually change the plan.**
+**Status: CUT TO BIBLE SLICES, 2026-11-24. All decisions were ruled 2026-11-23 (§ 8) and the grill
+was closed, but S0 — the spike, run before any store was built — measured 12 attributable entities
+against the pre-registered kill threshold of 25, and ruling G10 says that cuts the epic. § 7a holds
+the numbers, the method, and the three ways this plan was wrong about its own inputs. S0b (the column
+contract) survives the cut; S1–S4 do not. Owner may ratify or amend G10, and § 7a is the evidence for
+either.**
 
 This is the join layer between the two finished epics. The code index produced four
 generated tables about *addresses*; the census produced ten about *things*; the bible
@@ -224,7 +227,7 @@ S0 exists because a plan built on assumed edges is worth less than an afternoon.
 | # | work | gate |
 | --- | --- | --- |
 | ~~**S-1**~~ | **DONE 2026-11-23.** `bestiary.tsv` carried byte-identical duplicate rows and `census.py` dropped the columns that distinguished its art-matching rows, so `creature.tsv` had **no unique key**: 120 rows, 16 distinct `art` values, no combination of up to three columns unique, `source` and `grade` constant across every row. Now: `creature.tsv` is 15 rows keyed by `art`, `art-variant.tsv` is 118 rows keyed by (name, section, source_variant, variant, image), the generator collapses duplicates and refuses to write an unkeyable table, and `census.py --selftest` asserts uniqueness for all eleven tables. Full finding and two extra defects it exposed: `docs/bestiary.md` § 8. | done — `census --selftest` (6 controls) and `census --verify` both green, wired into `check_all` |
-| **S0** | **Spike: do the derivable legs actually yield edges?** Join `records` × `footprint` for creature, item and spell spans; join sector/world immediates. Report how many entities get at least one code edge, by leg and grade. No store is written. | the spike's own numbers, written into this doc. **Kill threshold pre-registered 2026-11-23: fewer than 25 distinct entities of the v1 kinds (Q11) with at least one `measured` edge, and this epic is cut to bible slices** — the number is fixed before the measurement so the measurement can actually change the plan |
+| **S0** | **DONE 2026-11-24, spike only, no store written. Result: 12 named entities with at least one `measured` edge, against the pre-registered threshold of 25 — see § 7a below for the numbers, the method, and the three things the plan got wrong.** Join `records` × `footprint` for creature, item and spell spans; join sector/world immediates. Report how many entities get at least one code edge, by leg and grade. No store is written. | the spike's own numbers, written into this doc. **Kill threshold pre-registered 2026-11-23: fewer than 25 distinct entities of the v1 kinds (Q11) with at least one `measured` edge, and this epic is cut to bible slices** — the number is fixed before the measurement so the measurement can actually change the plan. **Breached: 12 < 25.** |
 | **S0b** | **Column contract, per ADR 0005.** Every generated table declares each column's type and base, and `--verify` asserts every value against it. The motivating case is real and recent: `footprint.tsv`'s offset column holds **decimal**, and filtering it as hex returns zero rows, which reads as absence of evidence rather than a bad query. | a control per declared column: feed a value of the wrong type or base and the gate goes red; a table with no contract is a `--verify` failure, not a warning |
 | S1 | `records.tsv` — the record-address model, with stride, count and file provenance | `--verify` asserts every span is inside the DS block, strides tile without overlap, and every row names an evidence site; `--check-fresh` |
 | S2 | `entities.tsv` — census joined under stable ids | `--verify` asserts every census row appears exactly once, no id is minted for a row census does not have, and `name_source` is never blank where census had one |
@@ -233,8 +236,78 @@ S0 exists because a plan built on assumed edges is worth less than an afternoon.
 | S5 | facts keyed to entity ids; one bible page becomes a query; **retire `docs/status-screen-z.md`** as the proof | the retired doc's claims must all be present in the generated page, checked by a script that diffs claim-for-claim, not by reading |
 | S6 | docs, `docs/outstanding.md`, the issue, and a line in `docs/harness-portability.md` § 6 for whatever generic lesson S0 teaches | `tools/doc_command_gate.py` |
 
-S5 is the whole point and the reason S0 comes first: **a bible page that can retire a
-hand-maintained doc is the only evidence that this epic earned its existence.**
+### 7a. S0 result, 2026-11-24: the threshold was breached
+
+**12 distinct named entities of the v1 kinds carry at least one `measured` code edge. The
+pre-registered kill threshold is 25. Per ruling G10 the epic is therefore cut to bible
+slices.** The number was fixed before the measurement precisely so that this sentence could
+be written without renegotiating anything, and it is written.
+
+The measurement, and the three ways this plan was wrong about its own inputs:
+
+**1. No same-instruction form exists at these bases.** The plan's § 3 said creature
+attribution is derivable "because the base is the displacement: `mov 0x137(%di),%al`". That is
+true of *which field* a routine touches and false of *which entity*. Across all 193 footprint
+rows at the ten DS bases, exactly **one** instruction carried an immediate
+(`cmpb $0x4,0x4a` in `asm/3611_monster_damage_apply.asm`). This codebase always mediates
+through a register, in both directions: `mov $0x2c,%al` then `mov %al,0x197(%di)` to write, and
+`mov 0x197(%di),%al` then `cmp $0x34,%al` to test. `grep` for the same-instruction form
+`cmp $LIT,0x197(%di)` returns **zero across the whole tree**. An index built on the assumption
+that a literal sits in the instruction that touches the base would have reported nothing at all
+and looked like an absence of evidence — which is the § 3 failure mode this plan warned about
+for `footprint`'s decimal column, arriving in a new shape.
+
+So the spike added a bounded slice: walk back from a store to the load that filled the register,
+and forward from a load to the compare that consumed it, giving up if the register is written by
+anything unnamed in between. Conservative by construction — it can under-report, it cannot
+invent. That resolved **23 of 193** rows on the backward leg and **17 of 193** on the forward
+leg.
+
+**2. The item and spell legs are structurally empty, not under-mined.** Every one of the six
+`0xD6` (items held) and six `0xB6` (spell counts) sites addresses through a computed `%di`
+(`mov 0xd6(%di),%al`), and no literal anywhere in the tree names which item or which spell a
+site means. The slot index is a loop counter or a cursor, never an immediate. This was checked
+by direct `grep` and not inferred from the tool returning nothing, because a tool returning
+nothing is exactly what a broken tool looks like. **An item or spell page therefore cannot be
+derived from code at all** — it has to come from the content files, which is the census's job
+and already done.
+
+**3. Two of the five v1 kinds were never reachable from `footprint`.** `npc` lives in `tlkxNN`
+record rows and `gate` in `mapx` marker tiles; neither has a DS address, so no footprint row
+can touch either. Q11's five-kind list treated them as if they were the same kind of thing as
+a creature slot. They are not, and no amount of slicing changes that.
+
+What did come out, per leg:
+
+| leg | named entities with ≥1 `measured` edge | note |
+| --- | --- | --- |
+| creature | **12** — Balron, Daemon, Devil, Fighter, Frigate, Guard, King, Minax, Orc, Sea Monster, Thief, Wizard | literals at `mon_type` only; mapping is `art = type >> 2` |
+| item | **0** | no literal names an item, at any site, anywhere |
+| spell | **0** | same |
+| npc | **0** | not addressable from DS at all |
+| gate | **0** | not addressable from DS at all |
+| **counted total** | **12** | threshold 25 |
+
+Reported but deliberately **not** counted, because `world` and `sector` are not among Q11's five
+v1 kinds: the **world leg works completely** — the absolute form `mov 0x6d,%al` then
+`cmp $0x9,%al` yields all ten worlds including Planet X, which is how `asm/4223_planet_x_gate`
+was named in the first place. The sector leg yielded literals `0x00`–`0x05` and `0x7C` against
+`DS:4A`, which are era/world digits rather than sector identities, so it names nothing.
+
+**The honest reading.** Twelve creatures with a real code edge is a true and useful fact, and it
+is also the whole of what the code can say about entities: the engine already knows those twelve
+from the spawn arms and the special-attack dispatch, and both are decoded. The record index
+would have spent S1 through S4 building a store to re-derive what four `asm/` files already
+state inline. That is what the threshold was for.
+
+**What survives the cut.** S0b (the column contract) is not part of the bargain — it is a
+standing ADR 0005 obligation on every generated table including the ones already shipped, and
+`footprint.tsv`'s decimal column is a live trap for the next reader. S1–S4 are cut. S5 was the
+proof of value and it cannot be built on a 12-entity store.
+
+For the record, the reason S0 came first: **a bible page that can retire a hand-maintained doc
+was the only evidence that this epic earned its existence.** S0 found that the evidence was not
+there, which is the outcome the threshold existed to allow.
 
 ---
 
