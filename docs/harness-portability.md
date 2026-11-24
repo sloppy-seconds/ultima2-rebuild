@@ -2679,3 +2679,30 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   byte-for-byte comparison against the previous version on identical input, not a round-trip
   through the tool under test. A shared constant that is wrong in both directions is the one error
   a round-trip is structurally incapable of reporting.
+- 2026-11-23 — **a generated-table CLI without a `__main__` guard rewrites its own committed output
+  on import, and can disarm the gate that checks it.** A census tool ended with a bare call to its
+  entry point, so `import census` fell through to the write path with the default output directory.
+  Another script imported it purely to read a lookup helper, which meant every run of that script
+  regenerated all eleven tracked tables as a side effect. The damage was not the churn: a
+  regenerate-and-compare freshness gate run after such an import compares a fresh build against a
+  fresh build, so it can never go red. Import order decided whether the gate was armed.
+  → Tier 1, gate design: a freshness gate is only as trustworthy as the claim that nothing rewrote
+  the files between the last edit and the check. Any tool that writes committed output on import
+  breaks that claim silently, so entry points must be guarded and importing must be a read.
+- 2026-11-23 — **a dict comprehension over rows with duplicate keys is a conflict resolver that
+  never announces itself.** A join built as `{key: row for row in rows}` silently kept the last row
+  for each key, so where two third-party sources disagreed about a creature's hit points the
+  published table carried whichever happened to sort last — in one case a figure a live capture had
+  already disproved. The capture and the written resolution were both correct; the join simply never
+  looked at the disagreement, and the table published a single confident number.
+  → Tier 1, derived data: when sources can disagree, collapsing rows must keep every distinct value
+  and name the field that disagreed. Any construct where the last writer wins is a decision, and a
+  decision nobody recorded will eventually be wrong.
+- 2026-11-23 — **a uniqueness assertion written for one table of eleven is a rumour.** A generated
+  reference set asserted that one table's key was unique and reported green while another table had
+  no key at all: 120 rows over 16 distinct identity values, with two columns constant across every
+  row so they carried no information. Nothing downstream could tell, because the tool's verdict was
+  about the table it checked, not the set it published.
+  → Tier 1, derived data: declare every table's key as data and assert all of them, and treat a
+  column that holds one value across a whole table as a warning. A dead join and a healthy column
+  look identical until someone counts the distinct values.

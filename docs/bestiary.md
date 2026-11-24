@@ -363,6 +363,31 @@ not by an argument about which wiki is likelier.
   `art + variant`, which is what this data actually is. De-duplicating `bestiary.tsv` and giving it
   a uniqueness assertion comes first, because a source file with silent duplicates re-infects every
   table generated from it. See `docs/plan-record-index.md` § 7, slice S-1.
+  **S-1 landed the same day.** `disasm/census/creature.tsv` is now **15 rows, one per art index,
+  keyed by `art`**, and `disasm/census/art-variant.tsv` is **118 rows keyed by (name, section,
+  source_variant, variant, image)** holding the platform sprites, including the 94 that matched no
+  tile at all. `tools/bestiary_match.py` collapses byte-identical rows at generation and **refuses
+  to write the file if any rows remain that differ only in a column the table does not carry**; six
+  writer controls prove that refusal can fire. A range whose endpoints agree is now normalised
+  (`224-224` is 224), which resolved one conflict as pure notation and left five genuine ones visible
+  in a `conflicts` column instead of hidden in duplicate rows: Daemon and Devil `special`, Guard `hp`
+  255 vs 500, Jester `hp` 1 vs 1-255, Merchant `hp` 1 vs 5-50, Wizard `special`.
+* **The silent pick was propagating a value a capture had already disproved — found while splitting.**
+  `census.py` built its art index with `{c['art']: c for c in crows}`, so for art `0x18` the last
+  duplicate won and `tile.tsv` published Guard HP as **500** — the Gamer Corner figure, while the two
+  bullets above record that `castle-03-live` observed **255** and that the Codex is right. Neither the
+  capture nor the resolution was at fault; the join simply never looked at the disagreement. The tile
+  table now reads `255 | 500` with the field named in `conflicts`, which is honest rather than right,
+  and closing it properly means the capture, not a rule. **A dict comprehension over duplicate keys is
+  a conflict resolver that never announces itself.**
+* **`census.py` had no `__main__` guard, so importing it rewrote the committed census.**
+  `bot/launch.py` does `import census` to read the rocket pad, and the bare `main()` at the bottom of
+  the module fell through to `write_tables()` with the default `--out`. Every bot launch regenerated
+  all eleven tracked tables as a side effect — and a `--check-fresh` gate run after such an import
+  compares a fresh build against a fresh build, so **the freshness gate could be disarmed by import
+  order**. Guarded now: importing is a read, only the CLI writes. `census.py --selftest` is wired into
+  `check_all` and asserts uniqueness for all eleven tables through a declared `KEYS` table, replacing
+  the single hand-written sector check that had been the only uniqueness assertion in the tool.
 * **The codex HP/DMG columns are not HP and DMG in two of the four tables.** Those
   tables carry a second header row (`Min`, `Max`) written without `colspan`, so in
   the raw HTML the two sub-labels land under *Name* and *Apple II* and cannot be
