@@ -70,6 +70,17 @@ finding them, so the miss is left visible instead.
 3. The game's own dialogue says **`SHE'S GOT TO BE AT 9-9-9!`** (`tlkx11`, the Phylosopher),
    agreeing with `table[9]` from inside the binary.
 
+**A fourth source was looked for and is not in the tree.** The owner recalled a manual printing the
+XYZ coordinates of every planet except Planet X — which would have been a nice independent
+confirmation, and the omission of Planet X would have matched `table[9]` being the odd entry out. The
+manual we hold, `references/manuals/u2black-manual.pdf` (Black Gate, 1985), **contains no coordinate
+table**: the entire extracted text has 102 digits, and none of the decoded triples (`6-6-6`, `5-4-5`,
+`3-3-4`, `6-2-3`, `2-8-5`, `9-4-6`) appears in it. The coordinate table belongs to the **1982 Origin
+booklet**, which is not in this repository. Recorded so the check is not repeated: if a scan of the
+1982 booklet is ever added under `references/manuals/`, diffing it against `table[0..8]` is a
+one-command cross-check, and it would be a genuinely independent source rather than the Codex citation
+restated.
+
 `--verify` asserts all three, plus that the locator is unique and that `7` never appears. The
 controls were exercised, not assumed: reading the table as ten triples — the original mistake —
 turns it red with `EARTH is (6,5,3)`, and perturbing one pinned wiki coordinate turns it red on
