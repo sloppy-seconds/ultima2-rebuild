@@ -2815,3 +2815,17 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   (entity, context) with the value allowed to be a formula over a named variable, and keep conflicting
   sources in a visibly different column. Merging them lets a real error hide behind a plausible
   label; keeping them apart is what makes "which is right" a question that stops being malformed.
+- A measurement pass globbed one filename stem and reported the whole corpus. It had measured a third
+  of it. The platform's flat filesystem namespace had forced two corpora onto different stems, and the
+  second stem held the data for most of the game's worlds. Nothing looked wrong: the row count was
+  plausible, the values were real, and the missing third was simply absent from the answer.
+  → Tier 1, derived data: before a scan reports a corpus, enumerate the stems and directories that
+  could hold the same kind of data and print how many files each contributed. A glob is a hypothesis
+  about the naming scheme, and a plausible row count is not evidence that the glob was the right one.
+- A third-party reference gave one HP per creature and matched the program's spawn code exactly, nine
+  of nine, which read as corroboration and was true as far as it went. The program also stores HP per
+  authored placement, where most species carry many different values. The reference was not wrong; it
+  described one population and was being read as a species constant.
+  → Tier 2, schema: when an external source agrees with a derived value, ask which population it
+  measured before recording the agreement as corroboration. Agreement between a constant and one
+  population of a varying field is the weakest evidence that looks strongest.

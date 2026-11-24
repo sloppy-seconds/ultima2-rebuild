@@ -307,6 +307,42 @@ byte-width `sbb`, and Balron is literally `mov $0xff`. So Gamer Corner's Guard H
 **500 is impossible** and the codex's 255 stands — refuted by the width of the field,
 not by an argument about which wiki is likelier.
 
+### Placed HP is authored per slot, and it varies by region
+
+**Everything above is about spawned and dungeon HP. The third population was never measured until
+2026-11-23, and it does not behave like either of the others.** Placed monsters take HP from
+`monxNN[64 + slot]` — one byte per monster slot, written by the authoring tool per placement, not
+per species. So "the HP of a Guard" is not a single number: across the real sector files the Guard
+appears with **222 and 255**, and most placed types carry far more values than that — Thief and
+Wizard each show eighteen or nineteen distinct values across their placements.
+
+**Both layers had to be measured, and measuring only one is the trap.** `monx*` is Earth and Planet X;
+the planet worlds' monster tables are `MONG*`, shipped in `original/updated/` by the Galaxy patch,
+because MS-DOS had no directories and `MAPG10` collided with `mapx10` (see
+`docs/planet-maps-galaxy-patch.md`). A scan that globs `monx*` silently measures a third of the game
+and reports it as the whole of it. `original/updated/monx*` are byte-identical to the root set,
+verified, so there is no conflict to arbitrate — but sector numbers collide across the two layers
+with different contents, so a sector is only identified by the `(layer, sector)` pair, which is the
+same key census uses. Two placed types exist only on `mapx`: the sea serpent, which needs water, and
+the Balron.
+
+**And this explains why the third-party HP column looks right and is still the wrong shape.** The
+nine spawn arms match the third-party figures exactly, nine of nine — so the guide's number for a
+creature is its *wandering-spawn* value. It is not wrong; it is scoped to one population and reads as
+a species constant when it is not. That is the D6 ruling in `docs/plan-record-index.md` § 8 arriving
+from the data rather than the design.
+
+`tools/creature_hp.py` measures all three populations and writes `disasm/creature-populations.tsv`,
+one row per `(name, layer, context)`, every row graded `measured` and naming its source. It is wired
+into `check_all.sh` with a selftest whose controls include the byte-width tripwire and a check that
+the same sector number in the two layers stays two rows. Query it with `--what Guard` or
+`--sector 82 --layer mapg`.
+
+**One honesty note about this section.** The field-width refutation of the Guard's 500 above was
+already written here before this measurement was taken, and re-deriving it is exactly the failure
+`AGENTS.md` § 3 calls "look up before you derive" — the answer was in the document being edited. What
+is new here is the placed population, its per-slot variation, and the two-layer coverage.
+
 ## 7. What the join did **not** buy
 
 * **No monster type byte is named, and the `>>2` transform is still a hypothesis.** Two

@@ -368,6 +368,8 @@ opt_run "place_index" original/mapx22 -- python3 tools/place_index.py --verify
 # creature.tsv had none at all -- and a gate that checks one table in eleven is a rumour.
 run "census selftest" tools/census.py -- python3 tools/census.py --selftest
 opt_run "census verify" disasm/place-index.tsv disasm/source-gamercorner-locations.csv original/ultimaii.exe -- python3 tools/census.py --verify
+run "creature_hp selftest" tools/creature_hp.py -- python3 tools/creature_hp.py --selftest
+opt_run "creature populations fresh" disasm/creature-populations.tsv original/monx00 "original/updated/MONG10" -- python3 tools/creature_hp.py --check-fresh
 # One gate covers every committed generated table, including the census: regenerate each to a
 # temp dir and byte-compare. This caught a second stale file the moment it was written --
 # planet-index.tsv joins settlement names out of place-index, so it went stale when the wiki
