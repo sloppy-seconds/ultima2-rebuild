@@ -379,9 +379,26 @@ static void draw_bar(u2_frame *f, const u2_ctx *ctx, const u2_panel_colours *c)
 {
     char place[64];
     bar_place(place, sizeof place, ctx);
+    /* A filled rule, not a box: owner ruling 2026-11-25, after both candidates were
+     * built and looked at full-screen. A one-cell band cannot hold a 1 px border and a
+     * 16 px glyph at once -- measured, the label ate 42 px of the top border and 112 px
+     * of the bottom. See U2_ENH_BAR_H in layout.h.
+     *
+     * The label is drawn as glyph dots only, over a fill of the panel backdrop, and that
+     * is forced rather than tasteful. fill() stores a colour index raw while
+     * u2_font_draw_text() applies u2_frame_cga_idx on the way in, so for any background
+     * index below 4 the two disagree whenever CGA art draws on an EGA palette: the first
+     * build of this look filled the rule with c->backdrop and set the label's background
+     * to the same value, and the label landed on a block of a different colour from the
+     * field it sat on. Mapping the fill instead made the rule uniform but detached it from
+     * the backdrop around it. Drawing ink only ends the argument -- the backdrop shows
+     * through the letter spaces, which is also what the original's printer does, per the
+     * note on u2_font_draw_vram_rows_overlay. */
     box(f, U2_ENH_BAR_X, U2_ENH_BAR_Y, U2_ENH_BAR_W, U2_ENH_BAR_H,
-        c->bar, c->border);
-    text(f, U2_ENH_BAR_X + U2_ENH_BOX_PAD, U2_ENH_BAR_Y, place, c->text, c->bar);
+        c->backdrop, c->backdrop);
+    u2_font_draw_text_overlay(f, U2_ENH_BAR_Y / U2_ENH_TEXT_H,
+                              U2_ENH_BAR_TEXT_X / U2_ENH_TEXT_W,
+                              place, c->box_bg);
 }
 
 void u2_panel_draw(u2_frame *f, const u2_ctx *ctx, const u2_tiles_ega *tiles,

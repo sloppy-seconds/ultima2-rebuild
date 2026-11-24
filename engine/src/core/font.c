@@ -64,6 +64,37 @@ int u2_font_draw_text(u2_frame *f, int row, int col, const char *s,
     return n;
 }
 
+int u2_font_draw_text_overlay(u2_frame *f, int row, int col, const char *s, uint8_t fg)
+{
+    if (!f || !f->px || !s) return 0;
+    /* Bounds come from the frame's logical size for the same reason u2_font_draw_cell
+     * takes them there: the enhanced frame is a native grid at scale 1 and a scaled
+     * classic frame keeps its 40x25 cell grid, so the pixel constants would clip. */
+    const int s_scale = f->scale > 1 ? f->scale : 1;
+    if (row < 0 || col < 0 ||
+        row >= (f->h / s_scale) / U2_FONT_CELL_H ||
+        col >= (f->w / s_scale) / U2_FONT_CELL_W)
+        return 0;
+
+    int n = 0;
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++, n++) {
+        const uint8_t ch = (*p >= 32 && *p < 127) ? *p : ' ';
+        const unsigned char *glyph = font8x8_basic[ch & 0x7F];
+        const int x0 = (col + n) * U2_FONT_CELL_W;
+        const int y0 = row * U2_FONT_CELL_H;
+        for (int y = 0; y < U2_FONT_CELL_H; y++) {
+            const unsigned char bits = glyph[y];
+            for (int x = 0; x < U2_FONT_CELL_W; x++)
+                /* Only the set bits. Everything the opaque variant would have painted as
+                 * background is left alone, so whatever was drawn first shows through. */
+                if (bits & (1u << x))
+                    u2_frame_put_logical(f, x0 + x, y0 + y,
+                                         u2_frame_cga_idx(f, fg));
+        }
+    }
+    return n;
+}
+
 void u2_font_draw_vram_rows_overlay(u2_frame *f, const u2_vram *v, int top_row,
                                     int bottom_row)
 {

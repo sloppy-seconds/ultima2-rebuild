@@ -68,4 +68,17 @@ void u2_font_draw_vram_rows(u2_frame *f, const u2_vram *v, int top_row,
 void u2_font_draw_vram_rows_overlay(u2_frame *f, const u2_vram *v, int top_row,
                                     int bottom_row);
 
+/* u2_font_draw_text as glyph dots only: ink pixels are painted, the cell background is
+ * left exactly as it was. Same contract as u2_font_draw_vram_rows_overlay above, for a
+ * string instead of a vram grid.
+ *
+ * This exists because fill() and u2_font_draw_text() apply the CGA-on-EGA index map at
+ * different points: the fill stores the index raw, the glyph pass stores it mapped. For
+ * the two fixed points (0 and 15) that is invisible, which is why the panel boxes never
+ * noticed. Any other background colour makes the label sit on a block of a different
+ * colour from the field it was painted on. Drawing ink only removes the question: the
+ * field shows through the letter spaces, which is also what the original's printer does.
+ */
+int u2_font_draw_text_overlay(u2_frame *f, int row, int col, const char *s, uint8_t fg);
+
 #endif /* U2_FONT_H */

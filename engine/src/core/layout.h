@@ -119,7 +119,15 @@
  * until there was a use, and the use it now carries is the one named here as the
  * candidate: where the player is, planet and era on Earth, planet off Earth.
  * Positioned from the bottom of the frame rather than a literal, so it survives a
- * change of frame height without silently overlapping the map. */
+ * change of frame height without silently overlapping the map.
+ *
+ * The bar is a filled rule, not a box: owner ruling 2026-11-25, after both candidates
+ * were built and looked at full-screen. A one-cell band cannot hold a 1 px border and
+ * a 16 px glyph at once -- measured, the label ate 42 px of the top border and 112 px
+ * of the bottom. The alternative was three cells (border row + text row + border row),
+ * which fills the window to its bottom edge and leaves a large empty box; the rule was
+ * preferred. panel_check asserts no border-coloured pixel appears in the bar rect, so
+ * re-boxing it goes red rather than quietly reintroducing the collision. */
 #define U2_ENH_BAR_H       16
 /* Must land on the text grid: the panel's text() places by y / U2_ENH_TEXT_H, so a
  * y that is not a whole cell silently loses the remainder and the label draws above
@@ -128,6 +136,12 @@
 #define U2_ENH_BAR_Y       (U2_ENH_MAP_Y + U2_ENH_MAP_ROWS * 32 + U2_ENH_TEXT_H)
 #define U2_ENH_BAR_X       8
 #define U2_ENH_BAR_W       (U2_ENH_W - 2 * U2_ENH_BAR_X)
+/* The label's x, stated on the grid rather than derived. It is deliberately NOT
+ * BAR_X + U2_ENH_BOX_PAD: that is 24, and text() places by x / U2_ENH_TEXT_W, so 24
+ * silently drew at 16 -- the same truncation BAR_Y's comment above describes, on the
+ * other axis. 16 is the wanted inset (owner, 2026-11-25); writing it directly is what
+ * stops the arithmetic from asking for a position the grid cannot express. */
+#define U2_ENH_BAR_TEXT_X  U2_ENH_TEXT_W
 
 /* Where the player sits in the enhanced window. The reference centres the figure;
  * with an even count there is no exact centre, so this is the one that leaves the

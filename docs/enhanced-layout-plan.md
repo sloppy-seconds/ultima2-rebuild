@@ -346,6 +346,15 @@ window-resize-on-Ctrl-T problem closed.
 is the planet or area the player is standing on, which is a nicer home for that
 information than the map, but it stays an empty bar until there is a use for it.
 
+*Amended 2026-11-25.* The candidate use was taken: the bar now names the world, and the
+era on Earth. Its shape was also ruled, after both candidates were built and looked at
+full-screen — a borderless filled rule one text cell tall, in the backdrop colour with
+dark ink, rather than a three-cell bordered box. A one-cell band cannot hold a 1 px
+border and a 16 px glyph at once; the shipped build had the label eating 42 px of the
+top border and 112 px of the bottom. `panel_check` now asserts the bar draws no border
+and stays uniform. See `U2_ENH_BAR_H` in `core/layout.h` for the frame-layer trap that
+made the obvious implementation put the label on a block of the wrong colour.
+
 **Z screen — ruled.** Takes the whole screen in enhanced mode for now. Paginating it
 into the panel is a later change, and it is worth noting that the Z page is the one
 screen whose content is already too wide for a 276 px column, so pagination is not

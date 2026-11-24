@@ -11,6 +11,8 @@
  *   - text drawn through the wrong frame API, landing off the right-hand edge
  *   - a palette index assumed rather than looked up, drawing ink the same colour
  *     as its background
+ *   - a border sharing a row with the glyph drawn over it, so each silently ate
+ *     part of the other (the bottom bar, found and ruled 2026-11-25)
  *
  * All four are invisible at runtime — the frame clips silently and the wrong colour
  * is simply not there — so none of them can be found by looking at the screen.
@@ -89,8 +91,9 @@ static int box_interior(const boxrec *b, int x, int y)
     return x > b->x && y > b->y && x < b->x + b->w - 1 && y < b->y + b->h - 1;
 }
 
-/* Whole box, border included. Used only for the bar, whose label necessarily
- * covers its own horizontal borders -- see the NOTE in group_b. */
+/* Whole box, border included. Used for the bar, which is full-width chrome outside
+ * the three panel boxes and so is not held to the "text only inside a box interior"
+ * rule the three boxes are. */
 static int box_contains(const boxrec *b, int x, int y)
 {
     return x >= b->x && y >= b->y && x < b->x + b->w && y < b->y + b->h;
@@ -206,18 +209,6 @@ static int border_intact(const u2_frame *f, const boxrec *b, uint8_t border)
     return 1;
 }
 
-/* Only the two vertical edges. See the NOTE in group_b: the bar is one text cell
- * tall, so its label necessarily covers both horizontal border rows, and whether
- * that is the bar's design or a height bug is an owner call about presentation.
- * The vertical edges are not in dispute and must stay intact. */
-static int border_sides_intact(const u2_frame *f, const boxrec *b, uint8_t border)
-{
-    for (int y = b->y; y < b->y + b->h; y++)
-        if (f->px[y][b->x] != border || f->px[y][b->x + b->w - 1] != border)
-            return 0;
-    return 1;
-}
-
 static int group_b(void)
 {
     u2_frame f;
@@ -255,7 +246,13 @@ static int group_b(void)
     CK(border_intact(&f, &vit, C_BORDER), "B1 vitals border intact after drawing");
     CK(border_intact(&f, &sta, C_BORDER), "B1 stats border intact after drawing");
     CK(border_intact(&f, &cmd, C_BORDER), "B1 cmd border intact after drawing");
-    CK(border_sides_intact(&f, &bar, C_BORDER), "B1 bar side borders intact after drawing");
+    /* The bar is a filled rule, not a box (owner ruling 2026-11-25), so it must carry
+     * no border at all. This is the assertion that replaces the two NOTEs this gate
+     * first raised: a border inside a one-cell band is a border its own label
+     * overwrites, and on the shipped build the label ate 42 px of the top border row
+     * and 112 px of the bottom. Re-boxing the bar goes red here. */
+    CK(count_colour(&f, &bar, 0, C_BORDER) == 0,
+       "B1 bar draws no border (a one-cell band cannot hold a border and its label)");
 
     int touched = 0;
     for (int y = 0; y < map.h; y++)
@@ -270,33 +267,44 @@ static int group_b(void)
     CK(count_colour(&f, &vit, 1, C_TEXT) > 0, "B5 vitals interior has text");
     CK(count_colour(&f, &sta, 1, C_TEXT) > 0, "B5 stats interior has text");
     CK(count_colour(&f, &cmd, 1, C_TEXT) > 0, "B5 cmd interior has text");
-    CK(count_colour(&f, &bar, 0, C_TEXT) > 0, "B5 bar has the place label drawn in it");
+    CK(count_colour(&f, &bar, 0, C_BACKDROP) > 0, "B5 bar is filled with its rule colour");
+    /* The rule is the backdrop, mapped once and used for both the fill and the label's
+     * background so the two cannot disagree -- see draw_bar. panel_check leaves
+     * cga_on_ega clear, so the map is identity here and the rule is C_BACKDROP itself.
+     * The control that proves this assertion means something: setting cga_on_ega and
+     * filling with the unmapped value puts the label on a different colour, and the
+     * uniformity check below catches it. */
+    CK(count_colour(&f, &bar, 0, C_BOXBG) > 0, "B5 bar has the place label drawn in it");
+    /* Uniformity: every pixel of the rule that is not label ink is the rule colour.
+     * This is the assertion that fails if the fill and the glyph background ever store
+     * two different indices again. */
+    int rule_px = count_colour(&f, &bar, 0, C_BACKDROP);
+    int ink_px = count_colour(&f, &bar, 0, C_BOXBG);
+    CK(rule_px + ink_px == bar.w * bar.h,
+       "B5 bar is uniform: rule colour plus label ink, nothing else");
 
-    /* Two defects this gate found on its first run, both in the bottom bar, both
-     * left unfixed on purpose: enhanced mode is a presentation the owner rules on,
-     * and neither can be settled from the bytes. Filed in docs/outstanding.md.
-     *
-     * NOTE 1 -- the bar's label overwrites its own top and bottom border.
-     *   U2_ENH_BAR_H is 16, exactly one text cell, and text() places the label at
-     *   row BAR_Y/16, whose glyph spans physical rows 464..479 -- the same two
-     *   rows box() draws its border on. A 16 px band cannot hold a 1 px border and
-     *   a 16 px glyph at once, so one of them has to give: either the bar is two
-     *   cells tall, or it has no border. That is a look, not a byte.
-     *
-     * NOTE 2 -- the bar's label x is off the text grid and silently moves 8 px left.
-     *   U2_ENH_BAR_X is 8, so BAR_X + U2_ENH_BOX_PAD is 24, and text() computes
-     *   col = 24/16 = 1, which lands at physical x 16 rather than 24. layout.h
-     *   documents exactly this truncation as the reason BAR_Y had to be grid-aligned
-     *   ("the old +8 put the place line 9 px above the red it sits on") -- the y side
-     *   was fixed in 2026-11-20 and the x side was never looked at. */
-    printf("NOTE  bar: label spans both border rows (BAR_H == one text cell)\n");
-    printf("NOTE  bar: label x 24 is off the %d px grid, draws at %d\n",
-           U2_ENH_TEXT_W, ((U2_ENH_BAR_X + U2_ENH_BOX_PAD) / U2_ENH_TEXT_W) * U2_ENH_TEXT_W);
+    /* The bar's label x is U2_ENH_BAR_TEXT_X, which is already on the text grid. It
+     * used to be BAR_X + U2_ENH_BOX_PAD = 24, which text() truncated to 16 in silence.
+     * The property is that the ink begins inside the grid cell the constant names, not
+     * that it begins on its left edge: a glyph's first column can be blank sidebearing,
+     * and asserting the exact column would fail for a letter with a left gap. If the
+     * label ever lands off the grid the ink moves a whole cell and this goes red. */
+    int label_col = -1;
+    for (int x = bar.x; x < bar.x + bar.w; x++) {
+        int ink = 0;
+        for (int y = bar.y; y < bar.y + bar.h; y++)
+            if (f.px[y][x] == C_BOXBG) ink++;
+        if (ink > 0) { label_col = x; break; }
+    }
+    CK(label_col >= U2_ENH_BAR_TEXT_X &&
+       label_col < U2_ENH_BAR_TEXT_X + U2_ENH_TEXT_W,
+       "B5 bar label starts in the grid cell at U2_ENH_BAR_TEXT_X");
 
     /* The strongest single assertion here: any pixel in the text colour must be
      * inside a box interior. Overflow off the right edge, or text painted into the
      * gutter or over a border, fails here rather than being a screenshot someone
-     * hopes somebody takes. */
+     * hopes somebody takes. The bar is excluded because it is full-width chrome that
+     * sits outside the three panel boxes by design. */
     int stray = 0;
     for (int y = 0; y < f.h; y++) {
         for (int x = 0; x < f.w; x++) {
@@ -347,6 +355,33 @@ static int group_b(void)
             }
     CK(stray2 == 0, "B7b a 511-character log line wraps inside its box");
     u2_frame_free(&h);
+
+    /* The configuration that actually broke, and the only one in which the bar's
+     * uniformity can fail. With cga_on_ega clear the text layer's index map is identity,
+     * so the bar is uniform however it is painted and the assertion above cannot go red
+     * no matter what it is given -- a gate that can only fail in a configuration it never
+     * exercises is a decoration. CGA art on an EGA palette is the case that produced a
+     * label sitting on a block of the wrong colour, so it is drawn here and checked. */
+    u2_frame k;
+    memset(&k, 0, sizeof k);
+    if (u2_frame_init_size(&k, U2_ENH_W, U2_ENH_H, U2_ENH_SCALE) != 0) {
+        u2_frame_free(&f);
+        return 77;
+    }
+    k.cga_on_ega = 1;
+    u2_panel_draw(&k, &ctx, NULL, &c, -1, NULL, 0);
+    /* The control inside the gate: if the map did not move the backdrop index, B8 below
+     * would pass for the wrong reason and this frame would be decoration. */
+    CK(u2_frame_cga_idx(&k, C_BACKDROP) != C_BACKDROP,
+       "B8 control: the CGA-on-EGA map really does move the backdrop index here");
+    /* The rule is the backdrop and the ink is dark, and with a glyph-only label that
+     * stays true on both sides of the map: the fill is stored raw and the ink index is a
+     * fixed point. Before the overlay primitive this failed here, which is the whole
+     * reason the assertion exists. */
+    CK(count_colour(&k, &bar, 0, C_BACKDROP) + count_colour(&k, &bar, 0, C_BOXBG)
+       == bar.w * bar.h,
+       "B8 bar stays uniform with CGA art on an EGA palette (the case that broke)");
+    u2_frame_free(&k);
 
     u2_frame_free(&f);
     return 0;
