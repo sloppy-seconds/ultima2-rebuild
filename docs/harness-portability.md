@@ -2773,3 +2773,14 @@ never been shown to go red is a text assertion with extra steps. → Tier 2, har
   → Tier 1, evidence discipline: a findings document's "not established" has an expiry the moment any
   header or tool establishes the thing. When a decode closes a question that a prose note calls open,
   the correction belongs in the same commit as the decode, not in a follow-up.
+- 2026-11-23 — **a findings note can under-grade its own evidence, and the refutation of its negative
+  was in the routine it cited.** A mapping of seven internal identifiers to creature names was graded
+  "corroboration, not proof", on the stated ground that nothing in the binary pairs an identifier with
+  a word. One of the seven did exactly that: the arm keyed on that identifier prints a message that
+  names the creature in the executable's own text. The note had quoted the routine, quoted its string,
+  and then asserted the pairing did not exist. The defect is not a wrong answer — the conclusion was
+  conservative — it is a *verdict* that understated what the tree had proved, which propagates into
+  every downstream decision about what still needs a capture.
+  → Tier 1, evidence discipline: a negative of the form "nothing pairs X with Y" must be checked
+  against the print sites of the routine being discussed, not asserted beside them. Under-grading is
+  the quieter failure: an over-claim gets challenged, an under-claim just becomes permanent.

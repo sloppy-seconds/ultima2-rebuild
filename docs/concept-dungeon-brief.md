@@ -92,6 +92,27 @@ those ranges. So:
 > labelled hypothesis, and the art should stand on its own silhouette even if a
 > later capture reorders them.**
 
+**Sharpened 2026-11-23: one of those three is stronger than the other two, and the grades
+should not be lumped.** The gremlin arm is `cmp $0x5,%al` in `asm/12DB_dungeon_events.asm`, and
+the message it prints is `A GREMLIN STOLE SOME FOOD!` — **the binary's own string names the
+creature on the type byte**. That is not corroboration between a wiki and a formula, it is the
+executable pairing a stamp with a word, which is the thing the paragraph above says "nothing in
+the binary" does. So the honest split is three grades, not two:
+
+| stamp | name | grade | why |
+| --- | --- | --- | --- |
+| 5 | Gremlin | **proven** | `asm/12DB` keys on `cmp $0x5` and prints `A GREMLIN STOLE SOME FOOD!` — the string names it |
+| 2 | Ghost | corroborated | proven special (torch blown out) matches the third-party special for Ghost; the message does not name it |
+| 7 | Balron | corroborated | proven special (sleep) matches the third-party special for Balron; the message does not name it |
+| 1, 3, 4, 6 | Orc, Carrion creeper, Viper, Daemon/Minotaur | **hypothesis** | position in the third-party level-ordered list, and nothing else |
+
+**What would settle the remaining four is the stroke data, not a capture.** The original ships a
+file named `monsters` — 8 blocks of 256 bytes of stroke data, read by `asm/07F3` as one 0x800
+block, and `asm/68ED` indexes it as `(stamp & 7) * 256`. So the binary contains a *shape* per
+stamp. Rendering those eight blocks and comparing silhouettes against the four contested names is
+a decode plus a frame, and it is the only evidence about those four that would not be a guess
+about a wiki's ordering.
+
 Design consequence: the three proven creatures should visibly *do* their thing
 (a ghost that reads as cold and immaterial, a gremlin that reads as a thieving
 vermin, a balron that reads as a mind, not a muscle). The other four just need
