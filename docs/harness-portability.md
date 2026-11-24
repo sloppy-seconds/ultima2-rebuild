@@ -189,6 +189,638 @@ Candidates are easy to miss because they usually look like a bug fix:
 ## 6. Feedback log
 
 Newest first. One line per learning; the detail stays in the owning document.
+* **A plan's claim about what its own index can attribute is a hypothesis about the bytes, and the
+  cheapest way to be wrong for a week is to build on it.** A spike measured a planned entity-to-code
+  index against its own pre-registered kill threshold and found twelve attributable entities where
+  the plan had promised five kinds' worth. The plan's stated reason was sound and false in a specific
+  way: "the base is the displacement, so attribution is derivable" is true of *which field* a routine
+  touches and says nothing about *which entity*. This codebase mediates every immediate through a
+  register in both directions -- `mov $0x2c,%al` then `mov %al,BASE(%di)` to write, `mov BASE(%di),%al`
+  then `cmp $0x34,%al` to test -- so a scan for the same-instruction form finds **one row in 193** and
+  reports an absence that is entirely an artefact of the query. A bounded def-use slice (walk back from
+  a store to the load that filled the register, forward from a load to the compare that consumed it,
+  give up if the register is clobbered in between) recovered 40 rows and was conservative by
+  construction: it can under-report, it cannot invent. Two legs came back structurally empty and that
+  was established by `grep` over the tree, not by the tool's own zero, because a tool returning nothing
+  is exactly what a broken tool looks like.
+  → Tier 1, evidence discipline: before a store is designed, measure whether the join yields rows, and
+  fix the kill threshold in advance so the measurement is allowed to change the plan. Then honour it.
+* **A pre-registered kill threshold is only worth having if the verdict is honoured when it is
+  breached.** The threshold existed precisely so the decision could be made by a number rather than by
+  enthusiasm, the number came in below it, and the epic was cut. The temptation at that moment is to
+  discover that the measurement was slightly wrong, or that the near-misses should count -- and either
+  move makes the pre-registration a decoration. What survives the cut is reported separately from what
+  the cut killed, so the next reader can tell a closed question from an unasked one.
+  → Tier 1, planning: pre-registering a threshold is a promise to lose the argument, and its value is
+  exactly the size of the argument it prevents.
+
+* A new check program was written, built, run, and its controls demonstrated -- on the host compiler.
+  CI's clang job rejected it on a line that did nothing, with a warning gcc never emits, and the
+  workflow's own comment already said every one of clang's warnings is one gcc stays silent about. The
+  local suite was never going to catch it and passing it was not evidence about CI.
+  → Tier 2, verification: when CI compiles with more than one compiler, "green locally" names a
+  compiler and is not a verdict about the build. Run the second one before pushing, in the container
+  the project already ships -- it is a minute, and it is the only way the local run means what CI means.
+* The measurement of that first red was wrong, and the wrong number was committed. A tracked generated
+  input had been silently rewritten in the working tree by something nobody could identify, and the
+  generator faithfully produced a plausible table from it: 52 rows against a committed 43, reported as
+  nine missing splits, when the true diff on clean inputs was 42 rows with one run shortened and two
+  dropped. The selftest went red at the same instant, which is the signal -- a stale output does not
+  break a selftest, a changed input does.
+  → Tier 1, evidence discipline: regenerate the inputs' provenance before the output's. When a
+  generator's output disagrees with its committed copy, `git status` on the inputs is a cheaper test
+  than any theory about why the tool changed, and a selftest that goes red alongside a freshness gate
+  means the inputs moved, not that the output is stale. Commit the diff, not the conclusion, until the
+  working tree is clean.
+* A rules document said a generated table was owed a freshness check. It was not: the check had landed
+  weeks earlier and the prose had not caught up. Auditing the real gap found it somewhere else and in a
+  different shape -- eight generated tables with no freshness check, not because nobody thought of it,
+  but because their generators write to hardcoded paths and take no output argument, so the gate is
+  unbuildable without changing each tool first. One of the eight had thirteen separate writers, which
+  makes "its generator" not a thing and any freshness assertion on it meaningless. And the one table
+  that could be gated immediately went red on being gated.
+  → Tier 1, evidence discipline: before building a check the docs ask for, run the docs' own claim
+  against the tree. A rules file is a hypothesis about the present. And when a class of check is
+  missing, ask what makes it missing -- "nobody added it" and "the tools cannot be diffed in their
+  current shape" need opposite fixes, and only one of them is a line in a script.
+* A layout module documented that a coordinate was being silently truncated by integer division, said
+  the truncation had been fixed, and cited the screenshot that proved it. It had been fixed on one
+  axis. The other axis still truncated, in the same expression, in the same routine, and nobody looked
+  because the bug report had been about the first axis. A new pixel-level gate found it on its first
+  run, alongside a second defect of its own: a band declared exactly one text cell tall was also
+  declared to have a border, and the glyph necessarily covers both border rows, so the border had
+  never been visible where there was text.
+  → Tier 1, verification: when a defect class is fixed and written up, assert the whole class, not the
+  reported instance. "Fixed the y truncation" invites the next reader to treat the family as closed;
+  the fix is a check that every coordinate reaching that division is on the grid. And a written-up fix
+  without a gate behind it is a claim with an expiry date.
+* A measured result was quoted in prose as "54 of 54 slots" and copied between documents for weeks.
+  The tool still said 54 only because nobody had run it: the corpus had grown from two captures to
+  twenty and the real figure was 543 of 543 across four distinct sectors instead of one sector twice.
+  The prose was understating the project's own strongest validation, and the row that complained the
+  gate never ran was itself quoting the stale number.
+  → Tier 1, evidence discipline: a count over a growing corpus is a measurement with an expiry date.
+  Re-run the tool before citing its number anywhere, and where prose must name a figure, name the
+  command that prints it alongside, so the next reader has a way to check rather than a reason to
+  trust.
+* A scanned manual needed reading and the agent reached for a dedicated vision subagent, which then
+  died on that provider's billing limit. The agent was itself multimodal and could have read the
+  render directly; it had matched the task to the tool named for it instead of checking its own
+  capabilities. The detour cost a failed run and a round trip.
+  → Tier 2, orchestration: before delegating a capability task, check whether the current model
+  already has that capability. Delegation is for work the caller cannot do, for isolation, or for
+  parallelism -- not for naming symmetry, and a delegation hop adds a failure domain the caller did
+  not have to have.
+* A recalled claim about what the game's manual says was accepted, written up as the strongest
+  available evidence on a design question, and only then checked -- against a scanned copy of the
+  manual already sitting in the repository's own reference directory, readable with a one-line
+  extraction. The manual did not say it. The write-up had to be rewritten.
+  → Tier 1, evidence discipline: when a claim is about what a document says, and a copy of that
+  document may be in-tree, search for the file before reasoning about its contents. A recollection is
+  a pointer at a lookup, not a substitute for one, and "we do not have the manual" is a claim worth
+  spending ten seconds on before it is written down.
+* A documented quirk was described as an accident of position -- "only when the spawner happens to
+  hand out that slot, which is one in thirty-two" -- and that framing was used to argue the behaviour
+  could not express the design the players remembered. Counting the authored data said the opposite:
+  the slot was written deliberately in most of the corpus, and with the same creature type almost
+  everywhere. The quirk was the design.
+  → Tier 1, evidence discipline: before calling a mechanism incidental or incidental-only, count how
+  often the corpus actually produces it. "Can happen" and "happens in 23 of 30 authored cases" support
+  opposite conclusions, and a one-line count is cheap enough that there is no excuse for reasoning
+  from the first framing.
+* A third-party reference gave one HP per creature and matched the program's spawn code exactly, nine
+  of nine, which read as corroboration and was true as far as it went. The program also stores HP per
+  authored placement, where most species carry many different values. The reference was not wrong; it
+  described one population and was being read as a species constant.
+  → Tier 2, schema: when an external source agrees with a derived value, ask which population it
+  measured before recording the agreement as corroboration. Agreement between a constant and one
+  population of a varying field is the weakest evidence that looks strongest.
+* A measurement pass globbed one filename stem and reported the whole corpus. It had measured a third
+  of it. The platform's flat filesystem namespace had forced two corpora onto different stems, and the
+  second stem held the data for most of the game's worlds. Nothing looked wrong: the row count was
+  plausible, the values were real, and the missing third was simply absent from the answer.
+  → Tier 1, derived data: before a scan reports a corpus, enumerate the stems and directories that
+  could hold the same kind of data and print how many files each contributed. A glob is a hypothesis
+  about the naming scheme, and a plausible row count is not evidence that the glob was the right one.
+* Two true numbers for one field arrived three times in one day (a creature's HP read from a placement
+  table, from a spawn routine, and from a generated-dungeon formula), and each time the instinct was
+  to pick one and mark the other wrong. They were all correct: the field was not a property of the
+  entity but a property of the *route by which the entity came to exist*. Separately, a different
+  pair of numbers for the same field really was a source disagreement with one side wrong. The two
+  shapes look identical in a table and need opposite treatment.
+  → Tier 2, schema: when a field has several defensible values, ask whether they are populations
+  keyed by a closed context vocabulary, or sources in conflict. Model populations as rows keyed
+  (entity, context) with the value allowed to be a formula over a named variable, and keep conflicting
+  sources in a visibly different column. Merging them lets a real error hide behind a plausible
+  label; keeping them apart is what makes "which is right" a question that stops being malformed.
+* 2026-11-23 — **"parses to nothing" is a statement about the parser's starting point, not about the
+  bytes.** In a fixed-stride container of terminator-delimited records, the block whose first byte is
+  the terminator yields zero records when parsed from its own base and is routinely reported as
+  empty — while the same bytes hold real, reachable data at interior offsets that another code path
+  indexes directly. Calling that block empty is a parser artefact that then propagates into every
+  description of the container's layout.
+  → Tier 1, derived data: for terminator-delimited records in a strided file, never report a region
+  empty without also scanning it for nonzero bytes and reporting the first nonzero offset. If any
+  code path indexes into the region's interior, the region is not empty by definition.
+* 2026-11-23 — **a note that says a procedure "yields" something visible has not finished the decode
+  until someone looks.** A header recorded that plotting a shipped art file a particular way "yields
+  seven distinct creature silhouettes", and that sentence was load-bearing for an open identity
+  question — it was the only evidence that a shape existed per entity. But nobody had ever plotted
+  it, so the evidence sat in the tree contributing nothing for weeks while the identity question was
+  graded as unresolvable and queued as needing a capture. The decode was one rendering away from
+  being an observation, and the assertion was mistaken for the observation.
+  → Tier 1, evidence discipline: when a note claims a procedure produces something observable, the
+  observation is part of the decode, not an application of it. Either record what it yields or mark
+  the claim as decoration. A shape nobody has looked at has the same evidentiary value as a shape
+  that does not exist.
+* 2026-11-23 — **a findings note can under-grade its own evidence, and the refutation of its negative
+  was in the routine it cited.** A mapping of seven internal identifiers to creature names was graded
+  "corroboration, not proof", on the stated ground that nothing in the binary pairs an identifier with
+  a word. One of the seven did exactly that: the arm keyed on that identifier prints a message that
+  names the creature in the executable's own text. The note had quoted the routine, quoted its string,
+  and then asserted the pairing did not exist. The defect is not a wrong answer — the conclusion was
+  conservative — it is a *verdict* that understated what the tree had proved, which propagates into
+  every downstream decision about what still needs a capture.
+  → Tier 1, evidence discipline: a negative of the form "nothing pairs X with Y" must be checked
+  against the print sites of the routine being discussed, not asserted beside them. Under-grading is
+  the quieter failure: an over-claim gets challenged, an under-claim just becomes permanent.
+* 2026-11-23 — **an older findings section outranked a newer decoded header, and the stale negative
+  became the work queue.** One note recorded that a computation was "not established" and blamed a
+  wrong function boundary. A header written a week later named the routine, its operands and its
+  semantics, and said outright that the lookup used the entity's own page rather than the player's.
+  Nothing reconciled the two, so the queue cited the older text and an agent was about to re-derive
+  something the tree had already settled. The cost was not the derivation — it was that a closed
+  question was being advertised as open, which is the same defect as a stale queue row, one layer
+  down.
+  → Tier 1, evidence discipline: a findings document's "not established" has an expiry the moment any
+  header or tool establishes the thing. When a decode closes a question that a prose note calls open,
+  the correction belongs in the same commit as the decode, not in a follow-up.
+* 2026-11-23 — **"no candidate formula fits" is a claim about the candidates, and the missing one is
+  usually an input someone held constant.** A coordinate transform was recorded as unresolved after
+  several plausible index formulas were tried and the best matched 2 of 27 records; the write-up
+  concluded the code that computes it must be outside the analysed range, and that conclusion was
+  repeated into a queue as a to-do. It was wrong. Every candidate had used the *player's* page index;
+  each record carried its **own** page index in a field nobody had considered geometric. Adding that
+  one term made it exact on 27 of 27. The tell was free: the field's value range was identical to the
+  range of pages the observed outputs occupied, which was visible the moment both were printed.
+  → Tier 1, derived data: when no formula in a family fits, print the value range of every candidate
+  operand next to the range of the observed outputs before declaring the family exhausted. A held
+  constant is an assumption, not a fact, and it is the cheapest thing to test.
+* 2026-11-23 — **a closed item that survives in a second queue gets re-recommended as new work,
+  complete with its retired blocker.** An investigation was proposed as "blocked, needs a certain
+  game state" from a summary list. The detailed worklist had closed that question three weeks earlier,
+  twice, by two independent methods, and the blocker was a false premise — the state was reachable by
+  a single memory write and had in fact also been reached by real play in between. The summary list was
+  the only stale copy, and it was the one being consulted when planning what to do next.
+  → Tier 1, queue hygiene: one derived queue, regenerated from the detailed records, or none. Where
+  two levels of queue must coexist, the coarse one needs a rule that it is closed by a pointer to the
+  fine one and never by its own text — otherwise it freezes the moment the item below it moves, and
+  then advertises finished work as the plan.
+* 2026-11-23 — **independent agreement is a different grade from citation, and it is easy to miss
+  because the data source did not change.** A third-party statistics table had been treated throughout
+  as an unverified hypothesis. Reading the binary's spawn dispatch turned up nine immediates that
+  matched nine of the guide's figures exactly — including an odd ceiling value that the guide reported
+  and a naive progression model would have predicted differently. Nothing about the guide changed; the
+  evidence grade moved from "someone wrote this down" to "two independent sources agree", which is the
+  strongest validation of that source available.
+  → Tier 1, evidence discipline: when derived facts and third-party facts agree by accident of
+  discovery, say so and re-grade. Agreement nobody looked for is worth more than either source alone.
+* 2026-11-23 — **a decoded, measured check that no gate runs is a rumour.** A verification script
+  compared every relevant runtime capture against a formula derived from the disassembly and passed on
+  54 of 54 cases — a strong result, cited in prose as the basis for a whole section. It appeared in no
+  gate runner and no workflow, so nothing would notice if the code it protects regressed. The project
+  had already caught two gates that could not fail; this one could fail and simply was never asked.
+  → Tier 1, gate design: a finding's grade should imply a wired check. If a number is load-bearing
+  enough to quote, it is load-bearing enough to re-verify, and "someone can run it" is not a gate.
+* 2026-11-23 — **two true numbers for one field is more common than one wrong number, and a
+  single-value column silently picks.** A creature's hit points were recorded as 255 from shipped
+  data and 64 from a third-party guide, and the finding written up was "the game wins, the guide is
+  wrong". Both were right: 64 is what the runtime spawn path writes and 255 is what the shipped data
+  carries, so the entity has two populations with different statistics. The conflict was an artefact
+  of a table that offers one column per attribute.
+  → Tier 1, derived data: when a reference and the binary disagree, ask whether they are describing
+  the same population before ruling one of them wrong. Any schema with one value per key is an
+  unannounced decision when the key spans two populations.
+* 2026-11-23 — **"absent from the data file" is not "absent from the program", and the two get
+  confused in one sentence.** A claim that a certain entity could not be a creature was made by
+  searching the placed-entity tables for its identifier and finding nothing. It was a correct search
+  of the wrong mechanism: the same program also *generates* entities at runtime through a dispatch
+  chain, and the entity was there, in a routine whose filename already named it. The claim was
+  recorded, repeated, and only re-examined after a human repeated their recollection for the second
+  time. The whole thing was a directory listing away from being caught.
+  → Tier 1, evidence discipline: before recording that something does not exist, enumerate every
+  mechanism by which it could exist — shipped data, generated at runtime, derived from another value —
+  and say which were checked. A negative over one mechanism is a claim about that mechanism.
+* 2026-11-23 — **a uniqueness assertion written for one table of eleven is a rumour.** A generated
+  reference set asserted that one table's key was unique and reported green while another table had
+  no key at all: 120 rows over 16 distinct identity values, with two columns constant across every
+  row so they carried no information. Nothing downstream could tell, because the tool's verdict was
+  about the table it checked, not the set it published.
+  → Tier 1, derived data: declare every table's key as data and assert all of them, and treat a
+  column that holds one value across a whole table as a warning. A dead join and a healthy column
+  look identical until someone counts the distinct values.
+* 2026-11-23 — **a dict comprehension over rows with duplicate keys is a conflict resolver that
+  never announces itself.** A join built as `{key: row for row in rows}` silently kept the last row
+  for each key, so where two third-party sources disagreed about a creature's hit points the
+  published table carried whichever happened to sort last — in one case a figure a live capture had
+  already disproved. The capture and the written resolution were both correct; the join simply never
+  looked at the disagreement, and the table published a single confident number.
+  → Tier 1, derived data: when sources can disagree, collapsing rows must keep every distinct value
+  and name the field that disagreed. Any construct where the last writer wins is a decision, and a
+  decision nobody recorded will eventually be wrong.
+* 2026-11-23 — **a generated-table CLI without a `__main__` guard rewrites its own committed output
+  on import, and can disarm the gate that checks it.** A census tool ended with a bare call to its
+  entry point, so `import census` fell through to the write path with the default output directory.
+  Another script imported it purely to read a lookup helper, which meant every run of that script
+  regenerated all eleven tracked tables as a side effect. The damage was not the churn: a
+  regenerate-and-compare freshness gate run after such an import compares a fresh build against a
+  fresh build, so it can never go red. Import order decided whether the gate was armed.
+  → Tier 1, gate design: a freshness gate is only as trustworthy as the claim that nothing rewrote
+  the files between the last edit and the check. Any tool that writes committed output on import
+  breaks that claim silently, so entry points must be guarded and importing must be a read.
+* 2026-11-23 — **a round-trip test cannot detect a wrong base offset, because the reader and the
+  writer share it.** A save editor was refactored so its field offsets came from a generated table
+  instead of hand-copied numbers. The first run read the base from the wrong column of that table,
+  so every write landed at the wrong distance from the start of the record. `show` printed the
+  values that had just been set, and a write-then-read assertion passed, because both directions
+  subtracted the same wrong base. The defect was invisible to anything that only asks the tool
+  questions in its own vocabulary, and was caught only by running the previous version and the new
+  one over identical input and comparing the resulting bytes.
+  → Tier 1, refactor discipline: when a change is meant to preserve behaviour, the control is a
+  byte-for-byte comparison against the previous version on identical input, not a round-trip
+  through the tool under test. A shared constant that is wrong in both directions is the one error
+  a round-trip is structurally incapable of reporting.
+* 2026-11-23 — **a launcher that always passes a switch turns an env-var-presence test permanently
+  on, and the flag meant to control it can never go red.** A dev-only affordance read its variable
+  as "is it set" rather than "what is its value", and the container launcher passed `-e NAME=0` on
+  every launch so the flag had a default. Every session got the dev behaviour; passing the flag and
+  omitting it produced identical results, so the documented switch had one observable state and the
+  off state had no representation at all. Nine days passed before anyone noticed, because the only
+  consumer was a human looking at a screen and the dev behaviour resembled a plausible game state
+  rather than a mode. Two rules come out of it. **Read a switch by value, and treat the empty string
+  and `0` as off** — the sibling switch in the same file already did, which is the tell and the
+  reason the bug survived review. And **do not set a switch the caller did not ask for**; omitting it
+  keeps presence and truth in agreement even when a reader gets the first rule wrong. The general
+  shape: a flag whose two states are indistinguishable to every observer is a flag with one state, so
+  a dev affordance that changes what the program boots into must announce itself on stderr or in the
+  state dump, and must have a control proving the off state is reachable.
+* **2026-11-23 — a static archive built without `-fPIE` cannot link into a PIE-default
+  executable, and the failure arrives wearing the costume of an assertion.** The engine binary
+  links from objects directly and succeeded, so the build step went green; only the check programs,
+  which link the archive, died at link time with an absolute-relocation complaint. The harness then
+  reported the assertion it had been about to run, and two days were spent on a named behavioural
+  defect in code that was never executed. The general shape: a toolchain default that differs between
+  the developer's platform and the runner is a defect the build must be immune to, not a platform to
+  learn; and a harness must never be able to report a test result for a binary it failed to produce.
+  → Tier 1, build discipline: compile the archive with the same position-independence the executables
+  get, and make "could not build" a distinct verdict from "the test failed".
+* **2026-11-23 — a harness that discards the compiler's stderr cannot say why it is red, and two
+  harnesses in one repository differed only in how strictly they were compiled.** A mutation harness
+  reported every mutant as "would not compile" with the compiler output sent to `/dev/null`, while a
+  second mutation harness in the same job caught every mutant. The difference was that one hardcoded
+  a narrower flag set than the project's exported one and the other used the export; on the runner the
+  narrower set failed to build the mutant, and nothing in the verdict said so. The same rule this
+  project already applies to check programs -- never hold a test to a weaker bar than its subject --
+  had simply not been applied to the harnesses that prove the tests can fail. The general shape: any
+  harness that shells out to a compiler must capture its output and print the first lines on failure,
+  and every harness must compile with the project's exported flag set rather than a remembered copy.
+  → Tier 1, gate design: a gate that cannot name its reason gets rerun until it goes green by accident.
+* **2026-11-23 — "could not run" is a verdict, and collapsing it into "failed" makes a gate assert on
+  an input that cannot exist.** Several gates needed a file the repository gitignores by policy. Each
+  had reasoned correctly for the local case -- a silent skip would hide the defect the gate exists to
+  catch -- and then returned a plain failure, which meant the continuous-integration runner could never
+  go green and produced symptoms that read as product defects for days. The fix is a distinct
+  cannot-run exit code decided by the caller: locally the missing input is a real problem and stays a
+  failure; where the input is gitignored by design, the gate prints a visible skip naming what is
+  missing and where the property is still covered. The distinction is the precondition itself, not the
+  environment variable, so the same rule holds in both places. A skip that can hide a failure is not a
+  skip; one whose input cannot exist in that environment cannot.
+  → Tier 1, gate design: preconditions name the file the tool opens, and cannot-run is its own verdict.
+* **2026-11-23 — a sanitizer job that hardcodes the build directory links the wrong library and
+  reports PASS while sanitizing nothing.** The harness resolved the archive path from a fixed
+  directory while the sanitizer target built its own, so on a dirty developer tree the sanitizer run
+  linked an ordinary archive left there hours earlier and printed a pass; on a clean tree the same
+  mismatch surfaced as a link error. One root cause, two unearned verdicts, and only the loud one was
+  noticed. The general shape: any secondary build configuration (sanitizer, coverage, alternate
+  compiler) must publish the directory it built into, and every consumer must read that value rather
+  than reconstruct it -- a reconstructed path is a second hand-maintained copy of a build fact.
+  → Tier 1, build discipline: one exported build directory, read by everything that links against it.
+* **2026-11-23 — an authorship guard that compares per-file bodies must distinguish a rename from an
+  edit, or every legitimate rename gets marked and the marker stops meaning anything.** The guard
+  permits a changed body only when the file carries a correction marker. Renaming a file -- which the
+  project's own naming rules *require* whenever a session learns what a routine does -- presents to the
+  guard as a removal plus an addition, so ten correctly renamed files with byte-identical bodies were
+  reported as unmarked edits and the branch went red for obeying the rules. The fix separates the two
+  shapes on evidence: same address and identical body is a rename and owes nothing; a rename that also
+  changes a body still needs the marker. The general shape: a permission gate must be tested against
+  the legitimate operations it will meet, not only against the violation it was written to catch, and
+  a control proving the legal case passes is as necessary as one proving the illegal case fails.
+  → Tier 1, gate design: write the control that makes a gate red, and the control that proves it is
+  not red when the operation is legal.
+  → Tier 1, deploy discipline: env switches are read by value and left unset when false, and a
+  mode that changes the boot target says so where a log or a dump will show it.
+* 2026-11-21 — **a census is not a proof of layout, and a gate built on one cannot fail.** A picture
+  format was recorded as proven because decoding it one way reproduced a live capture at "100%
+  colour-class agreement over 4000 sampled pixels". Two candidate row mappings both produce exactly
+  the same colour histogram, so that check was satisfied by the wrong reading and by the right one
+  alike, and the wrong reading shipped: every picture rendered horizontally doubled and combed. The
+  property that separates the two is position, not count, and it needed a per-scanline comparison
+  against a capture rather than a tally. The general shape: **a derived check that summarises
+  structure into counts throws away exactly the axis that distinguishes the hypotheses it is meant
+  to separate.** It reads as a strong check because the number is large and the match is exact.
+  → Tier 1, verification discipline: when a check summarises geometry into a histogram, ask which
+  two layouts it cannot tell apart, and assert that pair positionally. Then write the control that
+  makes it red; if no input can make it fail, it is decoration.
+* 2026-11-20 — **when a visual claim is checked by eye against a render the harness itself produced,
+  a bug in the preview tool reads as a bug in the game.** Three wrong readings happened in one
+  investigation: palette-index bytes were saved as greyscale and the resulting near-black images were
+  read as "the art is sparse and dark"; frames were compared from a deduplicated list and the wrong
+  frame was matched to the wrong source file; and a non-integer downscale for a side-by-side made
+  correct art look combed. Each was plausible and each cost time. The fix was to stop comparing
+  impressions and assert pixel agreement against the source file through the same decode the engine
+  uses, which turns "looks wrong" into a number and a named file. A harness that renders previews for
+  a human should apply the real palette and scale by an integer factor, or it manufactures defects.
+  → Tier 1, verification discipline: measure against the source, and make preview tooling faithful
+  or do not trust it.
+* 2026-11-20 — **a resource lookup that reads one path field instead of the project's content-root
+  list sees a subset of the tree, and the symptom is format-dependent, so it reads as a bug in the
+  format that failed.** The splash loader searched the theme directory and the bare content root, and
+  never the patch/release sublayers that the root list defines. The upgrade package's high-colour
+  pictures live in a sublayer, so the three that happened to be duplicated in the theme directory
+  resolved and the rest fell back to the low-colour originals. The report was "the title picture is
+  fine and the demo pictures are broken", which invites a theory about the pictures; the actual
+  discriminator was which directory each file had been copied into. Two rules. A harness should have
+  exactly one search-path facility, and every loader that resolves a data file goes through it — a
+  loader that hand-rolls "themes dir then data dir" is a second copy of the path policy and will
+  drift. And when a fallback changes the *format* of what it loads, it must also change the
+  interpretation of the bytes (palette, stride, bit order) or be refused: a silent format fallback
+  produces output that is confidently wrong rather than missing, which is the worst kind to debug.
+  → Tier 1, content resolution: one search-path facility, and a format fallback must remap or refuse.
+* 2026-11-20 — **a decoder gate that asserts the output is fully populated rather than that it is
+  non-trivial cannot fail on the failure that matters.** The picture unpack was gated on "every one of
+  the 64,000 pixels is written", which a decode that produced a black rectangle satisfies perfectly.
+  The bug was not in the decoder at all: the caller blitted the picture and then composited its caption
+  with a text-screen routine that paints every cell's background, so the art was deleted between the
+  blit and the present, and every automated check along the way reported success. Two transferable
+  rules. First, an art or decode gate should assert ink (a distribution over the palette, or a floor on
+  non-background pixels), not coverage; coverage only catches truncation. Second, when a pipeline has a
+  compositing step, gate the composite and assert both directions in the same test — the old routine
+  must still destroy the underlay and the new one must not — because a check that exercises only the
+  replacement cannot tell which function it was given. The owner found this by looking at the screen,
+  which is the third time this project has had a "the code ran and the pixels disagreed" report; the
+  generic lesson is that a present call is not evidence of a visible result.
+  → Tier 1, gate design: what a check must be able to fail on, and composites need both-direction controls.
+* **2026-11-20 — a test that proves nothing was written has not proved nothing happened.** An
+  ending sequence was believed to touch no files because every content file was hashed before
+  and after it and none changed. That correctly refuted a *save*, and the write-up then recorded
+  the stronger conclusion that the file I/O in that path was unexecuted. It was a **read** of a
+  map the sequence then drew, and a hash comparison is blind to reads at any sampling rate. The
+  bytes were unambiguous all along and had simply never been decoded, because the capture's
+  verdict made decoding them feel settled. The generic rules: when a measurement is used to
+  refute an interpretation, write down what it can see and what it cannot, and treat "we saw no
+  evidence of X" and "X did not happen" as different claims; and when a disassembler left a
+  region as raw bytes, that region is unexplored territory no matter what a later test concluded,
+  because the test was written by someone working from the same gap.
+  → Tier 1, evidence provenance and what a negative measurement can carry.
+* **2026-11-20 — "reload the save" is not a general undo.** An ending animation wrote four fields
+  into live state, and the obvious fix was to reload the save afterwards. It was wrong twice over:
+  the fields lived outside the record's byte span, so reloading could not reach them at all, and
+  the flag that gated the animation was never cleared anywhere, so the animation re-ran on the
+  next entry. The generic rule: when a sequence mutates state as a costume rather than as a
+  decision, snapshot what it touches at the moment it starts and restore it explicitly when it
+  ends. Reloading persisted state only undoes the part that was ever persisted, and a harness that
+  asserts "the next run looks clean" will pass while the fields outside the record stay wrong.
+  → Tier 1, state ownership and restore discipline.
+* **2026-11-20 — piping a build through `head` can kill the build, and the failing test that
+  follows is a lie.** A gate was edited, then `make -j8 2>&1 | grep ... | head -5` was run to
+  check it compiled. `head` exits after five lines, the pipe closes, and `SIGPIPE` kills `make`
+  partway through: the compiler lines that did print looked like success because the warning flags
+  in each command line contained the substring being grepped. The binary on disk was the previous
+  one, so the next test run reported a defect that had already been fixed, and an hour went into
+  debugging source that was correct. The generic rules: never truncate a build's output with
+  `head` in the same pipeline, and never decide a build succeeded by reading its log — check the
+  build tool's own exit status, and make the check for errors a pattern that cannot match the
+  compiler's own command line (`error:` and `warning:`, not `error`). A harness that builds and
+  tests in one shell pipeline should assert the build's status before it runs anything.
+  → Tier 1, harness hygiene and build verification.
+* A gate that seeds only the region where its own wrong precondition happens to hold will pass
+  every case it has while the rule is dead in the field. A tile-cost rule here grew a sector test
+  transcribed from a branch at the routine's entry; ten cases passed, and the effect never fired
+  in the only map regions that contain the tile. Two things made it visible, and neither was the
+  gate. First, the live capture that originally proved the effect was re-read rather than
+  re-believed: its memory dump named the region it was taken in, and that region failed the test
+  the gate had quietly adopted. Second, a data census — counting the tile across every shipped map
+  file — showed it existed nowhere the gate allowed. The generic rules: when a capture is cited as
+  the proof of a behaviour, re-read the capture's own state for the conditions it was observed
+  under, because a prose summary of a capture loses exactly the context a later reader needs; and
+  when a rule is transcribed from a branch, write the case in the region the evidence actually
+  names, not the convenient one, then run the refuted rule as a control and require the new case
+  — and only the new case — to go red. A control that turns everything red proves the case is
+  sensitive to nothing in particular.
+  → Tier 1, evidence provenance and gate design.
+* **2026-11-18 — an overlay directory whose related files are gated independently will eventually
+  contain one half of a pair, and the half that survives alone becomes the truth.** A save wrote a
+  sector's terrain overlay without its creature overlay, because "store only what is dirty" was
+  applied to each file separately. On reload the orphaned overlay was read as ground truth and the
+  missing half was filled from release data, which turned every stamp it had baked into a sprite
+  with nothing under it. The tell was not the count of bad cells but their *coordinates*: the same
+  cell and the same byte appearing in three different sector files, with different ground
+  underneath each, is not behaviour, it is one buffer reaching several filenames. Two generic
+  rules: when a write-back layer can persist a derived file without the source file it was derived
+  from, pair them at the write and assert sibling completeness over the whole directory rather
+  than over the one file a scenario happens to touch; and when a check can only be driven red by a
+  shape no scripted scenario produces, plant the shape and require the check to name it.
+  → Tier 1, persistence invariants.
+* **2026-11-17 — score a written artefact only at the instant it was written, or you will
+  invent a defect.** A persistence layer that rewrites a file only when something dirtied it is
+  correct behaviour, and it turns a naive before/after comparison into a machine for producing
+  false positives: compare the file's bytes against state read *now* and every change since the
+  last write looks like a bug the program has right now. The harness that found this reported a
+  phantom at almost every checkpoint, and the numbers were entirely plausible — the endpoint
+  matched what a hand inspection of the saved file showed, which is what made it convincing.
+  Two guards fixed it, and both are worth copying: skip a checkpoint whose file bytes are
+  unchanged from the last one scored, and when the state has to be read over an interface the
+  action itself can advance (a save key that also hands the simulation a turn), read it on both
+  sides of the action and discard the checkpoint when the two disagree. Related and equally
+  generic: the same run showed the reference program writing the file about once per ten rounds
+  where the reimplementation wrote it on nearly every save, so "the reimplementation leaves more
+  residue" can be a difference in *when it writes* rather than in what it computes.
+  → Tier 1, measurement discipline for persistence.
+* **2026-11-17 — a save location that holds derived state as well as the record makes the
+  previous game the next game's ground.** The engine writes the world it has mutated into the
+  same directory as the character record, which is correct for resuming one game and wrong for
+  starting the next: the overlay is read ahead of the release content, so anything the last
+  character left behind is authored terrain for whoever creates a character next. The general
+  form is that "resume" and "start fresh" are two different questions, and a layout that answers
+  only the first silently answers the second with the wrong game. Two things worth carrying to
+  any harness with one default save location: a new game should rotate the old one aside rather
+  than overwrite it, because the old one is evidence and somebody's afternoon; and the counter
+  that would have caught this has to run at the moment of the write, not on a live frame — a
+  diagnostic that measures the running state cannot see a file, and this one printed zero while
+  the player was walking past nine. → Tier 1, save/derived-state layout and diagnostics that
+  measure the artefact rather than the session.
+* **A rate measured by two reads around a sleep is not a rate.** A vehicle's flight speed was
+  first reported as 12 cells/s from `pos()`, `sleep(2.0)`, `pos()`, and a Manhattan distance.
+  Three things were wrong and none of them produced an error: the game masks both coordinates
+  `& 0x3F`, so a wrap makes the distance fiction; a sector change reloads the position, so a
+  jump can be a map transition and not motion at all; and the two reads bracket more than the
+  sleep, so the elapsed time is not what was divided by. The fix is not a better formula but a
+  different instrument: poll at the maximum practical rate (the emulator's memory API sustained
+  ~1350 Hz, not the 5 Hz a hand-written sampler defaults to), and count only transitions that
+  are single-cell steps within one sector, labelling wraps, jumps and unchanged samples
+  separately instead of folding them into a distance. That turned an unverifiable "12" into 49
+  steps in 4.00 s with 0 jumps and 0 wraps, three runs, zero spread — and it replaced a shipped
+  constant that was 25% off. The owner's instinct that 12 cells/s "seems too fast even for a
+  human player" is what sent it back to be measured; the number survived and the method did
+  not, which is the good outcome. A plausible figure nobody questions is the dangerous one. →
+  Tier 1, tooling that fails loudly.
+* **A breakpoint that never fires, including on steps that demonstrably moved, is a fact about
+  the probe and not about the code.** Two addresses on a per-step dispatch path reported no hit
+  across several runs while the position bytes proved the step had executed. The temptation is
+  to read a silent breakpoint as evidence the code did not run; here the same run showed the
+  behaviour happening, so the only sound conclusion was that the probe was unreliable at those
+  addresses. Record which claims rest on a breakpoint and which rest on an observed state
+  change, and do not let the former borrow confidence from the latter. → Tier 1, tooling that
+  fails loudly.
+* **A refusal with no positive control is not a finding, and a control placed before the thing
+  it controls can destroy its own precondition.** A passability probe asked whether a mounted
+  plane refuses forest. The first run mounted correctly, saw the refusal, and proved nothing:
+  every neighbour of that pad was forest or mountain, so "refused forest" was indistinguishable
+  from "a grounded plane cannot move at all". The second run added the missing control and put
+  it *before* the mount — the control step walked the player off the launch pad, the board key
+  then had nothing to board, the mode byte stayed on-foot, and every subsequent "mounted" probe
+  silently tested a foot character while looking like a pass. The fix was a synthetic map where
+  pad, forest and open grass are three mutually adjacent cells, with the mount sitting between
+  the two halves and an accepted step on the far side of the refusal. Generalise twice: a
+  negative result needs a positive run through the same apparatus, and ordering a control before
+  a state transition can invalidate the state it was meant to qualify.
+  → Tier 1, experiment design.
+* **A routine cut in the middle will get a plausible wrong name on the far half, and the name
+  is the damage.** A boundary detector split one save routine into four pieces. The second
+  piece set up a 256-byte transfer with the same register pair a read uses and the same pair a
+  write uses — only the mode byte, set in the *first* fragment, distinguishes them — so it was
+  named a loader and documented as reading data into arrays. It was writing them to disk.
+  Nothing about that is detectable from the fragment alone, which is the point: an ambiguous
+  fragment must be left unnamed rather than named from its most plausible reading, because a
+  wrong name gets cited as fact by everything downstream and a blank one does not. The
+  detector's own rule should be that a fragment which does not set its own mode byte is a
+  continuation, not a function. → Tier 1, boundary detection.
+* **2026-11-15 — "does this change survive leaving and coming back?" is usually a question about
+  call order, not about a live session, and a harness should try the static form before it books a
+  capture.** The question here was whether an emptied container stays emptied across a site exit and
+  re-entry, and it had been parked as needing gameplay because two settled findings appeared to
+  contradict each other: the game does write whole sector images back to disk, and nothing inside a
+  site persists. Both were true. What settled it was reading the site-entry routine and noticing the
+  order of two calls in it: the store runs **before** the current-sector byte is reassigned, so what
+  gets written is the sector you are standing in and never the one you are entering, and the loader
+  runs after, re-reading the destination image from disk into the same buffer the store writes from.
+  A site's own image is therefore read fresh on every entry and never written back, which makes the
+  persistence rule a consequence of ordering rather than a policy anyone implemented. Three
+  transferable points. **(1)** When a persistence question is open, look for the entry routine and
+  ask whether the write precedes or follows the context switch; that single ordering fact decides it
+  and costs one read. **(2)** If load and store share one buffer, then cross-visit persistence is
+  decided by whether the load happens, and any in-memory distinction between "write one copy" and
+  "write both copies" helpers is about within-visit restamping and has nothing to do with it —
+  arguing about helper strength is the red herring, and it is the kind of argument a project will
+  have if the reload is not written down. **(3)** A capture is still worth running when the static
+  answer would change a shipped behaviour, but write the static argument first and let the capture
+  confirm a specific prediction rather than explore. → Tier 1, evidence discipline.
+* **2026-11-15 — a call that loads a value is not a delay unless somebody reads the value, and the
+  check is one instruction long.** A loop shaped as `draw; load-slot; step-counter` reads naturally
+  as a paced animation: a routine that returns a scaled timing word, called once per iteration, is
+  the textbook shape of a frame delay. It was not. At five of the six call sites the very next
+  instruction is a counter increment or decrement — the register the lookup filled is never read.
+  The values are computed and dropped and the loop's rate is the cost of the draw itself. Three
+  consequences worth carrying. **(1)** When a call looks like a timing primitive, check what happens
+  to its output register before believing it; a callee that saves and restores that register at its
+  own entry and exit is a strong hint the value is inert at the site. **(2)** Once the delay is
+  gone, the animation's rate is a property of the original's hardware and is not recoverable from
+  the program at all, so a port must either run unpaced and fast or supply a number it cannot
+  justify — and if it supplies one, the number has to be named, labelled as invented at its
+  definition, and paired with the measurement that would replace it. Shipping it silently is how a
+  port ends up with a constant nobody can defend and a suite that passes anyway. **(3)** The same
+  lookup can be a real timeout at one site and dead code at another, so "what is this routine for"
+  is not a property of the routine; it is a property of each call site. → Tier 1, evidence
+  discipline.
+* **2026-11-15 — A pace figure derived from cycles and a nominal clock is a bound, and saying
+  which direction it bounds in is part of the number.** A descent rate was computed as cycles per
+  step divided by the nominal CPU frequency, and the emulator that produced the cycle count
+  models no bus wait states, so real hardware spent strictly more wall-clock time per cycle. The
+  figure was therefore a floor, and it was written down as an estimate. The consequence is not
+  cosmetic: a player who remembers it as slower is then read as reporting a defect, when the
+  measurement and the memory never disagreed. State the direction, name what the model omits, and
+  prefer "at least" in the prose over a bare number. → Tier 1, evidence discipline.
+* **2026-11-16 — A fallback that silently repairs out-of-range state is a disconnected wire that
+  prints `ok`.** A keyboard helper's ring fallback read a buffer tail, found it outside the range
+  the module documented, set it to the range start, wrote there and reported success. The write
+  landed and read back correct. The program was not reading that buffer at all, so every key sent
+  that way was consumed by nobody — and "the program ignored this key" is observationally
+  identical to "the key never arrived". A null result measured through it is a result about the
+  harness. When a fallback meets state it does not recognise, refusing is the only safe action,
+  because the alternative is not an error but a *finding*. And check whether a module's code and
+  its own docstring agree before trusting either: the observation that would have caught this was
+  already written in the same file's prose, two inches from constants that said otherwise.
+  → Tier 1, tooling that fails loudly.
+* **A recorder that shells out to sibling scripts only works where those siblings live.**
+  A capture sidecar was copied into a container to reach a path the host could not see; its
+  breakpoint arm and its frame arm both invoke neighbouring scripts by repo-relative path,
+  so both failed — one with an error in a log nobody read, one silently producing zero
+  frames. The path was in fact host-visible all along and the detour was unnecessary. Before
+  relocating a tool, check that its dependencies travel with it; when a tool needs a path it
+  cannot see, the first question is whether the path is really invisible, not how to ship
+  the tool to it. → Tier 2, harness layout.
+* **A missing binary inside a container reads as a mismatch, not as an error.** A restore
+  step compared files with `cmp -s`; the image had no `cmp`, so every invocation exited 127,
+  every comparison reported "differs", and the log claimed 82 files restored when three had
+  changed. The copies were harmless, so the outcome was correct and the log was fabricated.
+  Replacing it with a checksum did not fix it either, because that checksum tool prints the
+  path alongside the value and the two paths are never equal. Both defects were invisible
+  from the result. Prefer a comparison whose failure mode is a nonzero exit you check, and
+  assert the tool exists before trusting a verdict from it. → Tier 2, harness contract.
+* **A watcher that has never observed a positive event cannot certify a negative one.** A
+  session recorded zero filesystem writes across a long playthrough and reported the
+  absence as a finding. It was almost certainly true, and it was worthless as stated, because
+  nothing in the session had demonstrated the watcher could see a write at all. The control
+  cost one keypress and fired within a second. Any harness that concludes "this never
+  happens" from a silent instrument must run the event that does happen, in the same session,
+  with the same instrument, and put the timestamp in the record. → Tier 1, harness contract.
+* 2026-11-15 — two related evidence-class errors in one finding, both from reading a routine in
+  isolation. First: **a routine whose only instruction is a conditional branch to a side effect is
+  part of that side effect's path, and a reachability scan that follows only `call` targets will
+  conclude the side effect is dead.** The store in question had no caller anywhere in the binary and
+  was reached solely by that branch; a call-graph scan reported it unreachable and a header written
+  from that conclusion asserted the game never writes the file at all. For any "this code never
+  runs" claim, check branch successors and indirect targets before trusting the call graph, and
+  prefer positive execution evidence over absence of a discovered caller. Second, and sharper:
+  **a file that comes back byte-identical after an operation is not evidence the write did not
+  happen.** The same header cited sector files unchanged after several site transitions as proof of
+  no store — which is exactly what storing unmutated content produces. To show a write does not
+  happen, mutate something the write would carry and look again; to show it does, instrument the
+  write call, not the file. Both survived review because each returned a plausible answer rather
+  than an error. → Tier 2, harness contract.
+* 2026-11-15 — two lessons from one boundary change, both about policy rather than bytes.
+  First: **a function-boundary policy has to name which kinds of evidence authorise a split, and
+  a code/data boundary is a different proof class from a routine boundary.** A routine boundary is
+  asserted by a dispatch target or a return; a code/data line is asserted by the consumer that
+  walks the data and by the data's own internal structure (entry starts landing on the running
+  sums of record lengths is not an accident over hundreds of bytes). A policy that only recognises
+  the first kind will either refuse a data split it should allow or, worse, let a fall-through
+  judgement through because it looks like the same thing. Second: **a summary of a ruling is not
+  the ruling.** The recorded one-line version of a prior decision said "leave this range alone";
+  the decision's own body permitted a split at named dispatch targets and named them. An override
+  was declared, and re-reading the source found no override. General form: when a change looks like
+  it contradicts a prior ruling, quote the ruling from the document that carries its reasoning
+  before writing the word "override" — the short version exists to be skimmed and will drift.
+* 2026-11-12 — an emulator's executed-instruction trace was treated as proof that a routine ran,
+  and it was the wrong instrument. The buffer is a small rolling window, so a command pressed once
+  had already scrolled out by the time the harvest landed, while per-turn code was still present.
+  Two claims written from it were wrong, and dumping "immediately" did not help because the window
+  rolls in seconds of ordinary play. The fix is a rule about evidence classes, not about this
+  binary: for a one-shot event, read the memory the event writes, over the live endpoint, right
+  away; reserve the trace for "did this ever run across a long session". General form: check the
+  retention window of any execution log before citing it as evidence of a single occurrence, and
+  prefer the observable the event actually changes. → Tier 2, harness contract.
+
 * **2026-11-23 -- a reference-only corpus must not be gated, and a precondition that names a
   directory rather than the file the tool opens lies in both directions.** The gates over the
   second-platform reference import were removed: their inputs are optional by design, so they
@@ -2288,618 +2920,3 @@ form: when a gate's observable is a capture taken by the program under test, ver
 moves when the feature moves and does not move when it does not. A pixel assertion that has
 never been shown to go red is a text assertion with extra steps. → Tier 2, harness contract.
 
-- 2026-11-12 — an emulator's executed-instruction trace was treated as proof that a routine ran,
-  and it was the wrong instrument. The buffer is a small rolling window, so a command pressed once
-  had already scrolled out by the time the harvest landed, while per-turn code was still present.
-  Two claims written from it were wrong, and dumping "immediately" did not help because the window
-  rolls in seconds of ordinary play. The fix is a rule about evidence classes, not about this
-  binary: for a one-shot event, read the memory the event writes, over the live endpoint, right
-  away; reserve the trace for "did this ever run across a long session". General form: check the
-  retention window of any execution log before citing it as evidence of a single occurrence, and
-  prefer the observable the event actually changes. → Tier 2, harness contract.
-
-- 2026-11-15 — two lessons from one boundary change, both about policy rather than bytes.
-  First: **a function-boundary policy has to name which kinds of evidence authorise a split, and
-  a code/data boundary is a different proof class from a routine boundary.** A routine boundary is
-  asserted by a dispatch target or a return; a code/data line is asserted by the consumer that
-  walks the data and by the data's own internal structure (entry starts landing on the running
-  sums of record lengths is not an accident over hundreds of bytes). A policy that only recognises
-  the first kind will either refuse a data split it should allow or, worse, let a fall-through
-  judgement through because it looks like the same thing. Second: **a summary of a ruling is not
-  the ruling.** The recorded one-line version of a prior decision said "leave this range alone";
-  the decision's own body permitted a split at named dispatch targets and named them. An override
-  was declared, and re-reading the source found no override. General form: when a change looks like
-  it contradicts a prior ruling, quote the ruling from the document that carries its reasoning
-  before writing the word "override" — the short version exists to be skimmed and will drift.
-
-- 2026-11-15 — two related evidence-class errors in one finding, both from reading a routine in
-  isolation. First: **a routine whose only instruction is a conditional branch to a side effect is
-  part of that side effect's path, and a reachability scan that follows only `call` targets will
-  conclude the side effect is dead.** The store in question had no caller anywhere in the binary and
-  was reached solely by that branch; a call-graph scan reported it unreachable and a header written
-  from that conclusion asserted the game never writes the file at all. For any "this code never
-  runs" claim, check branch successors and indirect targets before trusting the call graph, and
-  prefer positive execution evidence over absence of a discovered caller. Second, and sharper:
-  **a file that comes back byte-identical after an operation is not evidence the write did not
-  happen.** The same header cited sector files unchanged after several site transitions as proof of
-  no store — which is exactly what storing unmutated content produces. To show a write does not
-  happen, mutate something the write would carry and look again; to show it does, instrument the
-  write call, not the file. Both survived review because each returned a plausible answer rather
-  than an error. → Tier 2, harness contract.
-
-- **A watcher that has never observed a positive event cannot certify a negative one.** A
-  session recorded zero filesystem writes across a long playthrough and reported the
-  absence as a finding. It was almost certainly true, and it was worthless as stated, because
-  nothing in the session had demonstrated the watcher could see a write at all. The control
-  cost one keypress and fired within a second. Any harness that concludes "this never
-  happens" from a silent instrument must run the event that does happen, in the same session,
-  with the same instrument, and put the timestamp in the record. → Tier 1, harness contract.
-- **A missing binary inside a container reads as a mismatch, not as an error.** A restore
-  step compared files with `cmp -s`; the image had no `cmp`, so every invocation exited 127,
-  every comparison reported "differs", and the log claimed 82 files restored when three had
-  changed. The copies were harmless, so the outcome was correct and the log was fabricated.
-  Replacing it with a checksum did not fix it either, because that checksum tool prints the
-  path alongside the value and the two paths are never equal. Both defects were invisible
-  from the result. Prefer a comparison whose failure mode is a nonzero exit you check, and
-  assert the tool exists before trusting a verdict from it. → Tier 2, harness contract.
-- **A recorder that shells out to sibling scripts only works where those siblings live.**
-  A capture sidecar was copied into a container to reach a path the host could not see; its
-  breakpoint arm and its frame arm both invoke neighbouring scripts by repo-relative path,
-  so both failed — one with an error in a log nobody read, one silently producing zero
-  frames. The path was in fact host-visible all along and the detour was unnecessary. Before
-  relocating a tool, check that its dependencies travel with it; when a tool needs a path it
-  cannot see, the first question is whether the path is really invisible, not how to ship
-  the tool to it. → Tier 2, harness layout.
-- **A routine cut in the middle will get a plausible wrong name on the far half, and the name
-  is the damage.** A boundary detector split one save routine into four pieces. The second
-  piece set up a 256-byte transfer with the same register pair a read uses and the same pair a
-  write uses — only the mode byte, set in the *first* fragment, distinguishes them — so it was
-  named a loader and documented as reading data into arrays. It was writing them to disk.
-  Nothing about that is detectable from the fragment alone, which is the point: an ambiguous
-  fragment must be left unnamed rather than named from its most plausible reading, because a
-  wrong name gets cited as fact by everything downstream and a blank one does not. The
-  detector's own rule should be that a fragment which does not set its own mode byte is a
-  continuation, not a function. → Tier 1, boundary detection.
-* **2026-11-15 — "does this change survive leaving and coming back?" is usually a question about
-  call order, not about a live session, and a harness should try the static form before it books a
-  capture.** The question here was whether an emptied container stays emptied across a site exit and
-  re-entry, and it had been parked as needing gameplay because two settled findings appeared to
-  contradict each other: the game does write whole sector images back to disk, and nothing inside a
-  site persists. Both were true. What settled it was reading the site-entry routine and noticing the
-  order of two calls in it: the store runs **before** the current-sector byte is reassigned, so what
-  gets written is the sector you are standing in and never the one you are entering, and the loader
-  runs after, re-reading the destination image from disk into the same buffer the store writes from.
-  A site's own image is therefore read fresh on every entry and never written back, which makes the
-  persistence rule a consequence of ordering rather than a policy anyone implemented. Three
-  transferable points. **(1)** When a persistence question is open, look for the entry routine and
-  ask whether the write precedes or follows the context switch; that single ordering fact decides it
-  and costs one read. **(2)** If load and store share one buffer, then cross-visit persistence is
-  decided by whether the load happens, and any in-memory distinction between "write one copy" and
-  "write both copies" helpers is about within-visit restamping and has nothing to do with it —
-  arguing about helper strength is the red herring, and it is the kind of argument a project will
-  have if the reload is not written down. **(3)** A capture is still worth running when the static
-  answer would change a shipped behaviour, but write the static argument first and let the capture
-  confirm a specific prediction rather than explore. → Tier 1, evidence discipline.
-* **2026-11-15 — a call that loads a value is not a delay unless somebody reads the value, and the
-  check is one instruction long.** A loop shaped as `draw; load-slot; step-counter` reads naturally
-  as a paced animation: a routine that returns a scaled timing word, called once per iteration, is
-  the textbook shape of a frame delay. It was not. At five of the six call sites the very next
-  instruction is a counter increment or decrement — the register the lookup filled is never read.
-  The values are computed and dropped and the loop's rate is the cost of the draw itself. Three
-  consequences worth carrying. **(1)** When a call looks like a timing primitive, check what happens
-  to its output register before believing it; a callee that saves and restores that register at its
-  own entry and exit is a strong hint the value is inert at the site. **(2)** Once the delay is
-  gone, the animation's rate is a property of the original's hardware and is not recoverable from
-  the program at all, so a port must either run unpaced and fast or supply a number it cannot
-  justify — and if it supplies one, the number has to be named, labelled as invented at its
-  definition, and paired with the measurement that would replace it. Shipping it silently is how a
-  port ends up with a constant nobody can defend and a suite that passes anyway. **(3)** The same
-  lookup can be a real timeout at one site and dead code at another, so "what is this routine for"
-  is not a property of the routine; it is a property of each call site. → Tier 1, evidence
-  discipline.
-* **2026-11-15 — A pace figure derived from cycles and a nominal clock is a bound, and saying
-  which direction it bounds in is part of the number.** A descent rate was computed as cycles per
-  step divided by the nominal CPU frequency, and the emulator that produced the cycle count
-  models no bus wait states, so real hardware spent strictly more wall-clock time per cycle. The
-  figure was therefore a floor, and it was written down as an estimate. The consequence is not
-  cosmetic: a player who remembers it as slower is then read as reporting a defect, when the
-  measurement and the memory never disagreed. State the direction, name what the model omits, and
-  prefer "at least" in the prose over a bare number. → Tier 1, evidence discipline.
-* **2026-11-16 — A fallback that silently repairs out-of-range state is a disconnected wire that
-  prints `ok`.** A keyboard helper's ring fallback read a buffer tail, found it outside the range
-  the module documented, set it to the range start, wrote there and reported success. The write
-  landed and read back correct. The program was not reading that buffer at all, so every key sent
-  that way was consumed by nobody — and "the program ignored this key" is observationally
-  identical to "the key never arrived". A null result measured through it is a result about the
-  harness. When a fallback meets state it does not recognise, refusing is the only safe action,
-  because the alternative is not an error but a *finding*. And check whether a module's code and
-  its own docstring agree before trusting either: the observation that would have caught this was
-  already written in the same file's prose, two inches from constants that said otherwise.
-  → Tier 1, tooling that fails loudly.
-- **A refusal with no positive control is not a finding, and a control placed before the thing
-  it controls can destroy its own precondition.** A passability probe asked whether a mounted
-  plane refuses forest. The first run mounted correctly, saw the refusal, and proved nothing:
-  every neighbour of that pad was forest or mountain, so "refused forest" was indistinguishable
-  from "a grounded plane cannot move at all". The second run added the missing control and put
-  it *before* the mount — the control step walked the player off the launch pad, the board key
-  then had nothing to board, the mode byte stayed on-foot, and every subsequent "mounted" probe
-  silently tested a foot character while looking like a pass. The fix was a synthetic map where
-  pad, forest and open grass are three mutually adjacent cells, with the mount sitting between
-  the two halves and an accepted step on the far side of the refusal. Generalise twice: a
-  negative result needs a positive run through the same apparatus, and ordering a control before
-  a state transition can invalidate the state it was meant to qualify.
-  → Tier 1, experiment design.
-- **A breakpoint that never fires, including on steps that demonstrably moved, is a fact about
-  the probe and not about the code.** Two addresses on a per-step dispatch path reported no hit
-  across several runs while the position bytes proved the step had executed. The temptation is
-  to read a silent breakpoint as evidence the code did not run; here the same run showed the
-  behaviour happening, so the only sound conclusion was that the probe was unreliable at those
-  addresses. Record which claims rest on a breakpoint and which rest on an observed state
-  change, and do not let the former borrow confidence from the latter. → Tier 1, tooling that
-  fails loudly.
-- **A rate measured by two reads around a sleep is not a rate.** A vehicle's flight speed was
-  first reported as 12 cells/s from `pos()`, `sleep(2.0)`, `pos()`, and a Manhattan distance.
-  Three things were wrong and none of them produced an error: the game masks both coordinates
-  `& 0x3F`, so a wrap makes the distance fiction; a sector change reloads the position, so a
-  jump can be a map transition and not motion at all; and the two reads bracket more than the
-  sleep, so the elapsed time is not what was divided by. The fix is not a better formula but a
-  different instrument: poll at the maximum practical rate (the emulator's memory API sustained
-  ~1350 Hz, not the 5 Hz a hand-written sampler defaults to), and count only transitions that
-  are single-cell steps within one sector, labelling wraps, jumps and unchanged samples
-  separately instead of folding them into a distance. That turned an unverifiable "12" into 49
-  steps in 4.00 s with 0 jumps and 0 wraps, three runs, zero spread — and it replaced a shipped
-  constant that was 25% off. The owner's instinct that 12 cells/s "seems too fast even for a
-  human player" is what sent it back to be measured; the number survived and the method did
-  not, which is the good outcome. A plausible figure nobody questions is the dangerous one. →
-  Tier 1, tooling that fails loudly.
-
-- **2026-11-17 — a save location that holds derived state as well as the record makes the
-  previous game the next game's ground.** The engine writes the world it has mutated into the
-  same directory as the character record, which is correct for resuming one game and wrong for
-  starting the next: the overlay is read ahead of the release content, so anything the last
-  character left behind is authored terrain for whoever creates a character next. The general
-  form is that "resume" and "start fresh" are two different questions, and a layout that answers
-  only the first silently answers the second with the wrong game. Two things worth carrying to
-  any harness with one default save location: a new game should rotate the old one aside rather
-  than overwrite it, because the old one is evidence and somebody's afternoon; and the counter
-  that would have caught this has to run at the moment of the write, not on a live frame — a
-  diagnostic that measures the running state cannot see a file, and this one printed zero while
-  the player was walking past nine. → Tier 1, save/derived-state layout and diagnostics that
-  measure the artefact rather than the session.
-
-- **2026-11-17 — score a written artefact only at the instant it was written, or you will
-  invent a defect.** A persistence layer that rewrites a file only when something dirtied it is
-  correct behaviour, and it turns a naive before/after comparison into a machine for producing
-  false positives: compare the file's bytes against state read *now* and every change since the
-  last write looks like a bug the program has right now. The harness that found this reported a
-  phantom at almost every checkpoint, and the numbers were entirely plausible — the endpoint
-  matched what a hand inspection of the saved file showed, which is what made it convincing.
-  Two guards fixed it, and both are worth copying: skip a checkpoint whose file bytes are
-  unchanged from the last one scored, and when the state has to be read over an interface the
-  action itself can advance (a save key that also hands the simulation a turn), read it on both
-  sides of the action and discard the checkpoint when the two disagree. Related and equally
-  generic: the same run showed the reference program writing the file about once per ten rounds
-  where the reimplementation wrote it on nearly every save, so "the reimplementation leaves more
-  residue" can be a difference in *when it writes* rather than in what it computes.
-  → Tier 1, measurement discipline for persistence.
-
-- **2026-11-18 — an overlay directory whose related files are gated independently will eventually
-  contain one half of a pair, and the half that survives alone becomes the truth.** A save wrote a
-  sector's terrain overlay without its creature overlay, because "store only what is dirty" was
-  applied to each file separately. On reload the orphaned overlay was read as ground truth and the
-  missing half was filled from release data, which turned every stamp it had baked into a sprite
-  with nothing under it. The tell was not the count of bad cells but their *coordinates*: the same
-  cell and the same byte appearing in three different sector files, with different ground
-  underneath each, is not behaviour, it is one buffer reaching several filenames. Two generic
-  rules: when a write-back layer can persist a derived file without the source file it was derived
-  from, pair them at the write and assert sibling completeness over the whole directory rather
-  than over the one file a scenario happens to touch; and when a check can only be driven red by a
-  shape no scripted scenario produces, plant the shape and require the check to name it.
-  → Tier 1, persistence invariants.
-- A gate that seeds only the region where its own wrong precondition happens to hold will pass
-  every case it has while the rule is dead in the field. A tile-cost rule here grew a sector test
-  transcribed from a branch at the routine's entry; ten cases passed, and the effect never fired
-  in the only map regions that contain the tile. Two things made it visible, and neither was the
-  gate. First, the live capture that originally proved the effect was re-read rather than
-  re-believed: its memory dump named the region it was taken in, and that region failed the test
-  the gate had quietly adopted. Second, a data census — counting the tile across every shipped map
-  file — showed it existed nowhere the gate allowed. The generic rules: when a capture is cited as
-  the proof of a behaviour, re-read the capture's own state for the conditions it was observed
-  under, because a prose summary of a capture loses exactly the context a later reader needs; and
-  when a rule is transcribed from a branch, write the case in the region the evidence actually
-  names, not the convenient one, then run the refuted rule as a control and require the new case
-  — and only the new case — to go red. A control that turns everything red proves the case is
-  sensitive to nothing in particular.
-  → Tier 1, evidence provenance and gate design.
-- **2026-11-20 — piping a build through `head` can kill the build, and the failing test that
-  follows is a lie.** A gate was edited, then `make -j8 2>&1 | grep ... | head -5` was run to
-  check it compiled. `head` exits after five lines, the pipe closes, and `SIGPIPE` kills `make`
-  partway through: the compiler lines that did print looked like success because the warning flags
-  in each command line contained the substring being grepped. The binary on disk was the previous
-  one, so the next test run reported a defect that had already been fixed, and an hour went into
-  debugging source that was correct. The generic rules: never truncate a build's output with
-  `head` in the same pipeline, and never decide a build succeeded by reading its log — check the
-  build tool's own exit status, and make the check for errors a pattern that cannot match the
-  compiler's own command line (`error:` and `warning:`, not `error`). A harness that builds and
-  tests in one shell pipeline should assert the build's status before it runs anything.
-  → Tier 1, harness hygiene and build verification.
-- **2026-11-20 — "reload the save" is not a general undo.** An ending animation wrote four fields
-  into live state, and the obvious fix was to reload the save afterwards. It was wrong twice over:
-  the fields lived outside the record's byte span, so reloading could not reach them at all, and
-  the flag that gated the animation was never cleared anywhere, so the animation re-ran on the
-  next entry. The generic rule: when a sequence mutates state as a costume rather than as a
-  decision, snapshot what it touches at the moment it starts and restore it explicitly when it
-  ends. Reloading persisted state only undoes the part that was ever persisted, and a harness that
-  asserts "the next run looks clean" will pass while the fields outside the record stay wrong.
-  → Tier 1, state ownership and restore discipline.
-- **2026-11-20 — a test that proves nothing was written has not proved nothing happened.** An
-  ending sequence was believed to touch no files because every content file was hashed before
-  and after it and none changed. That correctly refuted a *save*, and the write-up then recorded
-  the stronger conclusion that the file I/O in that path was unexecuted. It was a **read** of a
-  map the sequence then drew, and a hash comparison is blind to reads at any sampling rate. The
-  bytes were unambiguous all along and had simply never been decoded, because the capture's
-  verdict made decoding them feel settled. The generic rules: when a measurement is used to
-  refute an interpretation, write down what it can see and what it cannot, and treat "we saw no
-  evidence of X" and "X did not happen" as different claims; and when a disassembler left a
-  region as raw bytes, that region is unexplored territory no matter what a later test concluded,
-  because the test was written by someone working from the same gap.
-  → Tier 1, evidence provenance and what a negative measurement can carry.
-
-- 2026-11-20 — **a decoder gate that asserts the output is fully populated rather than that it is
-  non-trivial cannot fail on the failure that matters.** The picture unpack was gated on "every one of
-  the 64,000 pixels is written", which a decode that produced a black rectangle satisfies perfectly.
-  The bug was not in the decoder at all: the caller blitted the picture and then composited its caption
-  with a text-screen routine that paints every cell's background, so the art was deleted between the
-  blit and the present, and every automated check along the way reported success. Two transferable
-  rules. First, an art or decode gate should assert ink (a distribution over the palette, or a floor on
-  non-background pixels), not coverage; coverage only catches truncation. Second, when a pipeline has a
-  compositing step, gate the composite and assert both directions in the same test — the old routine
-  must still destroy the underlay and the new one must not — because a check that exercises only the
-  replacement cannot tell which function it was given. The owner found this by looking at the screen,
-  which is the third time this project has had a "the code ran and the pixels disagreed" report; the
-  generic lesson is that a present call is not evidence of a visible result.
-  → Tier 1, gate design: what a check must be able to fail on, and composites need both-direction controls.
-
-- 2026-11-20 — **a resource lookup that reads one path field instead of the project's content-root
-  list sees a subset of the tree, and the symptom is format-dependent, so it reads as a bug in the
-  format that failed.** The splash loader searched the theme directory and the bare content root, and
-  never the patch/release sublayers that the root list defines. The upgrade package's high-colour
-  pictures live in a sublayer, so the three that happened to be duplicated in the theme directory
-  resolved and the rest fell back to the low-colour originals. The report was "the title picture is
-  fine and the demo pictures are broken", which invites a theory about the pictures; the actual
-  discriminator was which directory each file had been copied into. Two rules. A harness should have
-  exactly one search-path facility, and every loader that resolves a data file goes through it — a
-  loader that hand-rolls "themes dir then data dir" is a second copy of the path policy and will
-  drift. And when a fallback changes the *format* of what it loads, it must also change the
-  interpretation of the bytes (palette, stride, bit order) or be refused: a silent format fallback
-  produces output that is confidently wrong rather than missing, which is the worst kind to debug.
-  → Tier 1, content resolution: one search-path facility, and a format fallback must remap or refuse.
-
-- 2026-11-20 — **when a visual claim is checked by eye against a render the harness itself produced,
-  a bug in the preview tool reads as a bug in the game.** Three wrong readings happened in one
-  investigation: palette-index bytes were saved as greyscale and the resulting near-black images were
-  read as "the art is sparse and dark"; frames were compared from a deduplicated list and the wrong
-  frame was matched to the wrong source file; and a non-integer downscale for a side-by-side made
-  correct art look combed. Each was plausible and each cost time. The fix was to stop comparing
-  impressions and assert pixel agreement against the source file through the same decode the engine
-  uses, which turns "looks wrong" into a number and a named file. A harness that renders previews for
-  a human should apply the real palette and scale by an integer factor, or it manufactures defects.
-  → Tier 1, verification discipline: measure against the source, and make preview tooling faithful
-  or do not trust it.
-- 2026-11-21 — **a census is not a proof of layout, and a gate built on one cannot fail.** A picture
-  format was recorded as proven because decoding it one way reproduced a live capture at "100%
-  colour-class agreement over 4000 sampled pixels". Two candidate row mappings both produce exactly
-  the same colour histogram, so that check was satisfied by the wrong reading and by the right one
-  alike, and the wrong reading shipped: every picture rendered horizontally doubled and combed. The
-  property that separates the two is position, not count, and it needed a per-scanline comparison
-  against a capture rather than a tally. The general shape: **a derived check that summarises
-  structure into counts throws away exactly the axis that distinguishes the hypotheses it is meant
-  to separate.** It reads as a strong check because the number is large and the match is exact.
-  → Tier 1, verification discipline: when a check summarises geometry into a histogram, ask which
-  two layouts it cannot tell apart, and assert that pair positionally. Then write the control that
-  makes it red; if no input can make it fail, it is decoration.
-- 2026-11-23 — **a launcher that always passes a switch turns an env-var-presence test permanently
-  on, and the flag meant to control it can never go red.** A dev-only affordance read its variable
-  as "is it set" rather than "what is its value", and the container launcher passed `-e NAME=0` on
-  every launch so the flag had a default. Every session got the dev behaviour; passing the flag and
-  omitting it produced identical results, so the documented switch had one observable state and the
-  off state had no representation at all. Nine days passed before anyone noticed, because the only
-  consumer was a human looking at a screen and the dev behaviour resembled a plausible game state
-  rather than a mode. Two rules come out of it. **Read a switch by value, and treat the empty string
-  and `0` as off** — the sibling switch in the same file already did, which is the tell and the
-  reason the bug survived review. And **do not set a switch the caller did not ask for**; omitting it
-  keeps presence and truth in agreement even when a reader gets the first rule wrong. The general
-  shape: a flag whose two states are indistinguishable to every observer is a flag with one state, so
-  a dev affordance that changes what the program boots into must announce itself on stderr or in the
-  state dump, and must have a control proving the off state is reachable.
-* **2026-11-23 — a static archive built without `-fPIE` cannot link into a PIE-default
-  executable, and the failure arrives wearing the costume of an assertion.** The engine binary
-  links from objects directly and succeeded, so the build step went green; only the check programs,
-  which link the archive, died at link time with an absolute-relocation complaint. The harness then
-  reported the assertion it had been about to run, and two days were spent on a named behavioural
-  defect in code that was never executed. The general shape: a toolchain default that differs between
-  the developer's platform and the runner is a defect the build must be immune to, not a platform to
-  learn; and a harness must never be able to report a test result for a binary it failed to produce.
-  → Tier 1, build discipline: compile the archive with the same position-independence the executables
-  get, and make "could not build" a distinct verdict from "the test failed".
-* **2026-11-23 — a harness that discards the compiler's stderr cannot say why it is red, and two
-  harnesses in one repository differed only in how strictly they were compiled.** A mutation harness
-  reported every mutant as "would not compile" with the compiler output sent to `/dev/null`, while a
-  second mutation harness in the same job caught every mutant. The difference was that one hardcoded
-  a narrower flag set than the project's exported one and the other used the export; on the runner the
-  narrower set failed to build the mutant, and nothing in the verdict said so. The same rule this
-  project already applies to check programs -- never hold a test to a weaker bar than its subject --
-  had simply not been applied to the harnesses that prove the tests can fail. The general shape: any
-  harness that shells out to a compiler must capture its output and print the first lines on failure,
-  and every harness must compile with the project's exported flag set rather than a remembered copy.
-  → Tier 1, gate design: a gate that cannot name its reason gets rerun until it goes green by accident.
-* **2026-11-23 — "could not run" is a verdict, and collapsing it into "failed" makes a gate assert on
-  an input that cannot exist.** Several gates needed a file the repository gitignores by policy. Each
-  had reasoned correctly for the local case -- a silent skip would hide the defect the gate exists to
-  catch -- and then returned a plain failure, which meant the continuous-integration runner could never
-  go green and produced symptoms that read as product defects for days. The fix is a distinct
-  cannot-run exit code decided by the caller: locally the missing input is a real problem and stays a
-  failure; where the input is gitignored by design, the gate prints a visible skip naming what is
-  missing and where the property is still covered. The distinction is the precondition itself, not the
-  environment variable, so the same rule holds in both places. A skip that can hide a failure is not a
-  skip; one whose input cannot exist in that environment cannot.
-  → Tier 1, gate design: preconditions name the file the tool opens, and cannot-run is its own verdict.
-* **2026-11-23 — a sanitizer job that hardcodes the build directory links the wrong library and
-  reports PASS while sanitizing nothing.** The harness resolved the archive path from a fixed
-  directory while the sanitizer target built its own, so on a dirty developer tree the sanitizer run
-  linked an ordinary archive left there hours earlier and printed a pass; on a clean tree the same
-  mismatch surfaced as a link error. One root cause, two unearned verdicts, and only the loud one was
-  noticed. The general shape: any secondary build configuration (sanitizer, coverage, alternate
-  compiler) must publish the directory it built into, and every consumer must read that value rather
-  than reconstruct it -- a reconstructed path is a second hand-maintained copy of a build fact.
-  → Tier 1, build discipline: one exported build directory, read by everything that links against it.
-* **2026-11-23 — an authorship guard that compares per-file bodies must distinguish a rename from an
-  edit, or every legitimate rename gets marked and the marker stops meaning anything.** The guard
-  permits a changed body only when the file carries a correction marker. Renaming a file -- which the
-  project's own naming rules *require* whenever a session learns what a routine does -- presents to the
-  guard as a removal plus an addition, so ten correctly renamed files with byte-identical bodies were
-  reported as unmarked edits and the branch went red for obeying the rules. The fix separates the two
-  shapes on evidence: same address and identical body is a rename and owes nothing; a rename that also
-  changes a body still needs the marker. The general shape: a permission gate must be tested against
-  the legitimate operations it will meet, not only against the violation it was written to catch, and
-  a control proving the legal case passes is as necessary as one proving the illegal case fails.
-  → Tier 1, gate design: write the control that makes a gate red, and the control that proves it is
-  not red when the operation is legal.
-  → Tier 1, deploy discipline: env switches are read by value and left unset when false, and a
-  mode that changes the boot target says so where a log or a dump will show it.
-- 2026-11-23 — **a round-trip test cannot detect a wrong base offset, because the reader and the
-  writer share it.** A save editor was refactored so its field offsets came from a generated table
-  instead of hand-copied numbers. The first run read the base from the wrong column of that table,
-  so every write landed at the wrong distance from the start of the record. `show` printed the
-  values that had just been set, and a write-then-read assertion passed, because both directions
-  subtracted the same wrong base. The defect was invisible to anything that only asks the tool
-  questions in its own vocabulary, and was caught only by running the previous version and the new
-  one over identical input and comparing the resulting bytes.
-  → Tier 1, refactor discipline: when a change is meant to preserve behaviour, the control is a
-  byte-for-byte comparison against the previous version on identical input, not a round-trip
-  through the tool under test. A shared constant that is wrong in both directions is the one error
-  a round-trip is structurally incapable of reporting.
-- 2026-11-23 — **a generated-table CLI without a `__main__` guard rewrites its own committed output
-  on import, and can disarm the gate that checks it.** A census tool ended with a bare call to its
-  entry point, so `import census` fell through to the write path with the default output directory.
-  Another script imported it purely to read a lookup helper, which meant every run of that script
-  regenerated all eleven tracked tables as a side effect. The damage was not the churn: a
-  regenerate-and-compare freshness gate run after such an import compares a fresh build against a
-  fresh build, so it can never go red. Import order decided whether the gate was armed.
-  → Tier 1, gate design: a freshness gate is only as trustworthy as the claim that nothing rewrote
-  the files between the last edit and the check. Any tool that writes committed output on import
-  breaks that claim silently, so entry points must be guarded and importing must be a read.
-- 2026-11-23 — **a dict comprehension over rows with duplicate keys is a conflict resolver that
-  never announces itself.** A join built as `{key: row for row in rows}` silently kept the last row
-  for each key, so where two third-party sources disagreed about a creature's hit points the
-  published table carried whichever happened to sort last — in one case a figure a live capture had
-  already disproved. The capture and the written resolution were both correct; the join simply never
-  looked at the disagreement, and the table published a single confident number.
-  → Tier 1, derived data: when sources can disagree, collapsing rows must keep every distinct value
-  and name the field that disagreed. Any construct where the last writer wins is a decision, and a
-  decision nobody recorded will eventually be wrong.
-- 2026-11-23 — **a uniqueness assertion written for one table of eleven is a rumour.** A generated
-  reference set asserted that one table's key was unique and reported green while another table had
-  no key at all: 120 rows over 16 distinct identity values, with two columns constant across every
-  row so they carried no information. Nothing downstream could tell, because the tool's verdict was
-  about the table it checked, not the set it published.
-  → Tier 1, derived data: declare every table's key as data and assert all of them, and treat a
-  column that holds one value across a whole table as a warning. A dead join and a healthy column
-  look identical until someone counts the distinct values.
-- 2026-11-23 — **"absent from the data file" is not "absent from the program", and the two get
-  confused in one sentence.** A claim that a certain entity could not be a creature was made by
-  searching the placed-entity tables for its identifier and finding nothing. It was a correct search
-  of the wrong mechanism: the same program also *generates* entities at runtime through a dispatch
-  chain, and the entity was there, in a routine whose filename already named it. The claim was
-  recorded, repeated, and only re-examined after a human repeated their recollection for the second
-  time. The whole thing was a directory listing away from being caught.
-  → Tier 1, evidence discipline: before recording that something does not exist, enumerate every
-  mechanism by which it could exist — shipped data, generated at runtime, derived from another value —
-  and say which were checked. A negative over one mechanism is a claim about that mechanism.
-- 2026-11-23 — **two true numbers for one field is more common than one wrong number, and a
-  single-value column silently picks.** A creature's hit points were recorded as 255 from shipped
-  data and 64 from a third-party guide, and the finding written up was "the game wins, the guide is
-  wrong". Both were right: 64 is what the runtime spawn path writes and 255 is what the shipped data
-  carries, so the entity has two populations with different statistics. The conflict was an artefact
-  of a table that offers one column per attribute.
-  → Tier 1, derived data: when a reference and the binary disagree, ask whether they are describing
-  the same population before ruling one of them wrong. Any schema with one value per key is an
-  unannounced decision when the key spans two populations.
-- 2026-11-23 — **a decoded, measured check that no gate runs is a rumour.** A verification script
-  compared every relevant runtime capture against a formula derived from the disassembly and passed on
-  54 of 54 cases — a strong result, cited in prose as the basis for a whole section. It appeared in no
-  gate runner and no workflow, so nothing would notice if the code it protects regressed. The project
-  had already caught two gates that could not fail; this one could fail and simply was never asked.
-  → Tier 1, gate design: a finding's grade should imply a wired check. If a number is load-bearing
-  enough to quote, it is load-bearing enough to re-verify, and "someone can run it" is not a gate.
-- 2026-11-23 — **independent agreement is a different grade from citation, and it is easy to miss
-  because the data source did not change.** A third-party statistics table had been treated throughout
-  as an unverified hypothesis. Reading the binary's spawn dispatch turned up nine immediates that
-  matched nine of the guide's figures exactly — including an odd ceiling value that the guide reported
-  and a naive progression model would have predicted differently. Nothing about the guide changed; the
-  evidence grade moved from "someone wrote this down" to "two independent sources agree", which is the
-  strongest validation of that source available.
-  → Tier 1, evidence discipline: when derived facts and third-party facts agree by accident of
-  discovery, say so and re-grade. Agreement nobody looked for is worth more than either source alone.
-- 2026-11-23 — **a closed item that survives in a second queue gets re-recommended as new work,
-  complete with its retired blocker.** An investigation was proposed as "blocked, needs a certain
-  game state" from a summary list. The detailed worklist had closed that question three weeks earlier,
-  twice, by two independent methods, and the blocker was a false premise — the state was reachable by
-  a single memory write and had in fact also been reached by real play in between. The summary list was
-  the only stale copy, and it was the one being consulted when planning what to do next.
-  → Tier 1, queue hygiene: one derived queue, regenerated from the detailed records, or none. Where
-  two levels of queue must coexist, the coarse one needs a rule that it is closed by a pointer to the
-  fine one and never by its own text — otherwise it freezes the moment the item below it moves, and
-  then advertises finished work as the plan.
-- 2026-11-23 — **"no candidate formula fits" is a claim about the candidates, and the missing one is
-  usually an input someone held constant.** A coordinate transform was recorded as unresolved after
-  several plausible index formulas were tried and the best matched 2 of 27 records; the write-up
-  concluded the code that computes it must be outside the analysed range, and that conclusion was
-  repeated into a queue as a to-do. It was wrong. Every candidate had used the *player's* page index;
-  each record carried its **own** page index in a field nobody had considered geometric. Adding that
-  one term made it exact on 27 of 27. The tell was free: the field's value range was identical to the
-  range of pages the observed outputs occupied, which was visible the moment both were printed.
-  → Tier 1, derived data: when no formula in a family fits, print the value range of every candidate
-  operand next to the range of the observed outputs before declaring the family exhausted. A held
-  constant is an assumption, not a fact, and it is the cheapest thing to test.
-- 2026-11-23 — **an older findings section outranked a newer decoded header, and the stale negative
-  became the work queue.** One note recorded that a computation was "not established" and blamed a
-  wrong function boundary. A header written a week later named the routine, its operands and its
-  semantics, and said outright that the lookup used the entity's own page rather than the player's.
-  Nothing reconciled the two, so the queue cited the older text and an agent was about to re-derive
-  something the tree had already settled. The cost was not the derivation — it was that a closed
-  question was being advertised as open, which is the same defect as a stale queue row, one layer
-  down.
-  → Tier 1, evidence discipline: a findings document's "not established" has an expiry the moment any
-  header or tool establishes the thing. When a decode closes a question that a prose note calls open,
-  the correction belongs in the same commit as the decode, not in a follow-up.
-- 2026-11-23 — **a findings note can under-grade its own evidence, and the refutation of its negative
-  was in the routine it cited.** A mapping of seven internal identifiers to creature names was graded
-  "corroboration, not proof", on the stated ground that nothing in the binary pairs an identifier with
-  a word. One of the seven did exactly that: the arm keyed on that identifier prints a message that
-  names the creature in the executable's own text. The note had quoted the routine, quoted its string,
-  and then asserted the pairing did not exist. The defect is not a wrong answer — the conclusion was
-  conservative — it is a *verdict* that understated what the tree had proved, which propagates into
-  every downstream decision about what still needs a capture.
-  → Tier 1, evidence discipline: a negative of the form "nothing pairs X with Y" must be checked
-  against the print sites of the routine being discussed, not asserted beside them. Under-grading is
-  the quieter failure: an over-claim gets challenged, an under-claim just becomes permanent.
-- 2026-11-23 — **a note that says a procedure "yields" something visible has not finished the decode
-  until someone looks.** A header recorded that plotting a shipped art file a particular way "yields
-  seven distinct creature silhouettes", and that sentence was load-bearing for an open identity
-  question — it was the only evidence that a shape existed per entity. But nobody had ever plotted
-  it, so the evidence sat in the tree contributing nothing for weeks while the identity question was
-  graded as unresolvable and queued as needing a capture. The decode was one rendering away from
-  being an observation, and the assertion was mistaken for the observation.
-  → Tier 1, evidence discipline: when a note claims a procedure produces something observable, the
-  observation is part of the decode, not an application of it. Either record what it yields or mark
-  the claim as decoration. A shape nobody has looked at has the same evidentiary value as a shape
-  that does not exist.
-- 2026-11-23 — **"parses to nothing" is a statement about the parser's starting point, not about the
-  bytes.** In a fixed-stride container of terminator-delimited records, the block whose first byte is
-  the terminator yields zero records when parsed from its own base and is routinely reported as
-  empty — while the same bytes hold real, reachable data at interior offsets that another code path
-  indexes directly. Calling that block empty is a parser artefact that then propagates into every
-  description of the container's layout.
-  → Tier 1, derived data: for terminator-delimited records in a strided file, never report a region
-  empty without also scanning it for nonzero bytes and reporting the first nonzero offset. If any
-  code path indexes into the region's interior, the region is not empty by definition.
-- Two true numbers for one field arrived three times in one day (a creature's HP read from a placement
-  table, from a spawn routine, and from a generated-dungeon formula), and each time the instinct was
-  to pick one and mark the other wrong. They were all correct: the field was not a property of the
-  entity but a property of the *route by which the entity came to exist*. Separately, a different
-  pair of numbers for the same field really was a source disagreement with one side wrong. The two
-  shapes look identical in a table and need opposite treatment.
-  → Tier 2, schema: when a field has several defensible values, ask whether they are populations
-  keyed by a closed context vocabulary, or sources in conflict. Model populations as rows keyed
-  (entity, context) with the value allowed to be a formula over a named variable, and keep conflicting
-  sources in a visibly different column. Merging them lets a real error hide behind a plausible
-  label; keeping them apart is what makes "which is right" a question that stops being malformed.
-- A measurement pass globbed one filename stem and reported the whole corpus. It had measured a third
-  of it. The platform's flat filesystem namespace had forced two corpora onto different stems, and the
-  second stem held the data for most of the game's worlds. Nothing looked wrong: the row count was
-  plausible, the values were real, and the missing third was simply absent from the answer.
-  → Tier 1, derived data: before a scan reports a corpus, enumerate the stems and directories that
-  could hold the same kind of data and print how many files each contributed. A glob is a hypothesis
-  about the naming scheme, and a plausible row count is not evidence that the glob was the right one.
-- A third-party reference gave one HP per creature and matched the program's spawn code exactly, nine
-  of nine, which read as corroboration and was true as far as it went. The program also stores HP per
-  authored placement, where most species carry many different values. The reference was not wrong; it
-  described one population and was being read as a species constant.
-  → Tier 2, schema: when an external source agrees with a derived value, ask which population it
-  measured before recording the agreement as corroboration. Agreement between a constant and one
-  population of a varying field is the weakest evidence that looks strongest.
-- A documented quirk was described as an accident of position -- "only when the spawner happens to
-  hand out that slot, which is one in thirty-two" -- and that framing was used to argue the behaviour
-  could not express the design the players remembered. Counting the authored data said the opposite:
-  the slot was written deliberately in most of the corpus, and with the same creature type almost
-  everywhere. The quirk was the design.
-  → Tier 1, evidence discipline: before calling a mechanism incidental or incidental-only, count how
-  often the corpus actually produces it. "Can happen" and "happens in 23 of 30 authored cases" support
-  opposite conclusions, and a one-line count is cheap enough that there is no excuse for reasoning
-  from the first framing.
-- A recalled claim about what the game's manual says was accepted, written up as the strongest
-  available evidence on a design question, and only then checked -- against a scanned copy of the
-  manual already sitting in the repository's own reference directory, readable with a one-line
-  extraction. The manual did not say it. The write-up had to be rewritten.
-  → Tier 1, evidence discipline: when a claim is about what a document says, and a copy of that
-  document may be in-tree, search for the file before reasoning about its contents. A recollection is
-  a pointer at a lookup, not a substitute for one, and "we do not have the manual" is a claim worth
-  spending ten seconds on before it is written down.
-- A scanned manual needed reading and the agent reached for a dedicated vision subagent, which then
-  died on that provider's billing limit. The agent was itself multimodal and could have read the
-  render directly; it had matched the task to the tool named for it instead of checking its own
-  capabilities. The detour cost a failed run and a round trip.
-  → Tier 2, orchestration: before delegating a capability task, check whether the current model
-  already has that capability. Delegation is for work the caller cannot do, for isolation, or for
-  parallelism -- not for naming symmetry, and a delegation hop adds a failure domain the caller did
-  not have to have.
-- A measured result was quoted in prose as "54 of 54 slots" and copied between documents for weeks.
-  The tool still said 54 only because nobody had run it: the corpus had grown from two captures to
-  twenty and the real figure was 543 of 543 across four distinct sectors instead of one sector twice.
-  The prose was understating the project's own strongest validation, and the row that complained the
-  gate never ran was itself quoting the stale number.
-  → Tier 1, evidence discipline: a count over a growing corpus is a measurement with an expiry date.
-  Re-run the tool before citing its number anywhere, and where prose must name a figure, name the
-  command that prints it alongside, so the next reader has a way to check rather than a reason to
-  trust.
-- A layout module documented that a coordinate was being silently truncated by integer division, said
-  the truncation had been fixed, and cited the screenshot that proved it. It had been fixed on one
-  axis. The other axis still truncated, in the same expression, in the same routine, and nobody looked
-  because the bug report had been about the first axis. A new pixel-level gate found it on its first
-  run, alongside a second defect of its own: a band declared exactly one text cell tall was also
-  declared to have a border, and the glyph necessarily covers both border rows, so the border had
-  never been visible where there was text.
-  → Tier 1, verification: when a defect class is fixed and written up, assert the whole class, not the
-  reported instance. "Fixed the y truncation" invites the next reader to treat the family as closed;
-  the fix is a check that every coordinate reaching that division is on the grid. And a written-up fix
-  without a gate behind it is a claim with an expiry date.
-- A rules document said a generated table was owed a freshness check. It was not: the check had landed
-  weeks earlier and the prose had not caught up. Auditing the real gap found it somewhere else and in a
-  different shape -- eight generated tables with no freshness check, not because nobody thought of it,
-  but because their generators write to hardcoded paths and take no output argument, so the gate is
-  unbuildable without changing each tool first. One of the eight had thirteen separate writers, which
-  makes "its generator" not a thing and any freshness assertion on it meaningless. And the one table
-  that could be gated immediately went red on being gated.
-  → Tier 1, evidence discipline: before building a check the docs ask for, run the docs' own claim
-  against the tree. A rules file is a hypothesis about the present. And when a class of check is
-  missing, ask what makes it missing -- "nobody added it" and "the tools cannot be diffed in their
-  current shape" need opposite fixes, and only one of them is a line in a script.
-- The measurement of that first red was wrong, and the wrong number was committed. A tracked generated
-  input had been silently rewritten in the working tree by something nobody could identify, and the
-  generator faithfully produced a plausible table from it: 52 rows against a committed 43, reported as
-  nine missing splits, when the true diff on clean inputs was 42 rows with one run shortened and two
-  dropped. The selftest went red at the same instant, which is the signal -- a stale output does not
-  break a selftest, a changed input does.
-  → Tier 1, evidence discipline: regenerate the inputs' provenance before the output's. When a
-  generator's output disagrees with its committed copy, `git status` on the inputs is a cheaper test
-  than any theory about why the tool changed, and a selftest that goes red alongside a freshness gate
-  means the inputs moved, not that the output is stale. Commit the diff, not the conclusion, until the
-  working tree is clean.
-- A new check program was written, built, run, and its controls demonstrated -- on the host compiler.
-  CI's clang job rejected it on a line that did nothing, with a warning gcc never emits, and the
-  workflow's own comment already said every one of clang's warnings is one gcc stays silent about. The
-  local suite was never going to catch it and passing it was not evidence about CI.
-  → Tier 2, verification: when CI compiles with more than one compiler, "green locally" names a
-  compiler and is not a verdict about the build. Run the second one before pushing, in the container
-  the project already ships -- it is a minute, and it is the only way the local run means what CI means.
